@@ -4,7 +4,7 @@
 
 ## Goal
 
-Open a PR that fixes issue `#N`, with **bidirectional** issue↔PR linking, clear bot/human review rounds, full + security review, CI green, merge-ready. Do **not** merge.
+Open **one** PR on the **canonical** (issue’s) repository that fixes issue `#N`, with verified bidirectional linking, self-assignment, review/CI cleanup, merge-ready. Do **not** merge. Do **not** batch other issues’ PRs unless the user explicitly demanded a batch.
 
 ## Need-to-fix preflight (required — report before coding)
 
@@ -32,36 +32,76 @@ If preflight is unclear, say what’s missing; do not open a speculative PR.
 2. **If there are screenshots:** review them (read the images). If you cannot review them, **stop — do not create a PR**.
 3. **If there are no screenshots:** ignore the screenshot requirement and continue.
 
-## Issue ↔ PR linking (required)
+## Open PR on the issue’s repo (required)
 
-When opening the PR:
+1. Resolve `owner/repo` from the **issue** (not from a fork remote you happen to be in).
+2. Base branch = that repo’s development/default as appropriate.
+3. Push the head branch (upstream if you can; else fork head is OK).
+4. Create with explicit repo, e.g.:
 
-1. **PR → issue:** body must include a closing keyword, e.g. `Fixes #N` or `Closes #N` (use the repo’s convention).
-2. **Issue → PR:** after create, ensure GitHub shows the link (closing keywords usually do). Also leave a short issue comment:
+   ```bash
+   gh pr create --repo OWNER/REPO --base <base> --head <head> \
+     --title "…" --body "$(cat <<'EOF'
+   ## Summary
+   …
+
+   Fixes #N
+
+   ## Test plan
+   - [ ] …
+   EOF
+   )"
+   ```
+
+5. Confirm the PR URL is `https://github.com/OWNER/REPO/pull/…` (same OWNER/REPO as the issue). If it is `https://github.com/<your-fork>/…` only: **wrong** — close it and recreate against `OWNER/REPO`.
+
+## Issue ↔ PR linking + assign (required)
+
+After the canonical PR exists:
+
+1. **PR → issue:** body contains same-repo `Fixes #N` or `Closes #N`.
+2. **Verify link:**
+
+   ```bash
+   gh pr view <pr> --repo OWNER/REPO --json number,url,body,closingIssuesReferences
+   ```
+
+   `closingIssuesReferences` must include issue `#N`. If empty: edit the PR body to add `Fixes #N` on its own line, re-check.
+
+3. **Assign yourself** on the issue:
+
+   ```bash
+   gh issue edit N --repo OWNER/REPO --add-assignee @me
+   ```
+
+   If assign fails (permissions), report once and continue.
+
+4. **One issue comment** (idempotent — edit if a prior `[shipping-github] Opened PR` exists; never a second/cut-off comment):
 
    ```markdown
    [shipping-github] Opened PR #<pr> to address this.
    ```
 
-3. Verify with `gh pr view` / `gh issue view` that the cross-link is visible. If not, edit the PR body to add `Fixes #N` and re-check.
+5. Spot-check the issue Development sidebar / linked PRs still point at the **canonical** PR (not a closed fork duplicate).
 
 ## Steps
 
-1. Need-to-fix preflight → report to user; abort create if not needed.
-2. Pass the screenshot gate.
-3. Implement on a branch from the correct base; open PR with `Fixes #N` (+ issue comment). Use subagents when helpful.
-4. Keep the branch up to date with base; resolve conflicts early.
-5. Review wait-loop (`fix-pr-bots` pattern): owners/maintainers + humans + bots; push; wait (caps); repeat.
-6. Fix CLI / project checks; push until required CI green.
-7. Full review + security review with **subagents** (parallel). Fix what can/should land here; skip 0.1% nits.
-8. Changelog nudge if user-facing (shared rules).
-9. Recheck reviews + CI.
-10. Post merge-ready comment (or gated status). Do not merge.
+1. Confirm this request is **one** issue (or an explicit batch). Otherwise pick/ask — do not open extra PRs.
+2. Need-to-fix preflight → report; abort create if not needed.
+3. Pass the screenshot gate.
+4. Implement; open **canonical** PR with `Fixes #N`; assign self; one opened-PR comment (edit-not-duplicate).
+5. Keep branch up to date with base; resolve conflicts early.
+6. Review wait-loop (`fix-pr-bots`): owners/maintainers + humans + bots; push; wait (caps); repeat.
+7. Fix CLI / project checks; push until required CI green.
+8. Full review + security review with **subagents** (parallel). Fix what can/should land here; skip 0.1% nits.
+9. Changelog nudge if user-facing (shared rules).
+10. Recheck reviews + CI.
+11. Post merge-ready comment (idempotent). Do not merge.
 
 ## Done when
 
-- Preflight reported; PR only created when still needed
-- Issue↔PR linked both ways (closing keyword + verified; issue comment)
-- Screenshot gate passed (or N/A)
-- Useful reviews handled, base clean, CLI + required CI green
-- Full + security review done; merge-ready comment posted; **not** merged
+- Exactly the requested PR count (default **one**); no surprise batch
+- PR on **issue’s** repo (not fork-only)
+- `closingIssuesReferences` includes the issue; self assigned when possible
+- Single complete opened-PR comment (no duplicates/cut-offs)
+- Screenshot gate passed (or N/A); reviews + CI green; merge-ready posted; **not** merged

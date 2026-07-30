@@ -20,7 +20,7 @@ Shipping a PR is rarely one green check. It’s a grind of:
 |---|---|
 | Same mega-prompt every session | Short triggers → dedicated workflows under `references/` |
 | Unclear if an issue is still real | Research on latest development tip: fixed? open PR? duplicate? **security relevance**? priority; **comment on the issue** |
-| Duplicate PRs for the same issue | Create-PR preflight reports “already fixed / PR open / duplicate” **before** coding |
+| Duplicate PRs / fork-only PRs / comment spam | Create-PR: one PR unless batch asked; canonical repo only; verify link + assign self; edit comments never double-post |
 | Bot + human review ping-pong | Triage owners/maintainers first, then bots; wait with caps; recheck |
 | Agent spam on GitHub | No auto-replies to humans without your exact text; limited thread resolves |
 | Flaky CI “fixed” by rewriting tests | Classify branch vs flake; retry flakes (budget); don’t weaken CI |
@@ -51,7 +51,8 @@ Folder name must stay `shipping-github` (matches frontmatter `name`).
 Ask the agent things like:
 
 - `research issue #88` / `research issues #88 #91` — still broken on latest development? fixed? open PR? duplicate? security relevance? priority; posts a review comment on each issue; asks before security review if relevant  
-- `create a pr for issue #88 … merge ready, don't merge` / `create separate pr's for #52 and #62 pr` — preflight first (needed? already fixed? PR open?); links issue↔PR both ways  
+- `create a pr for issue #88 … merge ready, don't merge` — preflight first; **one** PR on the **issue’s** repo (not fork-only); `Fixes #N` verified; assign yourself; one issue comment (edit if incomplete — never a second cut-off comment)  
+- `create separate PRs for #52 and #62` — **explicit batch only**; still one canonical PR per issue, no fork-only, same link/assign/comment rules  
 - `fix coderabbit/codex on pr #42 and make it merge ready`  
 - `what's left on pr #42` — one-shot status  
 - `watch pr #42` — keep monitoring CI + new reviews until merged/closed or a hard blocker  

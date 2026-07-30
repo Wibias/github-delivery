@@ -163,9 +163,33 @@ Before claiming merge-ready (or ending a successful watch milestone):
 2. Unresolved thread count (humans vs bots)
 3. Local `git status` (report dirty files left untouched)
 
+## One PR at a time (no silent batches)
+
+- **Default:** create **at most one** PR per user request / turn.
+- Research may cover many issues; **create-PR** may not open multiple PRs unless the user explicitly demands a batch (“create PRs for #12 #34 #56”, “batch PRs for all of these”).
+- If several issues still need work after research: report the list and ask which one to open first — do not spray PRs.
+
+## Upstream / canonical repo only
+
+When opening a PR for an issue:
+
+1. Resolve the issue’s repository (`owner/name` from `gh issue view` / `gh repo view`). That repo is the **canonical** target.
+2. Open the PR **against that repo** (`gh pr create --repo owner/name …`). Head may be `user:branch` if you lack push to upstream, but the PR must live on the canonical repo — **never** leave a fork-only PR (`yourfork/repo#N`) as the deliverable.
+3. Closing keyword must be same-repo form: `Fixes #N` / `Closes #N` (not `Fixes other-owner#N` unless the user explicitly asked for a cross-repo PR).
+4. If you accidentally opened a fork-only PR: close it, open/fix the canonical PR, tell the user. Do not “also” keep the fork PR.
+
+## Comment idempotency (never spam / never cut-off doubles)
+
+For any `[shipping-github]` comment intent on an issue or PR (opened-PR notice, research review, security review, merge-ready, etc.):
+
+1. Before posting, look for an existing comment **you** authored with the same intent prefix on that thread.
+2. If one exists: **edit that comment** to the full final body (`gh api -X PATCH …/comments/{id}`). Do **not** post a second comment.
+3. Compose the **full** body first; post once. If the create fails or the body is truncated/incomplete: **edit the same comment** to the complete text — never add a follow-up “completion” comment.
+4. One intent → one comment. Truncated + full = bug; fix by edit.
+
 ## Comments
 
 - Merge-ready, status, and verdict comments: short and concrete.
-- Agent-authored GitHub comments: prefix with `[shipping-github]` when posting as the agent.
+- Agent-authored GitHub comments: prefix with `[shipping-github]` when posting as the agent; follow **Comment idempotency** above.
 - Merge thanks on the PR: `@` author only if not you.
 - Issue thanks after merge: thank issue author only if not you.

@@ -88,9 +88,11 @@ Post on **each** researched issue (prefix agent research comments with `[shippin
 **Gaps:** <what wasn’t verified, if any>
 ```
 
-Also summarize the same table(s) to the user in chat. For multiple issues, one chat summary with a row per issue, plus per-issue GitHub comments.
+Also summarize the same table(s) to the user in chat. For multiple issues, one chat summary with a row per issue, plus per-issue GitHub comments (**one research comment per issue** — edit if updating; never post a truncated stub then a full second comment).
 
 When any issue is **possible** or **likely** security: ask in chat with the wording above (review + post, redacted public / full detail in chat). Do not auto-start.
+
+Research may batch **comments**; it must **not** open PRs. Opening PRs is `create-pr-for-issue` only, one at a time unless the user explicitly demands a batch.
 
 ## Done when
 
