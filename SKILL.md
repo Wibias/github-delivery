@@ -55,7 +55,7 @@ Read `references/shared-rules.md` before acting. Non-negotiables:
 3. Review triage — trusted owners/maintainers first; published feedback only; verify bots against code.
 4. Social mutation — no auto-replies to humans without exact-text confirmation; limited thread resolves.
 5. CI classify — branch fix vs flake; max 3 flaky reruns per SHA.
-6. Mode-aware waits — fix/create: 3 rounds / 20m; watch: continue past green until merged/closed/blocker.
+6. Mode-aware waits — merge-ready/babysit-fix: **until merge-ready** (or hard blocker), never quit on “3 rounds / 20m”; watch: continue past green until merged/closed/blocker.
 7. Behind base + conflicts — update before merge-ready or merge.
 8. Draft/WIP/do-not-merge — never merge or claim ready while gated.
 9. Prefer in-PR fixes; merge only on merge workflow (thank PR + issue authors, no self-thanks; auto-close issues when fixed).

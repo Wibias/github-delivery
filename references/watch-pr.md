@@ -4,7 +4,7 @@
 
 ## Goal
 
-Persistently monitor an open PR: new **published** review feedback, required CI, mergeability/conflicts. Fix what is safe to auto-fix. **Green + mergeable is a milestone, not a stop** while the PR stays open — unless the user asked only for merge-ready (then use `fix-pr-bots` instead).
+Persistently monitor an open PR: new **published** review feedback, required CI, mergeability/conflicts. Fix what is safe to auto-fix. **Green + mergeable is a milestone, not a stop** while the PR stays open — unless the user asked only for merge-ready (then use `fix-pr-bots`, which runs until merge-ready, then stops).
 
 Do **not** merge unless they also asked to merge (then hand off to `merge-pr` when ready).
 
@@ -12,9 +12,9 @@ Do **not** merge unless they also asked to merge (then hand off to `merge-pr` wh
 
 | Intent | Workflow |
 |---|---|
-| One-shot / capped make merge-ready | `fix-pr-bots` |
+| Keep fixing until merge-ready (then stop) | `fix-pr-bots` — **no** early exit on round/time caps |
 | Read-only snapshot | `status` |
-| Continuous monitor until merged/closed/blocker | **this file** |
+| Keep watching after green until merged/closed | **this file** |
 
 ## Loop
 

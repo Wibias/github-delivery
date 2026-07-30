@@ -91,7 +91,7 @@ After the canonical PR exists:
 3. Pass the screenshot gate.
 4. Implement; open **canonical** PR with `Fixes #N`; assign self; one opened-PR comment (edit-not-duplicate).
 5. Keep branch up to date with base; resolve conflicts early.
-6. Review wait-loop (`fix-pr-bots`): owners/maintainers + humans + bots; push; wait (caps); repeat.
+6. Review wait-loop (`fix-pr-bots`): owners/maintainers + humans + bots; push; keep going until merge-ready or a hard blocker.
 7. Fix CLI / project checks; push until required CI green.
 8. Full review + security review with **subagents** (parallel). Fix what can/should land here; skip 0.1% nits.
 9. Changelog nudge if user-facing (shared rules).

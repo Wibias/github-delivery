@@ -12,7 +12,7 @@ Re-evaluate the PR from the user’s review comment(s), the author’s subsequen
 2. Diff the new commits against the concerns raised.
 3. Triage **humans first (owners/maintainers priority), then bots** (shared rules): fix useful; skip nits with rationale.
 4. If behind/conflicted: update from base before pushing further fixes.
-5. If changes are needed and you can fix them here: implement, push, wait (3 rounds / 20 min caps), recheck.
+5. If changes are needed and you can fix them here: implement, push, wait and recheck until stable or a hard blocker (shared rules — no early exit on round/time caps).
 6. If real necessary issues remain that you cannot or should not silently rewrite: submit a GitHub **changes requested** review with concrete blockers only.
 7. Do not auto-reply on human threads without exact-text confirmation (shared social policy).
 8. Security-offer + changelog nudge when applicable.

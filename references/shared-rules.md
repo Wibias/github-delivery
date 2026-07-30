@@ -73,17 +73,20 @@ Visible GitHub actions must not impersonate the user.
 
 If you disagree with a human comment or it needs a written answer: explain in **chat**, suggest a reply, wait for confirmation.
 
-## Push → wait → recheck (mode-aware caps)
+## Push → wait → recheck (mode-aware stops)
 
 1. Commit and push scoped fixes (when the workflow implies fix work / user authorized pushes).
 2. Wait for new review rounds and CI — backoff polling, not a busy loop.
-3. Re-triage; repeat until stable **or** the active mode’s stop rule hits.
+3. Re-triage; repeat until the mode’s **done** condition or a **hard blocker**.
 
-| Mode | Caps / stop |
-|---|---|
-| **Fix / re-review / create** | Max **3** new review rounds after a push; **20 minutes** wall-clock wait; then report what’s left |
-| **Watch** (`watch-pr`) | Keep polling while the PR is open until merged/closed or a hard blocker; green is a **milestone**, not a stop. Heartbeat briefly on changes only |
-| **Status** | No wait loop — one snapshot |
+| Mode | Keep going until | Hard stop (report, don’t pretend done) |
+|---|---|---|
+| **Fix / create → merge-ready** (`fix-pr-bots`, create-PR cleanup) | Each targeted PR is merge-ready (or gated with an explained blocker) | Permissions / dirty unrelated tree / push rejected / flake retry budget exhausted on required checks / product decision / human reply needs confirmation / user interrupt. **Do not** stop just because “3 rounds” or “20 minutes” passed |
+| **Watch** (`watch-pr`) | PR merged/closed (green+mergeable is a milestone — keep watching for new comments) | Same hard blockers, or user stop |
+| **Re-review** | Concerns re-checked and fixed or changes-requested | Same hard blockers |
+| **Status** | One snapshot — no wait loop | — |
+
+If the user named **several** existing PRs (“babysit these”, “make 778–782 merge ready”), keep working **each** until merge-ready or a hard blocker — same no-early-exit rule. That is not “creating” a batch; it’s finishing open PRs they listed.
 
 ## CI — branch fix vs flake
 
