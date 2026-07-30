@@ -47,24 +47,22 @@ Why it helps: <1–2 sentences on the concrete bugfix/value>
 ```
 
 4. Merge with the repo’s normal strategy (`gh pr merge` — prefer repo default; squash only if that’s the norm or user asked).
-5. **Linked issues — thank + close:**
-   - For each linked/fixed issue (`Fixes`/`Closes`/`Resolves`, or clearly linked):
-     - Comment on the **issue** (not only the PR):
+5. **Linked issues — thank + auto-close:**
+   - Prefer that the PR already uses `Fixes`/`Closes`/`Resolves #N` so GitHub auto-closes on merge.
+   - For each linked/fixed issue:
+     - Comment on the **issue**:
 
        ```markdown
        Thanks @{issue_author} — this is fixed by PR #{n} by <short what the fix did>.
        ```
 
-     - If `@{issue_author}` is **you**, omit the thanks/`@` line; use:
-
-       ```markdown
-       Fixed by PR #{n} by <short what the fix did>.
-       ```
-     - If the issue is still open (PR didn’t auto-close), close it with a reason pointing at the PR — unless the issue should stay open (tracking epic, partial fix); then say so and leave it open.
+     - If you are the issue author: omit thanks/`@`; use `Fixed by PR #{n} by <short what>.`
+     - If the issue is **still open** after merge (missing closing keyword, partial fix, epic): close it pointing at the PR when the fix is complete; if it should stay open, say why and leave it open.
+   - PR author was already thanked (or skipped if self) in step 3 — that is the PR-side thanks.
 6. Confirm merge (+ issue state); report URLs.
 
 ## Done when
 
 - Why-good PR comment posted; PR `@thanks` only when author ≠ you
 - PR merged (or blockers reported with no merge)
-- Linked issues thanked (no self-thanks) and closed when appropriate
+- Linked issues thanked (no self-thanks) and **closed** when the fix is complete (auto-close via `Fixes`/`Closes` and/or explicit close)
