@@ -194,5 +194,7 @@ For any `[shipping-github]` comment intent on an issue or PR (opened-PR notice, 
 
 - Merge-ready, status, and verdict comments: short and concrete.
 - Agent-authored GitHub comments: prefix with `[shipping-github]` when posting as the agent; follow **Comment idempotency** above.
+- **Markdown hygiene (no backslash spam):** never write `\_` or `\name` to “escape” identifiers. Put code, check names, symbols, and camelCase/snake_case tokens in **backticks** (e.g. `` `mergeStateStatus` ``, `` `previewArchivedCleanup` ``). Raw prose must not contain stray `\`.
+- Merge-ready body should follow the `fix-pr-bots` template (checklist), not a cryptic slash-escaped dump.
 - Merge thanks on the PR: `@` author only if not you.
 - Issue thanks after merge: thank issue author only if not you.

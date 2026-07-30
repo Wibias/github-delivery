@@ -27,17 +27,18 @@ Necessary/useful **human** (esp. owners/maintainers) + CodeRabbit/Codex comments
 10. **Final evidence sweep** (shared rules). If gates clear and checks green, post (idempotent — edit prior merge-ready comment if one exists):
 
 ```markdown
-## Merge ready
+## [shipping-github] Merge ready
 
 - Human review (trusted/owners first): addressed / declined (chat-confirmed if human reply)
 - Bot review (CodeRabbit/Codex): addressed / declined with rationale
-- Base: up to date / conflicts resolved
+- Base: up to date / conflicts resolved (`mergeStateStatus: CLEAN` when applicable — use backticks, never `\mergeStateStatus`)
 - CLI / local checks: green
-- Required CI: green (flaky retries used: N)
+- Required CI: green (flaky retries used: N; name flaky jobs in backticks, e.g. `previewArchivedCleanup`)
 
 Ready to merge.
 ```
 
+Do **not** post merge-ready as a slash-escaped bullet dump. If a prior merge-ready comment is malformed (stray `\`, truncated), **edit** it to the template above.
 If still draft/WIP/do-not-merge or hard-blocked: explain the blocker; keep trying only if the blocker is clearable (e.g. wait for CI); otherwise report and move to the next targeted PR if any.
 
 For monitoring **after** merge-ready while the PR stays open (new late comments), hand off to `watch-pr` if the user wants that.
