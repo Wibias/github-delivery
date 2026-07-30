@@ -15,7 +15,7 @@ Necessary/useful **human** (esp. owners/maintainers) + CodeRabbit/Codex comments
 
 ## Steps
 
-1. Identify PR(s), checkout head, note base/default branch.
+1. Identify PR(s), checkout head, note base/default branch, list **linked issues** (`closingIssuesReferences` / `Fixes #N`).
 2. Apply **draft/WIP/do-not-merge** awareness (shared rules). Work may continue; do not claim final merge-ready while gated.
 3. **Behind base + conflicts:** update from base if needed; resolve or stop and ask.
 4. Collect unresolved review threads: owners/maintainers first, then other humans, then bots. Skip resolved/outdated.
@@ -24,29 +24,39 @@ Necessary/useful **human** (esp. owners/maintainers) + CodeRabbit/Codex comments
 7. **Wait and recheck** — new useful comments or red required CI → fix/push again. Repeat until stable **or** a hard blocker (shared rules). No “3 rounds / 20 min then quit.”
 8. Fix CLI / project checks this PR broke. Classify CI: branch fix vs flake (shared rules; flake reruns still max 3 / SHA).
 9. Security-offer + changelog nudge when applicable.
-10. **Final evidence sweep** (shared rules). If gates clear and checks green, post (idempotent — edit prior merge-ready comment if one exists):
+10. **Final evidence sweep** (shared rules). **Refuse merge-ready** while useful bot/human threads remain open (or only “rate-limited / summary” without triage). CI green alone is not enough.
+11. If truly ready, post on the **PR** (idempotent — edit prior merge-ready if one exists; fix malformed `\` escapes by edit):
 
 ```markdown
 ## [shipping-github] Merge ready
 
 - Human review (trusted/owners first): addressed / declined (chat-confirmed if human reply)
-- Bot review (CodeRabbit/Codex): addressed / declined with rationale
-- Base: up to date / conflicts resolved (`mergeStateStatus: CLEAN` when applicable — use backticks, never `\mergeStateStatus`)
+- Bot review (CodeRabbit/Codex): addressed / declined with rationale (0 unresolved useful threads)
+- Base: up to date / conflicts resolved (`mergeStateStatus: CLEAN` when applicable — backticks only)
 - CLI / local checks: green
-- Required CI: green (flaky retries used: N; name flaky jobs in backticks, e.g. `previewArchivedCleanup`)
+- Required CI: green (flaky retries used: N; name jobs in backticks)
 
 Ready to merge.
 ```
 
-Do **not** post merge-ready as a slash-escaped bullet dump. If a prior merge-ready comment is malformed (stray `\`, truncated), **edit** it to the template above.
-If still draft/WIP/do-not-merge or hard-blocked: explain the blocker; keep trying only if the blocker is clearable (e.g. wait for CI); otherwise report and move to the next targeted PR if any.
+12. **Notify linked issue(s)** (required when merge-ready is posted): for each linked issue, one idempotent comment (edit if a prior “PR is merge-ready” note exists — never a second/cut-off comment):
+
+```markdown
+## [shipping-github] PR merge-ready
+
+PR #<pr> is merge-ready (reviews + required CI clean). Not merged yet.
+```
+
+If there are no linked issues, skip and say so in chat.
+
+If still draft/WIP/do-not-merge, open bot threads, or hard-blocked: **do not** post merge-ready (PR or issue); explain the blocker and keep going if clearable.
 
 For monitoring **after** merge-ready while the PR stays open (new late comments), hand off to `watch-pr` if the user wants that.
 
 ## Done when
 
-- Every targeted PR has merge-ready posted **or** a clear hard blocker
-- Useful human + bot threads handled (or declined with policy)
+- Every targeted PR has a valid merge-ready PR comment **and** linked-issue notify (or a clear hard blocker — no false merge-ready)
+- Useful human + bot threads handled (or declined with policy) before any merge-ready claim
 - Branch not conflicted / not wrongly behind (when claiming ready)
 - CLI + required CI green (when claiming ready)
 - PR(s) **not** merged

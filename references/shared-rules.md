@@ -162,9 +162,20 @@ For changelog **content**, semver bump choice, and release tagging, follow `git-
 
 Before claiming merge-ready (or ending a successful watch milestone):
 
-1. Fresh `gh pr view` (SHA, draft/gate, mergeable, required checks, reviewDecision)
-2. Unresolved thread count (humans vs bots)
+1. Fresh `gh pr view` (SHA, draft/gate, mergeable, required checks, `reviewDecision`)
+2. Unresolved **published** review threads (humans + bots). Count open threads; sample bodies.
 3. Local `git status` (report dirty files left untouched)
+
+**Do not post merge-ready** if any of these still hold:
+
+- Unresolved useful human or bot threads (CodeRabbit/Codex/Bugbot/etc.) that were not fixed **or** explicitly declined on-thread with rationale
+- Required CI red (or flake budget exhausted without a clear “out of scope / infra” hard-blocker report instead of merge-ready)
+- `CHANGES_REQUESTED` still in force from a trusted reviewer
+- Draft / WIP / do-not-merge gate
+
+“CI green” alone is **not** merge-ready. A rate-limited bot summary is **not** “bots clean.”
+
+When merge-ready **is** valid, also notify linked issues (see `fix-pr-bots`).
 
 ## One PR at a time (no silent batches)
 
