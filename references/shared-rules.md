@@ -197,9 +197,38 @@ When opening a PR for an issue:
 For any `[shipping-github]` comment intent on an issue or PR (opened-PR notice, research review, security review, merge-ready, etc.):
 
 1. Before posting, look for an existing comment **you** authored with the same intent prefix on that thread.
-2. If one exists: **edit that comment** to the full final body (`gh api -X PATCH …/comments/{id}`). Do **not** post a second comment.
+2. If one exists: **edit that comment** to the full final body. Do **not** post a second comment.
 3. Compose the **full** body first; post once. If the create fails or the body is truncated/incomplete: **edit the same comment** to the complete text — never add a follow-up “completion” comment.
 4. One intent → one comment. Truncated + full = bug; fix by edit.
+
+### Safe create / edit encoding (Windows)
+
+PowerShell pipes and default `Out-File` often send **UTF-16** or a **BOM** into `gh`, which GitHub stores as mojibake — e.g. `Run …` becomes `�un …`. That is a bug; fix by re-edit.
+
+**Required pattern** for create and PATCH (all shells, especially Windows):
+
+1. Write the markdown body to a temp `.md` file as **UTF-8 without BOM** (agent Write tool, or Node `fs.writeFileSync(path, text, 'utf8')` — not PowerShell `>` / `Out-File` / `Set-Content` defaults).
+2. Build a JSON payload file the same way (UTF-8, no BOM):
+
+```bash
+node -e "const fs=require('fs'); const body=fs.readFileSync('body.md','utf8'); fs.writeFileSync('payload.json', JSON.stringify({body}), 'utf8');"
+```
+
+3. Post or edit with file input only — **never** pipe a PowerShell string into `gh`:
+
+```bash
+# create issue comment
+gh api repos/OWNER/REPO/issues/ISSUE/comments --input payload.json
+
+# edit existing issue/PR conversation comment
+gh api -X PATCH repos/OWNER/REPO/issues/comments/COMMENT_ID --input payload.json
+
+# short creates only (still prefer --body-file over -b on Windows):
+gh issue comment N --repo OWNER/REPO --body-file body.md
+gh pr comment N --repo OWNER/REPO --body-file body.md
+```
+
+4. **Verify after every create/edit:** re-fetch the comment body. Reject and re-PATCH if you see mojibake like `�un …` (first letter eaten), text that starts mid-word, or a truncated body. Use the UTF-8 file method until the fetched body matches what you intended.
 
 ## Comments
 
