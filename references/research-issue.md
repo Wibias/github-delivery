@@ -4,7 +4,7 @@
 
 ## Goal
 
-On the **latest development branch tip**, determine for each issue: what it really is, whether it still reproduces / needs work, whether it’s already fixed on that branch, whether an open (or merged) PR already covers it, whether a duplicate issue exists, and a **priority** (`low` / `middle` / `high`) with short obvious reasons. Then **post a research review comment on each issue**.
+On the **latest development branch tip**, determine for each issue: what it really is, whether it still reproduces / needs work, whether it’s already fixed on that branch, whether an open (or merged) PR already covers it, whether a duplicate issue exists, **security relevance** (`none` / `possible` / `likely`), and a **priority** (`low` / `middle` / `high`) with short obvious reasons. Then **post a research review comment on each issue**.
 
 Do **not** open a PR unless the user also asked to create one.
 
@@ -30,15 +30,25 @@ Run for **each** issue (batch in parallel when independent):
 4. **Already fixed on development?** — cite commit SHA / merged PR if yes. Note if fixed on development but **not** on release/default.
 5. **Existing PR?** — `gh pr list --search` / issue timeline for open or recently merged PRs that fix or reference it. If open PR exists: link it; do not propose a second PR.
 6. **Duplicate / same issue?** — search open+closed issues by keywords/symptoms. If duplicate: link the canonical issue (prefer older or clearly maintained). Don’t claim duplicate without a link.
-7. **Priority** — pick one; reasons must be obvious from impact, not taste:
+7. **Security relevance** — classify from title, body, labels, and what the code path touches (not from vibes alone):
+
+| Level | When |
+|---|---|
+| **none** | No credible auth/secrets/injection/access-control/crypto/privacy angle |
+| **possible** | Touches API, auth-adjacent UI, permissions, tokens, user data, or security labels — impact unclear without deeper review |
+| **likely** | Clear vuln class (XSS, SQLi, auth bypass, secret exposure, RCE, privilege escalation, etc.) or reporter frames a security bug |
+
+   - If **possible** or **likely**: note the threat angle in one line; treat **likely** as a default **high** priority signal unless clearly fixed/shipped.
+   - **Ask the user once** (per issue or batch): whether to run `references/security-review.md` on the implicated area/branch (or on an open covering PR). Do **not** auto-run security review from research alone.
+8. **Priority** — pick one; reasons must be obvious from impact, not taste:
 
 | Priority | Typical signals |
 |---|---|
-| **high** | Crash, data loss, security, broken primary path, clear regression, blocks release |
-| **middle** | Real bug with workaround, moderate user impact, incomplete feature users expect |
-| **low** | Polish, rare edge case, unclear/unrepro, pure enhancement, docs nit |
+| **high** | Crash, data loss, **likely security**, broken primary path, clear regression, blocks release |
+| **middle** | Real bug with workaround, moderate user impact, incomplete feature users expect, **possible** security without confirmed exploitability |
+| **low** | Polish, rare edge case, unclear/unrepro, pure enhancement, docs nit, security relevance **none** |
 
-8. **Verdict** — one of:
+9. **Verdict** — one of:
 
 | Verdict | Meaning |
 |---|---|
@@ -66,6 +76,7 @@ Post on **each** researched issue (prefix agent research comments with `[shippin
 | Fixed on development? | no / yes — <PR/SHA> |
 | Open PR covering this? | none / #<n> |
 | Duplicate of? | none / #<n> |
+| Security relevance | **none \| possible \| likely** — <one-line threat angle or “n/a”> |
 | Priority | **low \| middle \| high** — <1–2 obvious reasons> |
 | Verdict | <from table> |
 
@@ -75,8 +86,12 @@ Post on **each** researched issue (prefix agent research comments with `[shippin
 
 Also summarize the same table(s) to the user in chat. For multiple issues, one chat summary with a row per issue, plus per-issue GitHub comments.
 
+When any issue is **possible** or **likely** security: ask in chat whether to run a security review (do not auto-start).
+
 ## Done when
 
-- Every requested issue has verdict + priority + evidence
+- Every requested issue has verdict + priority + **security relevance** + evidence
 - Each has a research comment on GitHub
+- Security-review ask made when relevance is possible/likely
 - No PR opened unless also requested
+- No security review started unless the user said yes

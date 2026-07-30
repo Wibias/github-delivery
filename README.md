@@ -19,7 +19,7 @@ Shipping a PR is rarely one green check. It’s a grind of:
 | Pain | What the skill does |
 |---|---|
 | Same mega-prompt every session | Short triggers → dedicated workflows under `references/` |
-| Unclear if an issue is still real | Research on latest development tip: fixed? open PR? duplicate? priority; **comment on the issue** |
+| Unclear if an issue is still real | Research on latest development tip: fixed? open PR? duplicate? **security relevance**? priority; **comment on the issue** |
 | Duplicate PRs for the same issue | Create-PR preflight reports “already fixed / PR open / duplicate” **before** coding |
 | Bot + human review ping-pong | Triage owners/maintainers first, then bots; wait with caps; recheck |
 | Agent spam on GitHub | No auto-replies to humans without your exact text; limited thread resolves |
@@ -50,7 +50,7 @@ Folder name must stay `shipping-github` (matches frontmatter `name`).
 
 Ask the agent things like:
 
-- `research issue #88` / `research issues #88 #91` — still broken on latest development? fixed? open PR? duplicate? priority; posts a review comment on each issue  
+- `research issue #88` / `research issues #88 #91` — still broken on latest development? fixed? open PR? duplicate? security relevance? priority; posts a review comment on each issue; asks before security review if relevant  
 - `create a pr for issue #88 … merge ready, don't merge` — preflight first (needed? already fixed? PR open?); links issue↔PR both ways  
 - `fix coderabbit/codex on pr #42 and make it merge ready`  
 - `what's left on pr #42` — one-shot status  
