@@ -38,8 +38,12 @@ Run for **each** issue (batch in parallel when independent):
 | **possible** | Touches API, auth-adjacent UI, permissions, tokens, user data, or security labels — impact unclear without deeper review |
 | **likely** | Clear vuln class (XSS, SQLi, auth bypass, secret exposure, RCE, privilege escalation, etc.) or reporter frames a security bug |
 
-   - If **possible** or **likely**: note the threat angle in one line; treat **likely** as a default **high** priority signal unless clearly fixed/shipped.
-   - **Ask the user once** (per issue or batch): whether to run `references/security-review.md` on the implicated area/branch (or on an open covering PR). Do **not** auto-run security review from research alone.
+   - If **possible** or **likely**: note a **high-level** threat class only in public text (e.g. “authz”, “token handling”) — never steps to abuse. Treat **likely** as a default **high** priority signal unless clearly fixed/shipped.
+   - **Ask the user once** in chat (per batch is fine), using this shape:
+
+     > Security relevance **possible/likely** on #<ids>. Want me to run a security review on these issues and **post** a review comment on each? (Exploit/abuse details stay in chat only — public posts are redacted.)
+
+     Do **not** auto-run. If they say yes → `references/security-review.md` with issue targets + post redacted public comments (shared disclosure rules).
 8. **Priority** — pick one; reasons must be obvious from impact, not taste:
 
 | Priority | Typical signals |
@@ -76,7 +80,7 @@ Post on **each** researched issue (prefix agent research comments with `[shippin
 | Fixed on development? | no / yes — <PR/SHA> |
 | Open PR covering this? | none / #<n> |
 | Duplicate of? | none / #<n> |
-| Security relevance | **none \| possible \| likely** — <one-line threat angle or “n/a”> |
+| Security relevance | **none \| possible \| likely** — <high-level class only, e.g. authz / tokens — no exploit steps> |
 | Priority | **low \| middle \| high** — <1–2 obvious reasons> |
 | Verdict | <from table> |
 
@@ -86,7 +90,7 @@ Post on **each** researched issue (prefix agent research comments with `[shippin
 
 Also summarize the same table(s) to the user in chat. For multiple issues, one chat summary with a row per issue, plus per-issue GitHub comments.
 
-When any issue is **possible** or **likely** security: ask in chat whether to run a security review (do not auto-start).
+When any issue is **possible** or **likely** security: ask in chat with the wording above (review + post, redacted public / full detail in chat). Do not auto-start.
 
 ## Done when
 

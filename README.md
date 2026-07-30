@@ -27,7 +27,7 @@ Shipping a PR is rarely one green check. It’s a grind of:
 | Draft / WIP merged by accident | Hard gates before merge-ready claims or merge |
 | CI green but more reviews may arrive | **Watch PR** — keep polling CI + new review comments until the PR is merged/closed or blocked (not a one-shot status check) |
 | Merge without closing the social loop | Thanks + why-it-helps on the PR; thank the **issue** author; auto-close when linked |
-| Security/API PRs slipping past | Explicit security review, or ask when the PR text mentions security/API |
+| Security/API PRs or issues slipping past | Explicit security review / ask; **public posts redacted** — exploit details only in chat |
 
 Shared rules live in one place (`references/shared-rules.md`): scope lock, git safety (no force-push, stop on dirty trees), evidence sweep before “ready.”
 
