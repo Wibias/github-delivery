@@ -51,7 +51,7 @@ Folder name must stay `shipping-github` (matches frontmatter `name`).
 Ask the agent things like:
 
 - `research issue #88` / `research issues #88 #91` — still broken on latest development? fixed? open PR? duplicate? security relevance? priority; posts a review comment on each issue; asks before security review if relevant  
-- `create a pr for issue #88 … merge ready, don't merge` — preflight first (needed? already fixed? PR open?); links issue↔PR both ways  
+- `create a pr for issue #88 … merge ready, don't merge` / `create separate pr's for #52 and #62 pr` — preflight first (needed? already fixed? PR open?); links issue↔PR both ways  
 - `fix coderabbit/codex on pr #42 and make it merge ready`  
 - `what's left on pr #42` — one-shot status  
 - `watch pr #42` — keep monitoring CI + new reviews until merged/closed or a hard blocker  
