@@ -90,5 +90,9 @@
   {
     "id": "R-ci-rerun-failed-job-only-2026-07-31",
     "sha256": "f931646368887eda4f8e111a5d11a89ea66edb3d9f845016b807ed66eb45bdba"
+  },
+  {
+    "id": "R-security-coverage-matrix-2026-07-31",
+    "sha256": "aa6a2286063a08031689927c0263ac0e26e6231ee7982b0afc046e2d4645ae29"
   }
 ]

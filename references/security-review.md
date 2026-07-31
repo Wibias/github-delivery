@@ -4,62 +4,102 @@
 
 ## Goal
 
-Run a focused security review on the named **PR(s) and/or issue area(s)**. Fix what can/should be fixed when a PR branch is in scope. When reviewing **issues**, post a **redacted** review on each issue and give the **full** findings (including abuse paths) **only in chat**.
+Run a **hardened, evidence-based** security review on the named **PR(s) and/or issue area(s)**. Prefer finding real exploitable issues over a shallow “LGTM.” Fix what can/should be fixed when a PR branch is in scope. When reviewing **issues**, post a **redacted** review on each issue and give the **full** findings (including abuse paths) **only in chat**.
 
 Do **not** merge unless asked.
+
+**Bar:** a security review that skips applicable surfaces or tools “because focused” is incomplete. Use the coverage matrix below; mark each row `done` / `n/a (why)` — never silently omit.
 
 ## Targets
 
 | User said | Target |
 |---|---|
-| PR #N / current branch | Checkout PR head (shared subagent preflight); run `security-review` subagent / `review-security` (`Diff: branch changes` unless uncommitted-only) |
-| Issue(s) #N… (from research ask) | Review the implicated code paths on latest development tip (and any open covering PR). Post on **each** issue when the user asked to post |
+| PR #N / current branch | Checkout PR head (shared subagent preflight); review **branch changes vs PR base** |
+| Issue(s) #N… (from research ask) | Review implicated code on latest development tip (+ open covering PR if any). Post on **each** issue when posting was requested |
 
 ## Public vs chat (mandatory)
 
 Follow **Public security disclosure** in `shared-rules.md`. Private GHSA / advisory IDs: chat-only detail; public posts redacted.
 
-**Chat (to the user):** full findings — severity, affected code, impact, and how it could be abused / repro steps if needed for fixing.
+**Chat (to the user):** full findings — severity, affected code, impact, abuse/repro path, fix, verification. Include the completed **coverage matrix**.
 
-**GitHub (issue or PR comment):** redacted but **detailed** — use the **Security** template in `references/comment-depth.md` (target, scope, method, findings table, summary, residual). Include severity, high-level category, affected area/component, next step. **Omit** exploit steps, payloads, exact bypass recipes, secret values, and anything that teaches abuse.
+**GitHub:** redacted but detailed — **Security** template in `references/comment-depth.md`. **Omit** exploit steps, payloads, bypass recipes, secret values.
 
-If a finding is vulnerability/policy-sensitive and hard to summarize safely, public comment may say only:
+Sensitive findings → short public “details shared privately” form + full table in chat. One idempotent comment per target.
 
-```markdown
-## [shipping-github] Security review
+## Mandatory method (do not skip)
 
-**Severity:** <critical|high|medium|low>
-**Area:** <component / authz / tokens / …>
-**Summary:** Security-sensitive finding — details shared privately with maintainers.
-**Next:** <patch / needs maintainer review / covered by PR #…>
-```
+Run in order. Skip a step only with an explicit `n/a` reason in the coverage matrix (tool missing, surface absent from diff).
 
-…and put the full table in chat only. One idempotent comment per target (edit, don’t double-post).
+### 1. Subagent / skill pass (required for PR diffs)
 
-## Tooling checklist (leads, not proof)
+1. Checkout PR head (shared **Subagent preflight**).
+2. Launch **exactly one** `security-review` subagent via `review-security` (`Diff: branch changes`; set base to the PR base when not the repo default).
+3. If available, also load skill **`security-review`** and use `references/security-checks.md` as the category depth guide — do not invent a thinner checklist.
+4. Subagent failure: retry once (shared preflight rules). If still failing → manual pass using the coverage matrix; say the subagent failed.
 
-Use what’s available; skip tools that aren’t installed. Prefer skill `security-review` / `review-security` subagent first, then deepen:
+### 2. Secrets scan (required when checkout exists)
 
-1. **Secrets** — scan touched paths / diff for committed secrets (e.g. `scan_secrets.py` if present); never print full secret values.
-2. **Semgrep** — fast pattern scan on changed paths when available.
-3. **CodeQL** — when dataflow/taint across files matters and the repo has CodeQL setup.
-4. **CI workflows** — untrusted `pull_request_target` / checkout of fork code, overly broad tokens, prompt-injection into agents.
-5. **Supply chain** — lockfile/deps install scripts; don’t claim CVEs without an audit command or authoritative source.
-6. **Variant analysis** — after one true bug, search for the same pattern nearby.
+- Run secrets scan on the repo / changed paths when possible (`python …/security-review/scripts/scan_secrets.py <path>` or equivalent).
+- Treat hits as **leads**; never print full secret values.
+- If the scanner is unavailable: say so and manually inspect diff for keys, tokens, `.env`, private URLs with credentials.
 
-Treat scanner output as **leads**; validate with a concrete abuse path or mark unproven. Full tooling depth lives in skill `security-review` — this workflow owns GitHub posting + ship-loop integration.
+### 3. Static leads (when installed)
+
+- **Semgrep** on changed paths when available.
+- **CodeQL** when dataflow/taint across files matters and the repo has it.
+- Missing tool → `n/a (not installed)` — still do the manual category pass.
+
+### 4. Coverage matrix (required in chat)
+
+For every security review, fill this table. Each row: `done` + evidence one-liner, or `n/a` + why.
+
+| Surface | What to prove |
+|---|---|
+| **Authn** | How identity is established; fail-open defaults; session/token handling on changed paths |
+| **Authz** | Server-side enforcement (not UI-only); object/tenant boundaries; privilege escalation |
+| **Injection** | User input → query/template/shell/HTML/path; validate near boundary |
+| **SSRF / outbound** | Destination policy, private/metadata ranges, redirects, URL allowlists |
+| **Secrets / config** | No secrets in client bundles, logs, commits; env naming; public/private key split |
+| **Uploads / files** | Type/size/path traversal; storage ACLs |
+| **Webhooks / payments** | Signature verification; replay; test vs live |
+| **CI / GitHub Actions** | `pull_request_target`, fork checkout, broad tokens, prompt-injection into agents |
+| **Supply chain** | Lockfile/deps install scripts; no unverified CVE claims |
+| **Logging / privacy** | PII/secrets in logs; error leakage |
+| **AI / agent / MCP** (if diff touches LLM, tools, prompts, MCP, RAG) | Prompt injection, tool poisoning, excessive agency — load skill **`ai-agent-security`** for those paths |
+| **Credential destinations / providers** (if presets, baseUrl, OAuth, API keys) | Custom destinations preserved vs silently rewritten; routing authorization; who can point traffic where |
+| **Variant analysis** | After any confirmed bug, search for the same pattern nearby |
+
+**Cannot claim “no security issues”** unless every applicable row is `done` or honestly `n/a`. Residual risk must be listed.
+
+### 5. Validate findings
+
+- Confirmed = concrete abuse/failure path + impact + file evidence.
+- Unproven leads → “Needs verification,” not Critical/High.
+- Severity: Critical / High / Medium / Low / Info (same meanings as skill `security-review`).
+
+## Domain heuristics (common ship-loop misses)
+
+- **Provider / preset PRs:** `preserveCustomDestination` (or equivalent); same-name custom provider must not be canonicalized onto a new host; document routing auth when catalogs bundle third-party models.
+- **Management / dashboard APIs:** authz on `/api/*`; Origin/CORS vs TLS terminators; admin token file ACLs.
+- **Proxy / outbound:** private-network defaults vs SSRF; metadata/link-local deny.
+- **Windows service / process control:** PID identity verification; no trust of healthz alone.
+- **Fail-open production defaults:** treat as findings when prod can run insecurely.
 
 ## Steps
 
-1. Resolve targets (PR and/or issues; bare `#N` per shared rules). Checkout the right branch when fixing or diff-reviewing a PR.
-2. Run the security review (subagent / `review-security` when a PR/branch diff applies; for issue-only, review implicated paths on development tip + checklist above as needed).
-3. Split output: **full → chat**, **redacted → GitHub** when posting was requested (default after research “yes”).
-4. If a PR is in scope: triage findings; fix necessary/useful issues in that PR; push; recheck CI as needed. Do not paste exploit detail into PR review bodies — use redacted request-changes / comments; details in chat.
-5. Summarize in chat: critical / worth-fixing / skipped, what was posted publicly, what was withheld. Public posts must meet `comment-depth.md` (no “security: none” without scope).
+1. Resolve targets (bare `#N` per shared rules). Checkout when reviewing/fixing a PR.
+2. Run **Mandatory method** (subagent → secrets → static leads → coverage matrix → validate).
+3. Split output: **full + matrix → chat**; **redacted → GitHub** when posting.
+4. PR in scope: triage; **fix** necessary/useful issues in this PR; push; recheck CI. Redacted request-changes / comments only on GitHub.
+5. Chat summary must include: Security decision (`Pass` / `Pass after fixes` / `Do not ship yet`), risk level, confirmed findings, needs verification, coverage matrix, residual, fixes landed this session.
 
 ## Done when
 
-- Security review ran for the agreed targets
-- User has full detail in chat
-- Public posts (if any) are redacted per shared rules
+- Subagent/skill pass attempted (or explicit failure + manual matrix)
+- Secrets scan attempted or `n/a` justified
+- Coverage matrix complete in chat (no silent skips)
+- User has full exploit/fix detail in chat
+- Public posts (if any) redacted + meet `comment-depth.md`
 - Necessary in-PR fixes landed or declined with rationale
+- AI/agent surfaces reviewed via `ai-agent-security` when the diff touches them
