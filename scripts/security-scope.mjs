@@ -92,7 +92,9 @@ const RULES = {
   },
   logging_privacy: {
     why: "logging/telemetry/analytics paths",
-    test: (f) => /log|telemetry|analytics|sentry|privacy|pii/i.test(f),
+    test: (f) =>
+      /(^|\/)(.*log(ger|ging|s)?|telemetry|analytics|sentry)(\/|\.|$)/i.test(f) ||
+      /privacy|[/_.-]pii([/_.-]|$)/i.test(f),
   },
   ai_agent_mcp: {
     why: "LLM/agent/MCP/prompt/RAG/tool surfaces — load ai-agent-security",
