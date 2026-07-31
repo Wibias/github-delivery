@@ -10,7 +10,9 @@ description: >
   preflight, run a full bug/security review with verdict, run a security review,
   request changes, or merge a PR with thanks and issue close-out. Also use when
   a PR description mentions security or API and the agent should ask whether to
-  run a security review. Do not use for: local unit-test debugging with no
+  run a security review. Watch/babysit MUST triage OWNER/CODEOWNER/top-level
+  human comments before idling on CI or CodeRabbit — never merge-dev-then-wait
+  while owner feedback is open. Do not use for: local unit-test debugging with no
   GitHub PR, filing PRDs/issue breakdowns (use issue-workflow), or Agent Skill
   authoring/skill-ratchet. Differentiator: Cursor babysit is a thin conflict/CI
   stub — this skill owns the full GitHub ship loop plus continuous watch;
@@ -61,7 +63,7 @@ Read `references/shared-rules.md` before acting. Non-negotiables:
 3. Review triage — trusted owners/maintainers first; published feedback only; verify bots against code.
 4. Social mutation — no auto-replies to humans without exact-text confirmation; limited thread resolves.
 5. CI classify — branch fix vs flake; max 3 flaky reruns per SHA; use **Required checks + review gate** (`scripts/required-checks.mjs`, `scripts/pr-policy-gate.mjs`, `scripts/review-threads.mjs`, `scripts/codeowners-for-pr.mjs`).
-6. Mode-aware waits — merge-ready / full-review / babysit-fix: **until green+comments clean** (or hard blocker); never quit on “3 rounds / 20m”; never invent soft “maintainer ack” stops; **thin settle** (~3–5 min quiet + recheck) before merge-ready / `approve-comment`; watch: **reviews first** (owners/CODEOWNERS before idling on CI), then tip-update, then CI; continue past green until merged/closed/blocker (**merge-queue queued ≠ merged**).
+6. Mode-aware waits — merge-ready / full-review / babysit-fix: **until green+comments clean** (or hard blocker); never quit on “3 rounds / 20m”; never invent soft “maintainer ack” stops; **thin settle** (~3–5 min quiet + recheck) before merge-ready / `approve-comment`; watch: **wake gate** — OWNER/CODEOWNER/top-level human comments before any “waiting for CI/CodeRabbit” line; then tip-update; then CI (**merge-queue queued ≠ merged**).
 7. Behind base + **compile against tip** — update from base, then verify build/tests on tip before merge-ready / full-review approve / merge. After push: re-check **stale approvals / last-push** policy.
 8. Draft/WIP/do-not-merge — never merge or claim ready while gated.
 9. Prefer in-PR fixes; merge only on merge workflow (thank PR + **issue authors**, no self-thanks; auto-close issues when fixed). **Never** `gh pr merge` without the issue-thank step when `closingIssuesReferences` / `Fixes #N` exist. **Stacked → `manage-stacked-prs`** (never merge mid-stack as if it were trunk).

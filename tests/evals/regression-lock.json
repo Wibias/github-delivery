@@ -70,5 +70,9 @@
   {
     "id": "R-watch-reviews-before-ci-2026-07-31",
     "sha256": "af8b8b5e64b7d5d23ee4358350767016a6094a3280dcf56f240370c7235bb465"
+  },
+  {
+    "id": "R-watch-no-wait-coderabbit-2026-07-31",
+    "sha256": "06268fea87d5d17d01028a92e2c015aabe28c014db9213540dcd950b17308ecc"
   }
 ]
