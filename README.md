@@ -89,6 +89,22 @@ Before `[shipping-github] Merge ready` (and full-review `approve-comment`):
 
 Watch may report “CI/reviews quiet — still watching” without claiming that full bar. Status never uses a looser bar than merge-ready.
 
+## Cursor built-in `babysit` conflict
+
+Cursor ships a thin **babysit** skill at `~/.cursor/skills-cursor/babysit`. It
+re-syncs if you delete it. Its description (“keep a PR merge-ready…”) steals
+`watch` / `babysit` prompts and runs merge-base → wait-on-CI without shipping-github’s
+owner wake gate.
+
+**Mitigations installed with this skill:**
+
+1. Prefer **shipping-github** (description leads with babysit/watch/monitor).
+2. Personal override skill **`babysit`** (from `overrides/babysit/`) installed next to
+   shipping-github — redirects to `watch-pr` / `fix-pr-bots` + `watch-wake-gate.mjs`.
+3. Optional user rule: prefer shipping-github over built-in babysit.
+
+You still cannot permanently delete the built-in; win on discovery + redirect instead.
+
 ## Install
 
 Copy or symlink this folder into your agent skills directory, for example:
@@ -97,7 +113,14 @@ Copy or symlink this folder into your agent skills directory, for example:
 ~/.agents/skills/shipping-github
 ```
 
-Folder name must stay `shipping-github` (matches frontmatter `name`).
+Also install the babysit redirect (same machine):
+
+```text
+~/.agents/skills/babysit   ← copy from overrides/babysit/
+~/.cursor/skills/babysit   ← same
+```
+
+Folder name for the main skill must stay `shipping-github` (matches frontmatter `name`).
 
 ## Requirements
 

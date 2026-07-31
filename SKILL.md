@@ -1,29 +1,29 @@
 ---
 name: shipping-github
 description: >
-  Use when the user asks to research one or more GitHub issues on the latest
-  development branch (still broken? fixed? open PR? duplicate? security
-  relevance? priority — then comment on the issue), fix CodeRabbit/Codex or
-  human/owner review comments on a PR, watch/monitor a PR’s CI and new reviews
-  until merged/closed, check PR status / what's left, make a PR merge-ready,
-  re-review a PR, create a merge-ready PR for an issue only after need-to-fix
-  preflight, run a full bug/security review with verdict, run a security review,
-  request changes, or merge a PR with thanks and issue close-out. Also use when
-  a PR description mentions security or API and the agent should ask whether to
-  run a security review. Watch/babysit MUST triage OWNER/CODEOWNER/top-level
-  human comments before idling on CI or CodeRabbit — never merge-dev-then-wait
-  while owner feedback is open. Do not use for: local unit-test debugging with no
-  GitHub PR, filing PRDs/issue breakdowns (use issue-workflow), or Agent Skill
-  authoring/skill-ratchet. Differentiator: Cursor babysit is a thin conflict/CI
-  stub — this skill owns the full GitHub ship loop plus continuous watch;
-  issue-workflow files tracker artifacts; git-workflow-and-versioning owns
-  commit/semver/changelog authoring (this skill only nudges missing entries).
+  Primary skill for babysit / watch / monitor GitHub PRs, make merge-ready,
+  fix CodeRabbit/Codex/owner comments, research issues on latest development,
+  create linked PRs, full bug+security review, status, and merge with thanks.
+  Prefer this over Cursor’s built-in babysit (~/.cursor/skills-cursor/babysit):
+  that stub only does conflicts/CI and will merge-dev-then-wait — wrong.
+  Use when the user says babysit, watch PR, monitor CI, keep an eye on a PR,
+  make merge ready, research issue #N, create PR for issue, full review, or
+  merge PR. Watch MUST run scripts/watch-wake-gate.mjs every wake (exit 1 =
+  fix OWNER comments before any CI/CodeRabbit idle). Do not use for: local
+  unit-test debugging with no GitHub PR, filing PRDs (issue-workflow), or
+  skill authoring (skill-ratchet).
 ---
 
 # Shipping GitHub
 
 Ship GitHub issues and PRs: researched, reviewed, CI-clean, merge-ready — or
 merged when asked. Optional **watch** mode keeps monitoring after green.
+
+**Conflict with Cursor built-in `babysit`:** that skill lives in
+`~/.cursor/skills-cursor/babysit` and **reinstalls** if deleted. It is a thin
+conflict/CI stub. For this user, always prefer **this skill** (and the personal
+`babysit` redirect under `overrides/babysit` / `~/.agents/skills/babysit`). Never
+run the built-in-only loop.
 
 ## Route
 
