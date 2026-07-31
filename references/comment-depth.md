@@ -87,8 +87,8 @@ Full coverage matrix + abuse paths stay in **chat**. If too sensitive for a usef
 <Does it fix a real bug / deliver claimed value? Cite issue + user-visible effect.>
 
 ### Bugs / correctness
-- Checked: <areas / tests run>
-- Findings: none blocking / <list with `path` + why it matters>
+- Method: bug-review.md — Bugbot: yes/n/a-unavailable/skipDeep; complementary: done/skipDeep (`silent_failures`/`resource_leaks`/`edge_cases`)
+- Findings: none blocking / <list with `path` + why it matters + confidence>
 - Fixed this session: none / <sha + summary>
 
 ### Security
@@ -128,7 +128,7 @@ none / draft|WIP|do-not-merge / hard blocker: <…>
 ### Reviews
 - **Humans (owners first):** <what was raised → fixed in `sha` / declined because … / none>
 - **Bots:** <0 unresolved useful threads; notable declines with one-line rationale>
-- **Own bug + security + spec/standards:** done on tip; blockers fixed: <none / list>
+- **Own bug + security + spec/standards:** bug-review (Bugbot y/n/skip + complementary) + security-review done on tip; blockers fixed: <none / list>
 
 ### Tip freshness
 - Updated from `<base>`: yes (`sha`) / already current

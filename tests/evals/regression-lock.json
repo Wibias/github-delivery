@@ -122,5 +122,21 @@
   {
     "id": "R-no-harness-security-review-2026-07-31",
     "sha256": "91b0386dc6089f4dd0851dc1778d5c63983aa3b7c8b2ad897c96cca4c1184d1f"
+  },
+  {
+    "id": "R-bug-scope-skip-docs-2026-07-31",
+    "sha256": "0831a3015fbd96a3cd47740f38783e041de5842b0ba5a12e601e98dc2f3dcdc6"
+  },
+  {
+    "id": "R-bug-cursor-bugbot-plus-complementary-2026-07-31",
+    "sha256": "11a5a5301db961df011c133930797de0c1c81b7d3f7af3a7d3c1ae1b0212d26f"
+  },
+  {
+    "id": "R-bug-no-fake-bugbot-claude-2026-07-31",
+    "sha256": "5d9f37f5eb171878d1b1ddc2dbb79be3b8a72848aa854f315cd19919efb69a7c"
+  },
+  {
+    "id": "R-bug-no-auto-deep-multiagent-2026-07-31",
+    "sha256": "1772f07179bdc3aaf2edcd7d630cbf1a602a011914d9516db1b47dc8aeb290f0"
   }
 ]

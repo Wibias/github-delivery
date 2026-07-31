@@ -26,7 +26,7 @@ Necessary/useful **human** (esp. owners/maintainers) + CodeRabbit/Codex comments
 8. Fix CLI / project checks this PR broke. Classify CI: branch fix vs flake (shared rules; flake reruns still max 3 / SHA). Apply **Required checks + review gate** + policy gate (code-owner enforcement, merge queue).
 9. **Own reviews (required — not optional):**
    - Subagent **preflight** (checkout PR head; stash only with user OK) — shared rules.
-   - **Bug:** `review-bugbot` / `bugbot` when available.
+   - **Bug:** run **`references/bug-review.md`** (`bug-scope.mjs` → Bugbot when Cursor → complementary lenses). Never fake Bugbot on Claude/Codex; never auto deep multi-agent kits.
    - **Security:** run **`references/security-review.md`** (scope script + matrix). **Never** Cursor harness `security-review` / `review-security`.
    - **Spec + Standards:** run or hand off skill `review` against PR base/merge-base (shared rules). Fix necessary gaps.
    - Triage findings; fix what can/should land in this PR; skip 0.1% nits. Public request-changes / comments stay redacted for exploit detail. Changelog nudge when user-facing.

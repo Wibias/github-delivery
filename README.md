@@ -33,6 +33,7 @@ Thin babysit skills (Cursor built-in, OpenAI `babysit-pr`, Claude marketplace co
 | Agent spam on GitHub | No auto-replies to humans without your exact text; limited thread resolves; inline replies in-thread |
 | Vague “looks good / CI green” reviews | **`comment-depth.md`** — research, security, verdict, merge-ready, status with paths/SHAs/evidence |
 | Shallow security “no findings” | `security-scope.mjs` + coverage matrix + HIGH/MEDIUM confidence + Do-Not-Flag; crypto/session, business-logic, removed-controls, IaC/Docker, **Agentic Skills Top 10** when skill/MCP paths change; High+ pass gate; auto `ai-agent-security` / deps audit when flagged; **never** Cursor harness `security-review` / `review-security`; **never** auto red-team second pass |
+| Shallow own-bug “LGTM” | `bug-scope.mjs` + `bug-review.md`: Bugbot when Cursor + complementary lenses (silent failures / leaks / edges); Claude/Codex never fake Bugbot; skip non-logic diffs; **never** auto deep multi-agent kits |
 | Flaky CI “fixed” by rewriting tests | Classify carefully — **don’t** weaken CI; **do** harden real test timeouts instead of burning reruns |
 | Draft / WIP merged by accident | Hard gates before merge-ready claims or merge; draft→ready only after ask |
 | Rate-limit thrash on dense polls | Composio GraphQL rate limit → `gh` fallback; backoff |
@@ -51,6 +52,7 @@ Shared rules live in one place (`references/shared-rules.md`): scope lock, git s
 | Create PR for issue → merge-ready | `references/create-pr-for-issue.md` |
 | Full review + verdict (babysit to green) | `references/full-review-pr.md` |
 | Security review | `references/security-review.md` |
+| Bug review (own-bug axis; also via merge-ready/full-review) | `references/bug-review.md` |
 | What’s left / is it merge ready? | `references/status.md` |
 | Merge + thanks + issue close-out | `references/merge-pr.md` |
 
@@ -68,6 +70,19 @@ Concrete evidence scripts (see `references/gate-helpers.md`):
 | `scripts/pr-policy-gate.mjs` | Code-owner **enforcement**, dismiss-stale / last-push approvals, merge queue / `merge_group` warn |
 | `scripts/watch-wake-gate.mjs` | Exit `1` until a **non-merge** commit addresses OWNER comments **and** PR is not DIRTY/BEHIND — ACK-only does not clear |
 | `scripts/security-scope.mjs` | PR file → required security surfaces (incl. crypto/session, business-logic, IaC/Docker, removed-controls, **agentic skills/MCP**); flags `ai-agent-security` + AST10 + deps audit; `adversarialPassDefault: false` |
+| `scripts/bug-scope.mjs` | PR file → `skipDeepBugReview` vs deep; complementary lenses; `requireBugbot: when_available`; `deepMultiAgentDefault: false` |
+
+### Bug review (own-bug axis)
+
+Merge-ready / full-review / create-PR run **`references/bug-review.md`**:
+
+| Host | Default deep path |
+|---|---|
+| **Cursor** | Bugbot (`review-bugbot`) **plus** one complementary lenses pass (silent failures / resource leaks / edge cases) |
+| **Claude** | Complementary lenses only (never claim Bugbot) |
+| **Codex** | Optional Codex `/review` once, then complementary (never claim Bugbot) |
+
+Docs/CSS/lockfile-only PRs may `skipDeepBugReview` (record n/a). Deep multi-agent kits (pr-review-toolkit, ultrareview, Codex adversarial-review) are **opt-in only** — same rule as security adversarial.
 
 ### Security review + adversarial / red-team
 

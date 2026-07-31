@@ -40,6 +40,16 @@ node "<shipping-github>/scripts/security-scope.mjs" OWNER/REPO N
 
 Returns `requiredSurfaces`, `requireAiAgentSecurity`, `requireAgenticSkillsTop10`, `requireDepsAudit`, `removedControlLeads`, `adversarialPassDefault: false`, and instructions (incl. crypto/session, business logic, IaC/Docker, AST01–10, confidence discipline). Cover every required surface; load `ai-agent-security` / AST10 checklist / deps audit when flagged. **Never** auto-launch adversarial/red-team second pass. See `security-review.md`.
 
+## Bug scope (PR → deep vs skip + lenses)
+
+Before own-bug review on a PR (merge-ready / full-review / create-PR):
+
+```bash
+node "<shipping-github>/scripts/bug-scope.mjs" OWNER/REPO N
+```
+
+Returns `skipDeepBugReview`, `requiredLenses`, `requireBugbot: "when_available"`, `deepMultiAgentDefault: false`, and instructions. If skip: record n/a. Else run `references/bug-review.md` (Bugbot when available on Cursor + one complementary lenses pass). **Never** auto-launch deep multi-agent bug toolkits. See `bug-review.md`.
+
 ## Watch wake gate (owner comments)
 
 Before any watch “waiting for CI/CodeRabbit” heartbeat:

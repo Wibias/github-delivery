@@ -144,16 +144,21 @@ If the user asked for **merge-ready / full-review / merge** and the PR is still 
 
 ## Subagent preflight (bug + checkout)
 
-**Bug:** before launching `bugbot` / `review-bugbot`, checkout the PR head (or named branch) locally. If checkout fails because of dirty files: **ask** before stash; only stash after user confirms.
+**Bug axis:** run **`references/bug-review.md`** (not a bare Bugbot launch).
+
+1. **Checkout** the PR head (or named branch) locally before Bugbot or complementary review. If checkout fails because of dirty files: **ask** before stash; only stash after user confirms.
+2. Run `scripts/bug-scope.mjs` for PRs. If `skipDeepBugReview`, record n/a and skip Bugbot/complementary.
+3. **Cursor only:** before launching `bugbot` / `review-bugbot`, use the prompt shape below. On Claude/Codex: **never** launch or claim Bugbot — complementary lenses (and Codex `/review` if available) only.
+4. After Bugbot (Cursor) and/or complementary: triage and **fix** what belongs in this PR. Do not only summarize unless the user asked review-only.
+5. **Never** auto-run deep multi-agent bug kits (pr-review-toolkit, ultrareview, Codex adversarial-review) unless the user explicitly asked.
+
+For Bugbot (Cursor) prompt shape:
+
+1. Must include `Full Repository Path` + `Diff: branch changes` (default) unless they asked uncommitted-only.
+2. If the subagent fails with **empty / uncomputable diff**: retry **once** with `Diff: natural language` + a per-file `Change Description` (bugbot path).
+3. Wrong invocation (missing path/diff): fix and retry once. Same unexplained failure twice → stop Bugbot, state unavailability, continue with complementary only.
 
 **Security:** **never** launch Cursor harness `security-review` / `review-security`. Run `references/security-review.md` instead (scope script + matrix). Checkout still required before that review when fixing/reviewing a PR head.
-
-For bugbot (and any allowed non-security review helper):
-
-1. Prompt shape must include `Full Repository Path` + `Diff: branch changes` (default) unless they asked uncommitted-only.
-2. If the subagent fails with **empty / uncomputable diff**: retry **once** with `Diff: natural language` + a per-file `Change Description` (bugbot path).
-3. Wrong invocation (missing path/diff): fix and retry once. Same unexplained failure twice → stop and report; do not loop.
-4. After findings: triage and **fix** what belongs in this PR (merge-ready / full-review / create-PR). Do not only summarize unless the user asked review-only.
 
 ## Spec + standards axis
 
