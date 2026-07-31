@@ -19,16 +19,16 @@ Do **not** merge unless they also asked to merge (then hand off to `merge-pr` wh
 ## Loop
 
 1. Identify PR (`#N`, URL, or current branch). Checkout head if fixing.
-2. Apply git safety (dirty tree / no force-push).
-3. Snapshot: draft/WIP gates, behind-base/conflicts, required CI, unresolved trusted-human + bot threads (published only).
+2. Apply git safety (dirty tree / no force-push / fork-head unwritable → hard stop).
+3. Snapshot: draft/WIP gates, behind-base/conflicts, required CI + review gate, unresolved trusted-human + bot threads (published only), stack/fork flags.
 4. **Reviews first:** triage per shared rules (owners/trusted first). Patch+push actionable items. Human written replies → chat confirm. Resolve only allowed threads after verified fixes.
 5. **CI:** classify branch vs flake. Fix branch-related; rerun flakes (max 3 / SHA); stop on exhausted infra failures.
-6. If behind/conflicted: update from base, resolve or ask, push.
+6. If behind/conflicted: update from base, resolve or ask, push; verify compile-against-tip when updating.
 7. Security-offer / changelog nudge once if applicable.
-8. If green + mergeable + reviews clean: report milestone (“ready to merge — still watching”) and **keep polling** while open.
+8. If green + mergeable + reviews clean: report milestone (“ready to merge — still watching”; if stacked, “ready vs parent — not trunk”) and **keep polling** while open.
 9. Stop only when:
    - PR **merged** or **closed**, or
-   - Hard blocker (permissions, dirty unrelated tree, push rejected, flake budget exhausted, product decision, human reply needs confirmation), or
+   - Hard blocker (permissions, fork-head unwritable, dirty unrelated tree, push rejected, flake budget exhausted, product decision, human reply needs confirmation, stack needs `manage-stacked-prs` for trunk), or
    - User interrupts / asks to stop.
 
 ## Cadence
