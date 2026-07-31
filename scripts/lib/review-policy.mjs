@@ -112,14 +112,7 @@ export function evaluateReviewPolicy({
   if (decision === "CHANGES_REQUESTED" || changesRequested.length > 0) {
     blockers.push("changes_requested");
   }
-
-  const reviewsAreRequired =
-    requiresApprovingReviews ||
-    requiresCodeOwnerReviews ||
-    requireLastPushApproval ||
-    requiredApprovalCount > 0;
-
-  if (decision === "REVIEW_REQUIRED" && reviewsAreRequired) {
+  if (decision === "REVIEW_REQUIRED") {
     blockers.push("review_required");
   }
   if (requiredApprovalCount > approvals.length) {
