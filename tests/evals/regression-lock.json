@@ -86,5 +86,9 @@
   {
     "id": "R-ci-fix-not-rerun-timeout-2026-07-31",
     "sha256": "adfcf740ee6a495cfe80e45b8a8bcfe5dd2f68a1761a27b0998f1e058fbe70c2"
+  },
+  {
+    "id": "R-ci-rerun-failed-job-only-2026-07-31",
+    "sha256": "f931646368887eda4f8e111a5d11a89ea66edb3d9f845016b807ed66eb45bdba"
   }
 ]

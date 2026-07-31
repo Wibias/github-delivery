@@ -267,8 +267,34 @@ Classify failed **required** checks from **failed job logs** before acting. Pref
 | Classification | Action |
 |---|---|
 | Branch-related / harden-in-PR | Patch, commit, push (new SHA) |
-| True infra | Rerun failed jobs up to **3** times for the same SHA; if still failing, **stop and report** — do not weaken CI |
+| True infra | Rerun **only the failed job(s)** up to **3** times for the same SHA; if still failing, **stop and report** — do not weaken CI |
 | Ambiguous | **One** log diagnosis: if the failure is inside a test/spec hitting your API/UI, treat as **harden-in-PR**. Only classify infra when logs show platform/runner failure with no useful test assertion |
+
+### How to rerun (true infra only)
+
+Target the **failed** job — never green matrix legs, never “rerun everything hoping Windows comes along.”
+
+```bash
+# Find the failed run + job databaseId (NOT the URL .../jobs/<n> number)
+gh run list --repo OWNER/REPO --branch HEAD_BRANCH --limit 5 \
+  --json databaseId,name,conclusion,headSha,url
+gh run view RUN_ID --repo OWNER/REPO --json jobs \
+  --jq '.jobs[] | {name,conclusion,databaseId}'
+
+# Preferred: only failed jobs in that run
+gh run rerun RUN_ID --repo OWNER/REPO --failed
+
+# Or a single failed job (use databaseId from above)
+gh run rerun RUN_ID --repo OWNER/REPO --job JOB_DATABASE_ID
+```
+
+**Verify after triggering:** `gh run view RUN_ID` / `gh pr checks` — the failed job (e.g. `windows-latest`) must be `queued`/`in_progress`. If only `ubuntu-latest` / `macos-latest` restarted, you reran the wrong thing — fix the command and rerun the Windows job.
+
+Do **not**:
+
+- `gh run rerun RUN_ID` without `--failed` when only one matrix leg failed (re-runs greens too; easy to mis-report)
+- Rerun a **different** workflow run / SHA than the one that failed
+- Say “rerunning the failed job” unless you confirmed the failed job’s `databaseId` / `--failed` set includes it
 
 ### Hard rules
 
@@ -278,6 +304,7 @@ Classify failed **required** checks from **failed job logs** before acting. Pref
 - Prefer failed-**job** logs as soon as a job fails; don’t wait for the whole workflow if logs are already available.
 - When both review fixes and CI failures apply: **fix+push first** (new SHA retriggers CI); don’t rerun flakes on a SHA you’re about to replace.
 - On **merge** / merge-ready: burning retry budget instead of hardening a repeated test timeout is a failed classification — fix first, then merge when green.
+- On true infra: **rerun the failed job only**; wrong-platform reruns (ubuntu/mac when Windows crashed) count as a botched retry — correct and rerun Windows, don’t burn the budget on greens.
 
 ## Merge policy extras
 
