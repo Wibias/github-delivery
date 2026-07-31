@@ -30,5 +30,13 @@
   {
     "id": "R-stack-handoff-2026-07-31",
     "sha256": "611de472760852349f3d4880ee52e3952f3484077ca92add65d8d70153221c3d"
+  },
+  {
+    "id": "R-encoding-2026-07-31",
+    "sha256": "8272bb8324d10be75f0ffb84bef6ecb42beaf44272851ad64463734d337817a6"
+  },
+  {
+    "id": "R-fork-head-2026-07-31",
+    "sha256": "b7e2e61ff57dde3e9186844179d20d7cf37c35a1a5025d3ac11a87d6cfebe300"
   }
 ]

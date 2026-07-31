@@ -312,7 +312,7 @@ For changelog **content**, semver bump choice, and release tagging, follow `git-
 
 ## Final evidence sweep
 
-Before claiming merge-ready (or reporting a watch **CI/review milestone**):
+Before claiming merge-ready (or reporting a watch **CI/review milestone**), also load `references/gate-helpers.md` when CI or CODEOWNERS may block.
 
 1. Fresh `gh pr view` (SHA, draft/gate, mergeable, required checks, `reviewDecision`, behind-base, `isCrossRepository` / head repo)
 2. Confirm head is **up to date with base** and **compiles/tests against tip** (local gate and/or green required CI on that SHA)
@@ -342,26 +342,71 @@ When merge-ready **is** valid, also notify linked issues (see `fix-pr-bots`).
 
 Before merge-ready / full-review `approve-comment` / merge / status “merge-ready” verdict:
 
-1. **Identify failing vs pending checks** on the **current** head SHA:
+1. **Prefer helper** (modern `checks[]` + legacy `contexts` + rulesets + live rollup):
+
+   ```bash
+   node "<shipping-github>/scripts/required-checks.mjs" OWNER/REPO N
+   # see references/gate-helpers.md
+   ```
+
+2. **Manual fallback** on the **current** head SHA:
 
    ```bash
    gh pr checks N --repo OWNER/REPO
-   gh pr view N --repo OWNER/REPO --json statusCheckRollup,mergeStateStatus,reviewDecision,isDraft,baseRefName,headRefName,headRepository,isCrossRepository
+   gh pr view N --repo OWNER/REPO --json statusCheckRollup,mergeStateStatus,reviewDecision,isDraft,baseRefName,headRefName,headRepository,isCrossRepository,reviewRequests
    ```
 
-2. **Branch protection** on the PR base (best-effort — may 404 without admin):
+3. **Branch protection** (best-effort — may 404 without admin):
 
    ```bash
-   gh api "repos/OWNER/REPO/branches/BASE/protection" --jq "{required_status_checks:.required_status_checks,reviews:.required_pull_request_reviews,enforce_admins:.enforce_admins.enabled}"
+   gh api "repos/OWNER/REPO/branches/BASE/protection" \
+     --jq "{strict:.required_status_checks.strict, contexts:.required_status_checks.contexts, checks:.required_status_checks.checks, reviews:.required_pull_request_reviews}"
    ```
 
-   If accessible, treat `required_status_checks.contexts` / `checks` as the required set. If inaccessible, fall back to: any check that is red and clearly part of the repo’s always-on matrix (e.g. Cross-platform CI jobs) **plus** anything `mergeStateStatus` implies (`BLOCKED` / `UNSTABLE` / `BEHIND`).
+   - **Legacy:** `required_status_checks.contexts` — string job/context names.
+   - **Modern:** `required_status_checks.checks` — objects with `context` (+ optional `app_id`). Treat each `context` as a required name.
+   - Merge both lists; a required name is green only when a live check with that **exact name** is success/neutral/skipped.
 
-3. **Review decision:** `reviewDecision` of `CHANGES_REQUESTED` blocks. Empty/`REVIEW_REQUIRED` with open CODEOWNER or required-reviewer requests blocks merge-ready unless the user said status-only and you label it blocked. Approvals that GitHub considers stale after new pushes → re-check; do not claim ready.
+4. **Rulesets** (often replace classic protection):
 
-4. **CODEOWNERS:** if protection requires owner reviews or the Files changed tab shows pending owners, list them; pending CODEOWNER approval blocks merge-ready / merge.
+   ```bash
+   gh api "repos/OWNER/REPO/rules/branches/BASE"
+   ```
 
-5. Status / chat must name **which** required jobs are red/pending (backticks), not “CI failing.”
+   Collect `required_status_checks` rule parameters (`context` fields). Union with protection names.
+
+5. If **no** required list is readable: fall back to `mergeStateStatus` (`BLOCKED` / `UNSTABLE` / `BEHIND`) **plus** clearly failing always-on matrix jobs. Do not invent “all green.”
+
+6. **Review decision:** `reviewDecision` of `CHANGES_REQUESTED` blocks. Empty/`REVIEW_REQUIRED` with open CODEOWNER or required-reviewer requests blocks merge-ready unless status-only (label blocked). Stale approvals after new pushes → re-check.
+
+7. **CODEOWNERS** — run path automation (below). Pending owners / review requests block merge-ready / merge.
+
+8. Status / chat must name **which** required jobs are red/pending (backticks), not “CI failing.”
+
+## CODEOWNERS path automation
+
+Do not rely only on the Files-changed UI hover.
+
+1. **Prefer helper:**
+
+   ```bash
+   node "<shipping-github>/scripts/codeowners-for-pr.mjs" OWNER/REPO N
+   ```
+
+   It loads CODEOWNERS from the **PR base** (`.github/CODEOWNERS` → root → `docs/`), maps each changed file to owners (last matching rule wins), unions owners, lists `reviewRequests`, and surfaces `GET …/codeowners/errors?ref=BASE`.
+
+2. **Manual fallback:**
+
+   ```bash
+   gh api "repos/OWNER/REPO/codeowners/errors?ref=BASE"
+   gh api "repos/OWNER/REPO/contents/.github/CODEOWNERS?ref=BASE" --jq .content
+   # decode base64; also try /CODEOWNERS and /docs/CODEOWNERS
+   gh api "repos/OWNER/REPO/pulls/N/files" --paginate --jq '.[].filename'
+   gh pr view N --repo OWNER/REPO --json reviewRequests,reviewDecision
+   ```
+
+3. Pending CODEOWNER / team review requests (and required-reviewer teams) block merge-ready / merge the same as open owner threads.
+4. Syntax errors in CODEOWNERS: report; do not pretend owners are complete.
 
 ## Fork head / push permission
 

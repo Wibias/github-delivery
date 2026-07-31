@@ -12,13 +12,13 @@ Report merge readiness **using the same bar as merge-ready / full-review** — w
    - draft/WIP/do-not-merge gates
    - behind-base / conflicts / `mergeStateStatus`
    - head SHA + whether it is tip-fresh (note if behind — do **not** claim merge-ready)
-   - required checks via `gh pr checks` + protection best-effort (shared **Required checks + review gate**)
-   - `reviewDecision`, CODEOWNERS / pending required reviewers
+   - required checks via `scripts/required-checks.mjs` when possible (else `gh pr checks` + protection/rulesets)
+   - `reviewDecision`, CODEOWNERS / pending required reviewers (`scripts/codeowners-for-pr.mjs` when possible)
    - unresolved published human (owners first) + bot threads; flag rate-limited bot “SUCCESS” with open threads
    - fork head / `isCrossRepository` (can maintainers push?)
    - stacked? (base is another open PR head)
    - linked issues; security/API cue; changelog gap if user-facing
-   - whether this session already ran own bug+security (if unknown: say **unknown — not run this session**; do **not** invent “own reviews done”)
+   - whether this session already ran own bug+security+spec (if unknown: say **unknown — not run this session**; do **not** invent “own reviews done”)
 
 2. Emit:
 

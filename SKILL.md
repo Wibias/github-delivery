@@ -60,7 +60,7 @@ Read `references/shared-rules.md` before acting. Non-negotiables:
 2. Git safety — stop on dirty unrelated trees; never force-push; stop if push rejected; **fork-head unwritable → hard stop** (shared rules).
 3. Review triage — trusted owners/maintainers first; published feedback only; verify bots against code.
 4. Social mutation — no auto-replies to humans without exact-text confirmation; limited thread resolves.
-5. CI classify — branch fix vs flake; max 3 flaky reruns per SHA; use **Required checks + review gate** (`gh pr checks` + protection best-effort + `reviewDecision` / CODEOWNERS).
+5. CI classify — branch fix vs flake; max 3 flaky reruns per SHA; use **Required checks + review gate** (`scripts/required-checks.mjs` or `gh pr checks` + protection `contexts`/`checks[]` + rulesets + `reviewDecision` / CODEOWNERS via `scripts/codeowners-for-pr.mjs`).
 6. Mode-aware waits — merge-ready / full-review / babysit-fix: **until green+comments clean** (or hard blocker); never quit on “3 rounds / 20m”; never invent soft “maintainer ack” stops; watch: continue past green until merged/closed/blocker.
 7. Behind base + **compile against tip** — update from base, then verify build/tests on tip before merge-ready / full-review approve / merge.
 8. Draft/WIP/do-not-merge — never merge or claim ready while gated.
@@ -79,6 +79,7 @@ Read `references/shared-rules.md` before acting. Non-negotiables:
 - Prefer `gh` for GitHub reads/writes.
 - Detect the repo default branch; do not hardcode `main`.
 - Cross-use thin helpers when helpful: `review-bugbot`, `review-security`, skill `review` (Spec+Standards), `manage-stacked-prs`, `split-to-prs`, `finishing-a-development-branch`, `git-workflow-and-versioning`, `issue-workflow`.
+- **Gate helpers:** `scripts/required-checks.mjs` (legacy `contexts` + modern `checks[]` + rulesets), `scripts/codeowners-for-pr.mjs` (path owners on PR base).
 - **Rate limits:** prefer Composio MCP `GITHUB_GET_GRAPHQL_RATE_LIMIT` when GitHub toolkit is connected; else `gh api rate_limit` / `gh api graphql` `rateLimit` (see shared rules).
 - **Inline replies:** Composio `GITHUB_CREATE_A_REPLY_FOR_A_REVIEW_COMMENT` or `gh api …/pulls/{pr}/comments/{id}/replies`.
 
@@ -94,6 +95,7 @@ Read `references/shared-rules.md` before acting. Non-negotiables:
 - references/security-review.md -- when to read: explicit security review on a PR/branch
 - references/status.md -- when to read: read-only PR status / what's left
 - references/merge-pr.md -- when to read: merge a PR with thanks and issue close-out
+- references/gate-helpers.md -- when to read: before ready/merge/status when resolving required CI or CODEOWNERS
 - tests/evals/cases.jsonl -- when to read: before discovery, execution, or adversarial evaluation
 - tests/evals/regression-cases.jsonl -- when to read: before rerunning or appending retained regressions
 - tests/evals/regression-lock.json -- when to read: when validating immutable retained regressions
