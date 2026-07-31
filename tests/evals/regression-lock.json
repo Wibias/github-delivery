@@ -102,5 +102,21 @@
   {
     "id": "R-security-high-pass-gate-2026-07-31",
     "sha256": "b5d18c34adc5d3e3bd2adbf716a1767b5dc289a464f228aa35a49fe9734b178d"
+  },
+  {
+    "id": "R-security-confidence-dof-2026-07-31",
+    "sha256": "a8b2d0c7b3989e09700b247448773e5237a112e525f9c93b58c0e52a391adb11"
+  },
+  {
+    "id": "R-security-iac-removed-crypto-2026-07-31",
+    "sha256": "3b9f3688d04fb32df1c1125fdffae099072a40d219c3a235e364db9ae50b64c9"
+  },
+  {
+    "id": "R-security-ast10-skills-2026-07-31",
+    "sha256": "4ceefcc8b10299a0bb591c122fa03728772883010fa31817f5b20e0c82df27e5"
+  },
+  {
+    "id": "R-security-no-auto-adversarial-2026-07-31",
+    "sha256": "b8a0d519e084d412d6afafa5961b0507c05b72bd5f051b8ea81e28a252ecfc7e"
   }
 ]

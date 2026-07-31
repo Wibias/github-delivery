@@ -38,7 +38,7 @@ Before a security review on a PR:
 node "<shipping-github>/scripts/security-scope.mjs" OWNER/REPO N
 ```
 
-Returns `requiredSurfaces`, `requireAiAgentSecurity`, `requireDepsAudit`, and instructions. Cover every required surface; load `ai-agent-security` / run deps audit when flagged. See `security-review.md`.
+Returns `requiredSurfaces`, `requireAiAgentSecurity`, `requireAgenticSkillsTop10`, `requireDepsAudit`, `removedControlLeads`, `adversarialPassDefault: false`, and instructions (incl. crypto/session, business logic, IaC/Docker, AST01–10, confidence discipline). Cover every required surface; load `ai-agent-security` / AST10 checklist / deps audit when flagged. **Never** auto-launch adversarial/red-team second pass. See `security-review.md`.
 
 ## Watch wake gate (owner comments)
 

@@ -378,6 +378,8 @@ When touching a PR in a workflow that does **not** already mandate security (`re
 3. Run `references/security-review.md` only if they say yes.
 4. Skip if already requested, mandated above, or declined this session.
 
+**Adversarial / red-team second pass:** never start unless the user explicitly asks in this session (see `security-review.md` §1b). Ordinary “security review” / “yes” to the offer above is **not** permission to red-team.
+
 ## Changelog / release-note nudge
 
 When the PR clearly changes **user-facing** behavior and lacks a changelog/release-note entry: **ask once**. Skip pure refactors/CI/docs-only (unless docs are the product) or repos with no changelog practice.
