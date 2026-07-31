@@ -1,46 +1,69 @@
 # Full review PR
 
-**Trigger:** “full review on pr #N…”, “bug + security review + rabbit/codex + verdict”, “is this PR useful?”.
+**Trigger:** “full review on pr #N…”, “bug + security review + rabbit/codex + verdict”, “is this PR useful?”, or a list of existing PRs to full-review.
 
 ## Goal
 
-Same technical bar as **make merge-ready** (bug + security subagents, clear useful human/bot comments, fix in-PR), **plus** an explicit **usefulness** judgment and a **verdict** comment (approve-comment / changes-requested / not-useful / gated). Use when the user wants a review verdict, not only a merge-ready babysit. Do **not** merge unless asked.
+Same babysit bar as **make merge-ready**: clear useful human + bot comments, own bug + security reviews, fix in-PR, **required CI green**, then a **verdict** comment (usefulness included). Do **not** merge unless asked.
+
+**Keep going on each targeted PR** until that bar (or a **hard blocker**). Soft opinions are not stop conditions.
 
 Skip 0.1% nits. No follow-up PR for in-scope fixes.
 
+## Targets
+
+- Default: one PR.
+- If the user lists several existing PRs: full-review **each** to the same bar; report a per-PR table when done. Do not abandon the batch because one PR is opinion-gated.
+
+## Verdict labels (strict)
+
+| Label | When allowed |
+|---|---|
+| `approve-comment` | Useful; bots/humans clear; own reviews clean; **required CI green**; no draft/WIP gate |
+| `changes-requested` | Concrete necessary blockers remain that you cannot/should not silently fix |
+| `not-useful` | Usefulness pass failed — stop expanding work on that PR |
+| `gated` | **Only** GitHub draft / WIP / do-not-merge (shared draft gates). **Not** “wants maintainer ack”, “security feels sensitive”, or “Windows looks flaky” |
+
+**Forbidden stop excuses** (report in chat if relevant, but **keep fixing CI + comments**):
+
+- “Needs maintainer security ack” / “should get human OK first”
+- “Security relevance possible” without a concrete unfixed finding
+- Treating shared/infra CI noise as done while **this PR’s** required checks are still red (classify + flake retries per shared rules; if budget exhausted → hard-blocker row, not a fake `gated`)
+
 ## Steps
 
-1. Load PR `#N`: intent, diff, linked issue, draft/WIP gates, behind-base/conflicts, required CI, unresolved **human** (owners/maintainers first) + CodeRabbit/Codex comments.
-2. Usefulness pass: is it fixing a real bug / delivering the claimed value? If not useful, verdict = reject/close recommendation and stop expanding work.
-3. Launch **parallel subagents**:
-   - Bug / correctness review
-   - Security review (`review-security` helper ok)
-4. Triage open human + bot comments (shared rules — owners/maintainers first).
-5. Fix everything that can and should be fixed in this PR; update from base if behind; push; wait until stable or hard blocker; recheck.
+1. Identify PR(s); checkout head; note base, linked issues, draft/WIP gates.
+2. Usefulness pass: real bug / claimed value? If not → `not-useful` verdict and stop that PR only.
+3. Parallel subagents: bug/correctness + security (`review-security` ok).
+4. Triage open human + bot comments (shared rules — owners/maintainers first). Fix useful; decline nits with rationale.
+5. Push fixes; **wait and recheck** until useful threads quiet **and** required CI green, or a hard blocker (shared rules — no early exit on round/time caps).
 6. Changelog nudge if user-facing.
-7. If real necessary issues remain: GitHub **changes requested** with concrete blockers only.
-8. Post a short verdict comment:
+7. If concrete necessary issues remain: GitHub **changes requested** with those blockers only.
+8. Post a short verdict comment **only after** CI+comments are handled or a real hard blocker / `not-useful` / draft `gated` applies:
 
 ```markdown
-## Verdict: <approve-comment | changes-requested | not-useful | gated>
+## [shipping-github] Verdict: <approve-comment | changes-requested | not-useful | gated>
 
 - Usefulness: …
 - Bugs: …
-- Security: …
+- Security: … (findings fixed / none / concrete remaining)
 - Owner/maintainer reviews: …
 - Bots: …
-- Base / CI: …
-- Gate: …
+- Base / CI: … (name failing required jobs in backticks if any)
+- Gate: … (draft/WIP only, or none)
 ```
 
 Approve via GitHub only if the user asked for approval; otherwise comment or request changes.
 
-If the user also asked for merge-ready and the verdict is clean: continue with the merge-ready PR + linked-issue comments from `fix-pr-bots` (idempotent).
+If the verdict is `approve-comment` (clean): also post merge-ready PR + linked-issue notify per `fix-pr-bots` (idempotent) unless the user asked for verdict-only.
 
 ## Done when
 
+For **every** targeted PR:
+
 - Usefulness assessed
 - Bug + security subagent reviews done
-- Useful bots/fixes handled or declined with rationale
-- Verdict comment posted
-- Changes requested only when warranted
+- Useful bots/humans handled or declined with rationale
+- Required CI green **or** hard-blocker reported (flake budget exhausted / permissions / etc.) — **never** “done” with unexplained red CI
+- Verdict posted with a **valid** label (see table)
+- No invented maintainer-ack / soft-security stop

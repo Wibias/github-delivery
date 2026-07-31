@@ -35,7 +35,7 @@ Match the user request, then read **only** the matching workflow file plus
 | Re-review PR #N from human review + commits + new rabbit/Codex | `references/re-review-pr.md` |
 | Research issue(s) #N… on latest development; priority; comment on issue | `references/research-issue.md` |
 | Create PR for issue #N (preflight first); link both ways; merge-ready | `references/create-pr-for-issue.md` |
-| Full review on PR #N; bug + security; open fixes; verdict | `references/full-review-pr.md` |
+| Full review on PR #N (or a list); babysit to green + verdict | `references/full-review-pr.md` |
 | Security review / security review on PR #N | `references/security-review.md` |
 | Status / what’s left / is PR #N merge ready? (read-only) | `references/status.md` |
 | Merge PR #N; why-good + thanks; issue thank + close | `references/merge-pr.md` |
@@ -56,7 +56,7 @@ Read `references/shared-rules.md` before acting. Non-negotiables:
 3. Review triage — trusted owners/maintainers first; published feedback only; verify bots against code.
 4. Social mutation — no auto-replies to humans without exact-text confirmation; limited thread resolves.
 5. CI classify — branch fix vs flake; max 3 flaky reruns per SHA.
-6. Mode-aware waits — merge-ready/babysit-fix: **until merge-ready** (or hard blocker), never quit on “3 rounds / 20m”; watch: continue past green until merged/closed/blocker.
+6. Mode-aware waits — merge-ready / full-review / babysit-fix: **until green+comments clean** (or hard blocker); never quit on “3 rounds / 20m”; never invent soft “maintainer ack” stops; watch: continue past green until merged/closed/blocker.
 7. Behind base + conflicts — update before merge-ready or merge.
 8. Draft/WIP/do-not-merge — never merge or claim ready while gated.
 9. Prefer in-PR fixes; merge only on merge workflow (thank PR + issue authors, no self-thanks; auto-close issues when fixed).
@@ -81,7 +81,7 @@ Read `references/shared-rules.md` before acting. Non-negotiables:
 - references/re-review-pr.md -- when to read: re-review after human/bot feedback
 - references/research-issue.md -- when to read: research one or more issues on latest development tip + priority comment
 - references/create-pr-for-issue.md -- when to read: preflight then open a linked PR for an issue and make it merge-ready
-- references/full-review-pr.md -- when to read: full usefulness/bug/security review + verdict
+- references/full-review-pr.md -- when to read: full-review babysit to CI green + usefulness verdict
 - references/security-review.md -- when to read: explicit security review on a PR/branch
 - references/status.md -- when to read: read-only PR status / what's left
 - references/merge-pr.md -- when to read: merge a PR with thanks and issue close-out

@@ -81,12 +81,13 @@ If you disagree with a human comment or it needs a written answer: explain in **
 
 | Mode | Keep going until | Hard stop (report, don’t pretend done) |
 |---|---|---|
-| **Fix / create → merge-ready** (`fix-pr-bots`, create-PR cleanup) | Each targeted PR is merge-ready (or gated with an explained blocker) | Permissions / dirty unrelated tree / push rejected / flake retry budget exhausted on required checks / product decision / human reply needs confirmation / user interrupt. **Do not** stop just because “3 rounds” or “20 minutes” passed |
+| **Fix / create → merge-ready** (`fix-pr-bots`, create-PR cleanup) | Each targeted PR is merge-ready (or draft/WIP gated with an explained blocker) | Permissions / dirty unrelated tree / push rejected / flake retry budget exhausted on required checks / product decision / human reply needs confirmation / user interrupt. **Do not** stop just because “3 rounds” or “20 minutes” passed. **Do not** stop for soft “needs maintainer ack” while CI/comments are still fixable |
+| **Full review** (`full-review-pr`) | Each targeted PR has a valid verdict **and** required CI green (or hard blocker / `not-useful` / draft-only `gated`) | Same hard blockers. Soft security opinions ≠ stop |
 | **Watch** (`watch-pr`) | PR merged/closed (green+mergeable is a milestone — keep watching for new comments) | Same hard blockers, or user stop |
 | **Re-review** | Concerns re-checked and fixed or changes-requested | Same hard blockers |
 | **Status** | One snapshot — no wait loop | — |
 
-If the user named **several** existing PRs (“babysit these”, “make 778–782 merge ready”), keep working **each** until merge-ready or a hard blocker — same no-early-exit rule. That is not “creating” a batch; it’s finishing open PRs they listed.
+If the user named **several** existing PRs (“full review these”, “babysit these”, “make 778–782 merge ready”), keep working **each** until that mode’s done condition or a hard blocker — same no-early-exit rule. That is not “creating” a batch; it’s finishing open PRs they listed.
 
 ## CI — branch fix vs flake
 
