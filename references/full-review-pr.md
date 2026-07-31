@@ -19,7 +19,7 @@ Skip 0.1% nits. No follow-up PR for in-scope fixes.
 
 | Label | When allowed |
 |---|---|
-| `approve-comment` | Useful; bots/humans clear; own reviews clean; **required CI green**; no draft/WIP gate |
+| `approve-comment` | Useful; bots/humans clear; own reviews clean; up to date with base; **compiles against tip**; **required CI green**; no draft/WIP gate |
 | `changes-requested` | Concrete necessary blockers remain that you cannot/should not silently fix |
 | `not-useful` | Usefulness pass failed — stop expanding work on that PR |
 | `gated` | **Only** GitHub draft / WIP / do-not-merge (shared draft gates). **Not** “wants maintainer ack”, “security feels sensitive”, or “Windows looks flaky” |
@@ -36,7 +36,7 @@ Skip 0.1% nits. No follow-up PR for in-scope fixes.
 2. Usefulness pass: real bug / claimed value? If not → `not-useful` verdict and stop that PR only.
 3. Parallel subagents: bug/correctness + security (`review-security` ok).
 4. Triage open human + bot comments (shared rules — owners/maintainers first). Fix useful; decline nits with rationale.
-5. Push fixes; **wait and recheck** until useful threads quiet **and** required CI green, or a hard blocker (shared rules — no early exit on round/time caps).
+5. Push fixes; update from base if behind; **verify compile/tests against tip**; **wait and recheck** until useful threads quiet **and** required CI green on that tip SHA, or a hard blocker (shared rules — no early exit on round/time caps).
 6. Changelog nudge if user-facing.
 7. If concrete necessary issues remain: GitHub **changes requested** with those blockers only.
 8. Post a short verdict comment **only after** CI+comments are handled or a real hard blocker / `not-useful` / draft `gated` applies:

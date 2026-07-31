@@ -17,7 +17,7 @@ Necessary/useful **human** (esp. owners/maintainers) + CodeRabbit/Codex comments
 
 1. Identify PR(s), checkout head, note base/default branch, list **linked issues** (`closingIssuesReferences` / `Fixes #N`).
 2. Apply **draft/WIP/do-not-merge** awareness (shared rules). Work may continue; do not claim final merge-ready while gated.
-3. **Behind base + conflicts:** update from base if needed; resolve or stop and ask.
+3. **Behind base + compile against tip:** update from base if needed; run local compile/typecheck/focused tests against tip; push; wait for required CI on the new SHA. If tip broke the branch, fix or hard-block — never claim ready while stale or non-compiling.
 4. Collect unresolved review threads: owners/maintainers first, then other humans, then bots. Skip resolved/outdated.
 5. Triage and fix necessary/useful items (trusted humans first; verify bots). For human declines needing a written reply: confirm exact text in chat first (shared social policy). Bot skip notes may use `[shipping-github]` prefix.
 6. Push fixes (git safety: no force-push; stop if rejected / dirty unrelated tree).
@@ -34,7 +34,7 @@ Necessary/useful **human** (esp. owners/maintainers) + CodeRabbit/Codex comments
 - Human review (trusted/owners first): addressed / declined (chat-confirmed if human reply)
 - Bot review (CodeRabbit/Codex): addressed / declined with rationale (0 unresolved useful threads)
 - Own bug + security review: done; blockers fixed / none
-- Base: up to date / conflicts resolved (`mergeStateStatus: CLEAN` when applicable — backticks only)
+- Base: up to date with tip; compiles/tests against tip; conflicts resolved (`mergeStateStatus: CLEAN` when applicable — backticks only)
 - CLI / local checks: green
 - Required CI: green (flaky retries used: N; name jobs in backticks)
 
@@ -60,6 +60,6 @@ For monitoring **after** merge-ready while the PR stays open (new late comments)
 - Every targeted PR has a valid merge-ready PR comment **and** linked-issue notify (or a clear hard blocker — no false merge-ready)
 - Useful human + bot threads handled (or declined with policy) before any merge-ready claim
 - Own bug + security subagent reviews completed; necessary findings fixed
-- Branch not conflicted / not wrongly behind (when claiming ready)
+- Branch not conflicted / not behind / **compiles against current tip** (when claiming ready)
 - CLI + required CI green (when claiming ready)
 - PR(s) **not** merged

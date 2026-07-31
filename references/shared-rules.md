@@ -27,14 +27,19 @@ Block **merge** (and do not post a final “Ready to merge” claim) when any of
 
 Report the gate and stop that step. Fix/review may continue, but say merge-ready is blocked until the gate clears.
 
-## Behind base + conflicts
+## Behind base + compile against tip
 
-Before declaring merge-ready or merging:
+`mergeable` / green CI on an **old SHA** is not enough. Before merge-ready, full-review approve, or merge:
 
-1. Check whether the PR head is behind its base / default branch and whether it has conflicts.
-2. If behind or conflicted: update from the base (merge or rebase per repo norm). Preserve intent; if intents conflict, stop and ask.
-3. Push the update, then recheck reviews + CI.
-4. Never claim merge-ready or merge while conflicted or knowingly stale behind a required base update.
+1. Check whether the PR head is behind its base (often `dev`) and whether it has conflicts.
+2. If behind or conflicted: **update from the base** (merge or rebase per repo norm). Preserve intent; if intents conflict, stop and ask.
+3. After the update (or if already up to date): verify the branch **still builds against current base tip**:
+   - Prefer the repo’s normal local gate for this change (typecheck / compile / focused tests / project CLI).
+   - Then push and wait for **required CI on the new SHA**.
+4. If it no longer compiles or tests fail **because of base drift**: fix in this PR (adapt to tip APIs) or hard-block with evidence — do **not** claim merge-ready / approve / merge.
+5. Never claim merge-ready or merge while conflicted, behind base, or failing compile/tests against current tip.
+
+Applies to: `fix-pr-bots`, `full-review-pr`, `create-pr-for-issue`, `re-review-pr`, `merge-pr`, and `watch-pr` when auto-fixing.
 
 ## Review triage (humans + bots)
 
@@ -165,18 +170,21 @@ For changelog **content**, semver bump choice, and release tagging, follow `git-
 
 Before claiming merge-ready (or ending a successful watch milestone):
 
-1. Fresh `gh pr view` (SHA, draft/gate, mergeable, required checks, `reviewDecision`)
-2. Unresolved **published** review threads (humans + bots). Count open threads; sample bodies.
-3. Local `git status` (report dirty files left untouched)
+1. Fresh `gh pr view` (SHA, draft/gate, mergeable, required checks, `reviewDecision`, behind-base)
+2. Confirm head is **up to date with base** and **compiles/tests against tip** (local gate and/or green required CI on that SHA)
+3. Unresolved **published** review threads (humans + bots). Count open threads; sample bodies.
+4. Local `git status` (report dirty files left untouched)
 
 **Do not post merge-ready** if any of these still hold:
 
+- Behind base, conflicted, or broken compile/tests against current tip
 - Unresolved useful human or bot threads (CodeRabbit/Codex/Bugbot/etc.) that were not fixed **or** explicitly declined on-thread with rationale
 - Required CI red (or flake budget exhausted without a clear “out of scope / infra” hard-blocker report instead of merge-ready)
 - `CHANGES_REQUESTED` still in force from a trusted reviewer
 - Draft / WIP / do-not-merge gate
+- Own bug/security blockers unfixed (merge-ready / full-review paths)
 
-“CI green” alone is **not** merge-ready. A rate-limited bot summary is **not** “bots clean.”
+“CI green” alone is **not** merge-ready. Green on a **stale** SHA while behind tip is **not** merge-ready. A rate-limited bot summary is **not** “bots clean.”
 
 When merge-ready **is** valid, also notify linked issues (see `fix-pr-bots`).
 

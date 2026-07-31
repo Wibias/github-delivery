@@ -57,7 +57,7 @@ Read `references/shared-rules.md` before acting. Non-negotiables:
 4. Social mutation — no auto-replies to humans without exact-text confirmation; limited thread resolves.
 5. CI classify — branch fix vs flake; max 3 flaky reruns per SHA.
 6. Mode-aware waits — merge-ready / full-review / babysit-fix: **until green+comments clean** (or hard blocker); never quit on “3 rounds / 20m”; never invent soft “maintainer ack” stops; watch: continue past green until merged/closed/blocker.
-7. Behind base + conflicts — update before merge-ready or merge.
+7. Behind base + **compile against tip** — update from base, then verify build/tests on tip before merge-ready / full-review approve / merge.
 8. Draft/WIP/do-not-merge — never merge or claim ready while gated.
 9. Prefer in-PR fixes; merge only on merge workflow (thank PR + issue authors, no self-thanks; auto-close issues when fixed).
 10. Create-PR: need-to-fix preflight; **one PR** unless explicit batch; **canonical repo only** (never fork-only deliverable); verify `Fixes #N` link; **assign @me** on the issue; **one** idempotent issue comment (edit if incomplete — never a second cut-off comment).
