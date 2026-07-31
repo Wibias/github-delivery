@@ -30,7 +30,7 @@ If both are installed, **prefer this redirect + shipping-github**.
    node "<shipping-github>/scripts/watch-wake-gate.mjs" OWNER/REPO N
    ```
 
-   Exit `1` → triage OWNER/MEMBER comments; **never** report waiting on CI/CodeRabbit.
+   Exit `1` → triage OWNER/MEMBER comments **in code** (rebase/drop overlap / keep leftovers); resolve DIRTY conflicts. ACK-only does not clear. **Never** report waiting on CI/CodeRabbit while exit `1`.
 4. Ordering: reviews/owners → tip update → CI. Never merge-base-then-idle.
 5. Optional: you may still use `gh_pr_watch.py` **as a snapshot helper** if present, but decisions and owner triage follow shipping-github — the Python watcher is not the policy engine.
 

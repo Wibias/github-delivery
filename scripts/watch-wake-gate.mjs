@@ -1,20 +1,22 @@
 #!/usr/bin/env node
 /**
- * Watch wake gate: block "waiting for CI/CodeRabbit" while trusted-human
- * PR conversation comments are still unaddressed.
+ * Watch wake gate: block idle/"waiting for CI/CodeRabbit" while work remains.
  *
  * Usage:
  *   node scripts/watch-wake-gate.mjs OWNER/REPO PR_NUMBER
  *
- * Exit 0 → can idle on CI/bots (no unacked OWNER/MEMBER/COLLABORATOR comments).
- * Exit 1 → must triage/fix listed comments first (do NOT report waiting).
+ * Exit 0 → may idle on CI/bots (owner comments cleared by a real commit; not DIRTY).
+ * Exit 1 → must act (do NOT report waiting). See blockers[].
  * Exit 2 → usage / gh error.
  *
- * A comment is acked only when, after it, there is either:
- *   - a non-merge commit on the PR head, or
- *   - a later comment matching /\[shipping-github\]\s*Addressed owner feedback/i
+ * Trusted-human top-level comments clear ONLY via a later **non-merge** commit
+ * on the PR head. A chatty
+ *   [shipping-github] Addressed owner feedback — …
+ * comment alone does **not** clear (that was gamed: ack + idle on conflicts).
+ * Post the ACK *after* the fix commit if you want a paper trail.
  *
- * Top-level OWNER notes are often NOT in reviewThreads — this gate catches them.
+ * Also blocks when mergeStateStatus is DIRTY / CONFLICTING / BEHIND — update
+ * from base / resolve; do not poll while conflicted.
  */
 import { spawnSync } from "node:child_process";
 
@@ -58,6 +60,7 @@ const AGENT_PREFIX_RE = /^#{0,3}\s*\[shipping-github\]/i;
 const ACK_RE = /\[shipping-github\]\s*Addressed owner feedback/i;
 const MERGE_COMMIT_RE =
   /^(Merge (branch|remote-tracking|pull request)|merge .* into |chore:\s*merge\b)/i;
+const DIRTY_STATES = new Set(["DIRTY", "CONFLICTING", "BEHIND"]);
 
 function isBotLogin(login) {
   if (!login) return true;
@@ -72,12 +75,11 @@ try {
     "--repo",
     repo,
     "--json",
-    "url,headRefOid,commits,comments,author",
+    "url,headRefOid,commits,mergeStateStatus,mergeable,baseRefName",
   ]);
 
   const myLogin = ghText(["api", "user", "--jq", ".login"]);
 
-  // Full issue comments (gh pr view comments can be truncated / incomplete)
   const issueComments = ghJson([
     "api",
     `repos/${owner}/${name}/issues/${pr}/comments?per_page=100`,
@@ -98,33 +100,41 @@ try {
     body: c.body || "",
   }));
 
+  const blockers = [];
+
+  const mergeState = meta.mergeStateStatus || "";
+  if (DIRTY_STATES.has(mergeState) || meta.mergeable === "CONFLICTING") {
+    blockers.push({
+      id: null,
+      author: null,
+      association: null,
+      createdAt: null,
+      url: meta.url,
+      excerpt: `mergeStateStatus=${mergeState} mergeable=${meta.mergeable}`,
+      reason: "base_dirty_or_behind",
+      howToClear: `Update from base \`${meta.baseRefName || "base"}\`, resolve conflicts, drop work already on tip if owner said it landed elsewhere, push a non-merge fix commit. Do not idle while DIRTY.`,
+    });
+  }
+
   const trusted = comments.filter((c) => {
     if (!TRUSTED.has(c.association)) return false;
     if (isBotLogin(c.login)) return false;
-    // Operator's own notes/verdicts are not "incoming review" for this gate
     if (myLogin && c.login === myLogin) return false;
     if (AGENT_PREFIX_RE.test(c.body.trim())) return false;
-    // ignore pure ACK markers themselves
     if (ACK_RE.test(c.body)) return false;
-    // ignore trivial reactions-only / empty
     if (c.body.trim().length < 40) return false;
     return true;
   });
 
-  const blockers = [];
   for (const c of trusted) {
     const t = Date.parse(c.createdAt);
-    const laterAck = comments.some(
-      (x) => Date.parse(x.createdAt) > t && ACK_RE.test(x.body),
-    );
     const laterNonMergeCommit = commits.some((commit) => {
       if (!commit.authoredDate) return false;
       if (Date.parse(commit.authoredDate) <= t) return false;
       if (MERGE_COMMIT_RE.test(commit.message || "")) return false;
-      // ignore empty messages
-      return true;
+      return Boolean((commit.message || "").trim());
     });
-    if (laterAck || laterNonMergeCommit) continue;
+    if (laterNonMergeCommit) continue;
     blockers.push({
       id: c.id,
       author: c.login,
@@ -132,9 +142,9 @@ try {
       createdAt: c.createdAt,
       url: c.url,
       excerpt: c.body.replace(/\s+/g, " ").slice(0, 220),
-      reason: "trusted_human_comment_unacked",
+      reason: "trusted_human_comment_needs_code",
       howToClear:
-        "Address in code (non-merge commit) or post: [shipping-github] Addressed owner feedback — <one line>",
+        "Act on the feedback in code (non-merge commit): rebase/drop overlap already on tip, keep leftover work, fix conflicts. Optional after push: [shipping-github] Addressed owner feedback — <one line>. ACK-only does NOT clear this gate.",
     });
   }
 
@@ -143,11 +153,13 @@ try {
     pr,
     url: meta.url,
     headRefOid: meta.headRefOid,
+    mergeStateStatus: meta.mergeStateStatus,
+    mergeable: meta.mergeable,
     canWait: blockers.length === 0,
     blockerCount: blockers.length,
     blockers,
     note: blockers.length
-      ? "Do NOT report waiting for CI/CodeRabbit. Triage blockers first."
+      ? "Do NOT report waiting for CI/CodeRabbit. Fix blockers (code + base), not ACK-only."
       : "Wake gate clear — CI/bot wait allowed.",
   };
 

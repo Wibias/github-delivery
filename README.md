@@ -64,7 +64,7 @@ Concrete evidence scripts (see `references/gate-helpers.md`):
 | `scripts/codeowners-for-pr.mjs` | Map PR files → CODEOWNERS on base + review requests |
 | `scripts/review-threads.mjs` | Paginate GraphQL unresolved review threads (+ optional resolve) |
 | `scripts/pr-policy-gate.mjs` | Code-owner **enforcement**, dismiss-stale / last-push approvals, merge queue / `merge_group` warn |
-| `scripts/watch-wake-gate.mjs` | **Watch only:** exit `1` while unacked OWNER/MEMBER top-level comments exist — forbids “waiting on CI/CodeRabbit” |
+| `scripts/watch-wake-gate.mjs` | Exit `1` until a **non-merge** commit addresses OWNER comments **and** PR is not DIRTY/BEHIND — ACK-only does not clear |
 
 ### Watch ordering (hard)
 

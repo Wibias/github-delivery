@@ -33,26 +33,33 @@ Do **not** merge unless they also asked to merge (then hand off to `merge-pr` on
 node "<shipping-github>/scripts/watch-wake-gate.mjs" OWNER/REPO N
 ```
 
-- **Exit `1` / `canWait: false`:** you are **forbidden** to say you are waiting on CI, `windows-latest`, CodeRabbit, or Codex. Triage `blockers[]` (OWNER/MEMBER/COLLABORATOR top-level comments) first — patch/rebase/drop overlap, then either a **non-merge** commit or post:
+- **Exit `1` / `canWait: false`:** you are **forbidden** to say you are waiting on CI, `windows-latest`, CodeRabbit, or Codex. Act on `blockers[]`:
+  - `trusted_human_comment_needs_code` — owner/member said something actionable (including “half landed elsewhere, keep the rest”): **rebase onto tip, drop duplicated work, keep leftovers, fix conflicts, push**. Do **not** only post an ACK comment.
+  - `base_dirty_or_behind` — `DIRTY` / `CONFLICTING` / `BEHIND`: update from base and resolve **now**. Polling while conflicted is forbidden.
+  - Optional paper trail **after** the fix commit:
 
-  ```markdown
-  [shipping-github] Addressed owner feedback — <one line what changed>
-  ```
+    ```markdown
+    [shipping-github] Addressed owner feedback — <one line what changed on tip>
+    ```
+
+  - **ACK-only does not clear the gate** (script requires a later non-merge commit).
 
 - **Exit `0`:** CI/bot wait is allowed.
 - Re-run this script after every push and before every progress heartbeat.
 
-This exists because prose “reviews first” was ignored in live watches. **The exit code is the rule.**
+This exists because prose “reviews first” was ignored, and ACK-without-fix was gamed. **The exit code is the rule.**
 
 ### Forbidden (instant fail)
 
-These progress lines are **illegal** while the wake-gate exits `1`:
+These progress lines are **illegal** while the wake-gate exits `1` (or while `mergeStateStatus` is DIRTY/CONFLICTING/BEHIND):
 
 - “up to date with `dev`; waiting on CI / windows-latest”
 - “waiting on CodeRabbit / Codex”
 - “tip is current; polling until green”
+- “acknowledged owner feedback; leaving open; keeping an eye out” **without** a follow-up fix commit / conflict resolution
+- “DIRTY / conflicting — expected; still watching” — conflicts are work, not a spectator sport
 
-Owner guidance is often a **top-level PR conversation comment** (not an inline review thread). The wake-gate script fetches those; `review-threads.mjs` alone is **not** enough.
+Owner “left open because leftover work remains” means **do the leftover work on tip** (or hard-block to the user with why you can’t), not acknowledge and poll.
 
 ### Wake gate checklist
 
@@ -73,14 +80,16 @@ On **every** poll / wake (including the first):
 5. **Reviews first (mandatory):** triage per shared rules — **CODEOWNERS / owners / maintainers first**, then other humans, then bots.
    - Patch+push actionable items (narrow scope / drop work already on tip / rebase per owner note).
    - Human written replies → chat confirm. Inline replies in-thread. Resolve only allowed threads after verified fixes.
-6. **Then** if behind/conflicted: update from base, resolve or ask, push; verify compile-against-tip. Prefer combining with review fixes in the **same** push.
+6. **Then** if behind/conflicted **or** wake-gate reports `base_dirty_or_behind`: update from base, resolve or ask, push; verify compile-against-tip. Prefer combining with review fixes in the **same** push. **Never** enter the 1–2 min poll loop while `DIRTY`/`CONFLICTING`.
 7. **Then CI:** classify branch vs flake. Fix branch-related; rerun flakes (max 3 / SHA); stop on exhausted infra failures. After push: re-check stale-approval / last-push via `pr-policy-gate`.
 8. Security-offer / changelog nudge once if applicable.
-9. Only if green + mergeable + **useful threads/comments quiet** on **current** SHA: report milestone **“CI/reviews quiet — still watching (not full merge-ready bar)”**. Do **not** post `[shipping-github] Merge ready` from watch alone. Keep polling while open. If auto-merge **or merge-queue** queued: watch until **actually merged**.
+9. Only if green + mergeable + **useful threads/comments quiet** on **current** SHA **and** wake-gate exit `0`: report milestone **“CI/reviews quiet — still watching (not full merge-ready bar)”**. Do **not** post `[shipping-github] Merge ready` from watch alone. Keep polling while open. If auto-merge **or merge-queue** queued: watch until **actually merged**.
 10. Stop only when:
    - PR **merged** or **closed**, or
    - Hard blocker (permissions, fork-head unwritable, dirty unrelated tree, push rejected, flake budget exhausted, product decision, human reply needs confirmation, stack needs `manage-stacked-prs` for trunk, merge-queue stuck with `merge_group` CI gap), or
    - User interrupts / asks to stop.
+
+**Partial land on another branch:** if the owner says most of the fix already merged elsewhere and left this PR open for leftovers — rebase onto current base, remove duplicated changes, implement/keep only the remaining delta, push, re-run wake-gate. Acknowledging in a comment without that rebase is a failed watch turn.
 
 ## Cadence
 

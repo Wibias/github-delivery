@@ -38,7 +38,7 @@ Before any watch “waiting for CI/CodeRabbit” heartbeat:
 node "<shipping-github>/scripts/watch-wake-gate.mjs" OWNER/REPO N
 ```
 
-Exit `1` = unacked OWNER/MEMBER/COLLABORATOR top-level comments (merge-from-base alone does **not** clear). Fix or post `[shipping-github] Addressed owner feedback — …`, then re-run. Exit `0` = wait allowed. See `watch-pr.md`.
+Exit `1` = must act: unacked OWNER/MEMBER top-level comments (**code** required — ACK comment alone does not clear) and/or `DIRTY`/`CONFLICTING`/`BEHIND`. Fix or rebase, then re-run. Exit `0` = wait allowed. See `watch-pr.md`.
 
 ## Merge queue + review policy
 

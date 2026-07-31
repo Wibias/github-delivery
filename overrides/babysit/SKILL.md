@@ -26,7 +26,7 @@ personal skill or `shipping-github` is available.
    node "<shipping-github>/scripts/watch-wake-gate.mjs" OWNER/REPO N
    ```
 
-   Exit `1` → triage OWNER/MEMBER comments; **never** report waiting on CI/CodeRabbit.
+   Exit `1` → triage OWNER/MEMBER comments **in code** (rebase/drop overlap / keep leftovers); resolve DIRTY conflicts. ACK-only does not clear. **Never** report waiting on CI/CodeRabbit while exit `1`.
 4. Ordering: reviews/owners → tip update → CI. Never merge-`dev`-then-idle.
 
 ## Do not
