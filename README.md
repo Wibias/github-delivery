@@ -69,6 +69,21 @@ Concrete evidence scripts (see `references/gate-helpers.md`):
 | `scripts/watch-wake-gate.mjs` | Exit `1` until a **non-merge** commit addresses OWNER comments **and** PR is not DIRTY/BEHIND — ACK-only does not clear |
 | `scripts/security-scope.mjs` | PR file → required security surfaces (incl. crypto/session, business-logic, IaC/Docker, removed-controls, **agentic skills/MCP**); flags `ai-agent-security` + AST10 + deps audit; `adversarialPassDefault: false` |
 
+### Security review + adversarial / red-team
+
+Normal **security review** (`references/security-review.md`) is defensive: scope script → coverage matrix → HIGH-confidence findings → High+ pass gate. Skill/MCP install paths also pull **Agentic Skills Top 10** (`references/agentic-skills-top10.md`) + `ai-agent-security`.
+
+**Adversarial / red-team second pass** (garak, promptfoo, PyRIT, extra attack subagent):
+
+| Rule | Detail |
+|---|---|
+| Default | **Never** on the agent’s own initiative (`adversarialPassDefault: false` in scope JSON) |
+| When allowed | Only if **you** explicitly ask this session — e.g. “adversarial pass”, “red team”, “red-team”, “second security pass”, “run garak/promptfoo” |
+| Not enough | Saying “security review” / “yes” to the security offer / AST10 flag / `ai-agent-security` mentioning red-teaming |
+| Pass gate | Does **not** block a normal **Pass** unless you said the review is incomplete without it |
+
+Policy lives in `security-review.md` §1b, hard rule #12 in `SKILL.md`, `shared-rules.md`, and scope `instructions[]`.
+
 ### Watch ordering (hard)
 
 Every watch wake:
