@@ -20,12 +20,12 @@ Necessary/useful **human** (esp. owners/maintainers) + CodeRabbit/Codex comments
 3. **Behind base + compile against tip:** update from base if needed; run local compile/typecheck/focused tests against tip; push; wait for required CI on the new SHA. If tip broke the branch, fix or hard-block — never claim ready while stale or non-compiling.
 4. Collect unresolved review threads: owners/maintainers first, then other humans, then bots. Skip resolved/outdated.
 5. Triage and fix necessary/useful items (trusted humans first; verify bots). For human declines needing a written reply: confirm exact text in chat first (shared social policy). Bot skip notes may use `[shipping-github]` prefix.
-6. Push fixes (git safety: no force-push; stop if rejected / dirty unrelated tree).
+6. Push fixes (git safety: no force-push; stop if rejected / dirty unrelated tree / **fork-head unwritable**).
 7. **Wait and recheck** — new useful comments or red required CI → fix/push again. Repeat until stable **or** a hard blocker (shared rules). No “3 rounds / 20 min then quit.”
-8. Fix CLI / project checks this PR broke. Classify CI: branch fix vs flake (shared rules; flake reruns still max 3 / SHA).
+8. Fix CLI / project checks this PR broke. Classify CI: branch fix vs flake (shared rules; flake reruns still max 3 / SHA). Apply **Required checks + review gate**.
 9. **Own reviews (required — not optional):** run **bug review + security review in parallel subagents** (`review-bugbot` / bug axis + `review-security` / security-review). Triage findings; fix what can/should land in this PR; skip 0.1% nits. Public request-changes / comments stay redacted for exploit detail (shared disclosure rules). Changelog nudge when user-facing.
-10. Recheck human/bot threads + required CI after any review-driven pushes (loop again if needed).
-11. **Final evidence sweep** (shared rules). **Refuse merge-ready** while useful bot/human threads remain open (or only “rate-limited / summary” without triage), or while own bug/security findings that should block merge are unfixed. CI green alone is not enough.
+10. Recheck human/bot threads + required CI after any review-driven pushes (loop again if needed). If **stacked**, label ready-vs-parent vs trunk; trunk merge → `manage-stacked-prs`.
+11. **Final evidence sweep** (shared rules). **Refuse merge-ready** while useful bot/human threads remain open (or only “rate-limited / summary” without triage), while protection/CODEOWNERS block, or while own bug/security findings that should block merge are unfixed. CI green alone is not enough.
 12. If truly ready, post on the **PR** (idempotent — edit prior merge-ready if one exists; fix malformed `\` escapes by edit):
 
 ```markdown

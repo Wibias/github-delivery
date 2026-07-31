@@ -19,7 +19,7 @@ Skip 0.1% nits. No follow-up PR for in-scope fixes.
 
 | Label | When allowed |
 |---|---|
-| `approve-comment` | Useful; bots/humans clear; own reviews clean; up to date with base; **compiles against tip**; **required CI green**; no draft/WIP gate |
+| `approve-comment` | Useful; bots/humans clear; own reviews clean; up to date with base; **compiles against tip**; **required CI green**; protection/`reviewDecision`/CODEOWNERS clear; not mid-stack-for-trunk; no draft/WIP gate |
 | `changes-requested` | Concrete necessary blockers remain that you cannot/should not silently fix |
 | `not-useful` | Usefulness pass failed — stop expanding work on that PR |
 | `gated` | **Only** GitHub draft / WIP / do-not-merge (shared draft gates). **Not** “wants maintainer ack”, “security feels sensitive”, or “Windows looks flaky” |

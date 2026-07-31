@@ -10,8 +10,11 @@ Merge PR `#N` after readiness checks, comment why it’s useful, `@thanks` the P
 
 - Not draft / WIP / do-not-merge (shared gates)
 - Not conflicted; not behind base; **compiles/tests against current tip** (update + verify first per shared rules)
-- Required CI green (non-required: note; ask if unclear)
+- Required CI green on **current** SHA (shared **Required checks + review gate**; non-required: note; ask if unclear)
+- `reviewDecision` / CODEOWNERS / required reviewers not blocking
 - No unresolved necessary owner/maintainer (or other human) blockers you agree with
+- **Not mid-stack for trunk:** if base is another open PR head, abort and hand off to `manage-stacked-prs` (merge bottom-up). Do not `gh pr merge` into a parent feature branch thinking it shipped to trunk.
+- Fork head: only merge if fixes are already on the head (or you could push); do not merge knowing required fixes were skipped for lack of push access
 
 If preflight fails, do **not** merge; report blockers.
 
@@ -24,8 +27,8 @@ Compare PR author login to the authenticated GitHub user (`gh api user --jq .log
 
 ## Steps
 
-1. Load PR `#N`: author, title, body, labels, draft state, linked issues, diff summary, CI, reviews. Resolve self-merge. Apply security-offer / changelog nudge if not already handled this session.
-2. Run preflight (including behind-base update + compile-against-tip verify). Enforce git safety (no force-push; stop if dirty unrelated / push rejected).
+1. Load PR `#N`: author, title, body, labels, draft state, linked issues, diff summary, CI, reviews, stack/fork flags. Resolve self-merge. Apply security-offer / changelog nudge if not already handled this session.
+2. Run preflight (behind-base update + compile-against-tip + required-checks/review gate + stack check). Enforce git safety (no force-push; stop if dirty unrelated / push rejected / fork-head unwritable when fixes needed).
 3. Post a short PR comment **before** merge (user-facing thanks are from you — no `[shipping-github]` prefix on ceremonial merge thanks):
 
 **Others’ PRs:**

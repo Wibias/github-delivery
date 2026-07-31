@@ -27,7 +27,9 @@ Shipping a PR is rarely one green check. It’s a grind of:
 | Draft / WIP merged by accident | Hard gates before merge-ready claims or merge |
 | CI green but more reviews may arrive | **Watch PR** — keep polling CI + new review comments until the PR is merged/closed or blocked (not a one-shot status check) |
 | Merge without closing the social loop | Thanks + why-it-helps on the PR; thank the **issue** author; auto-close when linked |
-| Security/API PRs or issues slipping past | Explicit security review / ask; **public posts redacted** — exploit details only in chat |
+| False “merge ready” from status | Status uses the **same** evidence bar as merge-ready (tip, protection, CODEOWNERS, stacks) |
+| Mid-stack merged as if trunk | Detect stack → hand off to **manage-stacked-prs** |
+| Can’t push fork head but “fixed” anyway | Fork-head unwritable → hard stop |
 
 Shared rules live in one place (`references/shared-rules.md`): scope lock, git safety (no force-push, stop on dirty trees), evidence sweep before “ready.”
 
@@ -70,6 +72,7 @@ The skill routes to `references/*.md` and always loads `references/shared-rules.
 | **issue-workflow** | Filing/breaking down tracker artifacts (PRDs, slices) — not “is it fixed on tip?” |
 | **git-workflow-and-versioning** | Local commit discipline, semver, changelog *authoring* (this skill only nudges that a user-facing PR may need an entry) |
 | Cursor **babysit** | Thin conflict/CI stub — optional; this skill covers richer watch + the full ship pack |
+| **manage-stacked-prs** | Stack inspect / restack / retarget / bottom-up merge — shipping detects stacks and hands off |
 
 ## Validation
 

@@ -86,11 +86,11 @@ If you disagree with a human comment or it needs a written answer: explain in **
 
 | Mode | Keep going until | Hard stop (report, don’t pretend done) |
 |---|---|---|
-| **Fix / create → merge-ready** (`fix-pr-bots`, create-PR cleanup) | Each targeted PR is merge-ready (or draft/WIP gated with an explained blocker) | Permissions / dirty unrelated tree / push rejected / flake retry budget exhausted on required checks / product decision / human reply needs confirmation / user interrupt. **Do not** stop just because “3 rounds” or “20 minutes” passed. **Do not** stop for soft “needs maintainer ack” while CI/comments are still fixable |
+| **Fix / create → merge-ready** (`fix-pr-bots`, create-PR cleanup) | Each targeted PR is merge-ready (or draft/WIP gated with an explained blocker) | Permissions / **fork-head unwritable** / dirty unrelated tree / push rejected / flake retry budget exhausted on required checks / product decision / human reply needs confirmation / user interrupt / **stacked trunk merge needs `manage-stacked-prs`**. **Do not** stop just because “3 rounds” or “20 minutes” passed. **Do not** stop for soft “needs maintainer ack” while CI/comments are still fixable |
 | **Full review** (`full-review-pr`) | Each targeted PR has a valid verdict **and** required CI green (or hard blocker / `not-useful` / draft-only `gated`) | Same hard blockers. Soft security opinions ≠ stop |
 | **Watch** (`watch-pr`) | PR merged/closed (green+mergeable is a milestone — keep watching for new comments) | Same hard blockers, or user stop |
 | **Re-review** | Concerns re-checked and fixed or changes-requested | Same hard blockers |
-| **Status** | One snapshot — no wait loop | — |
+| **Status** | One snapshot — no wait loop; verdict **cannot be looser** than merge-ready bar | — |
 
 If the user named **several** existing PRs (“full review these”, “babysit these”, “make 778–782 merge ready”), keep working **each** until that mode’s done condition or a hard blocker — same no-early-exit rule. That is not “creating” a batch; it’s finishing open PRs they listed.
 
@@ -170,23 +170,78 @@ For changelog **content**, semver bump choice, and release tagging, follow `git-
 
 Before claiming merge-ready (or ending a successful watch milestone):
 
-1. Fresh `gh pr view` (SHA, draft/gate, mergeable, required checks, `reviewDecision`, behind-base)
+1. Fresh `gh pr view` (SHA, draft/gate, mergeable, required checks, `reviewDecision`, behind-base, `isCrossRepository` / head repo)
 2. Confirm head is **up to date with base** and **compiles/tests against tip** (local gate and/or green required CI on that SHA)
-3. Unresolved **published** review threads (humans + bots). Count open threads; sample bodies.
-4. Local `git status` (report dirty files left untouched)
+3. Run **Required checks + review gate** below (protection / CODEOWNERS / reviewDecision)
+4. Unresolved **published** review threads (humans + bots). Count open threads; sample bodies. Rate-limited bot “SUCCESS” ≠ threads clean.
+5. **Stack check** (below) — if mid-stack, do not treat as trunk-ready without `manage-stacked-prs`
+6. Local `git status` (report dirty files left untouched)
 
 **Do not post merge-ready** if any of these still hold:
 
 - Behind base, conflicted, or broken compile/tests against current tip
 - Unresolved useful human or bot threads (CodeRabbit/Codex/Bugbot/etc.) that were not fixed **or** explicitly declined on-thread with rationale
 - Required CI red (or flake budget exhausted without a clear “out of scope / infra” hard-blocker report instead of merge-ready)
+- Branch-protection / reviewDecision / CODEOWNERS still blocking (see below)
 - `CHANGES_REQUESTED` still in force from a trusted reviewer
 - Draft / WIP / do-not-merge gate
 - Own bug/security blockers unfixed (merge-ready / full-review paths)
+- PR is stacked on another open PR and user asked to merge into trunk (hand off — do not fake ready)
 
 “CI green” alone is **not** merge-ready. Green on a **stale** SHA while behind tip is **not** merge-ready. A rate-limited bot summary is **not** “bots clean.”
 
 When merge-ready **is** valid, also notify linked issues (see `fix-pr-bots`).
+
+## Required checks + review gate (concrete)
+
+Before merge-ready / full-review `approve-comment` / merge / status “merge-ready” verdict:
+
+1. **Identify failing vs pending checks** on the **current** head SHA:
+
+   ```bash
+   gh pr checks N --repo OWNER/REPO
+   gh pr view N --repo OWNER/REPO --json statusCheckRollup,mergeStateStatus,reviewDecision,isDraft,baseRefName,headRefName,headRepository,isCrossRepository
+   ```
+
+2. **Branch protection** on the PR base (best-effort — may 404 without admin):
+
+   ```bash
+   gh api "repos/OWNER/REPO/branches/BASE/protection" --jq "{required_status_checks:.required_status_checks,reviews:.required_pull_request_reviews,enforce_admins:.enforce_admins.enabled}"
+   ```
+
+   If accessible, treat `required_status_checks.contexts` / `checks` as the required set. If inaccessible, fall back to: any check that is red and clearly part of the repo’s always-on matrix (e.g. Cross-platform CI jobs) **plus** anything `mergeStateStatus` implies (`BLOCKED` / `UNSTABLE` / `BEHIND`).
+
+3. **Review decision:** `reviewDecision` of `CHANGES_REQUESTED` blocks. Empty/`REVIEW_REQUIRED` with open CODEOWNER or required-reviewer requests blocks merge-ready unless the user said status-only and you label it blocked. Approvals that GitHub considers stale after new pushes → re-check; do not claim ready.
+
+4. **CODEOWNERS:** if protection requires owner reviews or the Files changed tab shows pending owners, list them; pending CODEOWNER approval blocks merge-ready / merge.
+
+5. Status / chat must name **which** required jobs are red/pending (backticks), not “CI failing.”
+
+## Fork head / push permission
+
+When the PR head is on a **fork** (`isCrossRepository: true` / `headRepository` ≠ canonical):
+
+1. Check whether you can push: `maintainerCanModify` on the PR, or push rights to the head fork.
+2. If a normal `git push` to the PR head is rejected / you lack write access: **hard stop**. Report: cannot push fixes to fork head; ask the author to enable “Allow edits from maintainers,” push themselves, or recreate as a same-repo branch.
+3. Do **not** open a parallel fork-only “fix” PR as the deliverable. Do **not** pretend merge-ready while required fixes cannot be pushed.
+4. Same-repo heads with rejected push (branch protection, missing rights): same hard stop — ask the user; never force-push.
+
+## Stacked PRs
+
+If the PR’s `baseRefName` is itself an open PR head (or the user says “stack” / “stacked”):
+
+1. **Do not** merge mid-stack into trunk with `merge-pr` alone.
+2. Stop mutating stack order/bases yourself unless the user asked for stack ops.
+3. **Hand off** to skill `manage-stacked-prs` (inspect → restack/retarget → merge bottom-up). Tell the user the stack order.
+4. Fix/review/status on a single stacked PR may continue (comments/CI on that PR), but label clearly: “ready relative to parent branch, **not** trunk” until the stack skill lands it.
+
+Detect quickly:
+
+```bash
+gh pr list --repo OWNER/REPO --state open --limit 100 --json number,headRefName,baseRefName,url
+# If this PR's baseRefName equals another open PR's headRefName → stacked
+```
+
 
 ## One PR at a time (no silent batches)
 
