@@ -2,5 +2,33 @@
   {
     "id": "E1-2026-07-30",
     "sha256": "63790b28785252b5e91eb5515e8a8e55425a3cc0a38164b69d9d75f7b4810159"
+  },
+  {
+    "id": "R-false-merge-ready-2026-07-31",
+    "sha256": "a6ff8d85fb49a5cdc759afcd3d18f091f307ee4745ee2919c06ee77c6dbbc956"
+  },
+  {
+    "id": "R-soft-gated-2026-07-31",
+    "sha256": "dcfa67a204ff94d9226e407ee2775e1c91966ccc0e63a2ff935f158248808fac"
+  },
+  {
+    "id": "R-issue-notify-2026-07-31",
+    "sha256": "c01b2cdd0896b56b81c9cd60611d0be9dff300768621bfc99714dd1f62507d32"
+  },
+  {
+    "id": "R-compile-tip-2026-07-31",
+    "sha256": "cc907f792fbbe8980590ac7ef2d33d77304ceecffc2199a12ef5b32fa6f8c210"
+  },
+  {
+    "id": "R-bare-number-2026-07-31",
+    "sha256": "be2b441b4e94cc36df67ac610068ab31591b541dd620dac2cf6f3c8dd139301a"
+  },
+  {
+    "id": "R-watch-not-ready-2026-07-31",
+    "sha256": "0e1666b63a911532ab22aca75bbdd1bbbcd0cfa3d84e6238d6844d91bae62f38"
+  },
+  {
+    "id": "R-stack-handoff-2026-07-31",
+    "sha256": "611de472760852349f3d4880ee52e3952f3484077ca92add65d8d70153221c3d"
   }
 ]
