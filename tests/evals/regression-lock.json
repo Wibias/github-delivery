@@ -54,5 +54,9 @@
   {
     "id": "R-stale-approval-2026-07-31",
     "sha256": "179594882aecc08f6abf61a7e8de1385e55efe9bdbaa451eb9487a7fc886c522"
+  },
+  {
+    "id": "R-thin-settle-2026-07-31",
+    "sha256": "b217091ce6bbaefd15fb928620fa1647dc10259760486b4240719ad29938d33e"
   }
 ]

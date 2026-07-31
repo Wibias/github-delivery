@@ -31,7 +31,8 @@ Necessary/useful **human** (esp. owners/maintainers) + CodeRabbit/Codex comments
 10. Recheck human/bot threads (`review-threads.mjs`) + required CI after any review-driven pushes (loop again if needed). Apply **rate-limit backoff** (Composio `GITHUB_GET_GRAPHQL_RATE_LIMIT` → `gh api rate_limit`) on dense polls. If **stacked**, label ready-vs-parent vs trunk; trunk merge → `manage-stacked-prs`. If **in merge queue**, keep watching until merged (do not stop at queued).
 11. Bot/human **inline** replies go in-thread (shared rules), never as duplicate top-level comments.
 12. **Final evidence sweep** (shared rules + gate helpers). **Refuse merge-ready** while useful bot/human threads remain open (or only “rate-limited / summary” without triage), while protection/enforced CODEOWNERS/stale-approval/merge-queue blocks, or while own bug/security/spec findings that should block merge are unfixed. CI green alone is not enough.
-13. If truly ready, post on the **PR** (idempotent — edit prior merge-ready if one exists; fix malformed `\` escapes by edit):
+13. **Thin settle** (shared rules): after the sweep would allow ready, wait ~3–5 min quiet (~4 default; stretch once if bot in-progress), recheck threads + CI. Activity resets the clock. Cap at two settle windows, then post. Do **not** skip settle for merge-ready.
+14. If truly ready after settle, post on the **PR** (idempotent — edit prior merge-ready if one exists; fix malformed `\` escapes by edit):
 
 ```markdown
 ## [shipping-github] Merge ready
@@ -46,7 +47,7 @@ Necessary/useful **human** (esp. owners/maintainers) + CodeRabbit/Codex comments
 Ready to merge.
 ```
 
-14. **Notify linked issue(s)** (required when merge-ready is posted): for each linked issue, one idempotent comment (edit if a prior “PR is merge-ready” note exists — never a second/cut-off comment):
+15. **Notify linked issue(s)** (required when merge-ready is posted): for each linked issue, one idempotent comment (edit if a prior “PR is merge-ready” note exists — never a second/cut-off comment):
 
 ```markdown
 ## [shipping-github] PR merge-ready
@@ -67,4 +68,5 @@ For monitoring **after** merge-ready while the PR stays open (new late comments)
 - Own **bug + security + Spec/Standards** reviews completed; necessary findings fixed
 - Branch not conflicted / not behind / **compiles against current tip** (when claiming ready)
 - CLI + required CI green (when claiming ready)
+- **Thin settle** completed (or two-window cap) before the merge-ready claim
 - PR(s) **not** merged

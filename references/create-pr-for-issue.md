@@ -83,7 +83,7 @@ Confirm this request is **one** issue (or an explicit batch). Otherwise pick/ask
 4. **Own reviews (required):** bug + security (shared subagent preflight) **and** Spec + Standards (`review` skill or short pass).
 5. CODEOWNERS path check (`scripts/codeowners-for-pr.mjs` when helpful).
 6. Changelog nudge if user-facing → `git-workflow-and-versioning` for authoring.
-7. Final evidence sweep; post merge-ready PR + linked-issue notify (idempotent). Do **not** merge.
+7. Final evidence sweep; **thin settle** (~3–5 min quiet + recheck; shared rules); then post merge-ready PR + linked-issue notify (idempotent). Do **not** merge.
 
 ## Done when
 

@@ -225,6 +225,24 @@ If the user named **several** existing PRs (“full review these”, “babysit 
 
 **Single writer:** do not run watch + fix-pr merge-ready posting concurrently on the same PR in a way that double-posts; one workflow owns the `[shipping-github] Merge ready` comment.
 
+## Thin settle window (before merge-ready / approve-comment)
+
+Do **not** post `[shipping-github] Merge ready`, linked-issue merge-ready notify, or full-review `approve-comment` on a **single** green+quiet snapshot. Late CodeRabbit/Codex rounds often land 1–5 minutes after CI turns green.
+
+**Applies to:** `fix-pr-bots`, create-PR cleanup → merge-ready, full-review when posting `approve-comment` / merge-ready.
+
+**Does not apply to:** `status` (one-shot snapshot), watch milestones (“still watching”), `changes-requested` / `not-useful` / draft `gated`, or merge itself (merge still uses the full evidence sweep; settle was already required if you just claimed ready).
+
+**Procedure:**
+
+1. Note the timestamp of the **last observable change** on this head: push / new review comment or submission / check status change / thread resolve / draft→ready.
+2. When the evidence sweep would otherwise allow ready: **wait ~3–5 minutes** of quiet (prefer **~4 min** default), then re-run a light recheck (`review-threads.mjs` + required CI / `pr-policy-gate` as needed).
+3. **Any** new activity during the window **resets** the quiet clock — fix/push/re-triage, then settle again.
+4. Cap: after **two** full settle windows (~8–10 min total quiet attempts) with no new useful threads and green required CI, post ready. Do **not** hang forever waiting for hypothetical bots. Do **not** invent soft “maintainer ack” stops during settle.
+5. If a bot **in-progress** signal is visible (e.g. eyes reaction / “review in progress” comment) and no completion yet: stretch the **first** settle toward ~**5–10 min** once, then proceed with ready if still clean — or keep looping if new comments arrived. This is a cooling-off judgment, not a guarantee no review is coming.
+
+Watch mode already keeps polling after quiet; settle is only for the **claim** that the PR is merge-ready / approve-worthy.
+
 ## CI — branch fix vs flake
 
 Classify failed **required** checks before patching:
@@ -320,6 +338,7 @@ Before claiming merge-ready (or reporting a watch **CI/review milestone**), also
 4. Unresolved **published** review threads via **`scripts/review-threads.mjs`** (paginate GraphQL). Rate-limited bot “SUCCESS” ≠ threads clean.
 5. **Stack check** (below) — if mid-stack, do not treat as trunk-ready without `manage-stacked-prs`
 6. Local `git status` (report dirty files left untouched)
+7. **Thin settle window** (above) — for merge-ready / `approve-comment` claims only: quiet elapsed + one recheck (or two-window cap). Status / watch milestones skip this.
 
 **Do not post merge-ready** if any of these still hold:
 
@@ -333,8 +352,9 @@ Before claiming merge-ready (or reporting a watch **CI/review milestone**), also
 - Draft / WIP / do-not-merge gate
 - Own bug/security/**spec-standards** blockers unfixed (merge-ready / full-review / create-PR paths)
 - PR is stacked on another open PR and user asked to merge into trunk (hand off — do not fake ready)
+- Settle window not yet elapsed (or reset by new activity) on a merge-ready / `approve-comment` path — one green snapshot is not enough
 
-“CI green” alone is **not** merge-ready. Green on a **stale** SHA while behind tip is **not** merge-ready. A rate-limited bot summary is **not** “bots clean.” Approvals on an **old** SHA are **not** approvals on tip when dismiss-stale / last-push rules apply.
+“CI green” alone is **not** merge-ready. Green on a **stale** SHA while behind tip is **not** merge-ready. A rate-limited bot summary is **not** “bots clean.” Approvals on an **old** SHA are **not** approvals on tip when dismiss-stale / last-push rules apply. A single quiet snapshot without settle is **not** merge-ready.
 
 **Watch milestones** may say only “CI/reviews quiet — still watching (not full merge-ready bar)” unless own bug+security+spec were already completed this session via fix-pr/full-review. Never post `[shipping-github] Merge ready` from watch alone. If `isInMergeQueue`: report queue position/state and keep watching until merged/closed.
 

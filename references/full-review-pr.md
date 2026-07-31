@@ -19,7 +19,7 @@ Skip 0.1% nits. No follow-up PR for in-scope fixes.
 
 | Label | When allowed |
 |---|---|
-| `approve-comment` | Useful; bots/humans clear; own reviews + spec/standards clean; up to date with base; **compiles against tip**; **required CI green**; protection/`reviewDecision`/CODEOWNERS clear; not mid-stack-for-trunk; no draft/WIP gate |
+| `approve-comment` | Useful; bots/humans clear; own reviews + spec/standards clean; up to date with base; **compiles against tip**; **required CI green**; protection/`reviewDecision`/CODEOWNERS clear; not mid-stack-for-trunk; no draft/WIP gate; **thin settle** done |
 | `changes-requested` | Concrete necessary blockers remain that you cannot/should not silently fix |
 | `not-useful` | Usefulness pass failed — stop expanding work on that PR |
 | `gated` | **Only** GitHub draft / WIP / do-not-merge (shared draft gates). **Not** “wants maintainer ack”, “security feels sensitive”, or “Windows looks flaky” |
@@ -39,7 +39,8 @@ Skip 0.1% nits. No follow-up PR for in-scope fixes.
 5. Push fixes; update from base if behind; **verify compile/tests against tip**; **wait and recheck** until useful threads quiet **and** required CI green on that tip SHA, or a hard blocker. Use **rate-limit backoff** (Composio → gh) on dense polls.
 6. Changelog nudge if user-facing.
 7. If concrete necessary issues remain: GitHub **changes requested** with those blockers only.
-8. Post a short verdict comment **only after** CI+comments are handled or a real hard blocker / `not-useful` / draft `gated` applies:
+8. Before `approve-comment` (or merge-ready notify): **thin settle** (shared rules) — ~3–5 min quiet + recheck; activity resets; two-window cap. Skip settle for `changes-requested` / `not-useful` / draft `gated`.
+9. Post a short verdict comment **only after** CI+comments are handled (and settle, when approving) or a real hard blocker / `not-useful` / draft `gated` applies:
 
 ```markdown
 ## [shipping-github] Verdict: <approve-comment | changes-requested | not-useful | gated>
@@ -66,5 +67,6 @@ For **every** targeted PR:
 - Bug + security + spec/standards reviews done
 - Useful bots/humans handled or declined with rationale
 - Required CI green **or** hard-blocker reported (flake budget exhausted / permissions / etc.) — **never** “done” with unexplained red CI
+- Thin settle completed before `approve-comment` / merge-ready (not for reject/gated labels)
 - Verdict posted with a **valid** label (see table)
 - No invented maintainer-ack / soft-security stop
