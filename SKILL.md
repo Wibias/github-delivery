@@ -73,6 +73,7 @@ Read `references/shared-rules.md` before acting. Non-negotiables:
 15. Merge-ready only when bots/humans are clear **and** own bug+security+spec reviews are done **and** thin settle elapsed; also post/edit one notify on each **linked issue** (not only on the PR). Unresolved GraphQL review threads block ready.
 16. Status verdicts must use the **same** merge-ready bar (no looser read-only “ready”). Watch milestones ≠ merge-ready.
 17. Draft→ready only after asking; inline replies in-thread; subagent checkout preflight; post-merge cleanup; backport only after ask; rate-limit backoff via Composio then gh; bare `#N` disambiguation; compose handoffs for stacks/split/finish/issue-workflow/git-workflow; CODEOWNERS **enforcement** vs suggestion-only.
+18. **>3 PRs (or research issues) in one ask → subagent fan-out** (one target per subagent, parallel/chunked) — never serialize large batches in the parent.
 
 ## Tooling
 

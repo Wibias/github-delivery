@@ -22,7 +22,7 @@ Do **not** open a PR unless the user also asked to create one.
 
 ## Per-issue checklist
 
-Run for **each** issue (batch in parallel when independent):
+Run for **each** issue (batch in parallel when independent). If **>3** issues: fan out with **subagents** (shared **Multi-PR / multi-issue fan-out**) — one issue per subagent; parent aggregates the chat table.
 
 1. **Fetch** — title, body, labels, state, author, assignees, linked PRs, timeline.
 2. **Restate the claim** — one sentence: what exact bug/feature/ask is this? Separate reporter’s theory from observable symptom.

@@ -23,6 +23,7 @@ Shipping a PR is rarely one green check. It’s a grind of:
 | Duplicate PRs / fork-only PRs / comment spam | Create-PR: one PR unless batch asked; canonical repo only; verify link + assign self; edit comments never double-post |
 | Bot + human review ping-pong | Triage owners/maintainers first, then bots; **own bug + security + Spec/Standards**; keep going until merge-ready |
 | Soft “needs maintainer ack” while CI is red | Soft opinions are **not** stop conditions; babysit until green / hard blocker |
+| 4+ PRs babysat one-by-one (too slow) | **>3 PRs/issues → subagent fan-out** (one per target, parallel/chunked) |
 | Green on a stale base | Update from base, then **compile against tip** before ready / approve / merge |
 | False merge-ready with open threads | GraphQL `reviewThreads` must be clear; linked-issue notify when ready is posted |
 | CI green, bots still arriving | **Thin settle** (~3–5 min quiet + recheck) before merge-ready / approve-comment |

@@ -12,6 +12,7 @@ Necessary/useful **human** (esp. owners/maintainers) + CodeRabbit/Codex comments
 
 - Default: one PR (`#N`).
 - If the user explicitly lists several **existing** PRs to babysit/make merge-ready: work each until merge-ready or hard-blocked. Report a per-PR table when done.
+- **>3 PRs:** fan out with **subagents** (shared **Multi-PR fan-out**) — one PR per subagent in parallel (chunk if rate-limited). Do not serialize 4+ in the parent.
 
 ## Steps
 

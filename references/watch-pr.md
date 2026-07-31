@@ -18,6 +18,11 @@ Do **not** merge unless they also asked to merge (then hand off to `merge-pr` on
 | Read-only snapshot | `status` |
 | Keep watching after green until merged/closed | **this file** |
 
+## Targets
+
+- Default: one PR.
+- If the user lists **>3** PRs to watch/babysit: fan out with **subagents** (shared **Multi-PR fan-out**). ≤3 may stay in the parent.
+
 ## Loop
 
 1. Identify PR (`#N`, URL, or current branch) — resolve bare `#N` per shared rules. Checkout head if fixing.

@@ -34,7 +34,7 @@ If preflight is unclear, say what’s missing; do not open a speculative PR.
 
 ### C. Confirm scope
 
-Confirm this request is **one** issue (or an explicit batch). Otherwise pick/ask — do not open extra PRs. If implementation scope explodes → hand off to `split-to-prs`.
+Confirm this request is **one** issue (or an explicit batch). Otherwise pick/ask — do not open extra PRs. If implementation scope explodes → hand off to `split-to-prs`. Explicit create batch of **>3** issues → **subagent fan-out** (shared rules).
 
 ### D. Implement + open canonical PR
 

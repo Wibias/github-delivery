@@ -58,5 +58,9 @@
   {
     "id": "R-thin-settle-2026-07-31",
     "sha256": "b217091ce6bbaefd15fb928620fa1647dc10259760486b4240719ad29938d33e"
+  },
+  {
+    "id": "R-multi-pr-fanout-2026-07-31",
+    "sha256": "9da99d796e049c38cb2dbb9de0d8cca386bd849ad8af40b954411435b528e083"
   }
 ]

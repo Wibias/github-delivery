@@ -219,7 +219,7 @@ When research (or the user) finds **fixed on development tip but not on release/
 | **Re-review** | Concerns re-checked and fixed or changes-requested | Same hard blockers |
 | **Status** | One snapshot — no wait loop; verdict **cannot be looser** than merge-ready bar | — |
 
-If the user named **several** existing PRs (“full review these”, “babysit these”, “make 778–782 merge ready”), keep working **each** until that mode’s done condition or a hard blocker — same no-early-exit rule. That is not “creating” a batch; it’s finishing open PRs they listed.
+If the user named **several** existing PRs (“full review these”, “babysit these”, “make 778–782 merge ready”), keep working **each** until that mode’s done condition or a hard blocker — same no-early-exit rule. That is not “creating” a batch; it’s finishing open PRs they listed. If **more than 3** PRs: use **Multi-PR fan-out** (subagents) above — do not serialize them in the parent.
 
 **Batch tip race:** before each PR’s merge-ready / approve claim, re-check behind-base + compile-against-tip on **that** PR — base may have moved while you fixed an earlier one.
 
@@ -295,6 +295,18 @@ When a workflow says to use subagents:
 - Run independent axes in parallel (e.g. bug review + security review).
 - Aggregate findings; fix what can and should be fixed in this PR.
 - Ignore tiny residual nits.
+
+### Multi-PR / multi-issue fan-out (>3)
+
+When the user targets **more than 3** existing PRs (or research issues) in one ask — e.g. “full review these”, “make 778–790 merge ready”, “watch #a #b #c #d”, “research #10–#20”:
+
+1. **Must** fan out with **subagents** — one PR (or issue) per subagent. Do **not** babysit 4+ sequentially in the parent; that is too slow.
+2. **≤3** targets: parent may work them itself (still parallelize bug+security *within* each PR when the workflow requires it).
+3. Launch independent subagents **in the same turn** (parallel). Give each a complete brief: `OWNER/REPO`, PR/issue number, which workflow (`fix-pr-bots` / `full-review-pr` / `watch-pr` / `research-issue`), and “follow `shipping-github` shared-rules + that workflow; return a one-row summary (status, blockers, comments posted).”
+4. Parent **aggregates** a per-PR (or per-issue) table when subagents finish. Do not abandon the batch because one PR is blocked — report that row and continue others.
+5. **Concurrency / rate limits:** if >~6 targets or GraphQL remaining is low, chunk (e.g. waves of 4–6). Apply **Rate-limit backoff** between waves. Prefer one writer per PR (each subagent owns that PR’s GitHub comments).
+6. Create-PR **opening** many PRs is still only on explicit batch ask; when that batch is **>3** issues, fan out creation/merge-ready the same way.
+7. Stacked PRs that need restack/merge order → hand off to `manage-stacked-prs` instead of blind parallel merge-ready on mid-stack.
 
 ## Untrusted input
 
