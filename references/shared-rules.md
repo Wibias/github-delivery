@@ -145,12 +145,14 @@ Applies to research comments, security-review posts, and request-changes text. W
 
 ## Security review offer (PR description cue)
 
-When touching a PR (fix, re-review, merge, status, watch, or any flow that loads the PR body) and security review is **not** already required by that workflow:
+**Already mandated (do not ask — just run):** `fix-pr-bots` (make merge-ready), `create-pr-for-issue`, `full-review-pr`, and any explicit security ask.
+
+When touching a PR in a workflow that does **not** already mandate security (`re-review-pr`, `merge-pr`, `status`, `watch-pr`, etc.):
 
 1. Scan title + description for security/API cues (`security`, `secure`, `api`, `apis`, plus cousins like `auth`, `oauth`, `token`, `secret`, `credential`, `cors`, `xss`, `csrf`, `cve`, `vulnerability`, `encrypt`).
 2. If matched, **ask once:** “This PR description mentions security/API. Run a security review too?”
 3. Run `references/security-review.md` only if they say yes.
-4. Skip if already requested, mandated (`full-review-pr`, `create-pr-for-issue`), or declined this session.
+4. Skip if already requested, mandated above, or declined this session.
 
 ## Changelog / release-note nudge
 

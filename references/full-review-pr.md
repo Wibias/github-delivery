@@ -1,10 +1,12 @@
 # Full review PR
 
-**Trigger:** “full review on pr #N…”, “bug + security review + rabbit/codex + verdict”.
+**Trigger:** “full review on pr #N…”, “bug + security review + rabbit/codex + verdict”, “is this PR useful?”.
 
 ## Goal
 
-Decide if the PR is useful (bugfix / meaningful change), run bug + security review, clear open useful bot comments, fix what should be fixed here, and leave a verdict comment. Use subagents. Request changes for real remaining blockers. Skip 0.1% nits. No follow-up PR for in-scope fixes. Do **not** merge unless asked.
+Same technical bar as **make merge-ready** (bug + security subagents, clear useful human/bot comments, fix in-PR), **plus** an explicit **usefulness** judgment and a **verdict** comment (approve-comment / changes-requested / not-useful / gated). Use when the user wants a review verdict, not only a merge-ready babysit. Do **not** merge unless asked.
+
+Skip 0.1% nits. No follow-up PR for in-scope fixes.
 
 ## Steps
 
@@ -14,7 +16,7 @@ Decide if the PR is useful (bugfix / meaningful change), run bug + security revi
    - Bug / correctness review
    - Security review (`review-security` helper ok)
 4. Triage open human + bot comments (shared rules — owners/maintainers first).
-5. Fix everything that can and should be fixed in this PR; update from base if behind; push; wait (caps); recheck.
+5. Fix everything that can and should be fixed in this PR; update from base if behind; push; wait until stable or hard blocker; recheck.
 6. Changelog nudge if user-facing.
 7. If real necessary issues remain: GitHub **changes requested** with concrete blockers only.
 8. Post a short verdict comment:
@@ -32,6 +34,8 @@ Decide if the PR is useful (bugfix / meaningful change), run bug + security revi
 ```
 
 Approve via GitHub only if the user asked for approval; otherwise comment or request changes.
+
+If the user also asked for merge-ready and the verdict is clean: continue with the merge-ready PR + linked-issue comments from `fix-pr-bots` (idempotent).
 
 ## Done when
 

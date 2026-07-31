@@ -21,7 +21,7 @@ Shipping a PR is rarely one green check. It’s a grind of:
 | Same mega-prompt every session | Short triggers → dedicated workflows under `references/` |
 | Unclear if an issue is still real | Research on latest development tip: fixed? open PR? duplicate? **security relevance**? priority; **comment on the issue** |
 | Duplicate PRs / fork-only PRs / comment spam | Create-PR: one PR unless batch asked; canonical repo only; verify link + assign self; edit comments never double-post |
-| Bot + human review ping-pong | Triage owners/maintainers first, then bots; keep going until merge-ready |
+| Bot + human review ping-pong | Triage owners/maintainers first, then bots; **own bug + security** reviews; keep going until merge-ready |
 | Agent spam on GitHub | No auto-replies to humans without your exact text; limited thread resolves |
 | Flaky CI “fixed” by rewriting tests | Classify branch vs flake; retry flakes (budget); don’t weaken CI |
 | Draft / WIP merged by accident | Hard gates before merge-ready claims or merge |

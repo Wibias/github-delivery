@@ -4,7 +4,7 @@
 
 ## Goal
 
-Necessary/useful **human** (esp. owners/maintainers) + CodeRabbit/Codex comments addressed, branch not behind/conflicted, CLI + required CI green, then a merge-ready summary — unless a draft/WIP/do-not-merge gate blocks it. Do **not** merge.
+Necessary/useful **human** (esp. owners/maintainers) + CodeRabbit/Codex comments addressed, **own bug + security review** done (same bar as create-PR / full-review), branch not behind/conflicted, CLI + required CI green, then a merge-ready summary — unless a draft/WIP/do-not-merge gate blocks it. Do **not** merge.
 
 **Keep going until merge-ready** (or a hard blocker). Do **not** stop after an arbitrary round count or wall-clock budget.
 
@@ -23,15 +23,17 @@ Necessary/useful **human** (esp. owners/maintainers) + CodeRabbit/Codex comments
 6. Push fixes (git safety: no force-push; stop if rejected / dirty unrelated tree).
 7. **Wait and recheck** — new useful comments or red required CI → fix/push again. Repeat until stable **or** a hard blocker (shared rules). No “3 rounds / 20 min then quit.”
 8. Fix CLI / project checks this PR broke. Classify CI: branch fix vs flake (shared rules; flake reruns still max 3 / SHA).
-9. Security-offer + changelog nudge when applicable.
-10. **Final evidence sweep** (shared rules). **Refuse merge-ready** while useful bot/human threads remain open (or only “rate-limited / summary” without triage). CI green alone is not enough.
-11. If truly ready, post on the **PR** (idempotent — edit prior merge-ready if one exists; fix malformed `\` escapes by edit):
+9. **Own reviews (required — not optional):** run **bug review + security review in parallel subagents** (`review-bugbot` / bug axis + `review-security` / security-review). Triage findings; fix what can/should land in this PR; skip 0.1% nits. Public request-changes / comments stay redacted for exploit detail (shared disclosure rules). Changelog nudge when user-facing.
+10. Recheck human/bot threads + required CI after any review-driven pushes (loop again if needed).
+11. **Final evidence sweep** (shared rules). **Refuse merge-ready** while useful bot/human threads remain open (or only “rate-limited / summary” without triage), or while own bug/security findings that should block merge are unfixed. CI green alone is not enough.
+12. If truly ready, post on the **PR** (idempotent — edit prior merge-ready if one exists; fix malformed `\` escapes by edit):
 
 ```markdown
 ## [shipping-github] Merge ready
 
 - Human review (trusted/owners first): addressed / declined (chat-confirmed if human reply)
 - Bot review (CodeRabbit/Codex): addressed / declined with rationale (0 unresolved useful threads)
+- Own bug + security review: done; blockers fixed / none
 - Base: up to date / conflicts resolved (`mergeStateStatus: CLEAN` when applicable — backticks only)
 - CLI / local checks: green
 - Required CI: green (flaky retries used: N; name jobs in backticks)
@@ -39,7 +41,7 @@ Necessary/useful **human** (esp. owners/maintainers) + CodeRabbit/Codex comments
 Ready to merge.
 ```
 
-12. **Notify linked issue(s)** (required when merge-ready is posted): for each linked issue, one idempotent comment (edit if a prior “PR is merge-ready” note exists — never a second/cut-off comment):
+13. **Notify linked issue(s)** (required when merge-ready is posted): for each linked issue, one idempotent comment (edit if a prior “PR is merge-ready” note exists — never a second/cut-off comment):
 
 ```markdown
 ## [shipping-github] PR merge-ready
@@ -57,6 +59,7 @@ For monitoring **after** merge-ready while the PR stays open (new late comments)
 
 - Every targeted PR has a valid merge-ready PR comment **and** linked-issue notify (or a clear hard blocker — no false merge-ready)
 - Useful human + bot threads handled (or declined with policy) before any merge-ready claim
+- Own bug + security subagent reviews completed; necessary findings fixed
 - Branch not conflicted / not wrongly behind (when claiming ready)
 - CLI + required CI green (when claiming ready)
 - PR(s) **not** merged
