@@ -118,5 +118,9 @@
   {
     "id": "R-security-no-auto-adversarial-2026-07-31",
     "sha256": "b8a0d519e084d412d6afafa5961b0507c05b72bd5f051b8ea81e28a252ecfc7e"
+  },
+  {
+    "id": "R-no-harness-security-review-2026-07-31",
+    "sha256": "91b0386dc6089f4dd0851dc1778d5c63983aa3b7c8b2ad897c96cca4c1184d1f"
   }
 ]

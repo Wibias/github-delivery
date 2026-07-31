@@ -32,7 +32,7 @@ Thin babysit skills (Cursor built-in, OpenAI `babysit-pr`, Claude marketplace co
 | Markdown `\_` spam in comments | Backticks for identifiers; no backslash-escaping |
 | Agent spam on GitHub | No auto-replies to humans without your exact text; limited thread resolves; inline replies in-thread |
 | Vague “looks good / CI green” reviews | **`comment-depth.md`** — research, security, verdict, merge-ready, status with paths/SHAs/evidence |
-| Shallow security “no findings” | `security-scope.mjs` + coverage matrix + HIGH/MEDIUM confidence + Do-Not-Flag; crypto/session, business-logic, removed-controls, IaC/Docker, **Agentic Skills Top 10** when skill/MCP paths change; High+ pass gate; auto `ai-agent-security` / deps audit when flagged; **never** auto red-team second pass |
+| Shallow security “no findings” | `security-scope.mjs` + coverage matrix + HIGH/MEDIUM confidence + Do-Not-Flag; crypto/session, business-logic, removed-controls, IaC/Docker, **Agentic Skills Top 10** when skill/MCP paths change; High+ pass gate; auto `ai-agent-security` / deps audit when flagged; **never** Cursor harness `security-review` / `review-security`; **never** auto red-team second pass |
 | Flaky CI “fixed” by rewriting tests | Classify carefully — **don’t** weaken CI; **do** harden real test timeouts instead of burning reruns |
 | Draft / WIP merged by accident | Hard gates before merge-ready claims or merge; draft→ready only after ask |
 | Rate-limit thrash on dense polls | Composio GraphQL rate limit → `gh` fallback; backoff |
@@ -72,6 +72,8 @@ Concrete evidence scripts (see `references/gate-helpers.md`):
 ### Security review + adversarial / red-team
 
 Normal **security review** (`references/security-review.md`) is defensive: scope script → coverage matrix → HIGH-confidence findings → High+ pass gate. Skill/MCP install paths also pull **Agentic Skills Top 10** (`references/agentic-skills-top10.md`) + `ai-agent-security`.
+
+**Full review / merge-ready / create-PR** use that **same** shipping-github security workflow for the security axis — **not** Cursor’s built-in Task `security-review` / skill `review-security` (forbidden; shallow harness stub).
 
 **Adversarial / red-team second pass** (garak, promptfoo, PyRIT, extra attack subagent):
 
@@ -120,13 +122,14 @@ Watch may report “CI/reviews quiet — still watching” without claiming that
 
 Multi-PR merges (“merge 775 and 778”) run the full ceremony **per PR**.
 
-## Competing babysit skills
+## Competing babysit / security skills
 
 | Source | Path / install | Problem |
 |---|---|---|
 | Cursor built-in **babysit** | `~/.cursor/skills-cursor/babysit` (re-syncs if deleted) | Thin conflict/CI stub; merge-base → wait-on-CI |
 | OpenAI optional **babysit-pr** | `npx skills add … --skill babysit-pr` / `.codex/skills/babysit-pr` | Watcher script loop; steals watch/babysit prompts if installed |
 | Claude marketplace copies | e.g. ce-babysit-pr / skills.sh babysit-pr | Same class of conflict if installed |
+| Cursor built-in **review-security** | `~/.cursor/skills-cursor/review-security` | Launches harness Task `security-review` — shallow; skips our matrix/pass gate |
 
 **Mitigations shipped with this repo:**
 
@@ -134,10 +137,12 @@ Multi-PR merges (“merge 775 and 778”) run the full ceremony **per PR**.
 2. Personal redirects from `overrides/`:
    - `babysit` → shipping-github watch/fix
    - `babysit-pr` → shipping-github watch/fix (preempt Codex/Claude installs)
+   - `review-security` → shipping-github `references/security-review.md` (never harness Task)
 3. Cursor user rule: prefer shipping-github over built-in babysit.
 4. Hard gate: `scripts/watch-wake-gate.mjs` on every watch wake.
+5. Hard rule: merge-ready / full-review / create-PR security axis = shipping-github security-review — **never** harness `security-review`.
 
-You cannot permanently delete Cursor’s built-in; win on discovery + redirect instead.
+You cannot permanently delete Cursor’s built-ins; win on discovery + redirect instead.
 
 ## Install
 
@@ -155,10 +160,13 @@ Also install the redirects (same machine):
 ```text
 ~/.agents/skills/babysit      ← overrides/babysit/
 ~/.agents/skills/babysit-pr   ← overrides/babysit-pr/
+~/.agents/skills/review-security ← overrides/review-security/
 ~/.cursor/skills/babysit
 ~/.cursor/skills/babysit-pr
+~/.cursor/skills/review-security
 ~/.codex/skills/babysit       # optional
 ~/.codex/skills/babysit-pr    # optional
+~/.codex/skills/review-security  # optional
 ```
 
 Folder name for the main skill must stay `shipping-github` (matches frontmatter `name`).

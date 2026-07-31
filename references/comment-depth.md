@@ -57,7 +57,7 @@ Anti-patterns (rewrite before posting):
 
 **Target:** issue `#N` / PR `#N` (`head@<sha>` or `dev@<sha>`)
 **Scope:** <components / routes / auth surfaces reviewed>
-**Method:** <security-review subagent + secrets scan + Semgrep/CodeQL if any + manual matrix>
+**Method:** <shipping-github security-review.md + secrets scan + Semgrep/CodeQL if any + matrix — not Cursor harness security-review>
 **Decision:** Pass / Pass after fixes / Do not ship yet  
 **Risk level:** Low / Medium / High / Critical  
 **Scope script:** `requiredSurfaces=[…]`; ai-agent-security: yes/no; agentic-skills-top10: yes/no; deps audit: yes/no/n/a; removed-controls/IaC/crypto as flagged; adversarial pass: no (unless user asked)

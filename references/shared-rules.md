@@ -142,15 +142,18 @@ If the user asked for **merge-ready / full-review / merge** and the PR is still 
 3. Only run `gh pr ready N` (or equivalent) after they say yes.
 4. If they say no: continue fixes; verdict stays `gated` / blocked until the gate clears.
 
-## Subagent preflight (bug + security)
+## Subagent preflight (bug + checkout)
 
-Before launching `bugbot` / `security-review` / `review-bugbot` / `review-security`:
+**Bug:** before launching `bugbot` / `review-bugbot`, checkout the PR head (or named branch) locally. If checkout fails because of dirty files: **ask** before stash; only stash after user confirms.
 
-1. **Checkout** the PR head (or named branch) locally. If checkout fails because of dirty files: **ask** before stash; only stash after user confirms.
-2. Prompt shape must include `Full Repository Path` + `Diff: branch changes` (default) unless they asked uncommitted-only.
-3. If the subagent fails with **empty / uncomputable diff**: retry **once** with `Diff: natural language` + a per-file `Change Description` (bugbot path). Security helper may not support NL diff — report and fall back to a manual bug/security pass in-chat.
-4. Wrong invocation (missing path/diff): fix and retry once. Same unexplained failure twice → stop and report; do not loop.
-5. After findings: triage and **fix** what belongs in this PR (merge-ready / full-review / create-PR). Do not only summarize unless the user asked review-only.
+**Security:** **never** launch Cursor harness `security-review` / `review-security`. Run `references/security-review.md` instead (scope script + matrix). Checkout still required before that review when fixing/reviewing a PR head.
+
+For bugbot (and any allowed non-security review helper):
+
+1. Prompt shape must include `Full Repository Path` + `Diff: branch changes` (default) unless they asked uncommitted-only.
+2. If the subagent fails with **empty / uncomputable diff**: retry **once** with `Diff: natural language` + a per-file `Change Description` (bugbot path).
+3. Wrong invocation (missing path/diff): fix and retry once. Same unexplained failure twice → stop and report; do not loop.
+4. After findings: triage and **fix** what belongs in this PR (merge-ready / full-review / create-PR). Do not only summarize unless the user asked review-only.
 
 ## Spec + standards axis
 
