@@ -17,7 +17,8 @@ Vague posts are a bug. Prefer **structured detail** over one-liners — still sc
 Anti-patterns (rewrite before posting):
 
 - “Bots addressed / CI green / looks good”
-- “Security: none” with no scope of what was reviewed
+- “Security: none” with no decision/risk line
+- Security comments that dump `requiredSurfaces=[…]`, method essays, or a findings table whose only row is “none” in every column
 - “Fixed on development” without SHA/PR
 - Merge-ready checklist with only yes/no and no evidence lines
 
@@ -52,25 +53,43 @@ Anti-patterns (rewrite before posting):
 
 ## Security (issue or PR — public / redacted)
 
+Keep the **public** comment short and scannable. Full matrix, scope-script JSON, abuse paths → **chat**.
+
 ```markdown
 ## [shipping-github] Security review
 
-**Target:** issue `#N` / PR `#N` (`head@<sha>` or `dev@<sha>`)
-**Scope:** <components / routes / auth surfaces reviewed>
-**Method:** <shipping-github security-review.md + secrets scan + Semgrep/CodeQL if any + matrix — not Cursor harness security-review>
-**Decision:** Pass / Pass after fixes / Do not ship yet  
-**Risk level:** Low / Medium / High / Critical  
-**Scope script:** `requiredSurfaces=[…]`; ai-agent-security: yes/no; agentic-skills-top10: yes/no; deps audit: yes/no/n/a; removed-controls/IaC/crypto as flagged; adversarial pass: no (unless user asked)
+**PR / issue:** `#N` @ `<short-sha>`  
+**Decision:** Pass | Pass after fixes | Do not ship yet  
+**Risk:** Low | Medium | High | Critical
 
-| Severity | Confidence | Area | Finding (redacted) | Next |
-|---|---|---|---|---|
-| critical\|high\|medium\|low\|info | high (confirmed only) | <authz / tokens / AST0x / …> | <what is wrong + affected surface — no exploit steps> | <fix in PR #n / patch tip / accept risk / needs maintainer> |
+### Findings
+none confirmed
 
-**Coverage (public summary):** authn/authz/injection/SSRF/secrets/CI/supply-chain/AI-agent/agentic-skills/providers/crypto-session/business-logic/removed-controls/IaC — done or n/a (name any n/a)
-**Summary:** <2–4 sentences: overall risk, whether tip is exploitable vs design gap>
-**Residual / out of scope:** <what you did not cover>
-**Fixes landed this session:** none / <sha + one line> (PR reviews only)
+<!-- Or, when there are findings: -->
+| Severity | Area | What (redacted) | Next |
+|---|---|---|---|
+| high | authz | <one line, no exploit steps> | fixed in `<sha>` / open |
+
+### Summary
+<1–2 sentences: overall risk on this tip>
+
+### Residual
+- <only real leftovers; or `none`>
+
+### Fixes this session
+- none
+<!-- or: - `<sha>` — <one line> -->
 ```
+
+**Do not** put on the public comment (chat-only / omit):
+
+- Long `requiredSurfaces=[…]` / scope-script dumps
+- Method essays (“shipping-github security-review.md + … not Cursor harness…”)
+- Path laundry lists in **Scope** (at most 3–5 key surfaces in Summary if needed)
+- A findings table whose only row is “none confirmed…” stuffed into every column
+- Full coverage matrix (done/n/a for every surface)
+
+Anti-patterns: walls of inline metadata; empty findings tables; repeating the same “none” five times.
 
 Full coverage matrix + abuse paths stay in **chat**. If too sensitive for a useful public table, use the short “details shared privately” form in `security-review.md`.
 
