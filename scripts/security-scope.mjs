@@ -92,9 +92,13 @@ const RULES = {
   },
   logging_privacy: {
     why: "logging/telemetry/analytics paths",
-    test: (f) =>
-      /(^|\/)(.*log(ger|ging|s)?|telemetry|analytics|sentry)(\/|\.|$)/i.test(f) ||
-      /privacy|[/_.-]pii([/_.-]|$)/i.test(f),
+    test: (f) => {
+      if (/catalog/i.test(f)) return /telemetry|analytics|sentry|privacy|[/_.-]pii([/_.-]|$)/i.test(f);
+      return (
+        /(^|\/)([^/]*log(ger|ging|s)?|telemetry|analytics|sentry)(\/|\.|$)/i.test(f) ||
+        /privacy|[/_.-]pii([/_.-]|$)/i.test(f)
+      );
+    },
   },
   ai_agent_mcp: {
     why: "LLM/agent/MCP/prompt/RAG/tool surfaces — load ai-agent-security",
