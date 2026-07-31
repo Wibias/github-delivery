@@ -30,6 +30,16 @@ node "<shipping-github>/scripts/review-threads.mjs" OWNER/REPO N --resolve PRRT_
 
 Paginates `reviewThreads`; exit `1` if any unresolved. Prefer this over guessing from the UI. See **Review threads (GraphQL)** in `shared-rules.md`.
 
+## Watch wake gate (owner comments)
+
+Before any watch “waiting for CI/CodeRabbit” heartbeat:
+
+```bash
+node "<shipping-github>/scripts/watch-wake-gate.mjs" OWNER/REPO N
+```
+
+Exit `1` = unacked OWNER/MEMBER/COLLABORATOR top-level comments (merge-from-base alone does **not** clear). Fix or post `[shipping-github] Addressed owner feedback — …`, then re-run. Exit `0` = wait allowed. See `watch-pr.md`.
+
 ## Merge queue + review policy
 
 ```bash

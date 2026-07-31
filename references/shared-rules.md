@@ -89,7 +89,7 @@ Rules:
 - Fix necessary/useful items; skip 0.1% nits.
 - Prefer fixing inside this PR over a follow-up PR.
 - Owner/maintainer requests are default-must-fix unless obsolete or contradictory.
-- **Watch / fix:** never idle on “waiting for CI” while unresolved owner/CODEOWNER/trusted-human feedback is open — triage and fix (or surface) first; tip-update may share the same push.
+- **Watch / fix:** never idle on “waiting for CI” while unresolved owner/CODEOWNER/trusted-human feedback is open — on watch, **`scripts/watch-wake-gate.mjs` exit `1` is authoritative**; triage and fix (or surface) first; tip-update may share the same push. Merge-from-base alone does not clear the gate.
 
 ### Comment fetch hygiene
 

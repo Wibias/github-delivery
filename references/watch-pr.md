@@ -27,28 +27,40 @@ Do **not** merge unless they also asked to merge (then hand off to `merge-pr` on
 
 **Reviews → then base update if needed → then CI/bots.** Never the reverse.
 
+### Mandatory script (every wake)
+
+```bash
+node "<shipping-github>/scripts/watch-wake-gate.mjs" OWNER/REPO N
+```
+
+- **Exit `1` / `canWait: false`:** you are **forbidden** to say you are waiting on CI, `windows-latest`, CodeRabbit, or Codex. Triage `blockers[]` (OWNER/MEMBER/COLLABORATOR top-level comments) first — patch/rebase/drop overlap, then either a **non-merge** commit or post:
+
+  ```markdown
+  [shipping-github] Addressed owner feedback — <one line what changed>
+  ```
+
+- **Exit `0`:** CI/bot wait is allowed.
+- Re-run this script after every push and before every progress heartbeat.
+
+This exists because prose “reviews first” was ignored in live watches. **The exit code is the rule.**
+
 ### Forbidden (instant fail)
 
-These progress lines are **illegal** while an OWNER / MEMBER / COLLABORATOR / CODEOWNER comment is still untriaged:
+These progress lines are **illegal** while the wake-gate exits `1`:
 
 - “up to date with `dev`; waiting on CI / windows-latest”
 - “waiting on CodeRabbit / Codex”
 - “tip is current; polling until green”
 
-**Correct** when owner feedback is open: act on it (patch / rebase / drop duplicated scope / ask user) **now**. Only after that may you wait on CI or bots.
+Owner guidance is often a **top-level PR conversation comment** (not an inline review thread). The wake-gate script fetches those; `review-threads.mjs` alone is **not** enough.
 
-Owner guidance is often a **top-level PR conversation comment** (not an inline review thread). Fetch `gh api repos/…/issues/N/comments` (or `gh pr view --comments`) every wake — `review-threads.mjs` alone is **not** enough.
+### Wake gate checklist
 
-### Wake gate (before any “waiting…” report)
+1. Run `watch-wake-gate.mjs` — if exit `1`, handle blockers; stop.
+2. Also list unresolved **inline** threads (`review-threads.mjs`).
+3. Only if human/owner queue is clear: tip-update if behind, then CI classify/fix/wait, then bot triage.
 
-Every poll / user update must pass this checklist **in order**. If any step fails, that is your action — do **not** emit a wait heartbeat.
-
-1. List unresolved **inline** threads (`review-threads.mjs`).
-2. List recent **top-level** PR comments; flag any from OWNER/MEMBER/COLLABORATOR/CODEOWNERS since last handled SHA / last agent action.
-3. If any flagged human feedback is untriaged → **stop gate**: triage + fix/push or surface to user. Do not proceed to CI wait.
-4. Only if human/owner queue is clear: tip-update if behind, then CI classify/fix/wait, then bot triage.
-
-CodeRabbit/Codex pending is **lower priority** than an open owner comment. Never wait on bots while owner text is unanswered in code or chat.
+CodeRabbit/Codex pending is **lower priority** than an open owner comment.
 
 ## Loop
 
@@ -56,8 +68,8 @@ On **every** poll / wake (including the first):
 
 1. Identify PR (`#N`, URL, or current branch) — resolve bare `#N` per shared rules. Checkout head if fixing.
 2. Apply git safety (dirty tree / no force-push / fork-head unwritable → hard stop).
-3. Snapshot: draft/WIP gates, behind-base/conflicts, required CI + review gate, unresolved threads, **top-level PR comments**, stack/fork/auto-merge/**merge-queue** flags.
-4. Run **Wake gate** (above). Fail → handle reviews; do not idle.
+3. Snapshot + **run `scripts/watch-wake-gate.mjs`** (exit `1` → handle owner blockers; do not idle). Also: draft/WIP, behind-base, required CI, `review-threads.mjs`, stack/fork/queue flags.
+4. Run **Wake gate** path above. Fail → handle reviews; do not idle.
 5. **Reviews first (mandatory):** triage per shared rules — **CODEOWNERS / owners / maintainers first**, then other humans, then bots.
    - Patch+push actionable items (narrow scope / drop work already on tip / rebase per owner note).
    - Human written replies → chat confirm. Inline replies in-thread. Resolve only allowed threads after verified fixes.

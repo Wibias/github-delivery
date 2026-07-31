@@ -27,7 +27,7 @@ Shipping a PR is rarely one green check. It’s a grind of:
 | Green on a stale base | Update from base, then **compile against tip** before ready / approve / merge |
 | False merge-ready with open threads | GraphQL `reviewThreads` must be clear; linked-issue notify when ready is posted |
 | CI green, bots still arriving | **Thin settle** (~3–5 min quiet + recheck) before merge-ready / approve-comment |
-| Watch merges `dev` then only waits CI | Forbidden — **reviews/CODEOWNERS first**, then tip-update, then CI |
+| Watch merges `dev` then only waits CI | Forbidden — run `watch-wake-gate.mjs`; exit `1` = fix OWNER comments first |
 | Watch “ready” ≠ merge-ready | Watch milestones are CI/review quiet only — full bar is fix-pr/full-review |
 | Status looser than merge-ready | Status uses the **same** evidence bar (tip, protection, CODEOWNERS, stacks, policy) |
 | Required checks / CODEOWNERS / queue / stale approvals | Helpers: `required-checks`, `codeowners-for-pr`, `review-threads`, `pr-policy-gate` |
@@ -72,7 +72,7 @@ Concrete evidence scripts (see `references/gate-helpers.md`):
 | `scripts/required-checks.mjs` | Required CI contexts / modern checks / rulesets + live rollup |
 | `scripts/codeowners-for-pr.mjs` | Map PR files → CODEOWNERS on base + review requests |
 | `scripts/review-threads.mjs` | Paginate GraphQL unresolved review threads (+ optional resolve) |
-| `scripts/pr-policy-gate.mjs` | Code-owner **enforcement**, dismiss-stale / last-push approvals, merge queue / `merge_group` warn |
+| `scripts/watch-wake-gate.mjs` | Block CI/bot idle while unacked OWNER/MEMBER top-level comments exist |
 
 ## Reliability bar (what “merge ready” means)
 

@@ -74,5 +74,9 @@
   {
     "id": "R-watch-no-wait-coderabbit-2026-07-31",
     "sha256": "06268fea87d5d17d01028a92e2c015aabe28c014db9213540dcd950b17308ecc"
+  },
+  {
+    "id": "R-watch-wake-gate-script-2026-07-31",
+    "sha256": "eb99620f4c3c1f7084022c858e7f455c2c52fcdb64561180c9e8f2d6d546e9be"
   }
 ]
