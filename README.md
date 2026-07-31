@@ -194,7 +194,8 @@ Folder name for the main skill must stay `shipping-github` (matches frontmatter 
 
 | Skill | Owns |
 |---|---|
-| **shipping-github** | GitHub issue/PR ship loop, research-on-tip, watch CI/reviews, merge ceremony, gate helpers, babysit redirects |
+| **shipping-github** | GitHub issue/PR ship loop, research-on-tip, watch CI/reviews, merge ceremony, gate helpers, babysit / review-security redirects |
+| **security-review** (knowledge) | Category checklist / secrets scan depth — **not** PR ship-loop entrypoint; shipping-github loads it when useful |
 | **issue-workflow** | Filing/breaking down tracker artifacts (PRDs, slices) — not “is it fixed on tip?” |
 | **git-workflow-and-versioning** | Local commit discipline, semver, changelog *authoring*, release tags (this skill only nudges missing entries) |
 | Cursor **babysit** / OpenAI **babysit-pr** | Thin watcher stubs — redirected away when personal overrides are installed |
