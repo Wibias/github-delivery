@@ -72,11 +72,104 @@ Visible GitHub actions must not impersonate the user.
 | Patch + push code | Allowed when the workflow is a fix/watch/create flow |
 | Reply on **bot** threads | Allowed when declining/skipping or noting a fix; prefix with `[shipping-github]` |
 | Reply on **human** threads | **Forbidden** unless the user confirms the **exact** reply text first |
+| Inline review-thread replies | Prefer **in-thread** replies (below), never a top-level PR comment that duplicates the thread |
 | Resolve review threads | Only after the fix is verified, and only for: (a) threads from the user who requested this run, or (b) trusted bot threads you addressed. Do **not** resolve other humans’ threads that others participated in without asking |
 | Approve / request changes | Only per the active review workflow; never approve unless asked |
-| Draft / ready / close / reopen PR | Never unless the user explicitly asks (merge workflow may close **issues** after merge) |
+| Draft / ready / close / reopen PR | Never convert draft→ready or ready→draft unless the user explicitly asks (see **Draft → ready**). Merge workflow may close **issues** after merge |
 
 If you disagree with a human comment or it needs a written answer: explain in **chat**, suggest a reply, wait for confirmation.
+
+### Inline review replies (not top-level)
+
+When the feedback lives on a **diff/line review comment**, reply **in that thread**:
+
+```bash
+# Prefer Composio when connected (session from COMPOSIO_SEARCH_TOOLS):
+# GITHUB_CREATE_A_REPLY_FOR_A_REVIEW_COMMENT — comment_id = thread root
+#   (use in_reply_to_id of a reply, else the comment's own id)
+
+# gh fallback:
+gh api "repos/OWNER/REPO/pulls/PR/comments/COMMENT_ID/replies" -f body="$(cat body.md)"
+# or: POST with --input payload.json (UTF-8 file pattern)
+```
+
+Do **not** post a new top-level PR conversation comment that says the same thing. Human-thread exact-text confirmation still applies.
+
+## Draft → ready
+
+If the user asked for **merge-ready / full-review / merge** and the PR is still a GitHub **draft** (or WIP/do-not-merge):
+
+1. Do **not** silently stop forever and do **not** auto-mark ready.
+2. Keep fixing comments/CI as allowed, but **ask once** in chat:
+
+   > PR #N is still a draft / WIP. Convert to ready-for-review so we can claim merge-ready?
+
+3. Only run `gh pr ready N` (or equivalent) after they say yes.
+4. If they say no: continue fixes; verdict stays `gated` / blocked until the gate clears.
+
+## Subagent preflight (bug + security)
+
+Before launching `bugbot` / `security-review` / `review-bugbot` / `review-security`:
+
+1. **Checkout** the PR head (or named branch) locally. If checkout fails because of dirty files: **ask** before stash; only stash after user confirms.
+2. Prompt shape must include `Full Repository Path` + `Diff: branch changes` (default) unless they asked uncommitted-only.
+3. If the subagent fails with **empty / uncomputable diff**: retry **once** with `Diff: natural language` + a per-file `Change Description` (bugbot path). Security helper may not support NL diff — report and fall back to a manual bug/security pass in-chat.
+4. Wrong invocation (missing path/diff): fix and retry once. Same unexplained failure twice → stop and report; do not loop.
+5. After findings: triage and **fix** what belongs in this PR (merge-ready / full-review / create-PR). Do not only summarize unless the user asked review-only.
+
+## Spec + standards axis
+
+For **full-review** and **create-PR** (before merge-ready claim), also run or hand off a **Spec + Standards** check:
+
+- Prefer skill **`review`** (Standards + Spec subagents against the PR base / merge-base) when available.
+- Spec source: linked issue / PRD / `Fixes #N` body. If none: note “no spec” and skip Spec axis.
+- Standards source: repo `AGENTS.md` / `CONTRIBUTING` / ADRs / linters already noted — do not re-litigate machine-enforced lint.
+- Fix in-PR violations that are necessary/useful; skip pure style nits already covered by CI.
+
+If `review` is unavailable: do a short in-session pass (does the diff match the issue? any clear CONTRIBUTING/ADR breaks?) and say so.
+
+## Rate-limit backoff (Composio → gh)
+
+GitHub throttles API calls. **GraphQL** is GitHub’s query API (one request can fetch many fields; quota is **points**/hour). You do not need to write GraphQL by hand for most ship work — prefer `gh` REST helpers — but rate-limit checks often use GraphQL.
+
+**Before dense poll loops** (watch / fix wait / multi-PR batch) and after any `403`/`429` / “rate limit” error:
+
+1. **Prefer Composio MCP** when the GitHub toolkit is connected:
+
+   - Discover via `COMPOSIO_SEARCH_TOOLS` (use_case: check GitHub GraphQL rate limit).
+   - Execute `GITHUB_GET_GRAPHQL_RATE_LIMIT` via `COMPOSIO_MULTI_EXECUTE_TOOL`.
+   - If `remaining` is low (e.g. < 200 points) or reset is soon: **sleep until reset** (or at least 30–60s with exponential backoff), then continue. Do not busy-poll.
+
+2. **Fallback without Composio:**
+
+   ```bash
+   gh api rate_limit --jq ".resources | {core,graphql,search}"
+   # or GraphQL:
+   gh api graphql -f query='query { rateLimit { limit remaining resetAt used } }'
+   ```
+
+3. On `gh`/`api` 403/429: read `X-RateLimit-Reset` / error message, wait until reset (+ a few seconds), retry once. Cap retries; if still limited, hard-stop and report.
+4. Watch cadence stays ~1–2 min when green; **stretch** polls when remaining quota is low.
+5. CodeRabbit/bot “rate limited” summaries are separate — still triage open threads; do not treat bot rate-limit as agent API rate-limit.
+
+## Post-merge cleanup
+
+After a successful `merge-pr` (and after `manage-stacked-prs` lands a stack bottom into trunk):
+
+1. Confirm the PR shows **merged**.
+2. Confirm linked issues auto-closed (or close explicitly per merge workflow).
+3. **Delete the head branch** when same-repo and safe: `gh pr merge` already may delete if repo setting on; else `gh api -X DELETE repos/OWNER/REPO/git/refs/heads/BRANCH` / `git push origin --delete BRANCH` only if the user didn’t ask to keep it and it’s not a shared long-lived branch.
+4. If this PR was a **stack parent**: hand off to `manage-stacked-prs` to **retarget/restack children** before deleting the parent branch.
+5. Report merge URL + issue states + whether branch was deleted.
+
+## Backport / release branch
+
+When research (or the user) finds **fixed on development tip but not on release/default**:
+
+1. Do **not** silently open a backport PR.
+2. Ask once: “Fixed on `dev` (SHA/PR). Want a backport PR onto `<release-branch>`?”
+3. If yes: create **one** canonical backport PR (same create-PR rules: link issue if still open, or note cherry-pick of SHA), then merge-ready loop.
+4. Prefer cherry-pick of the fix commit(s) onto the release branch; resolve conflicts carefully; compile-against that release tip.
 
 ## Push → wait → recheck (mode-aware stops)
 

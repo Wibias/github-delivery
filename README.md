@@ -73,6 +73,7 @@ The skill routes to `references/*.md` and always loads `references/shared-rules.
 | **git-workflow-and-versioning** | Local commit discipline, semver, changelog *authoring* (this skill only nudges that a user-facing PR may need an entry) |
 | Cursor **babysit** | Thin conflict/CI stub — optional; this skill covers richer watch + the full ship pack |
 | **manage-stacked-prs** | Stack inspect / restack / retarget / bottom-up merge — shipping detects stacks and hands off |
+| **review** | Spec + Standards axes — shipping runs/hands off on full-review and create-PR |
 
 ## Validation
 

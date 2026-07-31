@@ -49,8 +49,9 @@ Verdict: merge-ready | blocked — <one line matching fix-pr-bots bar>
    - Prefer **blocked** when read-only status cannot verify compile-against-tip or own reviews.
 
 4. If security/API cue and not yet asked this session: ask whether to run security review (do not run until yes).
-5. If stacked: point at `manage-stacked-prs` for trunk merge order.
-6. Stop. Do not fix unless they ask.
+5. If draft/WIP and user asked about merge-ready: remind **Draft → ready** ask (do not convert in status — status is read-only).
+6. If stacked: point at `manage-stacked-prs` for trunk merge order.
+7. Stop. Do not fix unless they ask.
 
 ## Done when
 

@@ -33,7 +33,8 @@ Do **not** merge unless they also asked to merge (then hand off to `merge-pr` wh
 
 ## Cadence
 
-- CI pending/failing: poll ~1 minute.
+- CI pending/failing: poll ~1 minute (longer if rate-limit remaining is low — shared **Rate-limit backoff**).
+- Before dense multi-PR / watch polls: check Composio `GITHUB_GET_GRAPHQL_RATE_LIMIT` (or `gh api rate_limit` / GraphQL `rateLimit`).
 - CI green, PR still open: keep polling at a practical interval (~1–2 minutes) for new reviews/conflicts — don’t abandon the watch.
 - On any change (new SHA, check flip, new comment): reset and act.
 - Heartbeat only on status **changes**, not every identical green poll.

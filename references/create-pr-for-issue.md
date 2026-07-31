@@ -93,9 +93,9 @@ After the canonical PR exists:
 5. Keep branch up to date with base; resolve conflicts early.
 6. Review wait-loop (`fix-pr-bots`): owners/maintainers + humans + bots; push; keep going until merge-ready or a hard blocker.
 7. Fix CLI / project checks; push until required CI green.
-8. Full review + security review with **subagents** (parallel). Fix what can/should land here; skip 0.1% nits.
+8. Full review + security with **subagents** (shared preflight) **and** Spec + Standards (`review` skill or short pass). Fix what can/should land here; skip 0.1% nits.
 9. Changelog nudge if user-facing (shared rules).
-10. Recheck reviews + CI.
+10. Recheck reviews + CI (rate-limit backoff on polls).
 11. Post merge-ready comment (idempotent). Do not merge.
 
 ## Done when

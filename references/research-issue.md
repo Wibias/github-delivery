@@ -27,7 +27,7 @@ Run for **each** issue (batch in parallel when independent):
 1. **Fetch** — title, body, labels, state, author, assignees, linked PRs, timeline.
 2. **Restate the claim** — one sentence: what exact bug/feature/ask is this? Separate reporter’s theory from observable symptom.
 3. **Latest-dev check** — update/fetch the development branch tip. Search code + history for the behavior. Prefer a minimal repro/test on that tip when feasible; if not tested, say so and why.
-4. **Already fixed on development?** — cite commit SHA / merged PR if yes. Note if fixed on development but **not** on release/default.
+4. **Already fixed on development?** — cite commit SHA / merged PR if yes. Note if fixed on development but **not** on release/default. If so: follow shared **Backport / release branch** (ask once before opening a backport PR).
 5. **Existing PR?** — `gh pr list --search` / issue timeline for open or recently merged PRs that fix or reference it. If open PR exists: link it; do not propose a second PR.
 6. **Duplicate / same issue?** — search open+closed issues by keywords/symptoms. If duplicate: link the canonical issue (prefer older or clearly maintained). Don’t claim duplicate without a link.
 7. **Security relevance** — classify from title, body, labels, and what the code path touches (not from vibes alone):
@@ -92,7 +92,9 @@ Also summarize the same table(s) to the user in chat. For multiple issues, one c
 
 When any issue is **possible** or **likely** security: ask in chat with the wording above (review + post, redacted public / full detail in chat). Do not auto-start.
 
-Research may batch **comments**; it must **not** open PRs. Opening PRs is `create-pr-for-issue` only, one at a time unless the user explicitly demands a batch.
+When verdict is **Fixed on development, not released**: ask the backport question (shared rules). Do not open a backport unless they say yes.
+
+Research may batch **comments**; it must **not** open PRs. Opening PRs is `create-pr-for-issue` only, one at a time unless the user explicitly demands a batch (including backports).
 
 ## Done when
 

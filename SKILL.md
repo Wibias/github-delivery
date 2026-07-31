@@ -68,12 +68,15 @@ Read `references/shared-rules.md` before acting. Non-negotiables:
 14. Comment idempotency — one intent → one `[shipping-github]` comment; edit to fix, never spam. Post/edit via UTF-8 file + `gh --input` / `--body-file` (never PowerShell string pipes — causes `�un…` mojibake). No Markdown backslash-escaping — use backticks.
 15. Merge-ready only when bots/humans are clear **and** own bug+security reviews are done; also post/edit one notify on each **linked issue** (not only on the PR).
 16. Status verdicts must use the **same** merge-ready bar (no looser read-only “ready”).
+17. Draft→ready only after asking; inline replies in-thread; subagent checkout preflight; Spec+Standards on full-review/create-PR; post-merge cleanup; backport only after ask; rate-limit backoff via Composio then gh.
 
 ## Tooling
 
 - Prefer `gh` for GitHub reads/writes.
 - Detect the repo default branch; do not hardcode `main`.
-- Cross-use thin helpers when helpful: `review-bugbot`, `review-security`.
+- Cross-use thin helpers when helpful: `review-bugbot`, `review-security`, skill `review` (Spec+Standards), skill `manage-stacked-prs`.
+- **Rate limits:** prefer Composio MCP `GITHUB_GET_GRAPHQL_RATE_LIMIT` when GitHub toolkit is connected; else `gh api rate_limit` / `gh api graphql` `rateLimit` (see shared rules).
+- **Inline replies:** Composio `GITHUB_CREATE_A_REPLY_FOR_A_REVIEW_COMMENT` or `gh api …/pulls/{pr}/comments/{id}/replies`.
 
 ## References
 <!-- eval:references -->
