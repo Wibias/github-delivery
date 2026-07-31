@@ -89,6 +89,7 @@ Rules:
 - Fix necessary/useful items; skip 0.1% nits.
 - Prefer fixing inside this PR over a follow-up PR.
 - Owner/maintainer requests are default-must-fix unless obsolete or contradictory.
+- **Watch / fix:** never idle on “waiting for CI” while unresolved owner/CODEOWNER/trusted-human feedback is open — triage and fix (or surface) first; tip-update may share the same push.
 
 ### Comment fetch hygiene
 

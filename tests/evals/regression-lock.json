@@ -66,5 +66,9 @@
   {
     "id": "R-merge-issue-thanks-2026-07-31",
     "sha256": "d9746345081a3642c5a1919972061bc2ebcdd894b63f53b8ec9f4e5c9aceffe7"
+  },
+  {
+    "id": "R-watch-reviews-before-ci-2026-07-31",
+    "sha256": "af8b8b5e64b7d5d23ee4358350767016a6094a3280dcf56f240370c7235bb465"
   }
 ]

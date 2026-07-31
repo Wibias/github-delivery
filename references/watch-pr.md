@@ -23,16 +23,33 @@ Do **not** merge unless they also asked to merge (then hand off to `merge-pr` on
 - Default: one PR.
 - If the user lists **>3** PRs to watch/babysit: fan out with **subagents** (shared **Multi-PR fan-out**). ≤3 may stay in the parent.
 
+## Hard ordering (do not invert)
+
+**Reviews → then base update if needed → then CI.** Never the reverse.
+
+Forbidden watch anti-pattern:
+
+1. Merge/`git pull` base (`dev`) onto the PR
+2. Sit and poll until CI is green
+3. Only then read owner/CODEOWNER comments
+
+If an **unresolved owner / CODEOWNER / trusted-human** thread is open (or a new one arrives), **address it before** idling on CI — even when CI is red or still running. A base update that will be followed by review-driven code changes is wasted CI; fix the review first (or fold review + tip-update into **one** push).
+
 ## Loop
+
+On **every** poll / wake (including the first):
 
 1. Identify PR (`#N`, URL, or current branch) — resolve bare `#N` per shared rules. Checkout head if fixing.
 2. Apply git safety (dirty tree / no force-push / fork-head unwritable → hard stop).
-3. Snapshot: draft/WIP gates, behind-base/conflicts, required CI + review gate (`required-checks` + `pr-policy-gate`), unresolved threads (`review-threads.mjs`), stack/fork/auto-merge/**merge-queue** flags.
-4. **Reviews first:** triage per shared rules (owners/trusted first). Patch+push actionable items. Human written replies → chat confirm. Inline replies in-thread. Resolve only allowed threads after verified fixes (`review-threads --resolve` only when policy allows).
-5. **CI:** classify branch vs flake. Fix branch-related; rerun flakes (max 3 / SHA); stop on exhausted infra failures. After push: re-check stale-approval / last-push via `pr-policy-gate`.
-6. If behind/conflicted: update from base, resolve or ask, push; verify compile-against-tip when updating.
+3. Snapshot: draft/WIP gates, behind-base/conflicts, required CI + review gate (`required-checks` + `pr-policy-gate`), unresolved threads (`review-threads.mjs`), **top-level PR conversation comments** (owners often leave guidance there, not only inline threads), stack/fork/auto-merge/**merge-queue** flags.
+4. **Reviews first (mandatory):** triage per shared rules — **CODEOWNERS / owners / maintainers first**, then other humans, then bots.
+   - Patch+push actionable items (scope narrow / drop duplicated work / rebase guidance from the comment).
+   - Human written replies → chat confirm. Inline replies in-thread. Resolve only allowed threads after verified fixes (`review-threads --resolve` only when policy allows).
+   - **Do not** enter a “wait for green” idle while useful owner/CODEOWNER feedback is still open or only acknowledged in chat.
+5. **Then** if behind/conflicted: update from base, resolve or ask, push; verify compile-against-tip. Prefer combining with review fixes in the same push when both are needed.
+6. **Then CI:** classify branch vs flake. Fix branch-related; rerun flakes (max 3 / SHA); stop on exhausted infra failures. After push: re-check stale-approval / last-push via `pr-policy-gate`.
 7. Security-offer / changelog nudge once if applicable.
-8. If green + mergeable + useful threads quiet on **current** SHA: report milestone **“CI/reviews quiet — still watching (not full merge-ready bar)”** (stacked: “quiet vs parent — not trunk”). Do **not** post `[shipping-github] Merge ready` from watch alone. Keep polling while open. If auto-merge **or merge-queue** queued: watch until **actually merged** (report queue position/state from `pr-policy-gate`).
+8. Only if green + mergeable + **useful threads/comments quiet** on **current** SHA: report milestone **“CI/reviews quiet — still watching (not full merge-ready bar)”** (stacked: “quiet vs parent — not trunk”). Do **not** post `[shipping-github] Merge ready` from watch alone. Keep polling while open. If auto-merge **or merge-queue** queued: watch until **actually merged** (report queue position/state from `pr-policy-gate`).
 9. Stop only when:
    - PR **merged** or **closed**, or
    - Hard blocker (permissions, fork-head unwritable, dirty unrelated tree, push rejected, flake budget exhausted, product decision, human reply needs confirmation, stack needs `manage-stacked-prs` for trunk, merge-queue stuck with `merge_group` CI gap), or
@@ -40,10 +57,11 @@ Do **not** merge unless they also asked to merge (then hand off to `merge-pr` on
 
 ## Cadence
 
-- CI pending/failing: poll ~1 minute (longer if rate-limit remaining is low — shared **Rate-limit backoff**).
+- **Open actionable reviews:** act immediately; do not burn the poll interval “waiting for CI.”
+- CI pending/failing **and** reviews quiet: poll ~1 minute (longer if rate-limit remaining is low — shared **Rate-limit backoff**).
 - Before dense multi-PR / watch polls: check Composio `GITHUB_GET_GRAPHQL_RATE_LIMIT` (or `gh api rate_limit` / GraphQL `rateLimit`).
 - CI green, PR still open: keep polling at a practical interval (~1–2 minutes) for new reviews/conflicts — don’t abandon the watch.
-- On any change (new SHA, check flip, new comment): reset and act; re-verify tip freshness before repeating milestone language.
+- On any change (new SHA, check flip, new comment): reset to step 3; **re-run reviews-first** before celebrating green.
 - Heartbeat only on status **changes**, not every identical green poll.
 
 ## Done when
@@ -54,3 +72,4 @@ Do **not** merge unless they also asked to merge (then hand off to `merge-pr` on
 
 Never treat a single green snapshot as the end of babysitting while the PR is still open.
 Never equate a watch milestone with merge-ready unless `fix-pr-bots` / `full-review-pr` already completed the full bar this session.
+Never report “waiting for CI” as the only action while unresolved owner/CODEOWNER comments remain.

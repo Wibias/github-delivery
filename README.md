@@ -27,6 +27,7 @@ Shipping a PR is rarely one green check. It’s a grind of:
 | Green on a stale base | Update from base, then **compile against tip** before ready / approve / merge |
 | False merge-ready with open threads | GraphQL `reviewThreads` must be clear; linked-issue notify when ready is posted |
 | CI green, bots still arriving | **Thin settle** (~3–5 min quiet + recheck) before merge-ready / approve-comment |
+| Watch merges `dev` then only waits CI | Forbidden — **reviews/CODEOWNERS first**, then tip-update, then CI |
 | Watch “ready” ≠ merge-ready | Watch milestones are CI/review quiet only — full bar is fix-pr/full-review |
 | Status looser than merge-ready | Status uses the **same** evidence bar (tip, protection, CODEOWNERS, stacks, policy) |
 | Required checks / CODEOWNERS / queue / stale approvals | Helpers: `required-checks`, `codeowners-for-pr`, `review-threads`, `pr-policy-gate` |
