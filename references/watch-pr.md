@@ -94,7 +94,7 @@ On **every** poll / wake (including the first):
 ## Cadence
 
 - **Open actionable reviews:** act immediately; do not burn the poll interval “waiting for CI” or “waiting for CodeRabbit.”
-- CI pending/failing **and** wake gate clear: poll ~1 minute (longer if rate-limit remaining is low).
+- CI pending/failing **and** wake gate clear: poll ~1 minute (longer if rate-limit remaining is low). Expect `windows-latest` often **~12–13 min**, typically done by **~15 min** — do **not** sleep a fixed 20 min after CI started (shared **CI wait expectations**).
 - Before dense multi-PR / watch polls: check Composio `GITHUB_GET_GRAPHQL_RATE_LIMIT` (or `gh api rate_limit` / GraphQL `rateLimit`).
 - CI green, PR still open: keep polling (~1–2 minutes) for new reviews/conflicts.
 - On any change (new SHA, check flip, **new comment**): reset to wake gate; **re-run reviews-first**.

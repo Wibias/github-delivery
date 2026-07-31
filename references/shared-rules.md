@@ -217,12 +217,12 @@ When research (or the user) finds **fixed on development tip but not on release/
 ## Push → wait → recheck (mode-aware stops)
 
 1. Commit and push scoped fixes (when the workflow implies fix work / user authorized pushes).
-2. Wait for new review rounds and CI — backoff polling, not a busy loop.
+2. Wait for new review rounds and CI — backoff polling, not a busy loop. See **CI wait expectations** below.
 3. Re-triage; repeat until the mode’s **done** condition or a **hard blocker**.
 
 | Mode | Keep going until | Hard stop (report, don’t pretend done) |
 |---|---|---|
-| **Fix / create → merge-ready** (`fix-pr-bots`, create-PR cleanup) | Each targeted PR is merge-ready (or draft/WIP gated with an explained blocker) | Permissions / **fork-head unwritable** / dirty unrelated tree / push rejected / flake retry budget exhausted on required checks / product decision / human reply needs confirmation / user interrupt / **stacked trunk merge needs `manage-stacked-prs`**. **Do not** stop just because “3 rounds” or “20 minutes” passed. **Do not** stop for soft “needs maintainer ack” while CI/comments are still fixable |
+| **Fix / create → merge-ready** (`fix-pr-bots`, create-PR cleanup) | Each targeted PR is merge-ready (or draft/WIP gated with an explained blocker) | Permissions / **fork-head unwritable** / dirty unrelated tree / push rejected / flake retry budget exhausted on required checks / product decision / human reply needs confirmation / user interrupt / **stacked trunk merge needs `manage-stacked-prs`**. **Do not** abandon the babysit just because wall-clock elapsed (e.g. “20 minutes of work”) while CI/comments are still fixable. **Do not** invent a fixed **20 min sleep** after CI starts — see CI wait expectations. **Do not** stop for soft “needs maintainer ack” while CI/comments are still fixable |
 | **Full review** (`full-review-pr`) | Each targeted PR has a valid verdict **and** required CI green (or hard blocker / `not-useful` / draft-only `gated`) | Same hard blockers. Soft security opinions ≠ stop |
 | **Watch** (`watch-pr`) | PR merged/closed (green+mergeable is a milestone — keep watching for new comments) | Same hard blockers, or user stop |
 | **Re-review** | Concerns re-checked and fixed or changes-requested | Same hard blockers |
@@ -233,6 +233,20 @@ If the user named **several** existing PRs (“full review these”, “babysit 
 **Batch tip race:** before each PR’s merge-ready / approve claim, re-check behind-base + compile-against-tip on **that** PR — base may have moved while you fixed an earlier one.
 
 **Single writer:** do not run watch + fix-pr merge-ready posting concurrently on the same PR in a way that double-posts; one workflow owns the `[shipping-github] Merge ready` comment.
+
+## CI wait expectations
+
+Waiting for required CI is **poll until green (or hard blocker)** — not a fixed long sleep after the workflow starts.
+
+| Expectation | Detail |
+|---|---|
+| Poll while pending | ~**1 min** (stretch only if GitHub rate-limit remaining is low) |
+| Typical `windows-latest` | Often finishes in **~12–13 min**; treat **~12–15 min** as the normal upper band for that leg |
+| Do **not** | Sleep a blanket **20 minutes** (or similar) after CI started “to be safe” |
+| Past ~15 min still pending | Re-check the job (queued/stuck/cancelled/waiting for runner). Investigate — don’t assume you must wait longer by policy |
+| Ubuntu/mac legs | Usually faster; still poll ~1 min; don’t gate the whole wait on an invented 20 min wall |
+
+Thin settle (~3–5 min **after** green) is separate — that is for late bots, not for Windows runtime.
 
 ## Thin settle window (before merge-ready / approve-comment)
 

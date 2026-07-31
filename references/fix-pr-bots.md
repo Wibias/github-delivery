@@ -22,7 +22,7 @@ Necessary/useful **human** (esp. owners/maintainers) + CodeRabbit/Codex comments
 4. Collect unresolved review threads via `scripts/review-threads.mjs` (owners/maintainers first, then other humans, then bots). Skip resolved/outdated.
 5. Triage and fix necessary/useful items (trusted humans first; verify bots). For human declines needing a written reply: confirm exact text in chat first (shared social policy). Bot skip notes may use `[shipping-github]` prefix.
 6. Push fixes (git safety: no force-push; stop if rejected / dirty unrelated tree / **fork-head unwritable**). After push: `pr-policy-gate.mjs` for stale-approval / last-push.
-7. **Wait and recheck** — new useful comments or red required CI → fix/push again. Repeat until stable **or** a hard blocker (shared rules). No “3 rounds / 20 min then quit.”
+7. **Wait and recheck** — new useful comments or red required CI → fix/push again. Repeat until stable **or** a hard blocker (shared rules). No “3 rounds then quit.” Poll CI ~1 min; expect `windows-latest` ~12–15 min — do **not** sleep a fixed 20 min after CI started.
 8. Fix CLI / project checks this PR broke. Classify CI: branch fix vs flake (shared rules; flake reruns still max 3 / SHA). Apply **Required checks + review gate** + policy gate (code-owner enforcement, merge queue).
 9. **Own reviews (required — not optional):**
    - Subagent **preflight** (checkout PR head; stash only with user OK) — shared rules.
