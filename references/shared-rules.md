@@ -246,22 +246,38 @@ Watch mode already keeps polling after quiet; settle is only for the **claim** t
 
 ## CI — branch fix vs flake
 
-Classify failed **required** checks before patching:
+Classify failed **required** checks from **failed job logs** before acting. Prefer **fix over burning reruns**.
 
-**Branch-related (fix in the PR):** compile/typecheck/lint/tests/snapshots in touched areas; deterministic failures clearly from this diff.
+### Branch-related / harden-in-PR (patch + push)
 
-**Likely flaky / infra (do not “fix” by rewriting CI/tests/deps):** runner provisioning, network/registry timeouts, Actions outages, rate limits, known flake patterns in unrelated suites.
+- Compile/typecheck/lint/tests/snapshots failing in touched areas
+- Deterministic failures clearly from this diff
+- **App/API/integration test timeouts or flakes** (e.g. `GET /api/…` 5s timeout, racey waits, undersized test timeouts) — even if “known flaky on `windows-latest`”
+- Same failing assertion/test name that already failed once on this SHA after a rerun
+- Failures you can harden with a small, scoped test/prod fix without weakening CI
+
+**Do not** call these “infra” and rerun. Fix or harden (timeouts, retries inside the test only when justified, await readiness, mock flaky externals, etc.). Never delete/skip the test to go green.
+
+### True flaky / infra (rerun only)
+
+- Runner provisioning / spot eviction
+- GitHub Actions / network / registry outages unrelated to the test body
+- Rate limits from the platform, not the app under test
 
 | Classification | Action |
 |---|---|
-| Branch-related | Patch, commit, push |
-| Flaky/infra | Rerun failed jobs up to **3** times for the same SHA; if still failing, stop and report — do not weaken CI or shotgun-edit unrelated tests |
-| Ambiguous | One diagnosis pass on failed job logs, then choose |
+| Branch-related / harden-in-PR | Patch, commit, push (new SHA) |
+| True infra | Rerun failed jobs up to **3** times for the same SHA; if still failing, **stop and report** — do not weaken CI |
+| Ambiguous | **One** log diagnosis: if the failure is inside a test/spec hitting your API/UI, treat as **harden-in-PR**. Only classify infra when logs show platform/runner failure with no useful test assertion |
 
+### Hard rules
+
+- **Same failure twice on one SHA → stop rerunning; fix or report.** Do not spend the 2nd/3rd retry on an identical `timeout` / assertion.
 - Required checks block merge-ready / merge.
 - Non-required failures: note them; only block if the user cares or they show a real break.
 - Prefer failed-**job** logs as soon as a job fails; don’t wait for the whole workflow if logs are already available.
-- When both actionable review fixes and flaky retries apply: **fix+push first** (new SHA retriggers CI); don’t rerun flakes on a SHA you’re about to replace.
+- When both review fixes and CI failures apply: **fix+push first** (new SHA retriggers CI); don’t rerun flakes on a SHA you’re about to replace.
+- On **merge** / merge-ready: burning retry budget instead of hardening a repeated test timeout is a failed classification — fix first, then merge when green.
 
 ## Merge policy extras
 

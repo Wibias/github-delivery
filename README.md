@@ -32,7 +32,7 @@ Thin babysit skills (Cursor built-in, OpenAI `babysit-pr`, Claude marketplace co
 | Markdown `\_` spam in comments | Backticks for identifiers; no backslash-escaping |
 | Agent spam on GitHub | No auto-replies to humans without your exact text; limited thread resolves; inline replies in-thread |
 | Vague “looks good / CI green” reviews | **`comment-depth.md`** — research, security, verdict, merge-ready, status with paths/SHAs/evidence |
-| Flaky CI “fixed” by rewriting tests | Classify branch vs flake; retry flakes (budget); don’t weaken CI |
+| Flaky CI “fixed” by rewriting tests | Classify carefully — **don’t** weaken CI; **do** harden real test timeouts instead of burning reruns |
 | Draft / WIP merged by accident | Hard gates before merge-ready claims or merge; draft→ready only after ask |
 | Rate-limit thrash on dense polls | Composio GraphQL rate limit → `gh` fallback; backoff |
 | Bare `gh pr merge` skips ceremony | Why-it-helps on PR; **thank issue author** even after `Fixes` auto-close; never done without that |

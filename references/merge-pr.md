@@ -17,7 +17,7 @@ Merge PR `#N` after readiness checks, comment why it’s useful, `@thanks` the P
 
 - Not draft / WIP / do-not-merge (shared gates)
 - Not conflicted; not behind base; **compiles/tests against current tip** (update + verify first per shared rules)
-- Required CI green on **current** SHA (shared **Required checks + review gate**; non-required: note; ask if unclear)
+- Required CI green on **current** SHA (shared **Required checks + review gate**; non-required: note; ask if unclear). If required CI fails: classify per shared **CI — branch fix vs flake** — **harden test/app timeouts before burning reruns**; do not merge on “one more retry.”
 - `reviewDecision` / CODEOWNERS (**when enforced**) / required reviewers / **required labels** not blocking
 - Unresolved review threads cleared (`scripts/review-threads.mjs`) when conversation resolution or useful threads remain
 - Approvals fresh on **head SHA** when dismiss-stale / last-push-approval is on (`scripts/pr-policy-gate.mjs`)
