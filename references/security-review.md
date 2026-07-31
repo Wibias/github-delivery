@@ -25,7 +25,7 @@ Follow **Public security disclosure** in `shared-rules.md`. Private GHSA / advis
 
 **Chat (to the user):** full findings — severity, **confidence**, affected code, impact, abuse/repro path, fix, verification. Include completed **coverage matrix** + scope script output summary.
 
-**GitHub:** short + scannable — **Security** template in `references/comment-depth.md` (decision, risk, findings or `none confirmed`, 1–2 sentence summary, residual, fixes). **Omit** exploit steps, payloads, bypass recipes, secret values. **Omit** scope-script dumps, method essays, and full coverage matrices on the public comment — those stay in chat.
+**GitHub:** short + scannable — **Security** template in `references/comment-depth.md` (decision, risk, findings or `none confirmed`, **3–4 substantive** summary sentences, residual, fixes). **Omit** exploit steps, payloads, bypass recipes, secret values. **Omit** scope-script dumps, method essays, and full coverage matrices on the public comment — those stay in chat.
 
 Sensitive findings → short public “details shared privately” form + full table in chat. One idempotent comment per target.
 

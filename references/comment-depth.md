@@ -71,7 +71,7 @@ none confirmed
 | high | authz | <one line, no exploit steps> | fixed in `<sha>` / open |
 
 ### Summary
-<1–2 sentences: overall risk on this tip>
+<3–4 substantive sentences: (1) what was reviewed on this tip, (2) overall risk / whether anything is exploitable now, (3) what changed or was already solid, (4) what residual risk remains if any>
 
 ### Residual
 - <only real leftovers; or `none`>
