@@ -2,19 +2,9 @@
 
 One Agent Skill for the whole GitHub **ship loop** — from “is this issue still a problem on latest `dev`?” to “merge it and thank the reporter” — without pasting the same long prompt every time.
 
-Thin babysit skills watch CI. This one runs the **workflows you actually repeat**: research issues (still broken? duplicate? open PR? priority?), open linked PRs only when needed, fix review noise, wait for the next bot round, decide what’s left, review for real bugs/security, and close the loop when you merge.
+Thin babysit skills (Cursor built-in, OpenAI `babysit-pr`, Claude marketplace copies) mostly watch CI. This skill owns the **workflows you actually repeat**: research issues, open linked PRs only when needed, fix owner/bot review noise, wait for the next round, decide what’s left, review for real bugs/security, settle before claiming ready, and close the social loop when you merge.
 
 ## Why it helps
-
-Shipping a PR is rarely one green check. It’s a grind of:
-
-- “Is #88 even still valid on tip of development?”
-- CodeRabbit / Codex / humans leaving another round after every push
-- CI flakes vs real branch failures
-- Opening a second PR when one already exists
-- Merging without thanking the reporter — or thanking yourself
-
-**shipping-github** turns those into named routes the agent follows consistently:
 
 | Pain | What the skill does |
 |---|---|
@@ -27,7 +17,8 @@ Shipping a PR is rarely one green check. It’s a grind of:
 | Green on a stale base | Update from base, then **compile against tip** before ready / approve / merge |
 | False merge-ready with open threads | GraphQL `reviewThreads` must be clear; linked-issue notify when ready is posted |
 | CI green, bots still arriving | **Thin settle** (~3–5 min quiet + recheck) before merge-ready / approve-comment |
-| Watch merges `dev` then only waits CI | Forbidden — run `watch-wake-gate.mjs`; exit `1` = fix OWNER comments first |
+| Watch merges `dev` then only waits CI | Forbidden — run `watch-wake-gate.mjs`; exit `1` = fix OWNER top-level comments first |
+| Cursor/Codex thin babysit steals the prompt | Personal redirects `overrides/babysit` + `overrides/babysit-pr` → this skill |
 | Watch “ready” ≠ merge-ready | Watch milestones are CI/review quiet only — full bar is fix-pr/full-review |
 | Status looser than merge-ready | Status uses the **same** evidence bar (tip, protection, CODEOWNERS, stacks, policy) |
 | Required checks / CODEOWNERS / queue / stale approvals | Helpers: `required-checks`, `codeowners-for-pr`, `review-threads`, `pr-policy-gate` |
@@ -43,7 +34,7 @@ Shipping a PR is rarely one green check. It’s a grind of:
 | Flaky CI “fixed” by rewriting tests | Classify branch vs flake; retry flakes (budget); don’t weaken CI |
 | Draft / WIP merged by accident | Hard gates before merge-ready claims or merge; draft→ready only after ask |
 | Rate-limit thrash on dense polls | Composio GraphQL rate limit → `gh` fallback; backoff |
-| Merge without closing the social loop | Thanks + why-it-helps on the PR; thank the **issue** author (even after auto-close); never bare `gh pr merge` |
+| Bare `gh pr merge` skips ceremony | Why-it-helps on PR; **thank issue author** even after `Fixes` auto-close; never done without that |
 
 Shared rules live in one place (`references/shared-rules.md`): scope lock, git safety (no force-push, stop on dirty trees), evidence sweep before “ready.”
 
@@ -52,7 +43,7 @@ Shared rules live in one place (`references/shared-rules.md`): scope lock, git s
 | Ask something like… | Loads |
 |---|---|
 | Fix CodeRabbit/Codex / humans → merge-ready | `references/fix-pr-bots.md` |
-| Watch / monitor until merged/closed | `references/watch-pr.md` |
+| Watch / monitor / babysit until merged/closed | `references/watch-pr.md` |
 | Re-review after your review + new bots | `references/re-review-pr.md` |
 | Research issue(s) on latest development | `references/research-issue.md` |
 | Create PR for issue → merge-ready | `references/create-pr-for-issue.md` |
@@ -72,7 +63,18 @@ Concrete evidence scripts (see `references/gate-helpers.md`):
 | `scripts/required-checks.mjs` | Required CI contexts / modern checks / rulesets + live rollup |
 | `scripts/codeowners-for-pr.mjs` | Map PR files → CODEOWNERS on base + review requests |
 | `scripts/review-threads.mjs` | Paginate GraphQL unresolved review threads (+ optional resolve) |
-| `scripts/watch-wake-gate.mjs` | Block CI/bot idle while unacked OWNER/MEMBER top-level comments exist |
+| `scripts/pr-policy-gate.mjs` | Code-owner **enforcement**, dismiss-stale / last-push approvals, merge queue / `merge_group` warn |
+| `scripts/watch-wake-gate.mjs` | **Watch only:** exit `1` while unacked OWNER/MEMBER top-level comments exist — forbids “waiting on CI/CodeRabbit” |
+
+### Watch ordering (hard)
+
+Every watch wake:
+
+1. Run `watch-wake-gate.mjs` — exit `1` → triage OWNER comments (top-level conversation counts; not only inline threads). Clear with a **non-merge** commit or `[shipping-github] Addressed owner feedback — …`.
+2. Then tip-update if behind.
+3. Then CI / bots.
+
+Never: merge `dev` → idle on `windows-latest` + CodeRabbit while an owner note is still open.
 
 ## Reliability bar (what “merge ready” means)
 
@@ -89,6 +91,17 @@ Before `[shipping-github] Merge ready` (and full-review `approve-comment`):
 
 Watch may report “CI/reviews quiet — still watching” without claiming that full bar. Status never uses a looser bar than merge-ready.
 
+### Merge ceremony (required)
+
+`merge-pr` is not bare `gh pr merge`:
+
+1. Why-it-helps PR comment (`@thanks` PR author only if not you)
+2. Merge
+3. For **each** linked/fixed issue: thank the **issue** author (omit `@` if you are the reporter) — **even if** GitHub already auto-closed via `Fixes`
+4. Post-merge cleanup
+
+Multi-PR merges (“merge 775 and 778”) run the full ceremony **per PR**.
+
 ## Competing babysit skills
 
 | Source | Path / install | Problem |
@@ -103,24 +116,31 @@ Watch may report “CI/reviews quiet — still watching” without claiming that
 2. Personal redirects from `overrides/`:
    - `babysit` → shipping-github watch/fix
    - `babysit-pr` → shipping-github watch/fix (preempt Codex/Claude installs)
-3. User rule (Cursor): prefer shipping-github over built-in babysit.
+3. Cursor user rule: prefer shipping-github over built-in babysit.
 4. Hard gate: `scripts/watch-wake-gate.mjs` on every watch wake.
+
+You cannot permanently delete Cursor’s built-in; win on discovery + redirect instead.
 
 ## Install
 
-Copy or symlink this folder into your agent skills directory, for example:
+Copy or symlink this folder into agent skills directories:
 
 ```text
 ~/.agents/skills/shipping-github
+~/.cursor/skills/shipping-github
+~/.codex/skills/shipping-github      # optional, for Codex
+~/.claude/skills/shipping-github     # optional, for Claude Code
 ```
 
 Also install the redirects (same machine):
 
 ```text
-~/.agents/skills/babysit      ← copy from overrides/babysit/
-~/.agents/skills/babysit-pr   ← copy from overrides/babysit-pr/
-~/.cursor/skills/babysit      ← same
-~/.cursor/skills/babysit-pr   ← same
+~/.agents/skills/babysit      ← overrides/babysit/
+~/.agents/skills/babysit-pr   ← overrides/babysit-pr/
+~/.cursor/skills/babysit
+~/.cursor/skills/babysit-pr
+~/.codex/skills/babysit       # optional
+~/.codex/skills/babysit-pr    # optional
 ```
 
 Folder name for the main skill must stay `shipping-github` (matches frontmatter `name`).
@@ -134,26 +154,24 @@ Folder name for the main skill must stay `shipping-github` (matches frontmatter 
 
 ## Quick use
 
-Ask the agent things like:
-
-- `research issue #88` / `research issues #88 #91` — still broken on latest development? fixed? open PR? duplicate? security relevance? priority; posts a review comment on each issue; asks before security review if relevant
-- `create a pr for issue #88 … merge ready, don't merge` — preflight first; **one** PR on the **issue’s** repo (not fork-only); `Fixes #N` verified; assign yourself; one issue comment (edit if incomplete — never a second cut-off comment)
-- `create separate PRs for #52 and #62` — **explicit batch only**; still one canonical PR per issue, no fork-only, same link/assign/comment rules
+- `research issue #88` / `research issues #88 #91`
+- `create a pr for issue #88 … merge ready, don't merge`
+- `create separate PRs for #52 and #62` — **explicit batch only**
 - `fix coderabbit/codex on pr #42 and make it merge ready`
-- `what's left on pr #42` — one-shot status (same evidence bar)
-- `watch pr #42` — keep monitoring CI + new reviews until merged/closed or a hard blocker
-- `full review on pr #42` — babysit to green + verdict (not soft-gated by “needs ack”)
+- `what's left on pr #42` — same evidence bar as merge-ready
+- `watch pr #42` / `babysit pr #42` — reviews first (wake gate), then CI, until merged/closed
+- `full review on pr #42` — babysit to green + verdict
 - `security review on pr #42`
-- `merge pr #42` — thanks PR author (not yourself) + thank issue author + close issue when fixed
+- `merge pr #42` / `merge pr 775 and 778` — full ceremony per PR, including issue-author thanks
 
 ## Boundary
 
 | Skill | Owns |
 |---|---|
-| **shipping-github** | GitHub issue/PR ship loop, research-on-tip, watch CI/reviews, merge ceremony, gate helpers |
+| **shipping-github** | GitHub issue/PR ship loop, research-on-tip, watch CI/reviews, merge ceremony, gate helpers, babysit redirects |
 | **issue-workflow** | Filing/breaking down tracker artifacts (PRDs, slices) — not “is it fixed on tip?” |
 | **git-workflow-and-versioning** | Local commit discipline, semver, changelog *authoring*, release tags (this skill only nudges missing entries) |
-| Cursor **babysit** | Thin conflict/CI stub — optional; this skill covers richer watch + the full ship pack |
+| Cursor **babysit** / OpenAI **babysit-pr** | Thin watcher stubs — redirected away when personal overrides are installed |
 | **manage-stacked-prs** | Stack inspect / restack / retarget / bottom-up merge — shipping detects stacks and hands off |
 | **split-to-prs** | Split oversized branch into reviewable PRs — hand off when scope explodes |
 | **finishing-a-development-branch** | Post-ship branch/worktree cleanup menu — hand off after merge |
