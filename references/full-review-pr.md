@@ -41,20 +41,7 @@ Skip 0.1% nits. No follow-up PR for in-scope fixes.
 6. Changelog nudge if user-facing.
 7. If concrete necessary issues remain: GitHub **changes requested** with those blockers only.
 8. Before `approve-comment` (or merge-ready notify): **thin settle** (shared rules) — ~3–5 min quiet + recheck; activity resets; two-window cap. Skip settle for `changes-requested` / `not-useful` / draft `gated`.
-9. Post a short verdict comment **only after** CI+comments are handled (and settle, when approving) or a real hard blocker / `not-useful` / draft `gated` applies:
-
-```markdown
-## [shipping-github] Verdict: <approve-comment | changes-requested | not-useful | gated>
-
-- Usefulness: …
-- Bugs: …
-- Security: … (findings fixed / none / concrete remaining)
-- Spec / standards: …
-- Owner/maintainer reviews: …
-- Bots: …
-- Base / CI: … (name failing required jobs in backticks if any)
-- Gate: … (draft/WIP only, or none)
-```
+9. Post a **detailed** verdict comment **only after** CI+comments are handled (and settle, when approving) or a real hard blocker / `not-useful` / draft `gated` applies. Use the **Full-review / re-review verdict** template in `references/comment-depth.md` — fill Usefulness, Bugs, Security, Spec, Reviews, Base/CI, Gate, Bottom line with paths/SHAs/checks. Do not post a bullet stub of “bots: addressed / CI: green.”
 
 Approve via GitHub only if the user asked for approval; otherwise comment or request changes.
 

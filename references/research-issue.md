@@ -65,30 +65,11 @@ Run for **each** issue (batch in parallel when independent). If **>3** issues: f
 
 ## Comment on the issue (required)
 
-Post on **each** researched issue (prefix agent research comments with `[shipping-github]`):
+Post on **each** researched issue. Use the **Research (issue)** template in `references/comment-depth.md` (structured table + Evidence / Gaps / Recommended next). Fill every field; name paths, SHAs, and commands — do not post a vague stub.
 
-```markdown
-## [shipping-github] Research review
+Prefix agent research comments with `[shipping-github]`. Edit if updating; never a truncated stub then a full second comment.
 
-**Claim:** <one sentence>
-**Checked against:** <development-branch>@<short-sha> (and release/default if relevant)
-
-| Field | Finding |
-|---|---|
-| Still an issue on latest development? | yes / no / unclear |
-| Exact issue | … |
-| Fixed on development? | no / yes — <PR/SHA> |
-| Open PR covering this? | none / #<n> |
-| Duplicate of? | none / #<n> |
-| Security relevance | **none \| possible \| likely** — <high-level class only, e.g. authz / tokens — no exploit steps> |
-| Priority | **low \| middle \| high** — <1–2 obvious reasons> |
-| Verdict | <from table> |
-
-**Evidence:** <links, SHAs, brief repro notes>
-**Gaps:** <what wasn’t verified, if any>
-```
-
-Also summarize the same table(s) to the user in chat. For multiple issues, one chat summary with a row per issue, plus per-issue GitHub comments (**one research comment per issue** — edit if updating; never post a truncated stub then a full second comment).
+Also summarize the same table(s) to the user in chat. For multiple issues, one chat summary with a row per issue, plus per-issue GitHub comments.
 
 When any issue is **possible** or **likely** security: ask in chat with the wording above (review + post, redacted public / full detail in chat). Do not auto-start.
 

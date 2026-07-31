@@ -21,7 +21,7 @@ Follow **Public security disclosure** in `shared-rules.md`. Private GHSA / advis
 
 **Chat (to the user):** full findings — severity, affected code, impact, and how it could be abused / repro steps if needed for fixing.
 
-**GitHub (issue or PR comment):** redacted. Include severity, high-level category, affected area/component, that a fix is needed / recommended next step. **Omit** exploit steps, payloads, exact bypass recipes, secret values, and anything that teaches abuse.
+**GitHub (issue or PR comment):** redacted but **detailed** — use the **Security** template in `references/comment-depth.md` (target, scope, method, findings table, summary, residual). Include severity, high-level category, affected area/component, next step. **Omit** exploit steps, payloads, exact bypass recipes, secret values, and anything that teaches abuse.
 
 If a finding is vulnerability/policy-sensitive and hard to summarize safely, public comment may say only:
 
@@ -34,7 +34,7 @@ If a finding is vulnerability/policy-sensitive and hard to summarize safely, pub
 **Next:** <patch / needs maintainer review / covered by PR #…>
 ```
 
-…and put the rest in chat only. One idempotent comment per target (edit, don’t double-post).
+…and put the full table in chat only. One idempotent comment per target (edit, don’t double-post).
 
 ## Tooling checklist (leads, not proof)
 
@@ -55,7 +55,7 @@ Treat scanner output as **leads**; validate with a concrete abuse path or mark u
 2. Run the security review (subagent / `review-security` when a PR/branch diff applies; for issue-only, review implicated paths on development tip + checklist above as needed).
 3. Split output: **full → chat**, **redacted → GitHub** when posting was requested (default after research “yes”).
 4. If a PR is in scope: triage findings; fix necessary/useful issues in that PR; push; recheck CI as needed. Do not paste exploit detail into PR review bodies — use redacted request-changes / comments; details in chat.
-5. Summarize in chat: critical / worth-fixing / skipped, what was posted publicly, what was withheld.
+5. Summarize in chat: critical / worth-fixing / skipped, what was posted publicly, what was withheld. Public posts must meet `comment-depth.md` (no “security: none” without scope).
 
 ## Done when
 

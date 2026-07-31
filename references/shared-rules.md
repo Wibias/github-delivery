@@ -573,9 +573,10 @@ gh pr comment N --repo OWNER/REPO --body-file body.md
 
 ## Comments
 
-- Merge-ready, status, and verdict comments: short and concrete.
+- **Depth:** follow `references/comment-depth.md` for research, security, verdict, merge-ready, status, and merge thanks. Vague one-liners (“bots clean / CI green / looks good”) are a bug — name paths, SHAs, checks, and evidence.
+- Merge-ready, status, and verdict comments: **structured and concrete**, not cryptic.
 - Agent-authored GitHub comments: prefix with `[shipping-github]` when posting as the agent; follow **Comment idempotency** above.
 - **Markdown hygiene (no backslash spam):** never write `\_` or `\name` to “escape” identifiers. Put code, check names, symbols, and camelCase/snake_case tokens in **backticks** (e.g. `` `mergeStateStatus` ``, `` `previewArchivedCleanup` ``). Raw prose must not contain stray `\`.
-- Merge-ready body should follow the `fix-pr-bots` template (checklist), not a cryptic slash-escaped dump.
-- Merge thanks on the PR: `@` author only if not you.
-- Issue thanks after merge: thank issue author only if not you.
+- Merge-ready body should follow the **Merge ready** template in `comment-depth.md`, not a slash-escaped dump.
+- Merge thanks on the PR: `@` author only if not you — use the concrete “Why it helps” shape in `comment-depth.md`.
+- Issue thanks after merge: thank issue author only if not you — cite PR + what changed.

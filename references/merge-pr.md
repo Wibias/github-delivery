@@ -41,39 +41,23 @@ Compare PR author login to the authenticated GitHub user (`gh api user --jq .log
 
 1. Load PR `#N`: author, title, body, labels, draft state, linked issues, diff summary, CI, reviews, stack/fork flags. Resolve self-merge. Apply security-offer / changelog nudge if not already handled this session.
 2. Run preflight (behind-base update + compile-against-tip + required-checks/review gate + stack check). Enforce git safety (no force-push; stop if dirty unrelated / push rejected / fork-head unwritable when fixes needed).
-3. Post a short PR comment **before** merge (user-facing thanks are from you — no `[shipping-github]` prefix on ceremonial merge thanks):
+3. Post a PR comment **before** merge using the **Merge thanks** shapes in `references/comment-depth.md` (user-facing — no `[shipping-github]` prefix on ceremonial merge thanks). **Why it helps** must be 2–3 concrete sentences (user-visible effect + key `path`/behavior + linked issue) — not “fixes the bug.”
 
-**Others’ PRs:**
-
-```markdown
-Thanks @{author} — merging this.
-
-Why it helps: <1–2 sentences on the concrete bugfix/value>
-
-Ship it.
-```
-
-**Your own PRs:**
-
-```markdown
-Merging this.
-
-Why it helps: <1–2 sentences on the concrete bugfix/value>
-```
-
+**Others’ PRs:** thanks `@{author}` + why it helps + “Ship it.”  
+**Your own PRs:** why it helps only (no self-`@thanks`).
 4. Merge with the repo’s normal strategy (`gh pr merge` — prefer repo default; squash only if that’s the norm or user asked). Prefer deleting the head branch when the repo/UI option allows and the branch is not long-lived.
 5. **Linked issues — thank + auto-close (required):**
    - Resolve links via `closingIssuesReferences` **and** `Fixes`/`Closes`/`Resolves #N` in the PR body. If both empty: say so in chat; still do PR ceremony.
    - Prefer that the PR already uses closing keywords so GitHub auto-closes on merge.
    - **After merge, for each linked/fixed issue** (do this even when GitHub already closed the issue):
      - Load `gh issue view N --json author,state`.
-     - Comment on the **issue** (UTF-8 `--body-file`):
+     - Comment on the **issue** (UTF-8 `--body-file`) using the issue thanks shape in `comment-depth.md`:
 
        ```markdown
-       Thanks @{issue_author} — this is fixed by PR #{n} by <short what the fix did>.
+       Thanks @{issue_author} — fixed by PR `#<n>` (`<short-sha>`): <what changed for users / which failure mode is gone>.
        ```
 
-     - If you are the issue author: omit thanks/`@`; use `Fixed by PR #{n} by <short what>.`
+     - If you are the issue author: omit thanks/`@`; use `Fixed by PR #<n> (\`<sha>\`): <what changed>.`
      - If the issue is **still open** after merge (missing closing keyword, partial fix, epic): close it pointing at the PR when the fix is complete; if it should stay open, say why and leave it open.
    - **Do not** treat auto-close as “thanks done.” Auto-close ≠ issue thank comment.
    - PR author was already thanked (or skipped if self) in step 3 — that is the PR-side thanks only.

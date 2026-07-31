@@ -22,30 +22,27 @@ Report merge readiness **using the same bar as merge-ready / full-review** — w
    - linked issues; security/API cue; changelog gap if user-facing
    - whether this session already ran own bug+security+spec (if unknown: say **unknown — not run this session**; do **not** invent “own reviews done”)
 
-2. Emit:
+2. Emit using the **Status** template in `references/comment-depth.md` (gate table + “What’s left” with concrete actions). Include the same fields as below at minimum — expand with evidence (job names, SHAs, thread counts):
 
 ```markdown
-## PR #N status
+## [shipping-github] Status
 
-- Gate: draft/WIP/do-not-merge — clear | blocked (<reason>)
-- Base: up to date with tip | behind | conflicts
-- Compile-against-tip: verified this session | unknown (read-only; behind or not checked)
-- Required CI (this SHA): green | red/pending (`job…`)
-- Branch protection / reviewDecision: clear | blocked (`CHANGES_REQUESTED` / REVIEW_REQUIRED / …)
-- CODEOWNERS / required reviewers: clear | pending (<who>)
-- Owner/maintainer threads: none open | N open
-- Other human threads: none open | N open
-- Bots (CodeRabbit/Codex): none open | N open | rate-limited summary only (threads still open?)
-- Own bug+security (this session): done | not run | unknown
-- Fork head / push: same-repo | fork (maintainerCanModify yes/no)
-- Stack: standalone | stacked on PR #P (not trunk-ready)
-- Security offer: n/a | cue present (not run) | already run/declined
-- Changelog nudge: n/a | user-facing, no entry
-- Linked issues: …
+**Verdict:** not merge-ready / merge-ready bar met (not posted) / gated
+**Head:** `<sha>` → `<base>` (`mergeStateStatus`)
 
-Verdict: merge-ready | blocked — <one line matching fix-pr-bots bar>
+| Gate | State | Detail |
+|---|---|---|
+| Owner/human threads | … | … |
+| Bot threads | … | … |
+| Own reviews | done / missing / unknown | … |
+| Tip / conflicts | … | … |
+| Required CI | … | name jobs |
+| Policy (CODEOWNERS/approvals/queue) | … | … |
+
+**What’s left:** <ordered concrete actions>
 ```
 
+Do **not** post a vague “CI mostly green, some comments” summary.
 3. **Verdict rules (same as merge-ready — stricter than “CI green”):**
    - `merge-ready` only if gate clear, up to date (or you positively know tip compiles), required CI green on current SHA, reviews/CODEOWNERS clear, useful bot/human threads clear, not mid-stack-for-trunk, and own bug+security done **or** you explicitly say status cannot confirm own reviews and therefore verdict is **blocked / incomplete** — never “merge-ready” when own reviews are unknown.
    - Prefer **blocked** when read-only status cannot verify compile-against-tip or own reviews.

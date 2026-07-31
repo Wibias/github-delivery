@@ -33,28 +33,9 @@ Necessary/useful **human** (esp. owners/maintainers) + CodeRabbit/Codex comments
 11. Bot/human **inline** replies go in-thread (shared rules), never as duplicate top-level comments.
 12. **Final evidence sweep** (shared rules + gate helpers). **Refuse merge-ready** while useful bot/human threads remain open (or only “rate-limited / summary” without triage), while protection/enforced CODEOWNERS/stale-approval/merge-queue blocks, or while own bug/security/spec findings that should block merge are unfixed. CI green alone is not enough.
 13. **Thin settle** (shared rules): after the sweep would allow ready, wait ~3–5 min quiet (~4 default; stretch once if bot in-progress), recheck threads + CI. Activity resets the clock. Cap at two settle windows, then post. Do **not** skip settle for merge-ready.
-14. If truly ready after settle, post on the **PR** (idempotent — edit prior merge-ready if one exists; fix malformed `\` escapes by edit):
+14. If truly ready after settle, post on the **PR** (idempotent — edit prior merge-ready if one exists; fix malformed `\` escapes by edit). Use the **Merge ready** template in `references/comment-depth.md` — evidence for reviews, tip freshness, checks, residual. Not a yes/no stub.
 
-```markdown
-## [shipping-github] Merge ready
-
-- Human review (trusted/owners first): addressed / declined (chat-confirmed if human reply)
-- Bot review (CodeRabbit/Codex): addressed / declined with rationale (0 unresolved useful threads)
-- Own bug + security + spec/standards: done; blockers fixed / none
-- Base: up to date with tip; compiles/tests against tip; conflicts resolved (`mergeStateStatus: CLEAN` when applicable — backticks only)
-- CLI / local checks: green
-- Required CI: green (flaky retries used: N; name jobs in backticks)
-
-Ready to merge.
-```
-
-15. **Notify linked issue(s)** (required when merge-ready is posted): for each linked issue, one idempotent comment (edit if a prior “PR is merge-ready” note exists — never a second/cut-off comment):
-
-```markdown
-## [shipping-github] PR merge-ready
-
-PR #<pr> is merge-ready (reviews + required CI clean). Not merged yet.
-```
+15. **Notify linked issue(s)** (required when merge-ready is posted): for each linked issue, one idempotent comment using the **Merge-ready notify** template in `comment-depth.md` (edit if a prior note exists — never a second/cut-off comment).
 
 If there are no linked issues, skip and say so in chat.
 
