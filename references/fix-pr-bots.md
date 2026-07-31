@@ -18,19 +18,19 @@ Necessary/useful **human** (esp. owners/maintainers) + CodeRabbit/Codex comments
 1. Identify PR(s), checkout head, note base/default branch, list **linked issues** (`closingIssuesReferences` / `Fixes #N`).
 2. Apply **draft/WIP/do-not-merge** awareness (shared rules). Work may continue; **ask once** about converting draft→ready when the user wanted merge-ready (shared **Draft → ready**). Do not claim final merge-ready while gated.
 3. **Behind base + compile against tip:** update from base if needed; run local compile/typecheck/focused tests against tip; push; wait for required CI on the new SHA. If tip broke the branch, fix or hard-block — never claim ready while stale or non-compiling.
-4. Collect unresolved review threads: owners/maintainers first, then other humans, then bots. Skip resolved/outdated.
+4. Collect unresolved review threads via `scripts/review-threads.mjs` (owners/maintainers first, then other humans, then bots). Skip resolved/outdated.
 5. Triage and fix necessary/useful items (trusted humans first; verify bots). For human declines needing a written reply: confirm exact text in chat first (shared social policy). Bot skip notes may use `[shipping-github]` prefix.
-6. Push fixes (git safety: no force-push; stop if rejected / dirty unrelated tree / **fork-head unwritable**).
+6. Push fixes (git safety: no force-push; stop if rejected / dirty unrelated tree / **fork-head unwritable**). After push: `pr-policy-gate.mjs` for stale-approval / last-push.
 7. **Wait and recheck** — new useful comments or red required CI → fix/push again. Repeat until stable **or** a hard blocker (shared rules). No “3 rounds / 20 min then quit.”
-8. Fix CLI / project checks this PR broke. Classify CI: branch fix vs flake (shared rules; flake reruns still max 3 / SHA). Apply **Required checks + review gate**.
+8. Fix CLI / project checks this PR broke. Classify CI: branch fix vs flake (shared rules; flake reruns still max 3 / SHA). Apply **Required checks + review gate** + policy gate (code-owner enforcement, merge queue).
 9. **Own reviews (required — not optional):**
    - Subagent **preflight** (checkout PR head; stash only with user OK) — shared rules.
    - Parallel: bug + security (`review-bugbot` / `review-security`).
    - **Spec + Standards:** run or hand off skill `review` against PR base/merge-base (shared rules). Fix necessary gaps.
    - Triage findings; fix what can/should land in this PR; skip 0.1% nits. Public request-changes / comments stay redacted for exploit detail. Changelog nudge when user-facing.
-10. Recheck human/bot threads + required CI after any review-driven pushes (loop again if needed). Apply **rate-limit backoff** (Composio `GITHUB_GET_GRAPHQL_RATE_LIMIT` → `gh api rate_limit`) on dense polls. If **stacked**, label ready-vs-parent vs trunk; trunk merge → `manage-stacked-prs`.
+10. Recheck human/bot threads (`review-threads.mjs`) + required CI after any review-driven pushes (loop again if needed). Apply **rate-limit backoff** (Composio `GITHUB_GET_GRAPHQL_RATE_LIMIT` → `gh api rate_limit`) on dense polls. If **stacked**, label ready-vs-parent vs trunk; trunk merge → `manage-stacked-prs`. If **in merge queue**, keep watching until merged (do not stop at queued).
 11. Bot/human **inline** replies go in-thread (shared rules), never as duplicate top-level comments.
-12. **Final evidence sweep** (shared rules). **Refuse merge-ready** while useful bot/human threads remain open (or only “rate-limited / summary” without triage), while protection/CODEOWNERS block, or while own bug/security/spec findings that should block merge are unfixed. CI green alone is not enough.
+12. **Final evidence sweep** (shared rules + gate helpers). **Refuse merge-ready** while useful bot/human threads remain open (or only “rate-limited / summary” without triage), while protection/enforced CODEOWNERS/stale-approval/merge-queue blocks, or while own bug/security/spec findings that should block merge are unfixed. CI green alone is not enough.
 13. If truly ready, post on the **PR** (idempotent — edit prior merge-ready if one exists; fix malformed `\` escapes by edit):
 
 ```markdown

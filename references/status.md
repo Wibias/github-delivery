@@ -13,10 +13,12 @@ Report merge readiness **using the same bar as merge-ready / full-review** — w
    - behind-base / conflicts / `mergeStateStatus`
    - head SHA + whether it is tip-fresh (note if behind — do **not** claim merge-ready)
    - required checks via `scripts/required-checks.mjs` when possible (else `gh pr checks` + protection/rulesets)
+   - review policy via `scripts/pr-policy-gate.mjs` (code-owner **enforcement**, dismiss-stale, last-push, merge queue)
+   - unresolved threads via `scripts/review-threads.mjs`
    - `reviewDecision`, CODEOWNERS / pending required reviewers (`scripts/codeowners-for-pr.mjs` when possible)
-   - unresolved published human (owners first) + bot threads; flag rate-limited bot “SUCCESS” with open threads
    - fork head / `isCrossRepository` (can maintainers push?)
    - stacked? (base is another open PR head)
+   - merge-queue queued vs merged
    - linked issues; security/API cue; changelog gap if user-facing
    - whether this session already ran own bug+security+spec (if unknown: say **unknown — not run this session**; do **not** invent “own reviews done”)
 

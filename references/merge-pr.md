@@ -11,12 +11,15 @@ Merge PR `#N` after readiness checks, comment why it’s useful, `@thanks` the P
 - Not draft / WIP / do-not-merge (shared gates)
 - Not conflicted; not behind base; **compiles/tests against current tip** (update + verify first per shared rules)
 - Required CI green on **current** SHA (shared **Required checks + review gate**; non-required: note; ask if unclear)
-- `reviewDecision` / CODEOWNERS / required reviewers / **required labels** not blocking
+- `reviewDecision` / CODEOWNERS (**when enforced**) / required reviewers / **required labels** not blocking
+- Unresolved review threads cleared (`scripts/review-threads.mjs`) when conversation resolution or useful threads remain
+- Approvals fresh on **head SHA** when dismiss-stale / last-push-approval is on (`scripts/pr-policy-gate.mjs`)
 - No unresolved necessary owner/maintainer (or other human) blockers you agree with
 - **Own reviews evidence:** a prior `[shipping-github] Merge ready` / full-review `approve-comment` this session, **or** run abbreviated bug+security+spec now, **or** warn and get explicit “merge anyway”
 - **Not mid-stack for trunk:** if base is another open PR head, abort and hand off to `manage-stacked-prs` (merge bottom-up). Do not `gh pr merge` into a parent feature branch thinking it shipped to trunk.
 - Fork head: only merge if fixes are already on the head (or you could push); do not merge knowing required fixes were skipped for lack of push access
 - **PR body** still contains `Fixes #N` when squash-merging (trailers lost on squash)
+- **Merge queue:** if enabled/in-queue, prefer queue merge and wait until **merged** (not merely enqueued); warn on missing `merge_group` workflow triggers
 
 If preflight fails, do **not** merge; report blockers.
 

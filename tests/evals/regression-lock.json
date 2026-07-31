@@ -38,5 +38,21 @@
   {
     "id": "R-fork-head-2026-07-31",
     "sha256": "b7e2e61ff57dde3e9186844179d20d7cf37c35a1a5025d3ac11a87d6cfebe300"
+  },
+  {
+    "id": "R-review-threads-2026-07-31",
+    "sha256": "62c0bfec360276cba9698cc9ceaa6a2ac769540922f63579544ebdf905f7e3e6"
+  },
+  {
+    "id": "R-merge-queue-2026-07-31",
+    "sha256": "0a9ccbb7d72331e1ceeec4ec4e2c375fce82e126d35b0477dedfe410bd75825d"
+  },
+  {
+    "id": "R-codeowner-enforce-2026-07-31",
+    "sha256": "53bc5d038dbd22a476325026d986fd657c1dac274a33b590733e64c6566bcee4"
+  },
+  {
+    "id": "R-stale-approval-2026-07-31",
+    "sha256": "179594882aecc08f6abf61a7e8de1385e55efe9bdbaa451eb9487a7fc886c522"
   }
 ]

@@ -312,12 +312,12 @@ For changelog **content**, semver bump choice, and release tagging, follow `git-
 
 ## Final evidence sweep
 
-Before claiming merge-ready (or reporting a watch **CI/review milestone**), also load `references/gate-helpers.md` when CI or CODEOWNERS may block.
+Before claiming merge-ready (or reporting a watch **CI/review milestone**), also load `references/gate-helpers.md` when CI, CODEOWNERS, threads, or merge-queue policy may block.
 
 1. Fresh `gh pr view` (SHA, draft/gate, mergeable, required checks, `reviewDecision`, behind-base, `isCrossRepository` / head repo)
 2. Confirm head is **up to date with base** and **compiles/tests against tip** (local gate and/or green required CI on that SHA)
-3. Run **Required checks + review gate** below (protection / CODEOWNERS / reviewDecision / required labels)
-4. Unresolved **published** review threads (humans + bots). Count open threads; sample bodies. Rate-limited bot “SUCCESS” ≠ threads clean.
+3. Run **Required checks + review gate** + **`scripts/pr-policy-gate.mjs`** (code-owner enforcement, stale approvals, merge queue)
+4. Unresolved **published** review threads via **`scripts/review-threads.mjs`** (paginate GraphQL). Rate-limited bot “SUCCESS” ≠ threads clean.
 5. **Stack check** (below) — if mid-stack, do not treat as trunk-ready without `manage-stacked-prs`
 6. Local `git status` (report dirty files left untouched)
 
@@ -326,15 +326,17 @@ Before claiming merge-ready (or reporting a watch **CI/review milestone**), also
 - Behind base, conflicted, or broken compile/tests against current tip
 - Unresolved useful human or bot threads (CodeRabbit/Codex/Bugbot/etc.) that were not fixed **or** explicitly declined on-thread with rationale
 - Required CI red (or flake budget exhausted without a clear “out of scope / infra” hard-blocker report instead of merge-ready)
-- Branch-protection / reviewDecision / CODEOWNERS / required labels still blocking (see below)
+- Branch-protection / reviewDecision / CODEOWNERS (when **enforced**) / required labels still blocking
+- Stale approvals after push when dismiss-stale / last-push-approval is on and head has no fresh approval
+- In merge queue but not yet **merged** (queued ≠ done for watch/merge claims)
 - `CHANGES_REQUESTED` still in force from a trusted reviewer
 - Draft / WIP / do-not-merge gate
 - Own bug/security/**spec-standards** blockers unfixed (merge-ready / full-review / create-PR paths)
 - PR is stacked on another open PR and user asked to merge into trunk (hand off — do not fake ready)
 
-“CI green” alone is **not** merge-ready. Green on a **stale** SHA while behind tip is **not** merge-ready. A rate-limited bot summary is **not** “bots clean.”
+“CI green” alone is **not** merge-ready. Green on a **stale** SHA while behind tip is **not** merge-ready. A rate-limited bot summary is **not** “bots clean.” Approvals on an **old** SHA are **not** approvals on tip when dismiss-stale / last-push rules apply.
 
-**Watch milestones** may say only “CI/reviews quiet — still watching (not full merge-ready bar)” unless own bug+security+spec were already completed this session via fix-pr/full-review. Never post `[shipping-github] Merge ready` from watch alone.
+**Watch milestones** may say only “CI/reviews quiet — still watching (not full merge-ready bar)” unless own bug+security+spec were already completed this session via fix-pr/full-review. Never post `[shipping-github] Merge ready` from watch alone. If `isInMergeQueue`: report queue position/state and keep watching until merged/closed.
 
 When merge-ready **is** valid, also notify linked issues (see `fix-pr-bots`).
 
@@ -377,11 +379,59 @@ Before merge-ready / full-review `approve-comment` / merge / status “merge-rea
 
 5. If **no** required list is readable: fall back to `mergeStateStatus` (`BLOCKED` / `UNSTABLE` / `BEHIND`) **plus** clearly failing always-on matrix jobs. Do not invent “all green.”
 
-6. **Review decision:** `reviewDecision` of `CHANGES_REQUESTED` blocks. Empty/`REVIEW_REQUIRED` with open CODEOWNER or required-reviewer requests blocks merge-ready unless status-only (label blocked). Stale approvals after new pushes → re-check.
+6. **Review decision:** `reviewDecision` of `CHANGES_REQUESTED` blocks. Empty/`REVIEW_REQUIRED` with open CODEOWNER or required-reviewer requests blocks merge-ready unless status-only (label blocked).
 
-7. **CODEOWNERS** — run path automation (below). Pending owners / review requests block merge-ready / merge.
+7. **CODEOWNERS** — path map + **enforcement** (below / `pr-policy-gate.mjs`). Suggestion-only CODEOWNERS ≠ hard block unless `reviewDecision` / pending required requests say otherwise; enforced code-owner reviews **do** block.
 
-8. Status / chat must name **which** required jobs are red/pending (backticks), not “CI failing.”
+8. **Stale approvals / last-push** — after every push to the PR head, re-run `pr-policy-gate.mjs`. If `dismissesStaleReviews` or `requireLastPushApproval` is on, approvals must cover the **current** `headRefOid`. Do not claim merge-ready on tip with only pre-push approvals.
+
+9. **Review threads** — run `scripts/review-threads.mjs` (below). Unresolved useful threads block merge-ready.
+
+10. Status / chat must name **which** required jobs are red/pending (backticks), not “CI failing.”
+
+## Review threads (GraphQL)
+
+`gh pr view` does **not** expose `reviewThreads`. Always use GraphQL (helper preferred):
+
+```bash
+node "<shipping-github>/scripts/review-threads.mjs" OWNER/REPO N
+```
+
+Manual pagination sketch:
+
+```bash
+gh api graphql -f query='
+query($o:String!,$r:String!,$n:Int!,$a:String){
+  repository(owner:$o,name:$r){
+    pullRequest(number:$n){
+      reviewThreads(first:100, after:$a){
+        pageInfo{hasNextPage endCursor}
+        nodes{id isResolved isOutdated path line
+          comments(first:10){nodes{databaseId body author{login}}}}
+      }
+    }
+  }
+}' -F o=OWNER -F r=REPO -F n=N
+```
+
+Reply in-thread (REST replies or `addPullRequestReviewThreadReply`). Resolve with `resolveReviewThread` / helper `--resolve PRRT_…` **only** when shared social policy allows.
+
+## Merge queue
+
+When `isMergeQueueEnabled` / `isInMergeQueue` (from `pr-policy-gate.mjs` or GraphQL):
+
+1. **Queued ≠ merged.** Watch/merge flows keep going until the PR is actually merged/closed (or dequeued with a blocker).
+2. Prefer merging via the queue when the base requires it (`gh pr merge` may enqueue).
+3. If queue is enabled but local `.github/workflows` never mention `merge_group`, **warn**: required checks that only run on `pull_request` often stall the queue. Do not “fix” by inventing workflow edits unless the user asked — report the gap.
+4. Auto-merge + merge queue: still wait for **merged** state, not merely “entry created.”
+
+## Stale approvals / last-push
+
+After **any** push that changes `headRefOid`:
+
+1. Run `scripts/pr-policy-gate.mjs`.
+2. If dismiss-stale or last-push-approval is enabled and there is no approval on the new SHA: merge-ready is blocked; say who needs to re-approve.
+3. Do not treat `reviewDecision: APPROVED` as tip-fresh without checking approval commits vs head when those rules are on.
 
 ## CODEOWNERS path automation
 
@@ -405,8 +455,9 @@ Do not rely only on the Files-changed UI hover.
    gh pr view N --repo OWNER/REPO --json reviewRequests,reviewDecision
    ```
 
-3. Pending CODEOWNER / team review requests (and required-reviewer teams) block merge-ready / merge the same as open owner threads.
+3. Pending CODEOWNER / team review requests block when enforcement is on **or** `reviewDecision`/`REVIEW_REQUIRED` applies. Use `pr-policy-gate.mjs` to distinguish **enforced** vs suggestion-only CODEOWNERS.
 4. Syntax errors in CODEOWNERS: report; do not pretend owners are complete.
+5. Always pair path mapping (`codeowners-for-pr.mjs`) with enforcement detection (`pr-policy-gate.mjs`).
 
 ## Fork head / push permission
 
