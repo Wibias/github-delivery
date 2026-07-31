@@ -1,10 +1,17 @@
 # Merge PR
 
-**Trigger:** “merge pr #N”, “merge it”, “ship pr #N”.
+**Trigger:** “merge pr #N”, “merge pr #A and #B”, “merge it”, “ship pr #N”.
 
 ## Goal
 
-Merge PR `#N` after readiness checks, comment why it’s useful, `@thanks` the PR author when they aren’t you, then close out linked issues with a short thanks on the issue.
+Merge PR `#N` after readiness checks, comment why it’s useful, `@thanks` the PR author when they aren’t you, then **always** thank the **issue creator(s)** on each linked/fixed issue (when they aren’t you) and close out those issues.
+
+**Never** run `gh pr merge` alone. Ceremony (PR why-comment → merge → issue thank(+close)) is part of merge — skipping issue thanks is a failed merge workflow even if GitHub closed the issue via `Fixes`.
+
+## Targets
+
+- Default: one PR.
+- Several PRs (“merge 775 and 778”): run **this whole file for each PR** (preflight → PR comment → merge → **linked-issue thanks** → cleanup). Report a per-PR table. ≤3 in-parent OK; **>3 → subagent fan-out** (shared rules), each subagent must still do issue thanks.
 
 ## Preflight (abort merge if failing)
 
@@ -55,10 +62,12 @@ Why it helps: <1–2 sentences on the concrete bugfix/value>
 ```
 
 4. Merge with the repo’s normal strategy (`gh pr merge` — prefer repo default; squash only if that’s the norm or user asked). Prefer deleting the head branch when the repo/UI option allows and the branch is not long-lived.
-5. **Linked issues — thank + auto-close:**
-   - Prefer that the PR already uses `Fixes`/`Closes`/`Resolves #N` so GitHub auto-closes on merge.
-   - For each linked/fixed issue:
-     - Comment on the **issue**:
+5. **Linked issues — thank + auto-close (required):**
+   - Resolve links via `closingIssuesReferences` **and** `Fixes`/`Closes`/`Resolves #N` in the PR body. If both empty: say so in chat; still do PR ceremony.
+   - Prefer that the PR already uses closing keywords so GitHub auto-closes on merge.
+   - **After merge, for each linked/fixed issue** (do this even when GitHub already closed the issue):
+     - Load `gh issue view N --json author,state`.
+     - Comment on the **issue** (UTF-8 `--body-file`):
 
        ```markdown
        Thanks @{issue_author} — this is fixed by PR #{n} by <short what the fix did>.
@@ -66,8 +75,9 @@ Why it helps: <1–2 sentences on the concrete bugfix/value>
 
      - If you are the issue author: omit thanks/`@`; use `Fixed by PR #{n} by <short what>.`
      - If the issue is **still open** after merge (missing closing keyword, partial fix, epic): close it pointing at the PR when the fix is complete; if it should stay open, say why and leave it open.
-   - PR author was already thanked (or skipped if self) in step 3 — that is the PR-side thanks.
-6. **Post-merge cleanup** (shared rules): confirm merged; confirm issues closed; delete same-repo head branch when safe; if this was a stack parent → `manage-stacked-prs` to retarget/restack children **before** deleting the parent branch.
+   - **Do not** treat auto-close as “thanks done.” Auto-close ≠ issue thank comment.
+   - PR author was already thanked (or skipped if self) in step 3 — that is the PR-side thanks only.
+6. **Post-merge cleanup** (shared rules): confirm merged; confirm issues closed; confirm **issue thank comments posted**; delete same-repo head branch when safe; if this was a stack parent → `manage-stacked-prs` to retarget/restack children **before** deleting the parent branch.
 7. If a release tag / semver / changelog authoring is needed next: hand off to `git-workflow-and-versioning` (ask once).
 8. If the feature branch/worktree should be cleaned up: hand off to `finishing-a-development-branch`.
 9. Confirm merge (+ issue state + branch deleted?); report URLs.
@@ -76,5 +86,7 @@ Why it helps: <1–2 sentences on the concrete bugfix/value>
 
 - Why-good PR comment posted; PR `@thanks` only when author ≠ you
 - PR merged (or blockers reported with no merge)
-- Linked issues thanked (no self-thanks) and **closed** when the fix is complete (auto-close via `Fixes`/`Closes` and/or explicit close)
+- **Every** linked/fixed issue has a thank (or self “Fixed by…”) comment — **even if** GitHub already auto-closed it. Missing issue thank = workflow incomplete; go post it before reporting done
+- Linked issues **closed** when the fix is complete (auto-close via `Fixes`/`Closes` and/or explicit close)
 - Post-merge cleanup done or explicitly skipped with reason (kept branch / stack handoff)
+- Multi-PR asks: every PR in the list reached this bar (or a hard blocker row)

@@ -42,7 +42,7 @@ Shipping a PR is rarely one green check. It’s a grind of:
 | Flaky CI “fixed” by rewriting tests | Classify branch vs flake; retry flakes (budget); don’t weaken CI |
 | Draft / WIP merged by accident | Hard gates before merge-ready claims or merge; draft→ready only after ask |
 | Rate-limit thrash on dense polls | Composio GraphQL rate limit → `gh` fallback; backoff |
-| Merge without closing the social loop | Thanks + why-it-helps on the PR; thank the **issue** author; auto-close when linked |
+| Merge without closing the social loop | Thanks + why-it-helps on the PR; thank the **issue** author (even after auto-close); never bare `gh pr merge` |
 
 Shared rules live in one place (`references/shared-rules.md`): scope lock, git safety (no force-push, stop on dirty trees), evidence sweep before “ready.”
 

@@ -62,5 +62,9 @@
   {
     "id": "R-multi-pr-fanout-2026-07-31",
     "sha256": "9da99d796e049c38cb2dbb9de0d8cca386bd849ad8af40b954411435b528e083"
+  },
+  {
+    "id": "R-merge-issue-thanks-2026-07-31",
+    "sha256": "d9746345081a3642c5a1919972061bc2ebcdd894b63f53b8ec9f4e5c9aceffe7"
   }
 ]
