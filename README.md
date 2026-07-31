@@ -21,7 +21,9 @@ Shipping a PR is rarely one green check. It’s a grind of:
 | Same mega-prompt every session | Short triggers → dedicated workflows under `references/` |
 | Unclear if an issue is still real | Research on latest development tip: fixed? open PR? duplicate? **security relevance**? priority; **comment on the issue** |
 | Duplicate PRs / fork-only PRs / comment spam | Create-PR: one PR unless batch asked; canonical repo only; verify link + assign self; edit comments never double-post |
-| Bot + human review ping-pong | Triage owners/maintainers first, then bots; **own bug + security** reviews; keep going until merge-ready |
+| Bot + human review ping-pong | Triage owners/maintainers first, then bots; **own bug + security + Spec/Standards**; keep going until merge-ready |
+| Watch “ready” ≠ merge-ready | Watch milestones are CI/review quiet only — full bar is fix-pr/full-review |
+| Oversized PR / stacked / finish branch | Hand off: **split-to-prs**, **manage-stacked-prs**, **finishing-a-development-branch** |
 | Agent spam on GitHub | No auto-replies to humans without your exact text; limited thread resolves |
 | Flaky CI “fixed” by rewriting tests | Classify branch vs flake; retry flakes (budget); don’t weaken CI |
 | Draft / WIP merged by accident | Hard gates before merge-ready claims or merge |
@@ -73,7 +75,11 @@ The skill routes to `references/*.md` and always loads `references/shared-rules.
 | **git-workflow-and-versioning** | Local commit discipline, semver, changelog *authoring* (this skill only nudges that a user-facing PR may need an entry) |
 | Cursor **babysit** | Thin conflict/CI stub — optional; this skill covers richer watch + the full ship pack |
 | **manage-stacked-prs** | Stack inspect / restack / retarget / bottom-up merge — shipping detects stacks and hands off |
-| **review** | Spec + Standards axes — shipping runs/hands off on full-review and create-PR |
+| **split-to-prs** | Split oversized branch into reviewable PRs — hand off when scope explodes |
+| **finishing-a-development-branch** | Post-ship branch/worktree cleanup menu — hand off after merge |
+| **review** | Spec + Standards axes — shipping runs/hands off on merge-ready paths |
+| **git-workflow-and-versioning** | Commits, semver, changelog authoring, release tags — shipping only nudges |
+| **issue-workflow** | Filing PRDs / slices / briefs — not tip-research |
 
 ## Validation
 

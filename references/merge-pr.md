@@ -11,10 +11,12 @@ Merge PR `#N` after readiness checks, comment why it’s useful, `@thanks` the P
 - Not draft / WIP / do-not-merge (shared gates)
 - Not conflicted; not behind base; **compiles/tests against current tip** (update + verify first per shared rules)
 - Required CI green on **current** SHA (shared **Required checks + review gate**; non-required: note; ask if unclear)
-- `reviewDecision` / CODEOWNERS / required reviewers not blocking
+- `reviewDecision` / CODEOWNERS / required reviewers / **required labels** not blocking
 - No unresolved necessary owner/maintainer (or other human) blockers you agree with
+- **Own reviews evidence:** a prior `[shipping-github] Merge ready` / full-review `approve-comment` this session, **or** run abbreviated bug+security+spec now, **or** warn and get explicit “merge anyway”
 - **Not mid-stack for trunk:** if base is another open PR head, abort and hand off to `manage-stacked-prs` (merge bottom-up). Do not `gh pr merge` into a parent feature branch thinking it shipped to trunk.
 - Fork head: only merge if fixes are already on the head (or you could push); do not merge knowing required fixes were skipped for lack of push access
+- **PR body** still contains `Fixes #N` when squash-merging (trailers lost on squash)
 
 If preflight fails, do **not** merge; report blockers.
 
@@ -63,7 +65,9 @@ Why it helps: <1–2 sentences on the concrete bugfix/value>
      - If the issue is **still open** after merge (missing closing keyword, partial fix, epic): close it pointing at the PR when the fix is complete; if it should stay open, say why and leave it open.
    - PR author was already thanked (or skipped if self) in step 3 — that is the PR-side thanks.
 6. **Post-merge cleanup** (shared rules): confirm merged; confirm issues closed; delete same-repo head branch when safe; if this was a stack parent → `manage-stacked-prs` to retarget/restack children **before** deleting the parent branch.
-7. Confirm merge (+ issue state + branch deleted?); report URLs.
+7. If a release tag / semver / changelog authoring is needed next: hand off to `git-workflow-and-versioning` (ask once).
+8. If the feature branch/worktree should be cleaned up: hand off to `finishing-a-development-branch`.
+9. Confirm merge (+ issue state + branch deleted?); report URLs.
 
 ## Done when
 

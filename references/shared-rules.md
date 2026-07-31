@@ -8,6 +8,40 @@ Read this before every `shipping-github` workflow.
 - Do not drive-by refactor, rename for taste, or expand scope.
 - Never edit CI workflows/checks just to make failures pass.
 - If a merge-blocking failure looks unrelated, update from the default base branch first; if still broken and out of scope, report and stop expanding.
+- If scope **explodes** (should be multiple reviewable PRs): **stop** and hand off to skill `split-to-prs` — do not silently batch-create.
+
+## Resolve `#N` (issue vs PR)
+
+When the user writes bare `#N` / a number list without saying “issue” or “PR”:
+
+1. Try both: `gh issue view N --repo OWNER/REPO` and `gh pr view N --repo OWNER/REPO`.
+2. If **only one** exists → use that.
+3. If **both** exist → **stop and ask** which they meant (do not guess).
+4. Defaults when the verb is clear: research/create/assign → **issue**; fix/watch/status/merge/full-review/re-review → **PR**.
+5. Always pass `--repo OWNER/REPO` from the issue/PR URL or `gh repo view` — never assume cwd remote is correct when the user pasted a different repo.
+
+## Comment / review routing
+
+| Intent | Where to post |
+|---|---|
+| Issue conversation / research / opened-PR / merge-ready-on-issue | Issue comments API / `gh issue comment` / `--body-file` |
+| PR conversation (merge-ready, verdict, thanks) | PR conversation = `issues/.../comments` / `gh pr comment` / `--body-file` |
+| Reply to a **diff/line review** comment | In-thread reply only (`…/pulls/{pr}/comments/{id}/replies` or Composio reply tool) |
+| Approve / request changes / comment-as-review | `gh pr review` (not a substitute for conversation comments) |
+
+Never use a top-level PR conversation comment as a substitute for an inline review reply.
+
+## Compose with other skills (do not reinvent)
+
+| Situation | Hand off to |
+|---|---|
+| Stacked PRs (restack / retarget / merge bottom-up) | `manage-stacked-prs` |
+| Split oversized branch into reviewable PRs | `split-to-prs` |
+| Commit messages, semver bump, changelog **authoring**, release tagging | `git-workflow-and-versioning` |
+| After ship: worktree cleanup / “finish this branch” menu | `finishing-a-development-branch` |
+| File PRDs / vertical slices / agent briefs (not tip-research) | `issue-workflow` |
+| Spec + Standards axes | `review` |
+| Thin CI stub only | Cursor `babysit` (optional; this skill owns the full loop) |
 
 ## Git safety
 
@@ -187,6 +221,10 @@ When research (or the user) finds **fixed on development tip but not on release/
 
 If the user named **several** existing PRs (“full review these”, “babysit these”, “make 778–782 merge ready”), keep working **each** until that mode’s done condition or a hard blocker — same no-early-exit rule. That is not “creating” a batch; it’s finishing open PRs they listed.
 
+**Batch tip race:** before each PR’s merge-ready / approve claim, re-check behind-base + compile-against-tip on **that** PR — base may have moved while you fixed an earlier one.
+
+**Single writer:** do not run watch + fix-pr merge-ready posting concurrently on the same PR in a way that double-posts; one workflow owns the `[shipping-github] Merge ready` comment.
+
 ## CI — branch fix vs flake
 
 Classify failed **required** checks before patching:
@@ -206,12 +244,25 @@ Classify failed **required** checks before patching:
 - Prefer failed-**job** logs as soon as a job fails; don’t wait for the whole workflow if logs are already available.
 - When both actionable review fixes and flaky retries apply: **fix+push first** (new SHA retriggers CI); don’t rerun flakes on a SHA you’re about to replace.
 
+## Merge policy extras
+
+Before merge / merge-ready claims, also watch for:
+
+- **Required labels** (repo rules / `ready` / semver labels) — if missing, block and say which.
+- **Auto-merge** already enabled — report “auto-merge queued”; watch until **actually merged**, don’t stop at queued.
+- **Merge queue / merge group** — wait for queue success; don’t claim merged early.
+- **Dependabot / Renovate** authors — still apply tip-compile + CI + review bar; prefer minimal dependency-bump scope; link advisory when present; don’t drive-by unrelated upgrades.
+- **Squash merge:** ensuring `Fixes #N` lives in the **PR body** (commit trailers are lost on squash).
+- **Private GHSA / advisory IDs:** keep details chat-only; public posts stay redacted (no advisory exploit detail).
+- **Team required reviewers** (org teams): treat pending the same as CODEOWNERS pending.
+
 ## Authority
 
 - **Default:** do not merge, do not approve, do not close the issue.
 - **Merge** only on the merge workflow / explicit merge ask.
 - **Request changes** when a review workflow finds real, necessary fixes.
-- After a successful merge, follow merge workflow issue thank + close steps.
+- After a successful merge, follow merge workflow issue thank + close steps + **Post-merge cleanup**.
+- Explicit user override (“merge anyway”) may skip own-review evidence only if they clearly insist after you warn.
 
 ## Branches
 
@@ -261,11 +312,11 @@ For changelog **content**, semver bump choice, and release tagging, follow `git-
 
 ## Final evidence sweep
 
-Before claiming merge-ready (or ending a successful watch milestone):
+Before claiming merge-ready (or reporting a watch **CI/review milestone**):
 
 1. Fresh `gh pr view` (SHA, draft/gate, mergeable, required checks, `reviewDecision`, behind-base, `isCrossRepository` / head repo)
 2. Confirm head is **up to date with base** and **compiles/tests against tip** (local gate and/or green required CI on that SHA)
-3. Run **Required checks + review gate** below (protection / CODEOWNERS / reviewDecision)
+3. Run **Required checks + review gate** below (protection / CODEOWNERS / reviewDecision / required labels)
 4. Unresolved **published** review threads (humans + bots). Count open threads; sample bodies. Rate-limited bot “SUCCESS” ≠ threads clean.
 5. **Stack check** (below) — if mid-stack, do not treat as trunk-ready without `manage-stacked-prs`
 6. Local `git status` (report dirty files left untouched)
@@ -275,13 +326,15 @@ Before claiming merge-ready (or ending a successful watch milestone):
 - Behind base, conflicted, or broken compile/tests against current tip
 - Unresolved useful human or bot threads (CodeRabbit/Codex/Bugbot/etc.) that were not fixed **or** explicitly declined on-thread with rationale
 - Required CI red (or flake budget exhausted without a clear “out of scope / infra” hard-blocker report instead of merge-ready)
-- Branch-protection / reviewDecision / CODEOWNERS still blocking (see below)
+- Branch-protection / reviewDecision / CODEOWNERS / required labels still blocking (see below)
 - `CHANGES_REQUESTED` still in force from a trusted reviewer
 - Draft / WIP / do-not-merge gate
-- Own bug/security blockers unfixed (merge-ready / full-review paths)
+- Own bug/security/**spec-standards** blockers unfixed (merge-ready / full-review / create-PR paths)
 - PR is stacked on another open PR and user asked to merge into trunk (hand off — do not fake ready)
 
 “CI green” alone is **not** merge-ready. Green on a **stale** SHA while behind tip is **not** merge-ready. A rate-limited bot summary is **not** “bots clean.”
+
+**Watch milestones** may say only “CI/reviews quiet — still watching (not full merge-ready bar)” unless own bug+security+spec were already completed this session via fix-pr/full-review. Never post `[shipping-github] Merge ready` from watch alone.
 
 When merge-ready **is** valid, also notify linked issues (see `fix-pr-bots`).
 

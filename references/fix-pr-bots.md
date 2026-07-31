@@ -64,7 +64,7 @@ For monitoring **after** merge-ready while the PR stays open (new late comments)
 
 - Every targeted PR has a valid merge-ready PR comment **and** linked-issue notify (or a clear hard blocker — no false merge-ready)
 - Useful human + bot threads handled (or declined with policy) before any merge-ready claim
-- Own bug + security subagent reviews completed; necessary findings fixed
+- Own **bug + security + Spec/Standards** reviews completed; necessary findings fixed
 - Branch not conflicted / not behind / **compiles against current tip** (when claiming ready)
 - CLI + required CI green (when claiming ready)
 - PR(s) **not** merged

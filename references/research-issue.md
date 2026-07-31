@@ -94,6 +94,8 @@ When any issue is **possible** or **likely** security: ask in chat with the word
 
 When verdict is **Fixed on development, not released**: ask the backport question (shared rules). Do not open a backport unless they say yes.
 
+When the real need is a **PRD / vertical-slice breakdown** rather than tip research: say so and hand off to `issue-workflow`.
+
 Research may batch **comments**; it must **not** open PRs. Opening PRs is `create-pr-for-issue` only, one at a time unless the user explicitly demands a batch (including backports).
 
 ## Done when

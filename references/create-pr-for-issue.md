@@ -37,20 +37,12 @@ If preflight is unclear, say what’s missing; do not open a speculative PR.
 1. Resolve `owner/repo` from the **issue** (not from a fork remote you happen to be in).
 2. Base branch = that repo’s development/default as appropriate.
 3. Push the head branch (upstream if you can; else fork head is OK).
-4. Create with explicit repo, e.g.:
+4. Create with explicit repo. On Windows, write the body to a UTF-8 file first (same as comment encoding rules):
 
    ```bash
+   # body.md = UTF-8 without BOM; must include Fixes #N on its own line
    gh pr create --repo OWNER/REPO --base <base> --head <head> \
-     --title "…" --body "$(cat <<'EOF'
-   ## Summary
-   …
-
-   Fixes #N
-
-   ## Test plan
-   - [ ] …
-   EOF
-   )"
+     --title "…" --body-file body.md
    ```
 
 5. Confirm the PR URL is `https://github.com/OWNER/REPO/pull/…` (same OWNER/REPO as the issue). If it is `https://github.com/<your-fork>/…` only: **wrong** — close it and recreate against `OWNER/REPO`.
@@ -68,13 +60,13 @@ After the canonical PR exists:
 
    `closingIssuesReferences` must include issue `#N`. If empty: edit the PR body to add `Fixes #N` on its own line, re-check.
 
-3. **Assign yourself** on the issue:
+3. **Assign yourself** on the **issue** (not as a substitute: PR assignee alone does not satisfy this):
 
    ```bash
    gh issue edit N --repo OWNER/REPO --add-assignee @me
    ```
 
-   If assign fails (permissions), report once and continue.
+   If assign fails (permissions), report once and continue. Do not claim “assigned” based only on the PR assignee field.
 
 4. **One issue comment** (idempotent — edit if a prior `[shipping-github] Opened PR` exists; never a second/cut-off comment):
 
@@ -93,8 +85,8 @@ After the canonical PR exists:
 5. Keep branch up to date with base; resolve conflicts early.
 6. Review wait-loop (`fix-pr-bots`): owners/maintainers + humans + bots; push; keep going until merge-ready or a hard blocker.
 7. Fix CLI / project checks; push until required CI green.
-8. Full review + security with **subagents** (shared preflight) **and** Spec + Standards (`review` skill or short pass). Fix what can/should land here; skip 0.1% nits.
-9. Changelog nudge if user-facing (shared rules).
+8. **Own reviews (required):** bug + security (shared subagent preflight) **and** Spec + Standards (`review` skill or short pass). Fix what can/should land here; skip 0.1% nits. If scope explodes → `split-to-prs`.
+9. Changelog nudge if user-facing (shared rules → `git-workflow-and-versioning` for authoring).
 10. Recheck reviews + CI (rate-limit backoff on polls).
 11. Post merge-ready comment (idempotent). Do not merge.
 
@@ -102,6 +94,7 @@ After the canonical PR exists:
 
 - Exactly the requested PR count (default **one**); no surprise batch
 - PR on **issue’s** repo (not fork-only)
-- `closingIssuesReferences` includes the issue; self assigned when possible
+- `closingIssuesReferences` includes the issue; **issue** self-assigned when possible
 - Single complete opened-PR comment (no duplicates/cut-offs)
-- Screenshot gate passed (or N/A); reviews + CI green; merge-ready posted; **not** merged
+- Screenshot gate passed (or N/A)
+- Own bug + security + Spec/Standards done; reviews + required CI green on tip; merge-ready posted; **not** merged
