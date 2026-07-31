@@ -19,11 +19,11 @@ description: >
 Ship GitHub issues and PRs: researched, reviewed, CI-clean, merge-ready — or
 merged when asked. Optional **watch** mode keeps monitoring after green.
 
-**Conflict with Cursor built-in `babysit`:** that skill lives in
-`~/.cursor/skills-cursor/babysit` and **reinstalls** if deleted. It is a thin
-conflict/CI stub. For this user, always prefer **this skill** (and the personal
-`babysit` redirect under `overrides/babysit` / `~/.agents/skills/babysit`). Never
-run the built-in-only loop.
+**Conflict with thin babysit skills:** Cursor’s built-in `babysit`
+(`~/.cursor/skills-cursor/babysit`) reinstalls if deleted. OpenAI’s optional
+`babysit-pr` / Claude marketplace copies can steal the same prompts if installed.
+Prefer **this skill** and the personal redirects under `overrides/babysit` and
+`overrides/babysit-pr`. Never run a thin watcher-only loop as the whole policy.
 
 ## Route
 

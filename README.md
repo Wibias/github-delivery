@@ -89,21 +89,22 @@ Before `[shipping-github] Merge ready` (and full-review `approve-comment`):
 
 Watch may report “CI/reviews quiet — still watching” without claiming that full bar. Status never uses a looser bar than merge-ready.
 
-## Cursor built-in `babysit` conflict
+## Competing babysit skills
 
-Cursor ships a thin **babysit** skill at `~/.cursor/skills-cursor/babysit`. It
-re-syncs if you delete it. Its description (“keep a PR merge-ready…”) steals
-`watch` / `babysit` prompts and runs merge-base → wait-on-CI without shipping-github’s
-owner wake gate.
+| Source | Path / install | Problem |
+|---|---|---|
+| Cursor built-in **babysit** | `~/.cursor/skills-cursor/babysit` (re-syncs if deleted) | Thin conflict/CI stub; merge-base → wait-on-CI |
+| OpenAI optional **babysit-pr** | `npx skills add … --skill babysit-pr` / `.codex/skills/babysit-pr` | Watcher script loop; steals watch/babysit prompts if installed |
+| Claude marketplace copies | e.g. ce-babysit-pr / skills.sh babysit-pr | Same class of conflict if installed |
 
-**Mitigations installed with this skill:**
+**Mitigations shipped with this repo:**
 
 1. Prefer **shipping-github** (description leads with babysit/watch/monitor).
-2. Personal override skill **`babysit`** (from `overrides/babysit/`) installed next to
-   shipping-github — redirects to `watch-pr` / `fix-pr-bots` + `watch-wake-gate.mjs`.
-3. Optional user rule: prefer shipping-github over built-in babysit.
-
-You still cannot permanently delete the built-in; win on discovery + redirect instead.
+2. Personal redirects from `overrides/`:
+   - `babysit` → shipping-github watch/fix
+   - `babysit-pr` → shipping-github watch/fix (preempt Codex/Claude installs)
+3. User rule (Cursor): prefer shipping-github over built-in babysit.
+4. Hard gate: `scripts/watch-wake-gate.mjs` on every watch wake.
 
 ## Install
 
@@ -113,11 +114,13 @@ Copy or symlink this folder into your agent skills directory, for example:
 ~/.agents/skills/shipping-github
 ```
 
-Also install the babysit redirect (same machine):
+Also install the redirects (same machine):
 
 ```text
-~/.agents/skills/babysit   ← copy from overrides/babysit/
-~/.cursor/skills/babysit   ← same
+~/.agents/skills/babysit      ← copy from overrides/babysit/
+~/.agents/skills/babysit-pr   ← copy from overrides/babysit-pr/
+~/.cursor/skills/babysit      ← same
+~/.cursor/skills/babysit-pr   ← same
 ```
 
 Folder name for the main skill must stay `shipping-github` (matches frontmatter `name`).
