@@ -32,7 +32,7 @@ Thin babysit skills (Cursor built-in, OpenAI `babysit-pr`, Claude marketplace co
 | Markdown `\_` spam in comments | Backticks for identifiers; no backslash-escaping |
 | Agent spam on GitHub | No auto-replies to humans without your exact text; limited thread resolves; inline replies in-thread |
 | Vague “looks good / CI green” reviews | **`comment-depth.md`** — research, security, verdict, merge-ready, status with paths/SHAs/evidence |
-| Shallow security “no findings” | Mandatory **coverage matrix** + subagent + secrets scan; AI/provider surfaces when in diff |
+| Shallow security “no findings” | `security-scope.mjs` + coverage matrix + High+ pass gate; auto `ai-agent-security` / deps audit when flagged |
 | Flaky CI “fixed” by rewriting tests | Classify carefully — **don’t** weaken CI; **do** harden real test timeouts instead of burning reruns |
 | Draft / WIP merged by accident | Hard gates before merge-ready claims or merge; draft→ready only after ask |
 | Rate-limit thrash on dense polls | Composio GraphQL rate limit → `gh` fallback; backoff |
@@ -67,6 +67,7 @@ Concrete evidence scripts (see `references/gate-helpers.md`):
 | `scripts/review-threads.mjs` | Paginate GraphQL unresolved review threads (+ optional resolve) |
 | `scripts/pr-policy-gate.mjs` | Code-owner **enforcement**, dismiss-stale / last-push approvals, merge queue / `merge_group` warn |
 | `scripts/watch-wake-gate.mjs` | Exit `1` until a **non-merge** commit addresses OWNER comments **and** PR is not DIRTY/BEHIND — ACK-only does not clear |
+| `scripts/security-scope.mjs` | PR file → required security surfaces; flags `ai-agent-security` + deps audit |
 
 ### Watch ordering (hard)
 

@@ -94,5 +94,13 @@
   {
     "id": "R-security-coverage-matrix-2026-07-31",
     "sha256": "aa6a2286063a08031689927c0263ac0e26e6231ee7982b0afc046e2d4645ae29"
+  },
+  {
+    "id": "R-security-scope-script-2026-07-31",
+    "sha256": "d4f27318e03f924005e3b1cd47b8be548918478d578ca55a9c3ac386eec38992"
+  },
+  {
+    "id": "R-security-high-pass-gate-2026-07-31",
+    "sha256": "b5d18c34adc5d3e3bd2adbf716a1767b5dc289a464f228aa35a49fe9734b178d"
   }
 ]

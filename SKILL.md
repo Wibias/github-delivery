@@ -82,7 +82,7 @@ Read `references/shared-rules.md` before acting. Non-negotiables:
 - Prefer `gh` for GitHub reads/writes.
 - Detect the repo default branch; do not hardcode `main`.
 - Cross-use thin helpers when helpful: `review-bugbot`, `review-security`, skill `review` (Spec+Standards), `manage-stacked-prs`, `split-to-prs`, `finishing-a-development-branch`, `git-workflow-and-versioning`, `issue-workflow`.
-- **Gate helpers:** `scripts/required-checks.mjs`, `scripts/codeowners-for-pr.mjs`, `scripts/review-threads.mjs`, `scripts/pr-policy-gate.mjs`, `scripts/watch-wake-gate.mjs` (see `references/gate-helpers.md`).
+- **Gate helpers:** `scripts/required-checks.mjs`, `scripts/codeowners-for-pr.mjs`, `scripts/review-threads.mjs`, `scripts/pr-policy-gate.mjs`, `scripts/watch-wake-gate.mjs`, `scripts/security-scope.mjs` (see `references/gate-helpers.md`).
 - **Rate limits:** prefer Composio MCP `GITHUB_GET_GRAPHQL_RATE_LIMIT` when GitHub toolkit is connected; else `gh api rate_limit` / `gh api graphql` `rateLimit` (see shared rules).
 - **Inline replies:** Composio `GITHUB_CREATE_A_REPLY_FOR_A_REVIEW_COMMENT` or `gh api …/pulls/{pr}/comments/{id}/replies`.
 

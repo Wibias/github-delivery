@@ -58,8 +58,9 @@ Anti-patterns (rewrite before posting):
 **Target:** issue `#N` / PR `#N` (`head@<sha>` or `dev@<sha>`)
 **Scope:** <components / routes / auth surfaces reviewed>
 **Method:** <security-review subagent + secrets scan + Semgrep/CodeQL if any + manual matrix>
-**Decision:** Pass / Pass after fixes / Do not ship yet
-**Risk level:** Low / Medium / High / Critical
+**Decision:** Pass / Pass after fixes / Do not ship yet  
+**Risk level:** Low / Medium / High / Critical  
+**Scope script:** `requiredSurfaces=[…]`; ai-agent-security: yes/no; deps audit: yes/no/n/a
 
 | Severity | Area | Finding (redacted) | Next |
 |---|---|---|---|
