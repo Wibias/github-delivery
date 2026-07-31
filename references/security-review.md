@@ -155,6 +155,10 @@ Never output **Pass** while High/Critical items are only “noted,” MEDIUM-con
 
 **Adversarial pass** does **not** block Pass unless the user said the review is incomplete without it.
 
+### Bug handoff (lock / error-mapping diffs)
+
+If this review touched locks, CAS, auth-refresh, mutation `finally`, or HTTP mapping of contention/busy: say so in chat and ensure the **bug** axis (`references/bug-review.md` Must-probe) still covers error propagation (typed catch in detached tasks, `finally` not replacing the original error, retryable 409/503, deterministic lock/cleanup tests). Security Pass alone does **not** close that bug coverage.
+
 ## Domain heuristics (common ship-loop misses)
 
 - **Provider / preset PRs:** `preserveCustomDestination` (or equivalent); same-name custom provider must not be canonicalized onto a new host; routing auth when catalogs bundle third-party models.

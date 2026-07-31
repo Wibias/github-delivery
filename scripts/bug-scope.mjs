@@ -169,6 +169,8 @@ try {
       "Confidence: only HIGH → Confirmed findings; MEDIUM → Needs verification; LOW → residual (Do-Not-Flag style/nits).",
       "HARD RULE: never auto-launch deep multi-agent toolkits (pr-review-toolkit, ultrareview, Codex adversarial-review) unless the user explicitly asked this session.",
       "On Cursor, complementary is additive to Bugbot (do not skip complementary after a clean Bugbot).",
+      "Must-probe when diff touches locks/mutations/OAuth/detached tasks/finally/API errors: (1) typed catch + clear pending + retryable surface in detached work, (2) finally/close must not replace original mutation error, (3) lock contention → retryable 409/503 not opaque failure, (4) lock/write-count cleanup regressions must be deterministic.",
+      "If security already reviewed lock/CAS/auth-refresh paths this session, bug complementary still must run those Must-probe checks (security Pass ≠ error-propagation covered).",
     ],
   };
 

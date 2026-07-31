@@ -62,11 +62,26 @@ Checkout PR head first (shared **Subagent preflight**).
 
 | Lens | What to prove |
 |---|---|
-| **silent_failures** | Empty/swallowed `catch`; ignored promises; missing error paths; fail-open that hides breakage |
+| **silent_failures** | Empty/swallowed `catch`; ignored promises; missing error paths; fail-open that hides breakage; **error propagation** (below) |
 | **resource_leaks** | Timers/listeners/handles/connections/streams not cleaned; missing `AbortSignal` / dispose on cancel |
-| **edge_cases** | Null/empty/partial collections; off-by-one bounds; races/TOCTOU on shared state; partial failure mid-batch |
+| **edge_cases** | Null/empty/partial collections; off-by-one bounds; races/TOCTOU on shared state; partial failure mid-batch; **lock/contention → caller contract** (below) |
 
-On Cursor this is **additive to Bugbot** (Bugbot leans precision and can under-index leaks / silent fails).
+On Cursor this is **additive to Bugbot** (Bugbot leans precision and can under-index leaks / silent fails / API contracts).
+
+#### Must probe — Bugbot often misses these
+
+When the diff touches locks, mutations, OAuth/refresh, detached/background tasks, `finally` cleanup, or HTTP/API error mapping, **explicitly** check:
+
+1. **Typed catch in detached/async work** — background/OAuth/commit tasks must catch the lock/mutation error type they can hit, clear pending/in-flight state, and surface a **retryable** flow error (not hang, not silent drop).
+2. **`finally` must not replace the original error** — `close()` / unlock / dispose in `finally` must not overwrite mutation/rollback failures (preserve or chain the primary error).
+3. **Lock contention → retryable API** — callers/management routes map contention/busy to retryable **409/503** (or documented equivalent), not an opaque 500/unknown failure.
+4. **Deterministic lock/cleanup regressions** — if the PR adds or changes write-count / lock-cleanup tests, they must be deterministic (no timing flakes); flag flaky new coverage as Needs verification or fix in-PR on merge-ready paths.
+
+Skip this block only when the diff clearly has none of those surfaces (say so in chat).
+
+#### Security → bug handoff
+
+If this session’s **security** pass already touched lock/CAS/auth-refresh/error-mapping, the bug complementary pass **still** must run the Must-probe checks above on those paths. Security Pass ≠ error-propagation covered.
 
 ### 3. Validate findings (confidence)
 

@@ -33,8 +33,9 @@ Thin babysit skills (Cursor built-in, OpenAI `babysit-pr`, Claude marketplace co
 | Agent spam on GitHub | No auto-replies to humans without your exact text; limited thread resolves; inline replies in-thread |
 | Vague “looks good / CI green” reviews | **`comment-depth.md`** — research, security, verdict, merge-ready, status with paths/SHAs/evidence |
 | Shallow security “no findings” | `security-scope.mjs` + coverage matrix + HIGH/MEDIUM confidence + Do-Not-Flag; crypto/session, business-logic, removed-controls, IaC/Docker, **Agentic Skills Top 10** when skill/MCP paths change; High+ pass gate; auto `ai-agent-security` / deps audit when flagged; **never** Cursor harness `security-review` / `review-security`; **never** auto red-team second pass |
-| Shallow own-bug “LGTM” | `bug-scope.mjs` + `bug-review.md`: Bugbot when Cursor + complementary lenses (silent failures / leaks / edges); Claude/Codex never fake Bugbot; skip non-logic diffs; **never** auto deep multi-agent kits |
+| Shallow own-bug “LGTM” | `bug-scope.mjs` + `bug-review.md`: Bugbot when Cursor + complementary lenses (silent failures / leaks / edges) **incl. Must-probe** error-propagation / lock→409/503; Claude/Codex never fake Bugbot; skip non-logic diffs; **never** auto deep multi-agent kits |
 | Flaky CI “fixed” by rewriting tests | Classify carefully — **don’t** weaken CI; **do** harden real test timeouts instead of burning reruns |
+| Required CI red but “unrelated / introduced elsewhere” left unfixed | Still **minimal-fix in this PR** after base update — required green is the goal; only true infra/permissions/product decisions hard-block |
 | Draft / WIP merged by accident | Hard gates before merge-ready claims or merge; draft→ready only after ask |
 | Rate-limit thrash on dense polls | Composio GraphQL rate limit → `gh` fallback; backoff |
 | Bare `gh pr merge` skips ceremony | Why-it-helps on PR; **thank issue author** even after `Fixes` auto-close; never done without that |
@@ -81,6 +82,8 @@ Merge-ready / full-review / create-PR run **`references/bug-review.md`**:
 | **Cursor** | Bugbot (`review-bugbot`) **plus** one complementary lenses pass (silent failures / resource leaks / edge cases) |
 | **Claude** | Complementary lenses only (never claim Bugbot) |
 | **Codex** | Optional Codex `/review` once, then complementary (never claim Bugbot) |
+
+Complementary **Must-probe** (Bugbot often misses): typed catch in detached/OAuth work, `finally`/`close` not replacing the original error, lock contention → retryable 409/503, deterministic lock/cleanup regressions. Security Pass on lock/CAS paths does **not** skip that bug check.
 
 Docs/CSS/lockfile-only PRs may `skipDeepBugReview` (record n/a). Deep multi-agent kits (pr-review-toolkit, ultrareview, Codex adversarial-review) are **opt-in only** — same rule as security adversarial.
 

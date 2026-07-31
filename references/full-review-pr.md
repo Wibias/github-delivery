@@ -30,6 +30,7 @@ Skip 0.1% nits. No follow-up PR for in-scope fixes.
 - “Needs maintainer security ack” / “should get human OK first”
 - “Security relevance possible” without a concrete unfixed finding
 - Treating shared/infra CI noise as done while **this PR’s** required checks are still red (classify + flake retries per shared rules; if budget exhausted → hard-blocker row, not a fake `gated`)
+- Skipping a required CI failure as “unrelated / introduced elsewhere” instead of a minimal harden/fix (shared scope lock)
 
 ## Steps
 

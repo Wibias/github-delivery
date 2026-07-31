@@ -138,5 +138,13 @@
   {
     "id": "R-bug-no-auto-deep-multiagent-2026-07-31",
     "sha256": "1772f07179bdc3aaf2edcd7d630cbf1a602a011914d9516db1b47dc8aeb290f0"
+  },
+  {
+    "id": "R-bug-error-propagation-must-probe-2026-07-31",
+    "sha256": "eea357302f5c82497232423290e71b80033ecba106800d3a7a9387fff1b2d1ff"
+  },
+  {
+    "id": "R-ci-fix-unrelated-required-2026-07-31",
+    "sha256": "82f5e2b040b4660c5e5a72cc665e1e826b86a2f4a7872b773fd8b7d3a42188b6"
   }
 ]

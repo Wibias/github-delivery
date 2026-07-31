@@ -48,7 +48,7 @@ Before own-bug review on a PR (merge-ready / full-review / create-PR):
 node "<shipping-github>/scripts/bug-scope.mjs" OWNER/REPO N
 ```
 
-Returns `skipDeepBugReview`, `requiredLenses`, `requireBugbot: "when_available"`, `deepMultiAgentDefault: false`, and instructions. If skip: record n/a. Else run `references/bug-review.md` (Bugbot when available on Cursor + one complementary lenses pass). **Never** auto-launch deep multi-agent bug toolkits. See `bug-review.md`.
+Returns `skipDeepBugReview`, `requiredLenses`, `requireBugbot: "when_available"`, `deepMultiAgentDefault: false`, and instructions (incl. Must-probe error-propagation / lock→409/503 when those surfaces change). If skip: record n/a. Else run `references/bug-review.md` (Bugbot when available on Cursor + one complementary lenses pass). **Never** auto-launch deep multi-agent bug toolkits. See `bug-review.md`.
 
 ## Watch wake gate (owner comments)
 

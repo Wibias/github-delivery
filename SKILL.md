@@ -58,11 +58,11 @@ offer** in `references/shared-rules.md` when loading the PR body.
 
 Read `references/shared-rules.md` before acting. Non-negotiables:
 
-1. Scope lock — no drive-by refactors; never weaken CI to go green.
+1. Scope lock — no drive-by refactors; never weaken CI to go green; **required CI red is still in scope to fix** even when the failure was introduced elsewhere (minimal patch after base update).
 2. Git safety — stop on dirty unrelated trees; never force-push; stop if push rejected; **fork-head unwritable → hard stop** (shared rules).
 3. Review triage — trusted owners/maintainers first; published feedback only; verify bots against code.
 4. Social mutation — no auto-replies to humans without exact-text confirmation; limited thread resolves.
-5. CI classify — **prefer fix/harden over reruns**; app/API test timeouts are not “infra”; same failure twice on one SHA → stop rerunning and fix; true infra → `gh run rerun RUN_ID --failed` (or `--job <databaseId>`) and **verify the failed leg** (e.g. `windows-latest`) actually restarted — never only ubuntu/mac; max 3 true-infra reruns per SHA; use gate helpers.
+5. CI classify — **prefer fix/harden over reruns**; app/API test timeouts are not “infra”; **“unrelated / not this PR” is not a skip** for required failures; same failure twice on one SHA → stop rerunning and fix; true infra → `gh run rerun RUN_ID --failed` (or `--job <databaseId>`) and **verify the failed leg** (e.g. `windows-latest`) actually restarted — never only ubuntu/mac; max 3 true-infra reruns per SHA; use gate helpers.
 6. Mode-aware waits — merge-ready / full-review / babysit-fix: **until green+comments clean** (or hard blocker); never abandon babysit on “3 rounds / 20m of work”; never invent a fixed **20 min CI sleep** (`windows-latest` usually **~12–15 min** — poll ~1 min; shared **CI wait expectations**); never invent soft “maintainer ack” stops; **thin settle** (~3–5 min quiet + recheck) before merge-ready / `approve-comment`; watch: **every wake run `watch-wake-gate.mjs`** — exit `1` means **fix in code** (OWNER leftovers / DIRTY), never ACK-only + idle on CI/CodeRabbit; then tip-update; then CI (**merge-queue queued ≠ merged**).
 7. Behind base + **compile against tip** — update from base, then verify build/tests on tip before merge-ready / full-review approve / merge. After push: re-check **stale approvals / last-push** policy.
 8. Draft/WIP/do-not-merge — never merge or claim ready while gated.

@@ -4,10 +4,11 @@ Read this before every `shipping-github` workflow.
 
 ## Scope lock
 
-- Change only what the issue/PR requires.
-- Do not drive-by refactor, rename for taste, or expand scope.
+- Change only what the issue/PR requires **plus** whatever is needed to clear **required CI** on this head (see below).
+- Do not drive-by refactor, rename for taste, or expand scope beyond that.
 - Never edit CI workflows/checks just to make failures pass.
-- If a merge-blocking failure looks unrelated, update from the default base branch first; if still broken and out of scope, report and stop expanding.
+- **Required CI still red after base update — even if the failure was introduced elsewhere / not by this PR’s feature — is in scope to fix.** Update from the default base first; then apply a **minimal** product/test harden so the branch (and everyone else) can go green again. Do **not** refuse with “unrelated / out of scope” while a fixable assertion, compile, typecheck, lint, or app/API test failure blocks required checks.
+- Stop and report only when: true **infra** after flake budget, permissions / fork-head unwritable, dirty unrelated worktree, push rejected, or a **product decision** that needs human confirmation — not merely because the buggy code lives outside the PR’s feature files.
 - If scope **explodes** (should be multiple reviewable PRs): **stop** and hand off to skill `split-to-prs` — do not silently batch-create.
 
 ## Resolve `#N` (issue vs PR)
@@ -70,7 +71,7 @@ Report the gate and stop that step. Fix/review may continue, but say merge-ready
 3. After the update (or if already up to date): verify the branch **still builds against current base tip**:
    - Prefer the repo’s normal local gate for this change (typecheck / compile / focused tests / project CLI).
    - Then push and wait for **required CI on the new SHA**.
-4. If it no longer compiles or tests fail **because of base drift**: fix in this PR (adapt to tip APIs) or hard-block with evidence — do **not** claim merge-ready / approve / merge.
+4. If it no longer compiles or tests fail **because of base drift** (or any other required-check failure visible on this head): **fix in this PR** with a minimal patch — even when the broken code was introduced on base / elsewhere — or hard-block only for true infra / permissions / product decisions. Do **not** claim merge-ready / approve / merge while required CI stays red “because unrelated.”
 5. Never claim merge-ready or merge while conflicted, behind base, or failing compile/tests against current tip.
 
 Applies to: `fix-pr-bots`, `full-review-pr`, `create-pr-for-issue`, `re-review-pr`, `merge-pr`, and `watch-pr` when auto-fixing.
@@ -149,7 +150,7 @@ If the user asked for **merge-ready / full-review / merge** and the PR is still 
 1. **Checkout** the PR head (or named branch) locally before Bugbot or complementary review. If checkout fails because of dirty files: **ask** before stash; only stash after user confirms.
 2. Run `scripts/bug-scope.mjs` for PRs. If `skipDeepBugReview`, record n/a and skip Bugbot/complementary.
 3. **Cursor only:** before launching `bugbot` / `review-bugbot`, use the prompt shape below. On Claude/Codex: **never** launch or claim Bugbot — complementary lenses (and Codex `/review` if available) only.
-4. After Bugbot (Cursor) and/or complementary: triage and **fix** what belongs in this PR. Do not only summarize unless the user asked review-only.
+4. After Bugbot (Cursor) and/or complementary: triage and **fix** what belongs in this PR. Do not only summarize unless the user asked review-only. Complementary Must-probe (locks/OAuth/detached/`finally`/API mapping) is required when those surfaces change — see `bug-review.md`.
 5. **Never** auto-run deep multi-agent bug kits (pr-review-toolkit, ultrareview, Codex adversarial-review) unless the user explicitly asked.
 
 For Bugbot (Cursor) prompt shape:
@@ -158,7 +159,7 @@ For Bugbot (Cursor) prompt shape:
 2. If the subagent fails with **empty / uncomputable diff**: retry **once** with `Diff: natural language` + a per-file `Change Description` (bugbot path).
 3. Wrong invocation (missing path/diff): fix and retry once. Same unexplained failure twice → stop Bugbot, state unavailability, continue with complementary only.
 
-**Security:** **never** launch Cursor harness `security-review` / `review-security`. Run `references/security-review.md` instead (scope script + matrix). Checkout still required before that review when fixing/reviewing a PR head.
+**Security:** **never** launch Cursor harness `security-review` / `review-security`. Run `references/security-review.md` instead (scope script + matrix). Checkout still required before that review when fixing/reviewing a PR head. If security touched lock/CAS/auth-refresh/error-mapping, bug Must-probe still applies (security Pass ≠ error-propagation covered).
 
 ## Spec + standards axis
 
@@ -274,11 +275,12 @@ Classify failed **required** checks from **failed job logs** before acting. Pref
 
 - Compile/typecheck/lint/tests/snapshots failing in touched areas
 - Deterministic failures clearly from this diff
+- **Pre-existing / “unrelated” failures** that still fail **required** checks on this head (base tip drift, another package, shared fixture, AI/provider error surfaced by a test this PR did not author) — still **fix here** with a minimal patch
 - **App/API/integration test timeouts or flakes** (e.g. `GET /api/…` 5s timeout, racey waits, undersized test timeouts) — even if “known flaky on `windows-latest`”
 - Same failing assertion/test name that already failed once on this SHA after a rerun
 - Failures you can harden with a small, scoped test/prod fix without weakening CI
 
-**Do not** call these “infra” and rerun. Fix or harden (timeouts, retries inside the test only when justified, await readiness, mock flaky externals, etc.). Never delete/skip the test to go green.
+**Do not** call these “infra” and rerun. **Do not** skip them as “out of scope / introduced elsewhere.” Fix or harden (timeouts, retries inside the test only when justified, await readiness, mock flaky externals, etc.). Never delete/skip the test to go green.
 
 ### True flaky / infra (rerun only)
 
@@ -326,6 +328,7 @@ Do **not**:
 - Prefer failed-**job** logs as soon as a job fails; don’t wait for the whole workflow if logs are already available.
 - When both review fixes and CI failures apply: **fix+push first** (new SHA retriggers CI); don’t rerun flakes on a SHA you’re about to replace.
 - On **merge** / merge-ready: burning retry budget instead of hardening a repeated test timeout is a failed classification — fix first, then merge when green.
+- **“Unrelated” ≠ skip:** if required CI fails on a path this PR did not author, still classify and harden/fix (or report true infra). Leaving the branch red so “someone else’s PR can fix it” is wrong while this PR is in a merge-ready / watch / full-review loop.
 - On true infra: **rerun the failed job only**; wrong-platform reruns (ubuntu/mac when Windows crashed) count as a botched retry — correct and rerun Windows, don’t burn the budget on greens.
 
 ## Merge policy extras
@@ -424,7 +427,7 @@ Before claiming merge-ready (or reporting a watch **CI/review milestone**), also
 
 - Behind base, conflicted, or broken compile/tests against current tip
 - Unresolved useful human or bot threads (CodeRabbit/Codex/Bugbot/etc.) that were not fixed **or** explicitly declined on-thread with rationale
-- Required CI red (or flake budget exhausted without a clear “out of scope / infra” hard-blocker report instead of merge-ready)
+- Required CI red (or flake budget exhausted without a clear **infra** hard-blocker report instead of merge-ready). Fixable product/test failures — including ones introduced elsewhere — are **not** an “out of scope” excuse to leave CI red.
 - Branch-protection / reviewDecision / CODEOWNERS (when **enforced**) / required labels still blocking
 - Stale approvals after push when dismiss-stale / last-push-approval is on and head has no fresh approval
 - In merge queue but not yet **merged** (queued ≠ done for watch/merge claims)

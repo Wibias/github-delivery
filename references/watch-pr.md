@@ -81,7 +81,7 @@ On **every** poll / wake (including the first):
    - Patch+push actionable items (narrow scope / drop work already on tip / rebase per owner note).
    - Human written replies → chat confirm. Inline replies in-thread. Resolve only allowed threads after verified fixes.
 6. **Then** if behind/conflicted **or** wake-gate reports `base_dirty_or_behind`: update from base, resolve or ask, push; verify compile-against-tip. Prefer combining with review fixes in the **same** push. **Never** enter the 1–2 min poll loop while `DIRTY`/`CONFLICTING`.
-7. **Then CI:** classify branch vs flake. Fix branch-related; rerun flakes (max 3 / SHA); stop on exhausted infra failures. After push: re-check stale-approval / last-push via `pr-policy-gate`.
+7. **Then CI:** classify branch vs flake. Fix branch-related **and** pre-existing/“unrelated” required failures (minimal patch); rerun flakes (max 3 / SHA); stop on exhausted infra failures. After push: re-check stale-approval / last-push via `pr-policy-gate`.
 8. Security-offer / changelog nudge once if applicable.
 9. Only if green + mergeable + **useful threads/comments quiet** on **current** SHA **and** wake-gate exit `0`: report milestone **“CI/reviews quiet — still watching (not full merge-ready bar)”**. Do **not** post `[shipping-github] Merge ready` from watch alone. Keep polling while open. If auto-merge **or merge-queue** queued: watch until **actually merged**.
 10. Stop only when:
