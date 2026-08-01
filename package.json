@@ -7,7 +7,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node --test tests/unit/review-policy.test.mjs",
-    "check": "node --check scripts/review-threads.mjs && node --check scripts/pr-policy-gate.mjs && npm test"
+    "test": "node --test tests/unit/review-policy.test.mjs tests/unit/required-checks-policy.test.mjs",
+    "check": "node --check scripts/review-threads.mjs && node --check scripts/pr-policy-gate.mjs && node --check scripts/required-checks.mjs && npm test"
   }
 }
