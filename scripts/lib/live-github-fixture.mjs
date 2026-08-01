@@ -62,12 +62,17 @@ export function evaluateFixtureReceipt(plan, events) {
   const duplicateNames = [...new Set(names.filter((name, i) => names.indexOf(name) !== i))];
   const stale = events.find((event) => event?.name === "stale_head_rejected");
   const draft = events.find((event) => event?.name === "draft_gate_observed");
+  const checksEvent = events.find((event) => event?.name === "checks_observed");
+  const checks = checksEvent?.checks || null;
   const finalGate = events.find((event) => event?.name === "final_gate_observed");
   const problems = [];
   if (missing.length) problems.push(`missing events: ${missing.join(", ")}`);
   if (duplicateNames.length) problems.push(`duplicate events: ${duplicateNames.join(", ")}`);
   if (stale && stale.outcome !== "rejected") problems.push("stale head mutation was not rejected");
   if (draft && draft.decision === "ready") problems.push("draft PR was incorrectly ready");
+  if (!checks || checks.conclusion !== "success" || !Number.isInteger(checks.count) || checks.count < 1 || !Array.isArray(checks.checks) || checks.checks.length !== checks.count) {
+    problems.push("checks evidence is missing, incomplete, or unsuccessful");
+  }
   if (finalGate && !new Set(["ready", "blocked", "unknown"]).has(finalGate.decision)) problems.push("final gate decision is invalid");
   return {
     schemaVersion: 1,
@@ -78,6 +83,7 @@ export function evaluateFixtureReceipt(plan, events) {
     passed: problems.length === 0,
     problems,
     eventCount: events.length,
+    checks,
     events,
   };
 }
@@ -101,7 +107,7 @@ export async function runFixtureScenario(adapter, options) {
     await adapter.markReady(plan, pr);
     record("ready_transitioned");
     const checks = await adapter.waitForChecks(plan, pr);
-    record("checks_observed", { conclusion: checks.conclusion });
+    record("checks_observed", { conclusion: checks.conclusion, count: checks.count, checks });
     const snapshot = await adapter.captureSnapshot(plan, pr);
     record("snapshot_captured", { head: snapshot.head });
     await adapter.changeHead(plan, pr, snapshot.head);
