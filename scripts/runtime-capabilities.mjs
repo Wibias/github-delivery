@@ -56,6 +56,9 @@ function liveInput(repo) {
     declarations: {
       connectorRead: parseBoolean(process.env.SHIPPING_GITHUB_CONNECTOR_READ),
       connectorWrite: parseBoolean(process.env.SHIPPING_GITHUB_CONNECTOR_WRITE),
+      brokeredConnectorWrite: parseBoolean(
+        process.env.SHIPPING_GITHUB_BROKERED_CONNECTOR_WRITE,
+      ),
       composio: parseBoolean(process.env.SHIPPING_GITHUB_COMPOSIO),
       bugbot: parseBoolean(process.env.SHIPPING_GITHUB_BUGBOT),
       subagents: parseBoolean(process.env.SHIPPING_GITHUB_SUBAGENTS),
