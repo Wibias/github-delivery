@@ -51,16 +51,21 @@ try {
     );
   }
 
+  const encodedBase = encodeURIComponent(base);
   const probes = {
     repository: probe(["api", `repos/${repo}`]),
     actions: probe(["api", `repos/${repo}/actions/runs?per_page=1`]),
     checks: probe([
       "api",
-      `repos/${repo}/commits/${encodeURIComponent(base)}/check-runs?per_page=1`,
+      `repos/${repo}/commits/${encodedBase}/check-runs?per_page=1`,
+    ]),
+    statuses: probe([
+      "api",
+      `repos/${repo}/commits/${encodedBase}/statuses?per_page=1`,
     ]),
     activeRules: probe([
       "api",
-      `repos/${repo}/rules/branches/${encodeURIComponent(base)}`,
+      `repos/${repo}/rules/branches/${encodedBase}`,
     ]),
     branchProtectionGraphql: probe([
       "api",
