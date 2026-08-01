@@ -23,22 +23,25 @@ export function buildRuntimeCapabilities({
   const optional = {
     connectorRead: boolean(declarations.connectorRead),
     connectorWrite: boolean(declarations.connectorWrite),
+    brokeredConnectorWrite: boolean(declarations.brokeredConnectorWrite),
     composio: boolean(declarations.composio),
     bugbot: boolean(declarations.bugbot),
     subagents: boolean(declarations.subagents),
     reviewTool: boolean(declarations.reviewTool),
   };
 
-  const repoReadable =
-    optional.connectorRead ||
-    (tools.gh && tools.ghAuthenticated && boolean(probes.repoReadableViaGh));
-  const headWritable =
-    optional.connectorWrite ||
-    (tools.gh && tools.ghAuthenticated && boolean(probes.headWritableViaGh));
+  const ghReadable =
+    tools.gh && tools.ghAuthenticated && boolean(probes.repoReadableViaGh);
+  const ghWritable =
+    tools.gh && tools.ghAuthenticated && boolean(probes.headWritableViaGh);
+  const repoReadable = optional.connectorRead || ghReadable;
+  const headWritable = optional.connectorWrite || ghWritable;
+  const brokerWriteAvailable = optional.brokeredConnectorWrite || ghWritable;
 
   const github = {
     repoReadable,
     headWritable,
+    brokerWriteAvailable,
     rulesetsReadable:
       declarations.rulesetsReadable === true ||
       (repoReadable && probes.rulesetsReadableViaGh !== false),
@@ -50,13 +53,13 @@ export function buildRuntimeCapabilities({
   const fallbacks = {
     githubReads: optional.connectorRead
       ? "connector"
-      : tools.gh && tools.ghAuthenticated && repoReadable
+      : ghReadable
         ? "gh"
         : "unavailable",
-    githubWrites: optional.connectorWrite
-      ? "connector"
-      : tools.gh && tools.ghAuthenticated && headWritable
-        ? "gh"
+    githubWrites: optional.brokeredConnectorWrite
+      ? "connector-broker"
+      : ghWritable
+        ? "gh-broker"
         : "unavailable",
     rateLimits: optional.composio
       ? "composio"
@@ -75,7 +78,10 @@ export function buildRuntimeCapabilities({
     !tools.node && "node_unavailable",
     !tools.git && "git_unavailable",
     !github.repoReadable && "github_read_unavailable",
-    !github.headWritable && "github_write_unavailable",
+    !github.headWritable && "github_write_permission_unavailable",
+    github.headWritable &&
+      !github.brokerWriteAvailable &&
+      "github_write_not_brokered",
     !github.rulesetsReadable && "rulesets_unreadable",
     !github.reviewThreadsReadable && "review_threads_unreadable",
     fallbacks.rateLimits === "unavailable" && "rate_limit_probe_unavailable",
@@ -94,6 +100,7 @@ export function buildRuntimeCapabilities({
     fallbacks,
     degraded,
     readyForReadOnly: github.repoReadable && tools.node,
-    readyForMutation: github.repoReadable && github.headWritable && tools.node,
+    readyForMutation:
+      github.repoReadable && github.brokerWriteAvailable && tools.node,
   };
 }
