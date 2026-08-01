@@ -59,11 +59,11 @@ offer** in `references/shared-rules.md` when loading the PR body.
 
 Read `references/shared-rules.md` before acting. Non-negotiables:
 
-1. Scope lock — no drive-by refactors; never weaken CI to go green; **required CI red is still in scope to fix** even when the failure was introduced elsewhere (minimal patch after base update).
+1. Scope lock — no drive-by refactors; never weaken CI to go green. For a red head, use the `baseHealth` component: PR-only failures are in scope; failures reproduced on the base tip may block merging but require a separate follow-up instead of silently expanding this PR; unknown origin is a hard evidence stop.
 2. Git safety — stop on dirty unrelated trees; never force-push; stop if push rejected; **fork-head unwritable → hard stop** (shared rules).
 3. Review triage — trusted owners/maintainers first; published feedback only; verify bots against code.
 4. Social mutation — no auto-replies to humans without exact-text confirmation; limited thread resolves.
-5. CI classify — **prefer fix/harden over reruns**; app/API test timeouts are not “infra”; **“unrelated / not this PR” is not a skip** for required failures; same failure twice on one SHA → stop rerunning and fix; true infra → `gh run rerun RUN_ID --failed` (or `--job <databaseId>`) and **verify the failed leg** (e.g. `windows-latest`) actually restarted — never only ubuntu/mac; max 3 true-infra reruns per SHA; use gate helpers.
+5. CI classify — **prefer fix/harden over reruns**; app/API test timeouts are not “infra”; never guess whether a required failure is unrelated. Use `ship-gate.mjs` base-health evidence: `fix_in_pr`, `separate_follow_up`, or `investigate`. Same failure twice on one SHA → stop blind reruns; true infra → `gh run rerun RUN_ID --failed` (or `--job <databaseId>`) and verify the failed leg actually restarted; max 3 true-infra reruns per SHA.
 6. Mode-aware waits — merge-ready / full-review / babysit-fix: **until green+comments clean** (or hard blocker); never abandon babysit on “3 rounds / 20m of work”; never invent a fixed **20 min CI sleep** (`windows-latest` usually **~12–15 min** — poll ~1 min; shared **CI wait expectations**); never invent soft “maintainer ack” stops; **thin settle** (~3–5 min quiet + recheck) before merge-ready / `approve-comment`; watch: **every wake run `ship-gate.mjs`**. Exit `1` means act on its namespaced blockers before idling; exit `2` means restore evidence and do not call the PR ready; exit `0` permits waiting. Use component helpers only to diagnose the authoritative result. Merge-queue queued still does not mean merged.
 7. Behind base + **compile against tip** — update from base, then verify build/tests on tip before merge-ready / full-review approve / merge. After push: re-check **stale approvals / last-push** policy.
 8. Draft/WIP/do-not-merge — never merge or claim ready while gated.
@@ -102,6 +102,7 @@ Read `references/shared-rules.md` before acting. Non-negotiables:
 - references/status.md -- when to read: read-only PR status / what's left
 - references/merge-pr.md -- when to read: merge a PR with thanks and issue close-out
 - references/gate-helpers.md -- when to read: before ready/merge/status/watch-idle; `ship-gate.mjs` is authoritative
+- references/base-health.md -- when to read: when required checks fail or base drift may affect PR scope
 - references/comment-depth.md -- when to read: before posting research, security, verdict, merge-ready, status, or merge thanks
 - tests/evals/cases.jsonl -- when to read: before discovery, execution, or adversarial evaluation
 - tests/evals/regression-cases.jsonl -- when to read: before rerunning or appending retained regressions
