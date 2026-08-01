@@ -36,7 +36,7 @@ Skip 0.1% nits. No follow-up PR for in-scope fixes.
 
 1. Identify PR(s); checkout head (subagent preflight); note base, linked issues, draft/WIP gates. If draft and user wanted green/merge-ready: ask once about **Draft → ready**.
 2. Usefulness pass: real bug / claimed value? If not → `not-useful` verdict and stop that PR only.
-3. Parallel where useful: **Bug** via **`references/bug-review.md`** (scope → Bugbot when Cursor → complementary). **Security** via **`references/security-review.md`** (never Cursor harness `security-review` / `review-security`). Plus **Spec + Standards** via skill `review` (or short in-session pass).
+3. Parallel where useful: **Bug** via **`references/bug-review.md`** (scope → Bugbot when Cursor → complementary). On Cursor, use that file's literal `review-bugbot` prompt contract; do not construct or paraphrase a replacement prompt in this workflow. **Security** via **`references/security-review.md`** (never Cursor harness `security-review` / `review-security`). Plus **Spec + Standards** via skill `review` (or short in-session pass).
 4. Triage open human + bot comments (shared rules — owners/maintainers first). Fix useful; decline nits with rationale. Inline replies in-thread only.
 5. Push fixes; update from base if behind; **verify compile/tests against tip**; **wait and recheck** until useful threads quiet **and** required CI green on that tip SHA, or a hard blocker. Use **rate-limit backoff** (Composio → gh) on dense polls.
 6. Changelog nudge if user-facing.
