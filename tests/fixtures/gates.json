@@ -1,0 +1,24 @@
+{
+  "codeowners": {
+    "text": "* @global\n/docs/ @docs # inline note\n/docs/private/*\n/src/** @src",
+    "cases": [
+      { "path": "README.md", "owners": ["@global"] },
+      { "path": "docs/guide.md", "owners": ["@docs"] },
+      { "path": "docs/private/secret.md", "owners": [] },
+      { "path": "src/lib/a.js", "owners": ["@src"] }
+    ]
+  },
+  "feedback": {
+    "myLogin": "maintainer",
+    "items": [
+      { "id": 1, "user": { "login": "owner" }, "author_association": "OWNER", "created_at": "2026-08-01T00:00:00Z", "body": "fix it" },
+      { "id": 2, "user": { "login": "bot[bot]" }, "author_association": "MEMBER", "created_at": "2026-08-01T00:00:00Z", "body": "automated" },
+      { "id": 3, "user": { "login": "maintainer" }, "author_association": "OWNER", "created_at": "2026-08-01T00:00:00Z", "body": "my own note" }
+    ],
+    "expectedKeys": ["issue_comment:1"]
+  },
+  "pagination": {
+    "pages": [[1, 2], [3]],
+    "expected": [1, 2, 3]
+  }
+}
