@@ -69,3 +69,13 @@ test("live fixture establishes Git credentials before pushing", () => {
   assert.ok(setup >= 0, "expected gh auth setup-git");
   assert.ok(push > setup, "Git authentication must be configured before the first push");
 });
+
+test("ship-gate snapshot does not request org-scoped reviewer identities through gh pr view", () => {
+  const source = readFileSync(new URL("../../scripts/ship-gate-snapshot.mjs", import.meta.url), "utf8");
+  const prViewFields = source.match(/"number,title,state,isDraft,url,baseRefName,headRefOid,mergeStateStatus,mergeable,reviewDecision,[^"]+"/)?.[0] || "";
+
+  assert.doesNotMatch(prViewFields, /reviewRequests/);
+  assert.match(source, /pulls\/\$\{pr\}\/requested_reviewers/);
+  assert.match(source, /users/);
+  assert.match(source, /teams/);
+});
