@@ -19,9 +19,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: write
-  pull-requests: write
-  issues: write
+  contents: read
 
 jobs:
   lifecycle:
@@ -42,12 +40,26 @@ jobs:
           package-manager-cache: false
 
       - name: Run fixture contract tests
-        run: node --test tests/unit/live-github-fixture.test.mjs tests/unit/live-fixture-cleanup.test.mjs
+        run: >-
+          node --test
+          tests/unit/live-github-fixture.test.mjs
+          tests/unit/live-fixture-cleanup.test.mjs
+          tests/unit/live-fixture-credential.test.mjs
+
+      - name: Verify live fixture credential
+        id: credential
+        env:
+          GH_TOKEN: ${{ secrets.LIVE_FIXTURE_TOKEN }}
+        run: >-
+          node scripts/verify-live-fixture-token.mjs
+          "${GITHUB_REPOSITORY}"
+          --base "main"
+          | tee live-fixture-credential.json
 
       - name: Exercise live GitHub lifecycle
         timeout-minutes: 20
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.LIVE_FIXTURE_TOKEN }}
           DISPOSITION: ${{ inputs.disposition || 'close' }}
         run: >-
           node scripts/live-github-fixture.mjs
@@ -58,10 +70,10 @@ jobs:
           --receipt live-fixture-receipt.json
 
       - name: Clean up fixture resources
-        if: always()
+        if: always() && steps.credential.outcome == 'success'
         timeout-minutes: 5
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.LIVE_FIXTURE_TOKEN }}
           DISPOSITION: ${{ inputs.disposition || 'close' }}
         run: >-
           node scripts/cleanup-live-github-fixture.mjs
@@ -78,6 +90,7 @@ jobs:
         with:
           name: live-fixture-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
+            live-fixture-credential.json
             live-fixture-receipt.json
             live-fixture-cleanup.json
           if-no-files-found: error
