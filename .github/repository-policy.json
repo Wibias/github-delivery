@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "defaultBranch": "main",
+  "pullRequests": {
+    "required": true,
+    "conversationResolution": true,
+    "dismissStaleApprovals": true
+  },
+  "branch": {
+    "allowForcePushes": false,
+    "allowDeletions": false,
+    "requireLinearHistory": false
+  },
+  "merge": {
+    "methods": ["merge"],
+    "updateBranch": true,
+    "autoMerge": true
+  },
+  "release": {
+    "environment": "release",
+    "protectedTagPattern": "v*",
+    "requiredReviewers": 1
+  },
+  "requiredChecks": [
+    "Node 20 / ubuntu-latest",
+    "Node 20 / windows-latest",
+    "Node 20 / macos-latest",
+    "Node 22 / ubuntu-latest",
+    "Node 22 / windows-latest",
+    "Node 22 / macos-latest",
+    "Dependency Review",
+    "CodeQL / Analyze (javascript-typescript)"
+  ]
+}
