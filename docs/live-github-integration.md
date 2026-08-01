@@ -17,9 +17,9 @@ Each run uses a unique `[shipping-github-fixture:<run-id>]` marker and a branch 
 9. Re-evaluate the final gate.
 10. Close or merge the fixture PR.
 11. Close the fixture issue and delete the branch.
-12. Upload a versioned receipt.
+12. Upload versioned lifecycle and cleanup evidence.
 
-Cleanup runs on failure and is restricted to the run's namespaced fixture branch and resources.
+All resources are restricted to the exact run marker and branch. The lifecycle process performs immediate best-effort cleanup on ordinary failures. A separate workflow step also runs under `if: always()` so cancellation or process termination cannot silently skip cleanup.
 
 ## Running it
 
@@ -37,7 +37,7 @@ GitHub can place pull-request workflows created by `GITHUB_TOKEN` into an approv
 fixture_workflows_approval_required
 ```
 
-Open the temporary fixture PR and choose **Approve workflows to run** before the observation timeout. If approval never arrives, the lifecycle fails closed and cleans up its namespaced resources.
+Open the temporary fixture PR and choose **Approve workflows to run** before the observation timeout. If approval never arrives, the lifecycle fails closed and cleanup runs independently of the failed process.
 
 ## Required check evidence
 
@@ -64,7 +64,29 @@ The observer reports stable failure or waiting codes:
 | `fixture_required_checks_missing` | One or more required workflows or matrix jobs never appeared |
 | `fixture_checks_failed` | An observed check failed, was cancelled, skipped, or timed out |
 
-Approval, missing, and pending states remain pollable until the deadline. A failed check stops immediately. Any unresolved state at timeout fails the lifecycle and triggers best-effort cleanup.
+Approval, missing, and pending states remain pollable until the deadline. A failed check stops immediately. Any unresolved state at timeout fails the lifecycle.
+
+## Cancellation and cleanup
+
+The workflow reserves time after the lifecycle step for cleanup. Cleanup independently discovers only resources whose title exactly matches the current marker and only the branch derived from the current run ID. It is idempotent when the PR, issue, or branch was already removed.
+
+The artifact contains:
+
+- `live-fixture-receipt.json`
+- `live-fixture-cleanup.json`
+
+A normal script failure writes a partial lifecycle receipt before exiting. If the process is killed before it can do so, the independent cleanup step creates a fallback receipt with:
+
+```json
+{
+  "passed": false,
+  "failure": {
+    "code": "fixture_lifecycle_interrupted"
+  }
+}
+```
+
+The cleanup report records every close/delete action and any cleanup failure. Missing evidence files are an artifact-upload error rather than a warning.
 
 ## Evidence contract
 
