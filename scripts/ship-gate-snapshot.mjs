@@ -599,8 +599,14 @@ try {
     "--repo",
     repo,
     "--json",
-    "number,title,state,isDraft,url,baseRefName,headRefOid,mergeStateStatus,mergeable,reviewDecision,reviewRequests,commits",
+    "number,title,state,isDraft,url,baseRefName,headRefOid,mergeStateStatus,mergeable,reviewDecision,commits",
   ]);
+  const reviewRequests = restCollection(
+    `repos/${owner}/${name}/pulls/${pr}/requested_reviewers`,
+    "review requests",
+    (payload) => [...(payload?.users || []), ...(payload?.teams || [])],
+  );
+  prEvidence.reviewRequests = reviewRequests.rows || [];
   const base = prEvidence.baseRefName;
   const headOid = prEvidence.headRefOid;
 
