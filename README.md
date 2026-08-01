@@ -44,6 +44,8 @@ routes to `references/merge-pr.md`, runs `scripts/ship-gate.mjs`, prepares guard
 - Merge operations are pinned with `--match-head-commit`.
 - Social writes require idempotency keys and produce versioned receipts.
 - Stacked PRs are handed to `manage-stacked-prs` and merged bottom-up.
+- Review depth is derived from changed paths, patches, symbols, removed controls, dependencies, workflow permissions, and uncertainty rather than filenames alone.
+- Live lifecycle fixtures exercise GitHub issues, branches, PRs, checks, snapshots, stale-head rejection, and cleanup against the real platform.
 
 ## Internal architecture
 
@@ -56,8 +58,10 @@ routes to `references/merge-pr.md`, runs `scripts/ship-gate.mjs`, prepares guard
 | `scripts/github-mutate.mjs` | Dry-run and execute authorized GitHub writes |
 | `scripts/runtime-capabilities.mjs` | Discover host/tool capabilities and safe fallbacks |
 | `scripts/validate-evals.mjs` | Execute offline routing and safety contracts |
-
-The final two scripts are introduced by the next stacked PRs; the table documents the intended complete stack.
+| `scripts/live-github-fixture.mjs` | Exercise the real GitHub lifecycle with namespaced temporary resources |
+| `scripts/review-scope.mjs` | Produce one evidence-ranked bug and security review plan |
+| `scripts/build-dist.mjs` | Build deterministic versioned skill bundles |
+| `scripts/prepare-release.mjs` | Verify release identity, checksums, SBOM, notes, and provenance subjects |
 
 ## Mutation safety
 
@@ -94,7 +98,13 @@ The broker defaults to dry-run. Execution requires `--execute`, re-checks the PR
 
 ## Installation
 
-Copy or symlink the repository into the skill directories used by your agent host:
+Build a deterministic bundle with:
+
+```bash
+npm run build:dist
+```
+
+Install through the dry-run-first installer documented in `docs/installation.md`, or place the verified skill directory in a host skill path such as:
 
 ```text
 ~/.agents/skills/shipping-github
@@ -116,10 +126,14 @@ Requirements:
 npm run check
 ```
 
-CI runs the complete suite on Node 20 and 22 across Ubuntu, Windows, and macOS.
+CI runs the complete suite on Node 20 and 22 across Ubuntu, Windows, and macOS. CodeQL, dependency review, workflow-policy validation, deterministic distribution checks, offline behavioral evaluations, and focused unit contracts are part of the repository controls.
+
+Use the **Live Integration** workflow to exercise the real lifecycle. Scheduled execution is opt-in through `LIVE_FIXTURE_ENABLED=true`.
 
 ## Current status
 
-The evidence and decision core, base-health classification, feedback resolution, mutation profiles, and guarded mutation broker are implemented. Runtime capability discovery, executable behavioral evaluations, deterministic packaging, release provenance, live GitHub integration fixtures, and deeper review-scope analysis remain planned.
+The planned implementation roadmap is complete: evidence snapshots, authoritative ship decisions, base-health isolation, feedback resolution, guarded mutations, capability discovery, behavioral evaluations, deterministic packaging, provenance-backed releases, repository security controls, live GitHub integration fixtures, and evidence-based review scoping are implemented.
+
+Remaining work is operational rather than architectural: apply the documented live repository rules, enable available GitHub security features, run release acceptance, and maintain the regression corpus as GitHub and agent hosts evolve.
 
 MIT licensed.
