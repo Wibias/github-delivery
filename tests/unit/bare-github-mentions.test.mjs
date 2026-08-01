@@ -19,7 +19,7 @@ test("public comment templates use notifying mention syntax", () => {
   assert.match(source, /Thanks @author — merging this\./);
   assert.match(source, /Thanks @issue_author — fixed by PR/);
   assert.match(source, /pending @login \(bare `@`, never backticked\)/);
-  assert.match(source, /write `@lidge-jun`, never `` `@lidge-jun` ``/);
+  assert.match(source, /write `@user`, never `` `@user` ``/);
 });
 
 test("merge workflow keeps broker architecture and bare mentions", () => {
