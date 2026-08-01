@@ -2,6 +2,7 @@ const CAPABILITIES = [
   "repository",
   "actions",
   "checks",
+  "statuses",
   "activeRules",
   "branchProtectionGraphql",
 ];
