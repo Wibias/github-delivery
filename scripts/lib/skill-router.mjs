@@ -11,6 +11,9 @@ function result(workflow, mutationMode = "read-only", explicitActions = []) {
   };
 }
 
+const SIMPLIFY_REQUEST =
+  /\b(simplify|simplification|cleanup|clean up|deduplicate|dedupe|reduce duplication)\b/;
+
 export function routeShippingGithubPrompt(prompt) {
   const text = normalized(prompt);
   if (!text) return null;
@@ -38,10 +41,16 @@ export function routeShippingGithubPrompt(prompt) {
   }
 
   if (/\b(full review|review .* for real bugs|usefulness verdict)\b/.test(text)) {
+    const simplifyRequested = SIMPLIFY_REQUEST.test(text);
     return result(
       "references/full-review-pr.md",
-      /\bfix\b/.test(text) ? "maintainer" : "review",
+      /\bfix\b/.test(text) || simplifyRequested ? "maintainer" : "review",
+      simplifyRequested ? ["push_code"] : [],
     );
+  }
+
+  if (SIMPLIFY_REQUEST.test(text) && /\bpr\s*#?\d+\b/.test(text)) {
+    return result("references/simplify-pr.md", "maintainer", ["push_code"]);
   }
 
   if (/\bsecurity review\b/.test(text)) {
