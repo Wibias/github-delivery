@@ -33,6 +33,7 @@ test("builds a complete report only when every required read succeeds", () => {
       repository: { ok: true },
       actions: { ok: true },
       checks: { ok: true },
+      statuses: { ok: true },
       activeRules: { ok: true },
       branchProtectionGraphql: { ok: true },
     },
@@ -51,6 +52,7 @@ test("reports exact missing capabilities without manufacturing success", () => {
       repository: { ok: true },
       actions: { ok: false, error: "actions denied" },
       checks: { ok: true },
+      statuses: { ok: false, error: "statuses denied" },
       activeRules: { ok: false, error: "rules denied" },
       branchProtectionGraphql: { ok: false, error: "graphql denied" },
     },
@@ -58,7 +60,7 @@ test("reports exact missing capabilities without manufacturing success", () => {
   assert.equal(report.valid, false);
   assert.deepEqual(
     report.failures.map((failure) => failure.capability),
-    ["actions", "activeRules", "branchProtectionGraphql"],
+    ["actions", "statuses", "activeRules", "branchProtectionGraphql"],
   );
   assert.doesNotMatch(JSON.stringify(report), /token/i);
 });
