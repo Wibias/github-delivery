@@ -5,6 +5,7 @@ import test from "node:test";
 import {
   actionsPolicyQuery,
   actionsSnapshotRepairPlan,
+  latestOpinionatedReviewsFromRest,
   repairActionsSnapshot,
 } from "../../scripts/lib/actions-snapshot-repair.mjs";
 import { createSnapshotEnvelope } from "../../scripts/lib/snapshot-schema.mjs";
@@ -105,11 +106,56 @@ function policy() {
   };
 }
 
-test("Actions policy query excludes repository-admin branch rules", () => {
+test("Actions policy query requests only merge-queue state", () => {
   const query = actionsPolicyQuery();
   assert.doesNotMatch(query, /branchProtectionRules/);
-  assert.match(query, /latestOpinionatedReviews/);
+  assert.doesNotMatch(query, /latestOpinionatedReviews/);
   assert.match(query, /isInMergeQueue/);
+  assert.match(query, /isMergeQueueEnabled/);
+});
+
+test("derives the latest opinionated review per author from REST rows", () => {
+  const reviews = latestOpinionatedReviewsFromRest([
+    {
+      user: { login: "alice" },
+      state: "APPROVED",
+      submitted_at: "2026-08-01T01:00:00Z",
+      commit_id: "old",
+    },
+    {
+      user: { login: "bob" },
+      state: "CHANGES_REQUESTED",
+      submitted_at: "2026-08-01T01:05:00Z",
+      commit_id: "bob-head",
+    },
+    {
+      user: { login: "alice" },
+      state: "COMMENTED",
+      submitted_at: "2026-08-01T01:10:00Z",
+      commit_id: "comment",
+    },
+    {
+      user: { login: "alice" },
+      state: "APPROVED",
+      submitted_at: "2026-08-01T01:15:00Z",
+      commit_id: "new",
+    },
+  ]);
+  assert.equal(reviews.pageInfo.hasNextPage, false);
+  assert.deepEqual(reviews.nodes, [
+    {
+      author: { login: "alice" },
+      state: "APPROVED",
+      submittedAt: "2026-08-01T01:15:00Z",
+      commit: { oid: "new" },
+    },
+    {
+      author: { login: "bob" },
+      state: "CHANGES_REQUESTED",
+      submittedAt: "2026-08-01T01:05:00Z",
+      commit: { oid: "bob-head" },
+    },
+  ]);
 });
 
 test("plans repair only for exact Actions installation restrictions", () => {
