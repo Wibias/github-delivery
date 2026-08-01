@@ -91,9 +91,8 @@ function writeSnapshot() {
   return path;
 }
 
-test("ship-gate evaluates one supplied snapshot without invoking gh", () => {
-  const snapshotPath = writeSnapshot();
-  const result = spawnSync(
+function runShipGate(snapshotPath, extraArgs = []) {
+  return spawnSync(
     process.execPath,
     [
       join(ROOT, "scripts", "ship-gate.mjs"),
@@ -105,6 +104,7 @@ test("ship-gate evaluates one supplied snapshot without invoking gh", () => {
       "head123",
       "--max-age-seconds",
       "999999999",
+      ...extraArgs,
     ],
     {
       cwd: ROOT,
@@ -112,6 +112,10 @@ test("ship-gate evaluates one supplied snapshot without invoking gh", () => {
       env: { ...process.env, PATH: "" },
     },
   );
+}
+
+test("ship-gate evaluates one supplied snapshot without invoking gh", () => {
+  const result = runShipGate(writeSnapshot());
   assert.equal(
     result.status,
     0,
@@ -120,6 +124,8 @@ test("ship-gate evaluates one supplied snapshot without invoking gh", () => {
   const output = JSON.parse(result.stdout);
   assert.equal(output.decision, "ready");
   assert.equal(output.snapshotId, "ship-gate-snapshot");
+  assert.equal(output.mutationMode, "read-only");
+  assert.equal(output.mutationProfile.actions.merge_pr.allowed, false);
   assert.equal(output.components.baseHealth.comparisonRequired, false);
   assert.deepEqual(Object.keys(output.components).sort(), [
     "baseHealth",
@@ -129,4 +135,19 @@ test("ship-gate evaluates one supplied snapshot without invoking gh", () => {
     "reviewThreads",
     "wake",
   ]);
+});
+
+test("ship-gate reports an explicitly selected mutation profile", () => {
+  const result = runShipGate(writeSnapshot(), [
+    "--mutation-mode",
+    "maintainer",
+  ]);
+  assert.equal(result.status, 0, result.stderr);
+  const output = JSON.parse(result.stdout);
+  assert.equal(output.mutationMode, "maintainer");
+  assert.equal(output.mutationProfile.actions.push_code.allowed, true);
+  assert.equal(
+    output.mutationProfile.actions.merge_pr.requiresExplicitInstruction,
+    true,
+  );
 });
