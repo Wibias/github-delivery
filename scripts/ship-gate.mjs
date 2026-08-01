@@ -4,6 +4,7 @@
  * Usage: node scripts/ship-gate.mjs OWNER/REPO PR_NUMBER [--snapshot FILE]
  */
 import { captureLiveSnapshot } from "./lib/live-snapshot.mjs";
+import { evaluateBaseHealthSnapshot } from "./lib/base-health-policy.mjs";
 import {
   evaluateCodeownersSnapshot,
   evaluateRequiredChecksSnapshot,
@@ -39,6 +40,7 @@ try {
   const output = combineShipGateResults({
     snapshot,
     requiredChecks: evaluateRequiredChecksSnapshot(snapshot),
+    baseHealth: evaluateBaseHealthSnapshot(snapshot),
     reviewPolicy: evaluateReviewPolicySnapshot(snapshot),
     reviewThreads: evaluateReviewThreadsSnapshot(snapshot),
     wake: evaluateWakeSnapshot(snapshot),
