@@ -35,7 +35,7 @@ const TEXT_EXTENSIONS = new Set([
   ".yaml",
   ".txt",
 ]);
-const FIXED_ZIP_DATE = 33; // 1980-01-01
+const FIXED_ZIP_DATE = 33;
 const FIXED_ZIP_TIME = 0;
 
 function sha256(buffer) {
@@ -53,9 +53,7 @@ function extension(path) {
 }
 
 function normalizePayload(path, buffer) {
-  if (!TEXT_EXTENSIONS.has(extension(path)) && basename(path) !== "LICENSE") {
-    return buffer;
-  }
+  if (!TEXT_EXTENSIONS.has(extension(path)) && basename(path) !== "LICENSE") return buffer;
   return Buffer.from(buffer.toString("utf8").replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n"), "utf8");
 }
 
@@ -63,16 +61,12 @@ function walkFiles(root, start, output) {
   const absolute = join(root, start);
   if (!existsSync(absolute)) return;
   const info = lstatSync(absolute);
-  if (info.isSymbolicLink()) {
-    throw new Error(`runtime payload cannot contain a symlink: ${start}`);
-  }
+  if (info.isSymbolicLink()) throw new Error(`runtime payload cannot contain a symlink: ${start}`);
   if (info.isFile()) {
     output.push(toPosix(start));
     return;
   }
-  for (const entry of readdirSync(absolute).sort()) {
-    walkFiles(root, join(start, entry), output);
-  }
+  for (const entry of readdirSync(absolute).sort()) walkFiles(root, join(start, entry), output);
 }
 
 export function collectRuntimeFiles(root) {
@@ -108,7 +102,7 @@ export function injectSkillMetadata(source, { version }) {
 
 function runtimeReferences(markdown) {
   const found = new Set();
-  const pattern = /(?:<shipping-github>\/)?((?:references|scripts|overrides|tests\/evals)\/[A-Za-z0-9_.@<>/-]+)/g;
+  const pattern = /(?<![A-Za-z0-9_<>/-])(?:<shipping-github>\/)?((?:references|scripts|overrides|tests\/evals)\/[A-Za-z0-9_.@<>/-]+)/g;
   for (const match of markdown.matchAll(pattern)) {
     const cleaned = match[1].replace(/[),.;:`'"\]}]+$/g, "");
     if (!cleaned.includes("<") && !cleaned.includes("*")) found.add(cleaned);
@@ -121,12 +115,8 @@ function validateReferences(payloads) {
   for (const [path, buffer] of payloads) {
     if (extension(path) !== ".md") continue;
     for (const reference of runtimeReferences(buffer.toString("utf8"))) {
-      const bundled =
-        available.has(reference) ||
-        [...available].some((candidate) => candidate.startsWith(`${reference}/`));
-      if (!bundled) {
-        throw new Error(`missing runtime reference: ${reference} (from ${path})`);
-      }
+      const bundled = available.has(reference) || [...available].some((candidate) => candidate.startsWith(`${reference}/`));
+      if (!bundled) throw new Error(`missing runtime reference: ${reference} (from ${path})`);
     }
   }
 }
@@ -135,9 +125,7 @@ function crc32(buffer) {
   let crc = 0xffffffff;
   for (const byte of buffer) {
     crc ^= byte;
-    for (let bit = 0; bit < 8; bit += 1) {
-      crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
-    }
+    for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
   }
   return (crc ^ 0xffffffff) >>> 0;
 }
@@ -163,7 +151,6 @@ function zipArchive(entries) {
     local.writeUInt16LE(name.length, 26);
     local.writeUInt16LE(0, 28);
     locals.push(local, name, data);
-
     const central = Buffer.alloc(46);
     central.writeUInt32LE(0x02014b50, 0);
     central.writeUInt16LE(0x0314, 4);
@@ -209,9 +196,7 @@ function splitTarPath(path) {
   for (let index = parts.length - 1; index > 0; index -= 1) {
     const prefix = parts.slice(0, index).join("/");
     const name = parts.slice(index).join("/");
-    if (Buffer.byteLength(prefix) <= 155 && Buffer.byteLength(name) <= 100) {
-      return { name, prefix };
-    }
+    if (Buffer.byteLength(prefix) <= 155 && Buffer.byteLength(name) <= 100) return { name, prefix };
   }
   throw new Error(`tar path is too long: ${path}`);
 }
@@ -252,8 +237,7 @@ function tarArchive(entries) {
 }
 
 function readPackage(root) {
-  const path = join(root, "package.json");
-  const value = JSON.parse(readFileSync(path, "utf8"));
+  const value = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
   if (value.name !== "shipping-github") throw new Error("package name must be shipping-github");
   if (!/^\d+\.\d+\.\d+$/.test(value.version || "")) throw new Error("package version must be semantic x.y.z");
   return value;
@@ -285,9 +269,7 @@ export function buildDistribution({ root = process.cwd(), out = join(root, "dist
   const payloads = new Map();
   for (const path of collectRuntimeFiles(root)) {
     let content = normalizePayload(path, readFileSync(join(root, ...path.split("/"))));
-    if (path === "SKILL.md") {
-      content = Buffer.from(injectSkillMetadata(content.toString("utf8"), { version }), "utf8");
-    }
+    if (path === "SKILL.md") content = Buffer.from(injectSkillMetadata(content.toString("utf8"), { version }), "utf8");
     payloads.set(path, content);
   }
   validateReferences(payloads);
@@ -307,13 +289,11 @@ export function buildDistribution({ root = process.cwd(), out = join(root, "dist
   const manifestBuffer = Buffer.from(JSON.stringify(manifest, null, 2) + "\n", "utf8");
   const archivePayloads = new Map(payloads);
   archivePayloads.set("manifest.json", manifestBuffer);
-
   rmSync(out, { recursive: true, force: true });
   mkdirSync(out, { recursive: true });
   const unpacked = join(out, "shipping-github");
   writePayloadDirectory(unpacked, archivePayloads);
   writeFileSync(join(out, "manifest.json"), manifestBuffer);
-
   const entries = [...archivePayloads.entries()].map(([path, content]) => ({
     path: `shipping-github/${path}`,
     content,
@@ -325,11 +305,7 @@ export function buildDistribution({ root = process.cwd(), out = join(root, "dist
   const tar = tarArchive(entries);
   writeFileSync(join(out, zipName), zip);
   writeFileSync(join(out, tarName), tar);
-  const sums = [
-    [sha256(manifestBuffer), "manifest.json"],
-    [sha256(tar), tarName],
-    [sha256(zip), zipName],
-  ]
+  const sums = [[sha256(manifestBuffer), "manifest.json"], [sha256(tar), tarName], [sha256(zip), zipName]]
     .sort((left, right) => left[1].localeCompare(right[1]))
     .map(([digest, name]) => `${digest}  ${name}`)
     .join("\n") + "\n";
@@ -360,9 +336,7 @@ export function compareDirectories(first, second) {
       differences.push({ path, reason: "missing" });
       continue;
     }
-    const leftBuffer = readFileSync(join(first, ...path.split("/")));
-    const rightBuffer = readFileSync(join(second, ...path.split("/")));
-    if (!leftBuffer.equals(rightBuffer)) differences.push({ path, reason: "content" });
+    if (!readFileSync(join(first, ...path.split("/"))).equals(readFileSync(join(second, ...path.split("/"))))) differences.push({ path, reason: "content" });
   }
   return differences;
 }
@@ -375,9 +349,7 @@ function semverParts(value) {
 function compareVersions(left, right) {
   const a = semverParts(left);
   const b = semverParts(right);
-  for (let index = 0; index < 3; index += 1) {
-    if (a[index] !== b[index]) return a[index] < b[index] ? -1 : 1;
-  }
+  for (let index = 0; index < 3; index += 1) if (a[index] !== b[index]) return a[index] < b[index] ? -1 : 1;
   return 0;
 }
 
@@ -392,29 +364,15 @@ export function planInstallation({ source, target, allowDowngrade = false, force
   source = resolve(source);
   target = resolve(target);
   const sourcePackage = installedPackage(source);
-  if (!existsSync(target)) {
-    return { action: "install", allowed: true, source, target, sourceVersion: sourcePackage.version, targetVersion: null };
-  }
+  if (!existsSync(target)) return { action: "install", allowed: true, source, target, sourceVersion: sourcePackage.version, targetVersion: null };
   const info = lstatSync(target);
-  if (info.isSymbolicLink()) {
-    return { action: "replace-symlink", allowed: force, source, target, sourceVersion: sourcePackage.version, targetVersion: null };
-  }
-  if (!info.isDirectory()) {
-    return { action: "conflict", allowed: false, source, target, sourceVersion: sourcePackage.version, targetVersion: null };
-  }
+  if (info.isSymbolicLink()) return { action: "replace-symlink", allowed: force, source, target, sourceVersion: sourcePackage.version, targetVersion: null };
+  if (!info.isDirectory()) return { action: "conflict", allowed: false, source, target, sourceVersion: sourcePackage.version, targetVersion: null };
   let targetPackage;
-  try {
-    targetPackage = installedPackage(target);
-  } catch {
-    return { action: "conflict", allowed: false, source, target, sourceVersion: sourcePackage.version, targetVersion: null };
-  }
+  try { targetPackage = installedPackage(target); } catch { return { action: "conflict", allowed: false, source, target, sourceVersion: sourcePackage.version, targetVersion: null }; }
   const comparison = compareVersions(sourcePackage.version, targetPackage.version);
-  if (comparison > 0) {
-    return { action: "upgrade", allowed: true, source, target, sourceVersion: sourcePackage.version, targetVersion: targetPackage.version };
-  }
-  if (comparison < 0) {
-    return { action: "downgrade", allowed: allowDowngrade, source, target, sourceVersion: sourcePackage.version, targetVersion: targetPackage.version };
-  }
+  if (comparison > 0) return { action: "upgrade", allowed: true, source, target, sourceVersion: sourcePackage.version, targetVersion: targetPackage.version };
+  if (comparison < 0) return { action: "downgrade", allowed: allowDowngrade, source, target, sourceVersion: sourcePackage.version, targetVersion: targetPackage.version };
   return { action: "same-version", allowed: force, source, target, sourceVersion: sourcePackage.version, targetVersion: targetPackage.version };
 }
 
@@ -425,26 +383,16 @@ export function applyInstallation({ source, target, backupRoot, allowDowngrade =
   if (existsSync(plan.target)) {
     const root = resolve(backupRoot || join(dirname(plan.target), ".shipping-github-backups"));
     mkdirSync(root, { recursive: true });
-    const suffix = `${Date.now()}-${plan.targetVersion || "unknown"}`;
-    backupPath = join(root, `shipping-github-${suffix}`);
+    backupPath = join(root, `shipping-github-${Date.now()}-${plan.targetVersion || "unknown"}`);
     renameSync(plan.target, backupPath);
   }
-  try {
-    cpSync(plan.source, plan.target, { recursive: true, errorOnExist: true, force: false });
-  } catch (error) {
+  try { cpSync(plan.source, plan.target, { recursive: true, errorOnExist: true, force: false }); }
+  catch (error) {
     rmSync(plan.target, { recursive: true, force: true });
     if (backupPath && existsSync(backupPath)) renameSync(backupPath, plan.target);
     throw error;
   }
-  return {
-    schemaVersion: 1,
-    kind: "shipping-github/install-receipt",
-    action: plan.action,
-    sourceVersion: plan.sourceVersion,
-    previousVersion: plan.targetVersion,
-    target: plan.target,
-    backupPath,
-  };
+  return { schemaVersion: 1, kind: "shipping-github/install-receipt", action: plan.action, sourceVersion: plan.sourceVersion, previousVersion: plan.targetVersion, target: plan.target, backupPath };
 }
 
 export function restoreBackup({ backup, target } = {}) {
