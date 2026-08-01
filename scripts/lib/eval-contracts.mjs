@@ -62,7 +62,7 @@ function validateCase(row, root, seenIds, errors) {
     }
   }
   for (const assertion of item.assertion_ids || []) {
-    if (!/^[a-z0-9][a-z0-9-]*$/.test(assertion)) {
+    if (!/^[A-Za-z0-9][A-Za-z0-9-]*$/.test(assertion)) {
       errors.push({ code: "invalid_assertion_id", id: item.id, assertion });
     }
   }
