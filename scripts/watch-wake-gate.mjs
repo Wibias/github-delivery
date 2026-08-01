@@ -1,70 +1,56 @@
 #!/usr/bin/env node
 /**
- * Watch wake gate: block idle/"waiting for CI/CodeRabbit" while work remains.
+ * Block idle/waiting while trusted feedback or base-state work remains.
+ * Usage: node scripts/watch-wake-gate.mjs OWNER/REPO PR_NUMBER
  *
- * Usage:
- *   node scripts/watch-wake-gate.mjs OWNER/REPO PR_NUMBER
- *
- * Exit 0 → may idle on CI/bots (owner comments cleared by a real commit; not DIRTY).
- * Exit 1 → must act (do NOT report waiting). See blockers[].
- * Exit 2 → usage / gh error.
- *
- * Trusted-human top-level comments clear ONLY via a later **non-merge** commit
- * on the PR head. A chatty
- *   [shipping-github] Addressed owner feedback — …
- * comment alone does **not** clear (that was gamed: ack + idle on conflicts).
- * Post the ACK *after* the fix commit if you want a paper trail.
- *
- * Also blocks when mergeStateStatus is DIRTY / CONFLICTING / BEHIND — update
- * from base / resolve; do not poll while conflicted.
+ * Exit 0: waiting is allowed
+ * Exit 1: known work remains
+ * Exit 2: evidence is incomplete or the command failed
  */
 import { spawnSync } from "node:child_process";
+import { collectPaginated } from "./lib/github-pagination.mjs";
+import {
+  findUnaddressedFeedback,
+  normalizeFeedback,
+} from "./lib/watch-feedback.mjs";
 
 const [repo, prRaw] = process.argv.slice(2);
-if (!repo || !prRaw || !repo.includes("/")) {
+const pr = Number(prRaw);
+if (!repo || !repo.includes("/") || !Number.isInteger(pr) || pr <= 0) {
   console.error("Usage: node scripts/watch-wake-gate.mjs OWNER/REPO PR_NUMBER");
   process.exit(2);
 }
-
-const pr = Number(prRaw);
 const [owner, name] = repo.split("/");
-
-function ghJson(args) {
-  const r = spawnSync("gh", args, {
-    encoding: "utf8",
-    maxBuffer: 20 * 1024 * 1024,
-  });
-  if (r.status !== 0) {
-    const err = (r.stderr || r.stdout || "").trim();
-    throw new Error(err || `gh failed (${r.status})`);
-  }
-  const out = (r.stdout || "").trim();
-  return out ? JSON.parse(out) : null;
-}
-
-function ghText(args) {
-  const r = spawnSync("gh", args, {
-    encoding: "utf8",
-    maxBuffer: 20 * 1024 * 1024,
-  });
-  if (r.status !== 0) {
-    const err = (r.stderr || r.stdout || "").trim();
-    throw new Error(err || `gh failed (${r.status})`);
-  }
-  return (r.stdout || "").trim();
-}
-
-const TRUSTED = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
-const BOT_RE = /\[bot\]$/i;
-const AGENT_PREFIX_RE = /^#{0,3}\s*\[shipping-github\]/i;
-const ACK_RE = /\[shipping-github\]\s*Addressed owner feedback/i;
-const MERGE_COMMIT_RE =
-  /^(Merge (branch|remote-tracking|pull request)|merge .* into |chore:\s*merge\b)/i;
 const DIRTY_STATES = new Set(["DIRTY", "CONFLICTING", "BEHIND"]);
 
-function isBotLogin(login) {
-  if (!login) return true;
-  return BOT_RE.test(login) || login === "github-actions";
+function ghOk(args) {
+  const result = spawnSync("gh", args, {
+    encoding: "utf8",
+    maxBuffer: 20 * 1024 * 1024,
+  });
+  return {
+    ok: result.status === 0,
+    body: result.stdout || "",
+    error: (result.stderr || result.stdout || "").trim() || null,
+  };
+}
+
+function ghJson(args) {
+  const result = ghOk(args);
+  if (!result.ok) throw new Error(result.error || "gh failed");
+  return JSON.parse(result.body || "null");
+}
+
+function fetchCollection(path, label) {
+  return collectPaginated({
+    label,
+    fetchPage(page) {
+      return ghOk([
+        "api",
+        `${path}${path.includes("?") ? "&" : "?"}per_page=100&page=${page}`,
+      ]);
+    },
+  });
 }
 
 try {
@@ -77,95 +63,132 @@ try {
     "--json",
     "url,headRefOid,commits,mergeStateStatus,mergeable,baseRefName",
   ]);
+  const loginResult = ghOk(["api", "user", "--jq", ".login"]);
+  const myLogin = loginResult.ok ? loginResult.body.trim() : null;
 
-  const myLogin = ghText(["api", "user", "--jq", ".login"]);
+  const issueComments = fetchCollection(
+    `repos/${owner}/${name}/issues/${pr}/comments`,
+    "issue comments",
+  );
+  const reviewComments = fetchCollection(
+    `repos/${owner}/${name}/pulls/${pr}/comments`,
+    "review comments",
+  );
+  const reviews = fetchCollection(
+    `repos/${owner}/${name}/pulls/${pr}/reviews`,
+    "review submissions",
+  );
 
-  const issueComments = ghJson([
-    "api",
-    `repos/${owner}/${name}/issues/${pr}/comments?per_page=100`,
-  ]);
-
-  const commits = (meta.commits || []).map((c) => ({
-    oid: c.oid || c.commit?.oid,
-    message: (c.messageHeadline || c.commit?.messageHeadline || "").trim(),
-    authoredDate: c.committedDate || c.commit?.authoredDate || c.authoredDate,
+  const commits = (meta.commits || []).map((commit) => ({
+    oid: commit.oid || commit.commit?.oid,
+    message: String(
+      commit.messageHeadline || commit.commit?.messageHeadline || "",
+    ).trim(),
+    authoredDate:
+      commit.committedDate ||
+      commit.commit?.authoredDate ||
+      commit.authoredDate ||
+      null,
   }));
 
-  const comments = (Array.isArray(issueComments) ? issueComments : []).map((c) => ({
-    id: c.id,
-    url: c.html_url,
-    login: c.user?.login,
-    association: c.author_association,
-    createdAt: c.created_at,
-    body: c.body || "",
-  }));
+  const feedback = [
+    ...issueComments.rows.map((row) =>
+      normalizeFeedback(row, "issue_comment"),
+    ),
+    ...reviewComments.rows.map((row) =>
+      normalizeFeedback(row, "review_comment"),
+    ),
+    ...reviews.rows.map((row) =>
+      normalizeFeedback(row, "review_submission"),
+    ),
+  ];
+  const unaddressed = findUnaddressedFeedback({
+    feedback,
+    commits,
+    myLogin,
+  });
 
   const blockers = [];
-
   const mergeState = meta.mergeStateStatus || "";
   if (DIRTY_STATES.has(mergeState) || meta.mergeable === "CONFLICTING") {
     blockers.push({
-      id: null,
-      author: null,
-      association: null,
-      createdAt: null,
+      key: "base-state",
+      kind: "merge_state",
       url: meta.url,
-      excerpt: `mergeStateStatus=${mergeState} mergeable=${meta.mergeable}`,
       reason: "base_dirty_or_behind",
-      howToClear: `Update from base \`${meta.baseRefName || "base"}\`, resolve conflicts, drop work already on tip if owner said it landed elsewhere, push a non-merge fix commit. Do not idle while DIRTY.`,
+      excerpt: `mergeStateStatus=${mergeState} mergeable=${meta.mergeable}`,
+      howToClear: `Update from base ${meta.baseRefName || "base"} and resolve conflicts before waiting.`,
     });
   }
 
-  const trusted = comments.filter((c) => {
-    if (!TRUSTED.has(c.association)) return false;
-    if (isBotLogin(c.login)) return false;
-    if (myLogin && c.login === myLogin) return false;
-    if (AGENT_PREFIX_RE.test(c.body.trim())) return false;
-    if (ACK_RE.test(c.body)) return false;
-    if (c.body.trim().length < 40) return false;
-    return true;
-  });
-
-  for (const c of trusted) {
-    const t = Date.parse(c.createdAt);
-    const laterNonMergeCommit = commits.some((commit) => {
-      if (!commit.authoredDate) return false;
-      if (Date.parse(commit.authoredDate) <= t) return false;
-      if (MERGE_COMMIT_RE.test(commit.message || "")) return false;
-      return Boolean((commit.message || "").trim());
-    });
-    if (laterNonMergeCommit) continue;
+  for (const comment of unaddressed) {
     blockers.push({
-      id: c.id,
-      author: c.login,
-      association: c.association,
-      createdAt: c.createdAt,
-      url: c.url,
-      excerpt: c.body.replace(/\s+/g, " ").slice(0, 220),
-      reason: "trusted_human_comment_needs_code",
+      key: comment.key,
+      id: comment.id,
+      kind: comment.kind,
+      author: comment.login,
+      association: comment.association,
+      createdAt: comment.createdAt,
+      url: comment.url,
+      path: comment.path,
+      line: comment.line,
+      excerpt: comment.body.replace(/\s+/g, " ").slice(0, 220),
+      reason: "trusted_human_feedback_needs_code",
       howToClear:
-        "Act on the feedback in code (non-merge commit): rebase/drop overlap already on tip, keep leftover work, fix conflicts. Optional after push: [shipping-github] Addressed owner feedback — <one line>. ACK-only does NOT clear this gate.",
+        "Address the feedback in a later non-merge commit. An acknowledgement comment alone does not clear the gate.",
     });
   }
 
-  const result = {
+  const sources = {
+    issueCommentsReadable: issueComments.readable,
+    issueCommentsComplete: issueComments.complete,
+    issueCommentsPages: issueComments.pages,
+    issueCommentsError: issueComments.error,
+    reviewCommentsReadable: reviewComments.readable,
+    reviewCommentsComplete: reviewComments.complete,
+    reviewCommentsPages: reviewComments.pages,
+    reviewCommentsError: reviewComments.error,
+    reviewsReadable: reviews.readable,
+    reviewsComplete: reviews.complete,
+    reviewsPages: reviews.pages,
+    reviewsError: reviews.error,
+  };
+  const complete =
+    issueComments.complete && reviewComments.complete && reviews.complete;
+  if (!complete) {
+    blockers.push({
+      key: "feedback-data",
+      kind: "evidence",
+      url: meta.url,
+      reason: "feedback_data_incomplete",
+      excerpt: "One or more feedback sources could not be read completely.",
+      howToClear: "Restore API access and rerun the wake gate.",
+    });
+  }
+
+  const output = {
+    schemaVersion: 1,
     repo,
     pr,
     url: meta.url,
     headRefOid: meta.headRefOid,
     mergeStateStatus: meta.mergeStateStatus,
     mergeable: meta.mergeable,
-    canWait: blockers.length === 0,
+    complete,
+    canWait: complete && blockers.length === 0,
     blockerCount: blockers.length,
     blockers,
-    note: blockers.length
-      ? "Do NOT report waiting for CI/CodeRabbit. Fix blockers (code + base), not ACK-only."
-      : "Wake gate clear — CI/bot wait allowed.",
+    feedbackCount: feedback.length,
+    sources,
+    note:
+      complete && blockers.length === 0
+        ? "Wake gate clear: CI or bot waiting is allowed."
+        : "Do not report waiting while feedback, base-state, or evidence blockers remain.",
   };
 
-  process.stdout.write(JSON.stringify(result, null, 2) + "\n");
-  process.exit(blockers.length ? 1 : 0);
-} catch (e) {
-  console.error(String(e?.message || e));
+  process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
+  process.exitCode = !complete ? 2 : blockers.length ? 1 : 0;
+} catch (error) {
+  console.error(String(error?.message || error));
   process.exit(2);
 }
