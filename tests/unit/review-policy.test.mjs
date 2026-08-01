@@ -2,10 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  evaluatePolicyDataCompleteness,
   evaluateReviewPolicy,
   maxRequiredApprovalCount,
   parseReviewThreadArgs,
-  reduceEffectiveReviews,
+  summarizeLatestOpinionatedReviews,
 } from "../../scripts/lib/review-policy.mjs";
 
 function review(login, state, submittedAt, commit = "head") {
@@ -48,52 +49,58 @@ test("review-threads rejects a missing resolve value", () => {
   );
 });
 
-test("a later approval supersedes the same reviewer's change request", () => {
-  const effective = reduceEffectiveReviews([
-    review("alice", "CHANGES_REQUESTED", "2026-07-31T10:00:00Z", "old"),
-    review("alice", "APPROVED", "2026-07-31T11:00:00Z", "head"),
+test("latest opinionated reviews are summarized without replaying history", () => {
+  const summary = summarizeLatestOpinionatedReviews([
+    review("alice", "APPROVED", "2026-07-31T11:00:00Z"),
+    review("bob", "CHANGES_REQUESTED", "2026-07-31T12:00:00Z"),
+    review("carol", "DISMISSED", "2026-07-31T13:00:00Z"),
   ]);
 
-  assert.equal(effective.length, 1);
-  assert.equal(effective[0].state, "APPROVED");
+  assert.deepEqual(
+    summary.approvals.map((item) => item.author.login),
+    ["alice"],
+  );
+  assert.deepEqual(
+    summary.changesRequested.map((item) => item.author.login),
+    ["bob"],
+  );
 });
 
-test("a comment does not erase an existing approval", () => {
-  const effective = reduceEffectiveReviews([
-    review("alice", "APPROVED", "2026-07-31T10:00:00Z"),
-    review("alice", "COMMENTED", "2026-07-31T11:00:00Z"),
-  ]);
+test("GitHub reviewDecision stays authoritative over diagnostic review rows", () => {
+  const result = evaluateReviewPolicy({
+    reviewDecision: "APPROVED",
+    requiresApprovingReviews: true,
+    requiredApprovalCount: 1,
+    latestOpinionatedReviews: [
+      review("alice", "CHANGES_REQUESTED", "2026-07-31T10:00:00Z"),
+    ],
+  });
 
-  assert.equal(effective.length, 1);
-  assert.equal(effective[0].state, "APPROVED");
+  assert.deepEqual(result.blockers, []);
+  assert.equal(result.changesRequested.length, 1);
 });
 
-test("a dismissed review clears that reviewer's prior decision", () => {
-  const effective = reduceEffectiveReviews([
-    review("alice", "APPROVED", "2026-07-31T10:00:00Z"),
-    review("alice", "DISMISSED", "2026-07-31T11:00:00Z"),
-  ]);
-
-  assert.deepEqual(effective, []);
-});
-
-test("ordinary required approval counts block when approvals are missing", () => {
+test("ordinary required approvals block through GitHub reviewDecision", () => {
   const result = evaluateReviewPolicy({
     reviewDecision: "REVIEW_REQUIRED",
     requiresApprovingReviews: true,
     requiredApprovalCount: 2,
-    reviews: [review("alice", "APPROVED", "2026-07-31T10:00:00Z")],
+    latestOpinionatedReviews: [
+      review("alice", "APPROVED", "2026-07-31T10:00:00Z"),
+    ],
   });
 
   assert.ok(result.blockers.includes("review_required"));
   assert.ok(result.blockers.includes("required_approvals_missing"));
 });
 
-test("conversation resolution policy requests the thread check without blocking by itself", () => {
+test("conversation resolution requests a thread check without blocking itself", () => {
   const result = evaluateReviewPolicy({
     reviewDecision: "APPROVED",
     requiresConversationResolution: true,
-    reviews: [review("alice", "APPROVED", "2026-07-31T10:00:00Z")],
+    latestOpinionatedReviews: [
+      review("alice", "APPROVED", "2026-07-31T10:00:00Z"),
+    ],
   });
 
   assert.equal(result.conversationResolutionCheckRequired, true);
@@ -104,25 +111,104 @@ test("last-push approval relies on GitHub's current review decision", () => {
   const blocked = evaluateReviewPolicy({
     reviewDecision: "REVIEW_REQUIRED",
     requireLastPushApproval: true,
-    reviews: [review("alice", "APPROVED", "2026-07-31T10:00:00Z", "old")],
+    latestOpinionatedReviews: [
+      review("alice", "APPROVED", "2026-07-31T10:00:00Z", "old"),
+    ],
   });
   assert.ok(blocked.blockers.includes("last_push_approval_needed"));
 
   const clear = evaluateReviewPolicy({
     reviewDecision: "APPROVED",
     requireLastPushApproval: true,
-    reviews: [review("alice", "APPROVED", "2026-07-31T11:00:00Z", "head")],
+    latestOpinionatedReviews: [
+      review("alice", "APPROVED", "2026-07-31T11:00:00Z", "head"),
+    ],
   });
   assert.deepEqual(clear.blockers, []);
 });
 
-test("required approval count uses the strictest active source", () => {
+test("classic branch patterns are not combined as cumulative policy", () => {
   assert.equal(
     maxRequiredApprovalCount({
-      matchingRules: [{ requiredApprovingReviewCount: 1 }],
-      restProtection: { requiredApprovingReviewCount: 2 },
-      rulesetPullRequest: [{ required_approving_review_count: 3 }],
+      matchingRules: [
+        { pattern: "main", requiredApprovingReviewCount: 1 },
+        { pattern: "*", requiredApprovingReviewCount: 3 },
+      ],
+      restProtection: { requiredApprovingReviewCount: 1 },
+      activePullRequestRules: [],
+    }),
+    1,
+  );
+});
+
+test("active rulesets remain cumulative with the effective classic rule", () => {
+  assert.equal(
+    maxRequiredApprovalCount({
+      restProtection: { requiredApprovingReviewCount: 1 },
+      activePullRequestRules: [
+        { required_approving_review_count: 2 },
+        { required_approving_review_count: 3 },
+      ],
     }),
     3,
   );
+});
+
+test("unreadable active rules fail policy completeness closed", () => {
+  const result = evaluatePolicyDataCompleteness({
+    branchProtectionGraphqlComplete: true,
+    matchingClassicRuleCount: 0,
+    classicProtectionReadable: false,
+    activeRulesComplete: false,
+  });
+
+  assert.equal(result.complete, false);
+  assert.ok(result.reasons.includes("active_rules_incomplete"));
+});
+
+test("an expected classic rule must have a readable effective response", () => {
+  const result = evaluatePolicyDataCompleteness({
+    branchProtectionGraphqlComplete: true,
+    matchingClassicRuleCount: 2,
+    classicProtectionReadable: false,
+    activeRulesComplete: true,
+  });
+
+  assert.equal(result.complete, false);
+  assert.ok(
+    result.reasons.includes("effective_classic_protection_unreadable"),
+  );
+});
+
+test("no classic match does not require a readable classic response", () => {
+  const result = evaluatePolicyDataCompleteness({
+    branchProtectionGraphqlComplete: true,
+    matchingClassicRuleCount: 0,
+    classicProtectionReadable: false,
+    activeRulesComplete: true,
+  });
+
+  assert.deepEqual(result, { complete: true, reasons: [] });
+});
+
+test("truncated classic rule diagnostics fail closed", () => {
+  const result = evaluatePolicyDataCompleteness({
+    branchProtectionGraphqlComplete: false,
+    matchingClassicRuleCount: 0,
+    classicProtectionReadable: false,
+    activeRulesComplete: true,
+  });
+
+  assert.equal(result.complete, false);
+  assert.ok(result.reasons.includes("classic_branch_rules_incomplete"));
+});
+
+test("missing reviewDecision fails closed when reviews are required", () => {
+  const result = evaluateReviewPolicy({
+    reviewDecision: null,
+    requiresApprovingReviews: true,
+    requiredApprovalCount: 1,
+  });
+
+  assert.ok(result.blockers.includes("review_decision_unknown"));
 });
