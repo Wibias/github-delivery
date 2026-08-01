@@ -62,8 +62,9 @@ function matchesExpected(check, expected) {
 }
 
 function evaluation({ state, code, message, checks, expectedChecks, runs, missingChecks = [], pendingChecks = [], failedChecks = [] }) {
+  const expectedWorkflows = uniqueSorted(expectedChecks.map((check) => check.workflow));
   const observedWorkflows = uniqueSorted(checks.map((check) => check.workflow));
-  const missingWorkflows = DEFAULT_EXPECTED_WORKFLOWS.filter((workflow) => !observedWorkflows.includes(workflow));
+  const missingWorkflows = expectedWorkflows.filter((workflow) => !observedWorkflows.includes(workflow));
   return {
     state,
     code,
@@ -76,7 +77,7 @@ function evaluation({ state, code, message, checks, expectedChecks, runs, missin
     summary: state === "ready" ? {
       conclusion: "success",
       count: checks.length,
-      expectedWorkflows: [...DEFAULT_EXPECTED_WORKFLOWS],
+      expectedWorkflows,
       expectedChecks: expectedChecks.map(checkLabel),
       observedWorkflows,
       checks,
