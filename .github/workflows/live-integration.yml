@@ -50,11 +50,12 @@ jobs:
         id: credential
         env:
           GH_TOKEN: ${{ secrets.LIVE_FIXTURE_TOKEN }}
-        run: >-
-          node scripts/verify-live-fixture-token.mjs
-          "${GITHUB_REPOSITORY}"
-          --base "main"
-          | tee live-fixture-credential.json
+        run: |
+          set -o pipefail
+          node scripts/verify-live-fixture-token.mjs \
+            "${GITHUB_REPOSITORY}" \
+            --base "main" \
+            | tee live-fixture-credential.json
 
       - name: Exercise live GitHub lifecycle
         timeout-minutes: 20
