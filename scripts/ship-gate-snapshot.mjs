@@ -7,6 +7,7 @@
 import { Buffer } from "node:buffer";
 import { spawnSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
+import { assembleSnapshotCapture } from "./lib/snapshot-capture-payload.mjs";
 import { collectPaginated } from "./lib/github-pagination.mjs";
 import { createSnapshotEnvelope } from "./lib/snapshot-schema.mjs";
 
@@ -59,6 +60,10 @@ function ghJson(args) {
   } catch {
     throw new Error(`gh returned invalid JSON: ${args.join(" ")}`);
   }
+}
+
+function isNotFound(error) {
+  return /(?:HTTP\s+404|Not Found)/i.test(String(error || ""));
 }
 
 function restCollection(path, label, unwrap = (payload) => payload) {
@@ -199,39 +204,386 @@ function reviewThreads(owner, name, pr) {
 }
 
 function fetchCodeowners(owner, name, ref) {
+  let source = {
+    readable: true,
+    complete: true,
+    path: null,
+    text: null,
+    error: null,
+  };
   for (const path of [".github/CODEOWNERS", "CODEOWNERS", "docs/CODEOWNERS"]) {
     const response = ghOk([
       "api",
       `repos/${owner}/${name}/contents/${path}?ref=${encodeURIComponent(ref)}`,
     ]);
-    if (!response.ok) continue;
+    if (!response.ok) {
+      if (isNotFound(response.error)) continue;
+      source = {
+        readable: false,
+        complete: false,
+        path,
+        text: null,
+        error: response.error || "CODEOWNERS request failed",
+      };
+      break;
+    }
     try {
       const payload = JSON.parse(response.body);
       if (payload?.content) {
-        return {
+        source = {
           readable: true,
           complete: true,
           path,
           text: Buffer.from(payload.content, "base64").toString("utf8"),
           error: null,
         };
+        break;
       }
     } catch {
-      return {
+      source = {
         readable: false,
         complete: false,
         path,
         text: null,
         error: "CODEOWNERS returned invalid JSON",
       };
+      break;
+    }
+  }
+
+  const errorsResponse = ghOk([
+    "api",
+    `repos/${owner}/${name}/codeowners/errors?ref=${encodeURIComponent(ref)}`,
+  ]);
+  if (errorsResponse.ok) {
+    try {
+      source.errors = JSON.parse(errorsResponse.body)?.errors || [];
+      source.errorsReadable = true;
+      source.errorsComplete = true;
+      source.errorsError = null;
+    } catch {
+      source.errors = [];
+      source.errorsReadable = false;
+      source.errorsComplete = false;
+      source.errorsError = "CODEOWNERS errors returned invalid JSON";
+    }
+  } else if (isNotFound(errorsResponse.error)) {
+    source.errors = [];
+    source.errorsReadable = true;
+    source.errorsComplete = true;
+    source.errorsError = null;
+  } else {
+    source.errors = [];
+    source.errorsReadable = false;
+    source.errorsComplete = false;
+    source.errorsError = errorsResponse.error || "CODEOWNERS errors request failed";
+  }
+  return source;
+}
+
+function fetchPolicy(owner, name, pr) {
+  const query = `
+    query($owner: String!, $name: String!, $number: Int!) {
+      repository(owner: $owner, name: $name) {
+        branchProtectionRules(first: 100) {
+          pageInfo { hasNextPage }
+          nodes { pattern }
+        }
+        pullRequest(number: $number) {
+          isInMergeQueue
+          isMergeQueueEnabled
+          mergeQueueEntry {
+            position
+            state
+            enqueuedAt
+            estimatedTimeToMerge
+          }
+          latestOpinionatedReviews(first: 100) {
+            pageInfo { hasNextPage }
+            nodes {
+              author { login }
+              state
+              submittedAt
+              commit { oid }
+            }
+          }
+        }
+      }
+    }`;
+  const response = ghOk([
+    "api",
+    "graphql",
+    "-f",
+    `query=${query}`,
+    "-F",
+    `owner=${owner}`,
+    "-F",
+    `name=${name}`,
+    "-F",
+    `number=${pr}`,
+  ]);
+  if (!response.ok) {
+    return {
+      readable: false,
+      complete: false,
+      branchProtectionRules: { pageInfo: { hasNextPage: true }, nodes: [] },
+      latestOpinionatedReviews: { pageInfo: { hasNextPage: true }, nodes: [] },
+      mergeQueue: null,
+      error: response.error || "policy GraphQL request failed",
+    };
+  }
+  let payload;
+  try {
+    payload = JSON.parse(response.body);
+  } catch {
+    return {
+      readable: false,
+      complete: false,
+      branchProtectionRules: { pageInfo: { hasNextPage: true }, nodes: [] },
+      latestOpinionatedReviews: { pageInfo: { hasNextPage: true }, nodes: [] },
+      mergeQueue: null,
+      error: "policy GraphQL returned invalid JSON",
+    };
+  }
+  if (payload.errors?.length) {
+    return {
+      readable: false,
+      complete: false,
+      branchProtectionRules: { pageInfo: { hasNextPage: true }, nodes: [] },
+      latestOpinionatedReviews: { pageInfo: { hasNextPage: true }, nodes: [] },
+      mergeQueue: null,
+      error: JSON.stringify(payload.errors),
+    };
+  }
+  const repository = payload.data?.repository;
+  const pullRequest = repository?.pullRequest;
+  if (!repository || !pullRequest) {
+    return {
+      readable: false,
+      complete: false,
+      branchProtectionRules: { pageInfo: { hasNextPage: true }, nodes: [] },
+      latestOpinionatedReviews: { pageInfo: { hasNextPage: true }, nodes: [] },
+      mergeQueue: null,
+      error: "policy GraphQL returned an unexpected payload",
+    };
+  }
+  const branchProtectionRules = repository.branchProtectionRules || {
+    pageInfo: { hasNextPage: true },
+    nodes: [],
+  };
+  const latestOpinionatedReviews = pullRequest.latestOpinionatedReviews || {
+    pageInfo: { hasNextPage: true },
+    nodes: [],
+  };
+  const complete =
+    branchProtectionRules.pageInfo?.hasNextPage !== true &&
+    latestOpinionatedReviews.pageInfo?.hasNextPage !== true;
+  return {
+    readable: true,
+    complete,
+    branchProtectionRules,
+    latestOpinionatedReviews,
+    mergeQueue: {
+      enabled: pullRequest.isMergeQueueEnabled === true,
+      inQueue: pullRequest.isInMergeQueue === true,
+      entry: pullRequest.mergeQueueEntry || null,
+    },
+    error: complete ? null : "policy GraphQL pagination incomplete",
+  };
+}
+
+function patternMatchesBranch(pattern, branch) {
+  if (!pattern) return false;
+  if (pattern === branch) return true;
+  const expression = String(pattern)
+    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+    .replace(/\*\*/g, "<<<STARSTAR>>>")
+    .replace(/\*/g, "[^/]*")
+    .replace(/<<<STARSTAR>>>/g, ".*");
+  return new RegExp(`^${expression}$`).test(branch);
+}
+
+function fetchBranchProtection(owner, name, base, policy) {
+  const matchingCount = (policy.branchProtectionRules?.nodes || []).filter((rule) =>
+    patternMatchesBranch(rule?.pattern, base),
+  ).length;
+  const response = ghOk([
+    "api",
+    `repos/${owner}/${name}/branches/${encodeURIComponent(base)}/protection`,
+  ]);
+  if (response.ok) {
+    try {
+      return {
+        required: matchingCount > 0,
+        readable: true,
+        complete: true,
+        payload: JSON.parse(response.body),
+        error: null,
+      };
+    } catch {
+      return {
+        required: matchingCount > 0,
+        readable: false,
+        complete: false,
+        payload: null,
+        error: "branch protection returned invalid JSON",
+      };
+    }
+  }
+  if (matchingCount === 0) {
+    return {
+      required: false,
+      readable: true,
+      complete: true,
+      payload: null,
+      error: null,
+    };
+  }
+  return {
+    required: true,
+    readable: false,
+    complete: false,
+    payload: null,
+    error: response.error || "branch protection request failed",
+  };
+}
+
+function scanTargetWorkflows(owner, name, base, mergeQueueEnabled) {
+  const listing = ghOk([
+    "api",
+    `repos/${owner}/${name}/contents/.github/workflows?ref=${encodeURIComponent(base)}`,
+  ]);
+  if (!listing.ok) {
+    if (isNotFound(listing.error)) {
+      return {
+        readable: true,
+        complete: true,
+        scannedRef: base,
+        workflowFiles: 0,
+        hasMergeGroupTrigger: false,
+        hasPullRequestTrigger: false,
+        warning: mergeQueueEnabled
+          ? "Merge queue is enabled, but the base has no workflow directory."
+          : null,
+        error: null,
+      };
+    }
+    return {
+      readable: false,
+      complete: false,
+      scannedRef: base,
+      workflowFiles: 0,
+      hasMergeGroupTrigger: null,
+      hasPullRequestTrigger: null,
+      warning: null,
+      error: listing.error || "workflow listing request failed",
+    };
+  }
+
+  let entries;
+  try {
+    entries = JSON.parse(listing.body);
+  } catch {
+    return {
+      readable: false,
+      complete: false,
+      scannedRef: base,
+      workflowFiles: 0,
+      hasMergeGroupTrigger: null,
+      hasPullRequestTrigger: null,
+      warning: null,
+      error: "workflow listing returned invalid JSON",
+    };
+  }
+  if (!Array.isArray(entries)) {
+    return {
+      readable: false,
+      complete: false,
+      scannedRef: base,
+      workflowFiles: 0,
+      hasMergeGroupTrigger: null,
+      hasPullRequestTrigger: null,
+      warning: null,
+      error: "workflow listing returned an unexpected payload",
+    };
+  }
+
+  const files = entries.filter(
+    (entry) => entry?.type === "file" && /\.ya?ml$/i.test(entry.name || ""),
+  );
+  let hasMergeGroupTrigger = false;
+  let hasPullRequestTrigger = false;
+  for (const entry of files) {
+    const response = ghOk([
+      "api",
+      `repos/${owner}/${name}/contents/${entry.path
+        .split("/")
+        .map(encodeURIComponent)
+        .join("/")}?ref=${encodeURIComponent(base)}`,
+    ]);
+    if (!response.ok) {
+      return {
+        readable: false,
+        complete: false,
+        scannedRef: base,
+        workflowFiles: files.length,
+        hasMergeGroupTrigger,
+        hasPullRequestTrigger,
+        warning: null,
+        error: response.error || `workflow ${entry.path} could not be read`,
+      };
+    }
+    try {
+      const payload = JSON.parse(response.body);
+      const text = Buffer.from(payload.content || "", "base64").toString("utf8");
+      if (/\bmerge_group\b/.test(text)) hasMergeGroupTrigger = true;
+      if (/\bpull_request(?:_target)?\b/.test(text)) {
+        hasPullRequestTrigger = true;
+      }
+    } catch {
+      return {
+        readable: false,
+        complete: false,
+        scannedRef: base,
+        workflowFiles: files.length,
+        hasMergeGroupTrigger,
+        hasPullRequestTrigger,
+        warning: null,
+        error: `workflow ${entry.path} returned invalid JSON`,
+      };
     }
   }
   return {
     readable: true,
     complete: true,
-    path: null,
-    text: null,
+    scannedRef: base,
+    workflowFiles: files.length,
+    hasMergeGroupTrigger,
+    hasPullRequestTrigger,
+    warning:
+      mergeQueueEnabled && !hasMergeGroupTrigger
+        ? "Merge queue enabled but no target-base workflow mentions merge_group; queue checks may stall."
+        : null,
     error: null,
+  };
+}
+
+function fetchViewer() {
+  const response = ghOk(["api", "user", "--jq", ".login"]);
+  if (!response.ok) {
+    return {
+      readable: false,
+      complete: false,
+      login: null,
+      error: response.error || "viewer request failed",
+    };
+  }
+  const login = response.body.trim();
+  return {
+    readable: Boolean(login),
+    complete: Boolean(login),
+    login: login || null,
+    error: login ? null : "viewer login was empty",
   };
 }
 
@@ -282,121 +634,41 @@ try {
     "review submissions",
   );
   const threads = reviewThreads(owner, name, pr);
-
-  const protectionResponse = ghOk([
-    "api",
-    `repos/${owner}/${name}/branches/${encodeURIComponent(base)}/protection`,
-  ]);
-  let branchProtection = null;
-  let branchProtectionError = protectionResponse.error;
-  if (protectionResponse.ok) {
-    try {
-      branchProtection = JSON.parse(protectionResponse.body);
-      branchProtectionError = null;
-    } catch {
-      branchProtectionError = "branch protection returned invalid JSON";
-    }
-  }
+  const policy = fetchPolicy(owner, name, pr);
+  const branchProtection = fetchBranchProtection(owner, name, base, policy);
   const codeowners = fetchCodeowners(owner, name, base);
+  const workflowCoverage = scanTargetWorkflows(
+    owner,
+    name,
+    base,
+    policy.mergeQueue?.enabled === true,
+  );
+  const viewer = fetchViewer();
 
-  const sources = {
-    pr: { required: true, readable: true, complete: true, error: null },
-    changedFiles: {
-      required: true,
-      readable: changedFiles.readable,
-      complete: changedFiles.complete,
-      pages: changedFiles.pages,
-      error: changedFiles.error,
-    },
-    activeRules: {
-      required: true,
-      readable: activeRules.readable,
-      complete: activeRules.complete,
-      pages: activeRules.pages,
-      error: activeRules.error,
-    },
-    checkRuns: {
-      required: true,
-      readable: checkRuns.readable,
-      complete: checkRuns.complete,
-      pages: checkRuns.pages,
-      error: checkRuns.error,
-    },
-    statuses: {
-      required: true,
-      readable: statuses.readable,
-      complete: statuses.complete,
-      pages: statuses.pages,
-      error: statuses.error,
-    },
-    issueComments: {
-      required: true,
-      readable: issueComments.readable,
-      complete: issueComments.complete,
-      pages: issueComments.pages,
-      error: issueComments.error,
-    },
-    reviewComments: {
-      required: true,
-      readable: reviewComments.readable,
-      complete: reviewComments.complete,
-      pages: reviewComments.pages,
-      error: reviewComments.error,
-    },
-    reviews: {
-      required: true,
-      readable: reviews.readable,
-      complete: reviews.complete,
-      pages: reviews.pages,
-      error: reviews.error,
-    },
-    reviewThreads: {
-      required: true,
-      readable: threads.readable,
-      complete: threads.complete,
-      pages: threads.pages,
-      error: threads.error,
-    },
-    branchProtection: {
-      required: false,
-      readable: protectionResponse.ok,
-      complete: protectionResponse.ok || branchProtection === null,
-      error: branchProtectionError,
-    },
-    codeowners: {
-      required: false,
-      readable: codeowners.readable,
-      complete: codeowners.complete,
-      error: codeowners.error,
-    },
-  };
+  const capture = assembleSnapshotCapture({
+    prEvidence,
+    changedFiles,
+    activeRules,
+    checkRuns,
+    statuses,
+    issueComments,
+    reviewComments,
+    reviews,
+    threads,
+    branchProtection,
+    codeowners,
+    policy,
+    workflowCoverage,
+    viewer,
+  });
 
   const snapshot = createSnapshotEnvelope({
     repo,
     pr,
     headOid,
     capturedAt,
-    sources,
-    evidence: {
-      pullRequest: prEvidence,
-      changedFiles: changedFiles.rows,
-      branchProtection,
-      activeRules: activeRules.rows,
-      checks: {
-        checkRuns: checkRuns.rows,
-        statuses: statuses.rows,
-      },
-      feedback: {
-        issueComments: issueComments.rows,
-        reviewComments: reviewComments.rows,
-        reviews: reviews.rows,
-        reviewThreads: threads.rows,
-      },
-      codeowners: {
-        path: codeowners.path,
-        text: codeowners.text,
-      },
-    },
+    sources: capture.sources,
+    evidence: capture.evidence,
   });
 
   const json = `${JSON.stringify(snapshot, null, 2)}\n`;
