@@ -151,14 +151,22 @@ function adapter(tempRoot) {
 }
 
 const tempRoot = mkdtempSync(join(tmpdir(), "shipping-github-fixture-"));
+let parsedArgs = null;
 try {
-  const args = parseArgs(process.argv.slice(2));
-  const plan = buildFixturePlan(args);
+  parsedArgs = parseArgs(process.argv.slice(2));
+  const plan = buildFixturePlan(parsedArgs);
   const receipt = await runFixtureScenario(adapter(tempRoot), plan);
   const output = JSON.stringify(receipt, null, 2) + "\n";
-  if (args.receipt) writeFileSync(args.receipt, output);
+  if (parsedArgs.receipt) writeFileSync(parsedArgs.receipt, output);
   process.stdout.write(output);
 } catch (error) {
+  if (parsedArgs?.receipt && error?.fixtureReceipt) {
+    try {
+      writeFileSync(parsedArgs.receipt, JSON.stringify(error.fixtureReceipt, null, 2) + "\n");
+    } catch (receiptError) {
+      console.error(`unable to persist failure receipt: ${receiptError?.message || receiptError}`);
+    }
+  }
   console.error(String(error?.message || error));
   process.exitCode = 1;
 } finally {
