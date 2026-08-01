@@ -50,12 +50,11 @@ test("pure docs still skip both review axes", () => {
 test("Cursor full review uses Bugbot's exact required prompt fields", () => {
   const bugReview = readFileSync(new URL("../../references/bug-review.md", import.meta.url), "utf8");
   const fullReview = readFileSync(new URL("../../references/full-review-pr.md", import.meta.url), "utf8");
-  const requiredHeader = [
-    "Full Repository Path: <absolute path to the checked-out repository>",
-    "Diff: branch changes",
-  ].join("\n");
+  const promptFence = bugReview.match(
+    /```text\s*\n\s*Full Repository Path: <absolute path to the checked-out repository>\s*\n\s*Diff: branch changes\s*\n\s*```/,
+  );
 
-  assert.ok(bugReview.includes(requiredHeader), "expected the canonical two-line Bugbot prompt header");
+  assert.ok(promptFence, "expected the canonical two-line Bugbot prompt fence");
   assert.match(bugReview, /first two lines/i);
   assert.match(bugReview, /do not paraphrase/i);
   assert.match(bugReview, /Do \*\*not\*\* use `OWNER\/REPO`/);
