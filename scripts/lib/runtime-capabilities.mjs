@@ -79,7 +79,8 @@ export function buildRuntimeCapabilities({
     !tools.git && "git_unavailable",
     !github.repoReadable && "github_read_unavailable",
     !github.headWritable && "github_write_permission_unavailable",
-    github.headWritable && !github.brokerWriteAvailable &&
+    github.headWritable &&
+      !github.brokerWriteAvailable &&
       "github_write_not_brokered",
     !github.rulesetsReadable && "rulesets_unreadable",
     !github.reviewThreadsReadable && "review_threads_unreadable",
