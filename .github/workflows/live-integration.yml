@@ -1,0 +1,66 @@
+name: Live Integration
+
+on:
+  workflow_dispatch:
+    inputs:
+      disposition:
+        description: Final fixture PR action
+        required: true
+        default: close
+        type: choice
+        options:
+          - close
+          - merge
+  schedule:
+    - cron: "23 4 * * 2"
+
+concurrency:
+  group: live-integration-${{ github.repository }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  lifecycle:
+    if: github.event_name == 'workflow_dispatch' || vars.LIVE_FIXTURE_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+
+      - name: Run fixture contract tests
+        run: node --test tests/unit/live-github-fixture.test.mjs
+
+      - name: Exercise live GitHub lifecycle
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DISPOSITION: ${{ inputs.disposition || 'close' }}
+        run: >-
+          node scripts/live-github-fixture.mjs
+          "${GITHUB_REPOSITORY}"
+          --run-id "gha-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          --base "main"
+          --disposition "${DISPOSITION}"
+          --receipt live-fixture-receipt.json
+
+      - name: Upload lifecycle receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: live-fixture-${{ github.run_id }}-${{ github.run_attempt }}
+          path: live-fixture-receipt.json
+          if-no-files-found: warn
+          retention-days: 30
