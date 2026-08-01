@@ -4,41 +4,39 @@ The **Live Integration** workflow exercises the complete GitHub lifecycle agains
 
 ## Why a dedicated credential is required
 
-GitHub's workflow `GITHUB_TOKEN` can be granted contents, issues, and pull-request write permissions, but it cannot be granted the repository Administration read permission required for complete branch-protection and policy evidence.
+GitHub's workflow `GITHUB_TOKEN` can be granted contents, issues, pull-request, Actions, Checks, and commit-status permissions, but it cannot be granted the repository Administration read permission required for complete branch-protection and policy evidence.
 
 The lifecycle therefore fails before mutation unless the repository Actions secret `LIVE_FIXTURE_TOKEN` is configured and passes the non-mutating capability preflight.
 
 The ordinary workflow token remains read-only. The dedicated credential is exposed only to the preflight, lifecycle, and cleanup steps.
 
+## Current GitHub token limitation
+
+GitHub does not currently expose the **Checks** permission when creating a fine-grained personal access token. GitHub's REST endpoint pages still describe a fine-grained `Checks: read` permission, but GitHub's personal-access-token documentation lists the Checks API as an unsupported fine-grained-token use case.
+
+For this public repository, use a classic personal access token with only the `public_repo` scope for the acceptance workflow. Do not select the broader `repo` scope.
+
+A GitHub App is the preferred future option when strict single-repository scoping is required because an App can receive repository-specific Administration and Checks permissions. The classic-token path is retained here as the simplest working acceptance credential.
+
 ## Create the token
 
-Create a fine-grained personal access token under the maintainer account:
+Create a classic personal access token under the maintainer account:
 
 1. Open GitHub **Settings**.
 2. Open **Developer settings**.
-3. Open **Personal access tokens** → **Fine-grained tokens**.
-4. Choose **Generate new token**.
-5. Use a descriptive name such as `shipping-github live fixture`.
+3. Open **Personal access tokens** → **Tokens (classic)**.
+4. Choose **Generate new token (classic)**.
+5. Use a descriptive note such as `shipping-github live fixture`.
 6. Select a short expiration, such as 90 days.
-7. Set **Resource owner** to `Wibias`.
-8. Set **Repository access** to **Only select repositories**.
-9. Select only `shipping-github`.
+7. Select only the `public_repo` scope.
 
-Grant these repository permissions:
+Do not select:
 
-| Permission | Access |
-|---|---|
-| Administration | Read-only |
-| Actions | Read-only |
-| Checks | Read-only |
-| Commit statuses | Read-only |
-| Contents | Read and write |
-| Issues | Read and write |
-| Pull requests | Read and write |
+- `repo`, which includes private-repository access
+- `workflow`, because the fixture does not create or modify workflow files
+- organization, package, hook, admin, or user scopes
 
-Metadata read access is granted automatically.
-
-Do not use a classic token with broad account-wide `repo` scope when a repository-scoped fine-grained token is available.
+A classic token cannot be restricted to one repository. Limit its lifetime, store it only as the repository Actions secret, and rotate it before expiration.
 
 ## Store the token
 
@@ -47,7 +45,7 @@ In `Wibias/shipping-github`:
 1. Open **Settings** → **Secrets and variables** → **Actions**.
 2. Choose **New repository secret**.
 3. Name it exactly `LIVE_FIXTURE_TOKEN`.
-4. Paste the fine-grained token as the value.
+4. Paste the classic token as the value.
 
 The secret is not available to pull-request workflows. The Live Integration workflow runs only through manual dispatch or its explicitly enabled schedule on the default branch.
 
@@ -71,7 +69,7 @@ The verifier performs read-only probes for:
 
 A missing or under-scoped credential fails before issue, branch, or pull-request creation. The verifier never prints the credential.
 
-GitHub does not provide a reliable non-mutating probe for every write permission. The token must therefore be configured with the documented Contents, Issues, and Pull requests write permissions. Any denied write still fails the lifecycle and triggers namespaced cleanup.
+GitHub does not provide a reliable non-mutating probe for every write capability. The `public_repo` scope supplies the public-repository writes used by the fixture. Any denied write still fails the lifecycle and triggers namespaced cleanup.
 
 ## Run acceptance
 
@@ -94,4 +92,4 @@ A successful acceptance receipt has `passed: true`, records all required checks,
 
 ## Rotation
 
-Rotate the fine-grained token before expiration and immediately after suspected exposure. Replace the repository secret in place; no workflow change is required.
+Rotate the classic token before expiration and immediately after suspected exposure. Replace the repository secret in place; no workflow change is required.
