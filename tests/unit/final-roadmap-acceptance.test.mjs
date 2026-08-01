@@ -47,6 +47,21 @@ test("pure docs still skip both review axes", () => {
   assert.deepEqual(projectBugScope(reviewPlan).requiredLenses, []);
 });
 
+test("Cursor Bugbot instructions provide the exact required prompt fields", () => {
+  const bugReview = readFileSync(new URL("../../references/bug-review.md", import.meta.url), "utf8");
+  const sharedRules = readFileSync(new URL("../../references/shared-rules.md", import.meta.url), "utf8");
+  const requiredHeader = [
+    "Full Repository Path: <absolute path to the checked-out repository>",
+    "Diff: branch changes",
+  ].join("\n");
+
+  for (const source of [bugReview, sharedRules]) {
+    assert.ok(source.includes(requiredHeader), "expected the canonical two-line Bugbot prompt header");
+    assert.match(source, /first two lines/i);
+    assert.match(source, /do not paraphrase|do not replace/i);
+  }
+});
+
 test("live fixture establishes Git credentials before pushing", () => {
   const source = readFileSync(new URL("../../scripts/live-github-fixture.mjs", import.meta.url), "utf8");
   const setup = source.indexOf('run("gh", ["auth", "setup-git"]);');
