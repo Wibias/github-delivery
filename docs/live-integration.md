@@ -31,6 +31,7 @@ Grant these repository permissions:
 | Administration | Read-only |
 | Actions | Read-only |
 | Checks | Read-only |
+| Commit statuses | Read-only |
 | Contents | Read and write |
 | Issues | Read and write |
 | Pull requests | Read and write |
@@ -64,6 +65,7 @@ The verifier performs read-only probes for:
 - repository visibility
 - Actions workflow runs
 - commit check runs
+- commit statuses
 - active repository rules
 - GraphQL branch-protection rules
 
@@ -78,7 +80,7 @@ After storing the secret:
 1. Open **Actions** → **Live Integration**.
 2. Choose **Run workflow** from `main`.
 3. Keep `disposition` set to `close`.
-4. Approve the temporary fixture pull request workflows when GitHub requests approval.
+4. If GitHub requests approval for the temporary fixture pull request workflows, approve them.
 5. Confirm the lifecycle completes successfully.
 6. Download the `live-fixture-<run-id>-<attempt>` artifact.
 
