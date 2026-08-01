@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { waitForExpectedChecks } from "./lib/live-fixture-checks.mjs";
 import { parseFixtureGateResult } from "./lib/live-fixture-gate-result.mjs";
+import { waitForObservedHead } from "./lib/live-fixture-head.mjs";
 import { buildFixturePlan, runFixtureScenario } from "./lib/live-github-fixture.mjs";
 
 function parseArgs(argv) {
@@ -125,8 +126,15 @@ function adapter(tempRoot) {
       writeFileSync(plan.fixturePath, JSON.stringify({ marker: plan.marker, generation: 2 }, null, 2) + "\n");
       run("git", ["add", plan.fixturePath]);
       run("git", ["-c", "user.name=shipping-github fixture", "-c", "user.email=fixture@users.noreply.github.com", "commit", "-m", `${plan.marker} advance fixture head`]);
+      const expectedHead = run("git", ["rev-parse", "HEAD"]).stdout;
       run("git", ["push", "origin", `HEAD:refs/heads/${plan.branch}`]);
-      if (!currentHead(plan.repo, pr.number)) throw new Error("fixture head did not advance");
+      await waitForObservedHead({
+        readHead: async () => currentHead(plan.repo, pr.number),
+        expectedHead,
+        timeoutMs: Number(process.env.FIXTURE_HEAD_TIMEOUT_MS || 60 * 1000),
+        intervalMs: Number(process.env.FIXTURE_HEAD_INTERVAL_MS || 1 * 1000),
+      });
+      return { head: expectedHead };
     },
     async attemptStaleHeadMutation(plan, pr, expectedHead) {
       const path = join(tempRoot, "stale-request.json");
