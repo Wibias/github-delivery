@@ -40,10 +40,28 @@ Checkout PR head first (shared **Subagent preflight**).
 
 #### Cursor
 
-1. Launch **exactly one** `bugbot` via `review-bugbot` (`Diff: branch changes`; PR base when not default).
-2. Retry once on wrong invocation / empty diff (NL diff fallback per shared rules).
-3. If Bugbot is unavailable after that → say so in chat; continue with complementary only. **Do not** fake a Bugbot report.
-4. Then run **§2 Complementary** (additive — even if Bugbot found nothing).
+1. Launch **exactly one** `bugbot` via `review-bugbot`. The prompt's **first two lines** must be exactly:
+
+   ```text
+   Full Repository Path: <absolute path to the checked-out repository>
+   Diff: branch changes
+   ```
+
+   Replace the placeholder with the actual absolute local filesystem path after checkout. Do **not** use `OWNER/REPO`. Do not paraphrase, rename, bullet, or replace either field label. Optional PR/base context belongs only after those first two lines.
+2. For a PR whose base is not the repository default, keep the exact `Diff: branch changes` field and add `Base Reference: <base branch or merge-base>` after the required header.
+3. If the user explicitly asked for uncommitted-only review, change only the value to `Diff: uncommitted changes`; keep the `Full Repository Path:` line first.
+4. On a wrong invocation or missing-field validator error, retry **once** with the same exact two-field header.
+5. On an empty or uncomputable diff, retry **once** with:
+
+   ```text
+   Full Repository Path: <absolute path to the checked-out repository>
+   Diff: natural language
+   Change Description:
+   - <path>: <concise description of the change>
+   ```
+
+6. If Bugbot is unavailable after the one retry → say so in chat; continue with complementary only. **Do not** fake a Bugbot report.
+7. Then run **§2 Complementary** (additive — even if Bugbot found nothing).
 
 #### Claude
 

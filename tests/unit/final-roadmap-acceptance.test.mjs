@@ -47,6 +47,21 @@ test("pure docs still skip both review axes", () => {
   assert.deepEqual(projectBugScope(reviewPlan).requiredLenses, []);
 });
 
+test("Cursor full review uses Bugbot's exact required prompt fields", () => {
+  const bugReview = readFileSync(new URL("../../references/bug-review.md", import.meta.url), "utf8");
+  const fullReview = readFileSync(new URL("../../references/full-review-pr.md", import.meta.url), "utf8");
+  const promptFence = bugReview.match(
+    /```text\s*\n\s*Full Repository Path: <absolute path to the checked-out repository>\s*\n\s*Diff: branch changes\s*\n\s*```/,
+  );
+
+  assert.ok(promptFence, "expected the canonical two-line Bugbot prompt fence");
+  assert.match(bugReview, /first two lines/i);
+  assert.match(bugReview, /do not paraphrase/i);
+  assert.match(bugReview, /Do \*\*not\*\* use `OWNER\/REPO`/);
+  assert.match(fullReview, /literal `review-bugbot` prompt contract/);
+  assert.match(fullReview, /do not construct or paraphrase a replacement prompt/i);
+});
+
 test("live fixture establishes Git credentials before pushing", () => {
   const source = readFileSync(new URL("../../scripts/live-github-fixture.mjs", import.meta.url), "utf8");
   const setup = source.indexOf('run("gh", ["auth", "setup-git"]);');
