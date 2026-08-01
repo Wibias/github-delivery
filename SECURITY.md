@@ -45,6 +45,29 @@ The following are not reportable without a concrete security impact in this repo
 
 ## Reporting a vulnerability
 
-Use GitHub's **Report a vulnerability** feature for this repository when available. Otherwise contact the repository owner through a private channel listed on their GitHub profile. Do not open a public issue containing exploit steps, payloads, secrets, or other sensitive details.
+Do not open a public issue for an undisclosed vulnerability.
 
-Include the affected version or commit, impacted workflow, realistic abuse path, expected security property, and a minimal reproduction that does not expose third-party systems.
+Submit reports privately through GitHub's vulnerability reporting form:
+
+https://github.com/Wibias/shipping-github/security/advisories/new
+
+Include:
+
+- the affected version or commit
+- the impacted workflow or component
+- a realistic abuse path and impact assessment
+- the expected security property
+- minimal reproduction steps or a proof of concept that does not expose third-party systems
+- any suggested remediation, if available
+
+Do not include secrets belonging to third parties, test against systems you do not own, or publicly disclose exploit details before coordinated disclosure.
+
+## Response and disclosure timeline
+
+- We aim to acknowledge a vulnerability report within 7 days.
+- We aim to provide an initial assessment or request additional information within 14 days.
+- We will provide status updates during the investigation when meaningful progress occurs.
+- We aim to resolve confirmed vulnerabilities within 90 days, although complex fixes or coordinated dependency disclosures may require more time.
+- Public disclosure should be coordinated with the maintainer and should normally occur only after a fix or mitigation is available.
+
+If these timelines cannot be met, the reporter will be informed through the private advisory thread.

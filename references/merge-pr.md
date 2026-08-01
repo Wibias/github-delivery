@@ -49,11 +49,13 @@ Create a temporary audit file for this PR, for example `shipping-github-pr-32-mu
 
 Prepare an idempotent `post_comment` request containing:
 
+
 - `mutationMode: "maintainer"`
 - the exact repository, PR number, and current `expectedHead`
 - a stable `idempotencyKey`, such as `merge-thanks-pr-32`
 - a concrete 2–3 sentence why-it-helps comment
 - thanks to the PR author only when they are not the authenticated user
+- use the **Merge thanks** shape from `references/comment-depth.md`; keep GitHub `@mentions` bare and never backticked
 
 Run it through:
 
@@ -86,7 +88,7 @@ The broker must re-read the head before mutation and pin the merge using `--matc
 For every linked or fixed issue:
 
 1. Read the issue author and current state.
-2. Post one idempotent issue thank/fixed comment through the broker-supported social mutation path.
+2. Post one idempotent issue thank/fixed comment through the broker-supported social mutation path using the issue shape from `references/comment-depth.md`; keep the real `@login` bare and omit self-thanks.
 3. If the fix is complete and the issue remains open, execute `close_linked_issue` through the broker with explicit instruction.
 4. Leave epics or partially fixed issues open and state why.
 
@@ -107,6 +109,7 @@ Auto-close does not replace the required issue comment.
 - Partial ceremony: continue only the missing idempotent step; do not duplicate completed comments.
 - Mutation command failure: include the action, receipt or plan hash, and error; never claim success.
 - Verification mismatch: treat the mutation as unresolved until repository state confirms it.
+
 
 ## Done when
 
