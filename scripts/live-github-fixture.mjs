@@ -52,6 +52,9 @@ function adapter(tempRoot) {
       return { number: numberFromUrl(url), url };
     },
     async createBranch(plan) {
+      if (process.env.GH_TOKEN || process.env.GITHUB_TOKEN) {
+        run("gh", ["auth", "setup-git"]);
+      }
       run("git", ["fetch", "origin", plan.baseBranch]);
       run("git", ["switch", "--detach", `origin/${plan.baseBranch}`]);
       run("git", ["switch", "-C", plan.branch]);
