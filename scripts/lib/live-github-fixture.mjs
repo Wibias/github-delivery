@@ -88,6 +88,17 @@ export function evaluateFixtureReceipt(plan, events) {
   };
 }
 
+function attachFailureReceipt(error, plan, events) {
+  const failure = error instanceof Error ? error : new Error(String(error));
+  const code = String(failure.code || "fixture_lifecycle_failed");
+  const receipt = evaluateFixtureReceipt(plan, events);
+  receipt.failure = { code, message: failure.message };
+  receipt.problems.unshift(`${code}: ${failure.message}`);
+  receipt.passed = false;
+  failure.fixtureReceipt = receipt;
+  return failure;
+}
+
 export async function runFixtureScenario(adapter, options) {
   const plan = buildFixturePlan(options);
   const events = [];
@@ -125,8 +136,9 @@ export async function runFixtureScenario(adapter, options) {
     await adapter.deleteBranch(plan);
     record("branch_deleted");
   } catch (error) {
-    await adapter.bestEffortCleanup?.(plan, { issue, pr, events, error });
-    throw error;
+    const failure = attachFailureReceipt(error, plan, events);
+    await adapter.bestEffortCleanup?.(plan, { issue, pr, events, error: failure });
+    throw failure;
   }
   const receipt = evaluateFixtureReceipt(plan, events);
   if (!receipt.passed) throw new Error(receipt.problems.join("; "));
