@@ -32,6 +32,44 @@ When the user writes bare `#N` / a number list without saying “issue” or “
 
 Never use a top-level PR conversation comment as a substitute for an inline review reply.
 
+### Full-review verdict publication identity
+
+General comment idempotency does not collapse separate full-review runs into one
+comment.
+
+Each new explicit `full-review-pr` invocation is a new publication identity and
+MUST publish a new top-level PR verdict comment. This remains true when:
+
+- the PR number is unchanged;
+- the reviewed head SHA is unchanged;
+- the verdict category is unchanged;
+- an earlier `[shipping-github] Verdict` comment already exists.
+
+At the start of the full-review run, create one unique `full-review-run-id`. Keep
+that identifier unchanged while the same run waits for CI, retries tools,
+continues after compaction, or repairs an incomplete publication.
+
+Every full-review verdict comment MUST include:
+
+`<!-- shipping-github:full-review-verdict run:<full-review-run-id> head:<reviewed-head-sha> -->`
+
+Publication behavior:
+
+- no comment with the exact current run marker exists → post a new top-level PR
+  comment;
+- the exact current run marker exists and that publication is incomplete,
+  malformed, or truncated → edit that current-run comment;
+- only an older run marker exists → post a new comment;
+- only a verdict for another head exists → post a new comment;
+- a completed verdict from an earlier run is immutable historical evidence.
+
+Never choose an editable verdict merely because it is the newest
+`[shipping-github]` comment. Both the `full-review-run-id` and reviewed head must
+match.
+
+The idempotency boundary is the workflow run, not the PR number, verdict type,
+comment heading, or workflow name.
+
 ## Compose with other skills (do not reinvent)
 
 | Situation                                                              | Hand off to                                                |

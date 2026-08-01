@@ -12,7 +12,7 @@ Vague posts are a bug. Prefer **structured detail** over one-liners — still sc
 4. **Separate facts from judgment:** evidence → finding → action (fixed / declined / follow-up).
 5. **Per-axis completeness:** if a template has a section, fill it (use `none` / `n/a` with why when empty).
 6. **Security public posts stay redacted** (shared disclosure) — detail ≠ exploit steps.
-7. **Idempotent:** edit the prior `[shipping-github]` comment of the same intent; don’t spam a second vague stub.
+7. **Idempotent within one publication identity:** repair or complete the current run’s own comment instead of duplicating it. A new explicit full-review invocation is a new publication identity and MUST post a new verdict comment; never overwrite a completed verdict from an earlier full-review run.
 8. **Chat can be fuller** than GitHub for security abuse paths and long dumps.
 
 Anti-patterns (rewrite before posting):
@@ -32,18 +32,19 @@ Anti-patterns (rewrite before posting):
 **Claim:** <what the reporter asserts, in one precise sentence>
 **Checked against:** `<dev-branch>@<short-sha>` (release/default: `<branch>@<sha or n/a>`)
 
-| Field | Finding |
-|---|---|
-| Still an issue on latest development? | yes / no / unclear |
-| Exact issue | <symptom + where in code/product; cite `path` / command> |
-| Fixed on development? | no / yes — `<PR#>` / `<sha>` — <one line what landed> |
-| Open PR covering this? | none / `#<n>` (`title`, author, status) |
-| Duplicate of? | none / `#<n>` — why same root cause |
-| Security relevance | **none \| possible \| likely** — <class only: authz / tokens / SSRF / …> |
-| Priority | **low \| middle \| high** — <impact + who hits it + how often> |
-| Verdict | <Needs fix on development \| Fixed on development, not released \| Already fixed / shipped \| Covered by open PR \| Duplicate \| Not actionable / not a bug> |
+| Field                                 | Finding                                                                                                                                                      |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Still an issue on latest development? | yes / no / unclear                                                                                                                                           |
+| Exact issue                           | <symptom + where in code/product; cite `path` / command>                                                                                                     |
+| Fixed on development?                 | no / yes — `<PR#>` / `<sha>` — <one line what landed>                                                                                                        |
+| Open PR covering this?                | none / `#<n>` (`title`, author, status)                                                                                                                      |
+| Duplicate of?                         | none / `#<n>` — why same root cause                                                                                                                          |
+| Security relevance                    | **none \| possible \| likely** — <class only: authz / tokens / SSRF / …>                                                                                     |
+| Priority                              | **low \| middle \| high** — <impact + who hits it + how often>                                                                                               |
+| Verdict                               | <Needs fix on development \| Fixed on development, not released \| Already fixed / shipped \| Covered by open PR \| Duplicate \| Not actionable / not a bug> |
 
 **Evidence**
+
 - Tip check: <command or file read + result in one line each>
 - History: <related PRs/issues/commits if any>
 - Repro: <done / not attempted — why>
@@ -65,20 +66,25 @@ Keep the **public** comment short and scannable. Full matrix, scope-script JSON,
 **Risk:** Low | Medium | High | Critical
 
 ### Findings
+
 none confirmed
 
 <!-- Or, when there are findings: -->
-| Severity | Area | What (redacted) | Next |
-|---|---|---|---|
-| high | authz | <one line, no exploit steps> | fixed in `<sha>` / open |
+
+| Severity | Area  | What (redacted)              | Next                    |
+| -------- | ----- | ---------------------------- | ----------------------- |
+| high     | authz | <one line, no exploit steps> | fixed in `<sha>` / open |
 
 ### Summary
+
 <3–4 substantive sentences: (1) what was reviewed on this tip, (2) overall risk / whether anything is exploitable now, (3) what changed or was already solid, (4) what residual risk remains if any>
 
 ### Residual
+
 - <only real leftovers; or `none`>
 
 ### Fixes this session
+
 - none
 <!-- or: - `<sha>` — <one line> -->
 ```
@@ -99,41 +105,50 @@ Full coverage matrix + abuse paths stay in **chat**. If too sensitive for a usef
 
 ```markdown
 ## [shipping-github] Verdict: <approve-comment | changes-requested | not-useful | gated>
+<!-- shipping-github:full-review-verdict run:<full-review-run-id> head:<reviewed-head-sha> -->
 
 **PR:** `#N` — <title>
 **Head:** `<short-sha>` on `<base>` (mergeStateStatus: `…`)
 **Linked:** `#…` / none
 
 ### Usefulness
+
 <Does it fix a real bug / deliver claimed value? Cite issue + user-visible effect.>
 
 ### Bugs / correctness
+
 - Method: bug-review.md — Bugbot: yes/n/a-unavailable/skipDeep; complementary: done/skipDeep (`silent_failures`/`resource_leaks`/`edge_cases`)
 - Findings: none blocking / <list with `path` + why it matters + confidence>
 - Fixed this session: none / <sha + summary>
 
 ### Security
+
 - Scope reviewed: <auth / input / …>
 - Findings: none / <redacted one-liners>
 - Fixed this session: none / <sha>
 
 ### Spec / standards
+
 - Spec source: linked issue / PR body / none
 - Gaps: none / <what drifts from claimed behavior or repo norms>
 
 ### Reviews
+
 - Owners/maintainers: none open / addressed <threads> / pending @login (bare `@`, never backticked)
 - Bots (CodeRabbit/Codex/Bugbot): cleared / declined <nit> with rationale / open <id>
 
 ### Base / CI
+
 - Behind/conflicts: clean / updated in `<sha>` / **DIRTY** (blocker)
 - Required checks: green / failing `job-name` (branch vs flake)
 - Local tip compile/tests: <command + result>
 
 ### Gate
+
 none / draft|WIP|do-not-merge / hard blocker: <…>
 
 ### Bottom line
+
 <One paragraph: ship / fix these N items / not useful because …>
 When pinging a person, use bare `@login` (e.g. @user) — never `` `@login` ``.
 ```
@@ -148,21 +163,25 @@ When pinging a person, use bare `@login` (e.g. @user) — never `` `@login` ``.
 **Linked issues:** `#…`
 
 ### Reviews
+
 - **Humans (owners first):** <what was raised → fixed in `sha` / declined because … / none>
 - **Bots:** <0 unresolved useful threads; notable declines with one-line rationale>
 - **Own bug + security + spec/standards:** bug-review (Bugbot y/n/skip + complementary) + security-review done on tip; blockers fixed: <none / list>
 
 ### Tip freshness
+
 - Updated from `<base>`: yes (`sha`) / already current
 - Compiles/tests against tip: <command + pass>
 - Conflicts: none
 
 ### Checks
+
 - Local/CLI: <what ran + green>
 - Required CI: green on `<sha>` (flake retries: N — `job` if any)
 - Policy: code-owner enforcement / stale approvals / merge-queue: clear / n/a
 
 ### Residual
+
 none / follow-ups explicitly out of scope: <…>
 
 Ready to merge.
@@ -174,6 +193,7 @@ Ready to merge.
 ## [shipping-github] PR merge-ready
 
 PR `#<pr>` (`<short title>`) is merge-ready on `<base>@<sha>`:
+
 - Reviews (humans + bots) + own bug/security/spec: clean
 - Required CI green; tip compiles
 
@@ -190,15 +210,15 @@ Same evidence depth as merge-ready, labeled **Status** (not Merge ready). Each b
 **Verdict:** not merge-ready / merge-ready bar met (not posted) / gated
 **Head:** `<sha>` → `<base>` (`mergeStateStatus`)
 
-| Gate | State | Detail |
-|---|---|---|
-| Owner/human threads | … | … |
-| Bot threads | … | … |
-| Own reviews | done / missing | … |
-| Tip / conflicts | … | … |
-| Required CI | … | name jobs |
-| Policy (CODEOWNERS/approvals/queue) | … | … |
-| Settle | n/a for status | — |
+| Gate                                | State          | Detail    |
+| ----------------------------------- | -------------- | --------- |
+| Owner/human threads                 | …              | …         |
+| Bot threads                         | …              | …         |
+| Own reviews                         | done / missing | …         |
+| Tip / conflicts                     | …              | …         |
+| Required CI                         | …              | name jobs |
+| Policy (CODEOWNERS/approvals/queue) | …              | …         |
+| Settle                              | n/a for status | —         |
 
 **What’s left:** <ordered list of concrete actions>
 ```

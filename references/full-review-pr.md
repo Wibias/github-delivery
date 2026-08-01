@@ -62,6 +62,57 @@ action. That chat verdict satisfies the required verdict item.
 
 The only permitted exit without a verdict is explicit user cancellation.
 
+### Full-review run and publication identity
+
+At the start of this explicit full-review invocation, create one unique
+`full-review-run-id` and record it in the execution plan.
+
+Use a stable form such as:
+
+`fr-<PR-number>-<review-start-head-short-sha>-<UTC-start-time>`
+
+The identifier remains unchanged throughout this same run, including:
+
+- CI polling;
+- tool or reviewer retries;
+- Bugbot fallback;
+- context compaction or resumed execution;
+- head refreshes;
+- correction of a partial verdict publication.
+
+A later explicit full-review request MUST create a new `full-review-run-id`, even
+when it targets the same PR and the same head.
+
+### Final verdict publication
+
+Every completed full-review run MUST publish a new top-level PR conversation
+comment containing:
+
+`<!-- shipping-github:full-review-verdict run:<full-review-run-id> head:<reviewed-head-sha> -->`
+
+Before publishing:
+
+1. Search for the exact current `full-review-run-id`.
+2. If no exact current-run marker exists, use `post_comment`.
+3. If the exact marker exists only because this run’s publication is incomplete,
+   malformed, or truncated, use `edit_own_comment` to repair it.
+4. Never edit a completed verdict from an earlier full-review run.
+5. Never use another head’s verdict as the editable target.
+6. Never select the newest generic `[shipping-github] Verdict` comment without
+   matching both run ID and reviewed head.
+
+Once `Publish final verdict` is marked complete, that comment becomes immutable
+historical review evidence.
+
+The final chat report must use:
+
+- `posted new verdict comment` when this run created its required verdict;
+- `repaired current-run verdict comment` only when this run repaired its own
+  incomplete publication.
+
+It must never describe a newly completed full review as `updated verdict
+comment`.
+
 ## Goal
 
 Same babysit bar as **make merge-ready**: clear useful human + bot comments, own bug + security + **spec/standards**, fix in-PR, **required CI green**, then a **verdict** comment (usefulness included). Do **not** merge unless asked.
