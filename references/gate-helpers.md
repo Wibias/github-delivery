@@ -9,10 +9,11 @@ Resolve `<shipping-github>` to this skill’s install directory (repo root or `~
 Run exactly one authoritative decision first:
 
 ```bash
-node "<shipping-github>/scripts/ship-gate.mjs" OWNER/REPO N
+node "<shipping-github>/scripts/ship-gate.mjs" OWNER/REPO N \
+  --mutation-mode read-only
 ```
 
-The command captures one evidence snapshot and evaluates required checks, base health, review policy, unresolved threads, trusted feedback, merge state, and advisory CODEOWNERS against that same head SHA.
+The command captures one evidence snapshot and evaluates required checks, base health, review policy, unresolved threads, trusted feedback, merge state, and advisory CODEOWNERS against that same head SHA. Its output also includes the active mutation profile.
 
 Decision contract:
 
@@ -26,10 +27,23 @@ Known blockers outrank unknown evidence. Unknown evidence outranks readiness. No
 
 ```bash
 node "<shipping-github>/scripts/ship-gate-snapshot.mjs" OWNER/REPO N --output snapshot.json
-node "<shipping-github>/scripts/ship-gate.mjs" OWNER/REPO N --snapshot snapshot.json
+node "<shipping-github>/scripts/ship-gate.mjs" OWNER/REPO N \
+  --snapshot snapshot.json \
+  --mutation-mode read-only
 ```
 
 Snapshot replay validates schema, repository, PR number, head SHA when supplied with `--expected-head`, completeness, and age. Snapshot mode performs no GitHub API calls. When a replayed red head lacks base-health evidence, the failure origin remains `unknown` rather than being guessed.
+
+## Mutation profile
+
+Default to `read-only`. Select `review`, `maintainer`, or `autonomous` only when the user request or governing workflow authorizes that level.
+
+```bash
+node "<shipping-github>/scripts/mutation-policy.mjs" maintainer
+node "<shipping-github>/scripts/mutation-policy.mjs" maintainer merge_pr --explicit
+```
+
+The profile is an upper bound. Human replies still require exact-text confirmation even in autonomous mode. See `references/mutation-modes.md`.
 
 ## Base-health classification
 
@@ -66,8 +80,11 @@ Maps PR files to owners on the base branch. GitHub `reviewDecision` remains auth
 
 ```bash
 node "<shipping-github>/scripts/review-threads.mjs" OWNER/REPO N
-# mutation only when the active social policy permits it:
-node "<shipping-github>/scripts/review-threads.mjs" OWNER/REPO N --resolve PRRT_xxx
+# mutation only when the active mode and social policy permit it:
+node "<shipping-github>/scripts/review-threads.mjs" OWNER/REPO N \
+  --resolve PRRT_xxx \
+  --mutation-mode maintainer \
+  --explicit
 ```
 
 ### Watch and trusted feedback
