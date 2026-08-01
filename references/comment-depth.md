@@ -7,12 +7,13 @@ Vague posts are a bug. Prefer **structured detail** over one-liners — still sc
 ## Depth rules
 
 1. **Name concrete things** in backticks: files, symbols, checks, SHAs, PR/issue numbers, branches.
-2. **Say what you checked** (paths, tip SHA, tests/commands) and **what you concluded** — not “looks fine.”
-3. **Separate facts from judgment:** evidence → finding → action (fixed / declined / follow-up).
-4. **Per-axis completeness:** if a template has a section, fill it (use `none` / `n/a` with why when empty).
-5. **Security public posts stay redacted** (shared disclosure) — detail ≠ exploit steps.
-6. **Idempotent:** edit the prior `[shipping-github]` comment of the same intent; don’t spam a second vague stub.
-7. **Chat can be fuller** than GitHub for security abuse paths and long dumps.
+2. **GitHub `@mentions` stay bare** — write `@user`, never `` `@user` ``. Backticks kill the mention (no notify, looks like code). Same for merge thanks / verdict / any public comment.
+3. **Say what you checked** (paths, tip SHA, tests/commands) and **what you concluded** — not “looks fine.”
+4. **Separate facts from judgment:** evidence → finding → action (fixed / declined / follow-up).
+5. **Per-axis completeness:** if a template has a section, fill it (use `none` / `n/a` with why when empty).
+6. **Security public posts stay redacted** (shared disclosure) — detail ≠ exploit steps.
+7. **Idempotent:** edit the prior `[shipping-github]` comment of the same intent; don’t spam a second vague stub.
+8. **Chat can be fuller** than GitHub for security abuse paths and long dumps.
 
 Anti-patterns (rewrite before posting):
 
@@ -21,6 +22,7 @@ Anti-patterns (rewrite before posting):
 - Security comments that dump `requiredSurfaces=[…]`, method essays, or a findings table whose only row is “none” in every column
 - “Fixed on development” without SHA/PR
 - Merge-ready checklist with only yes/no and no evidence lines
+- Backticked people: `` `@login` `` / `` `@{author}` `` (must be bare `@login`)
 
 ## Research (issue)
 
@@ -120,7 +122,7 @@ Full coverage matrix + abuse paths stay in **chat**. If too sensitive for a usef
 - Gaps: none / <what drifts from claimed behavior or repo norms>
 
 ### Reviews
-- Owners/maintainers: none open / addressed <threads> / pending <who>
+- Owners/maintainers: none open / addressed <threads> / pending @login (bare `@`, never backticked)
 - Bots (CodeRabbit/Codex/Bugbot): cleared / declined <nit> with rationale / open <id>
 
 ### Base / CI
@@ -133,6 +135,7 @@ none / draft|WIP|do-not-merge / hard blocker: <…>
 
 ### Bottom line
 <One paragraph: ship / fix these N items / not useful because …>
+When pinging a person, use bare `@login` (e.g. @user) — never `` `@login` ``.
 ```
 
 ## Merge-ready (PR)
@@ -207,15 +210,17 @@ Still short, but concrete:
 **PR (other author):**
 
 ```markdown
-Thanks @{author} — merging this.
+Thanks @author — merging this.
 
 Why it helps: <2–3 sentences: user-visible bug/value, key change in `path`/behavior, linked `#issue` if any>
 
 Ship it.
 ```
 
+(Replace `author` with the real login; keep the `@` **outside** any backticks.)
+
 **Issue (after merge):**
 
 ```markdown
-Thanks @{issue_author} — fixed by PR `#<n>` (`<short-sha>`): <what changed for users / which failure mode is gone>.
+Thanks @issue_author — fixed by PR `#<n>` (`<short-sha>`): <what changed for users / which failure mode is gone>.
 ```
