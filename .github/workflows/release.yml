@@ -1,0 +1,118 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate release artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+
+      - name: Run repository checks
+        run: npm run check
+
+      - name: Build release subjects
+        env:
+          SOURCE_COMMIT: ${{ github.sha }}
+        run: npm run build:dist -- --source-commit "${SOURCE_COMMIT}"
+
+      - name: Prepare and verify release
+        run: >-
+          node scripts/prepare-release.mjs
+          --event "${{ github.event_name }}"
+          --ref "${{ github.ref }}"
+          --source-commit "${{ github.sha }}"
+
+      - name: Upload verified dry-run evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: shipping-github-release-${{ github.sha }}
+          path: |
+            dist/manifest.json
+            dist/SHA256SUMS
+            dist/sbom.spdx.json
+            dist/RELEASE_NOTES.md
+            dist/release-metadata.json
+            dist/shipping-github-v*.zip
+            dist/shipping-github-v*.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: Publish attested release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+
+      - name: Rebuild from the tagged commit
+        run: |
+          npm run check
+          npm run build:dist -- --source-commit "${GITHUB_SHA}"
+          node scripts/prepare-release.mjs \
+            --event "${GITHUB_EVENT_NAME}" \
+            --ref "${GITHUB_REF}" \
+            --source-commit "${GITHUB_SHA}"
+
+      - name: Attest release provenance
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: |
+            dist/shipping-github-v*.zip
+            dist/shipping-github-v*.tar.gz
+
+      - name: Attest release SBOM
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: dist/shipping-github-v*.zip
+          sbom-path: dist/sbom.spdx.json
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1 && {
+            echo "release ${GITHUB_REF_NAME} already exists" >&2
+            exit 1
+          }
+          gh release create "${GITHUB_REF_NAME}" \
+            dist/shipping-github-v*.zip \
+            dist/shipping-github-v*.tar.gz \
+            dist/manifest.json \
+            dist/SHA256SUMS \
+            dist/sbom.spdx.json \
+            --verify-tag \
+            --title "shipping-github ${GITHUB_REF_NAME}" \
+            --notes-file dist/RELEASE_NOTES.md
