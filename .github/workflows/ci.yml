@@ -29,13 +29,16 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          fetch-depth: 2
+          fetch-depth: 4
 
       - name: Emit non-force restack tree blueprint
-        if: github.event_name == 'push' && matrix.os == 'ubuntu-latest' && matrix.node == 22
+        if: github.event_name == 'pull_request' && matrix.os == 'ubuntu-latest' && matrix.node == 22
         shell: bash
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          git show HEAD^:.github/workflows/ci.yml > .github/workflows/ci.yml
+          git fetch origin "${PR_HEAD_SHA}" --depth=3
+          git show "${PR_HEAD_SHA}~2:.github/workflows/ci.yml" > .github/workflows/ci.yml
           git add .github/workflows/ci.yml
           tree_sha="$(git write-tree)"
           echo "RESTACK_TREE_SHA=${tree_sha}"
