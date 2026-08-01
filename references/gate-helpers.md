@@ -12,7 +12,7 @@ Run exactly one authoritative decision first:
 node "<shipping-github>/scripts/ship-gate.mjs" OWNER/REPO N
 ```
 
-The command captures one evidence snapshot and evaluates required checks, review policy, unresolved threads, trusted feedback, merge state, and advisory CODEOWNERS against that same head SHA.
+The command captures one evidence snapshot and evaluates required checks, base health, review policy, unresolved threads, trusted feedback, merge state, and advisory CODEOWNERS against that same head SHA.
 
 Decision contract:
 
@@ -29,7 +29,18 @@ node "<shipping-github>/scripts/ship-gate-snapshot.mjs" OWNER/REPO N --output sn
 node "<shipping-github>/scripts/ship-gate.mjs" OWNER/REPO N --snapshot snapshot.json
 ```
 
-Snapshot replay validates schema, repository, PR number, head SHA when supplied with `--expected-head`, completeness, and age. Snapshot mode performs no GitHub API calls.
+Snapshot replay validates schema, repository, PR number, head SHA when supplied with `--expected-head`, completeness, and age. Snapshot mode performs no GitHub API calls. When a replayed red head lacks base-health evidence, the failure origin remains `unknown` rather than being guessed.
+
+## Base-health classification
+
+When the PR head has failing checks, inspect `components.baseHealth` and the detailed base-health result.
+
+- `prOnlyFailures` belong in the PR.
+- `sharedFailures` may block merging but require a separate follow-up rather than silent scope expansion.
+- `unknownFailures` forbid a readiness claim.
+- `baseOnlyFailures` are advisory and tracked separately.
+
+A green head does not require base evidence. See `references/base-health.md`.
 
 ## Focused diagnostics
 

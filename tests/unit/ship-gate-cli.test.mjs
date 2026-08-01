@@ -120,7 +120,9 @@ test("ship-gate evaluates one supplied snapshot without invoking gh", () => {
   const output = JSON.parse(result.stdout);
   assert.equal(output.decision, "ready");
   assert.equal(output.snapshotId, "ship-gate-snapshot");
+  assert.equal(output.components.baseHealth.comparisonRequired, false);
   assert.deepEqual(Object.keys(output.components).sort(), [
+    "baseHealth",
     "codeowners",
     "requiredChecks",
     "reviewPolicy",
