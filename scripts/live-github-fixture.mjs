@@ -3,6 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
+import { waitForExpectedChecks } from "./lib/live-fixture-checks.mjs";
 import { buildFixturePlan, runFixtureScenario } from "./lib/live-github-fixture.mjs";
 
 function parseArgs(argv) {
@@ -29,6 +30,18 @@ function run(command, args, { allowFailure = false } = {}) {
   return { status: result.status ?? 1, stdout: String(result.stdout || "").trim(), stderr: String(result.stderr || "").trim() };
 }
 
+function parseJsonOutput(result, fallback, context) {
+  if (!result.stdout) {
+    if (result.status === 0 || /no checks reported|no runs found/i.test(result.stderr)) return fallback;
+    throw new Error(`${context}: ${result.stderr || `command failed (${result.status})`}`);
+  }
+  try {
+    return JSON.parse(result.stdout);
+  } catch {
+    throw new Error(`${context}: command returned invalid JSON: ${result.stdout.slice(0, 300)}`);
+  }
+}
+
 function numberFromUrl(url) {
   const match = String(url).match(/\/(?:issues|pull)\/(\d+)(?:$|\?)/);
   if (!match) throw new Error(`unable to parse number from ${url}`);
@@ -43,6 +56,27 @@ function gateDecision(repo, pr) {
 
 function currentHead(repo, pr) {
   return run("gh", ["pr", "view", String(pr), "--repo", repo, "--json", "headRefOid", "--jq", ".headRefOid"]).stdout;
+}
+
+function readPrChecks(repo, pr) {
+  const result = run("gh", [
+    "pr", "checks", String(pr),
+    "--repo", repo,
+    "--json", "name,workflow,bucket,state,link,event",
+  ], { allowFailure: true });
+  return parseJsonOutput(result, [], "unable to read fixture PR checks");
+}
+
+function readPrWorkflowRuns(repo, pr) {
+  const head = currentHead(repo, pr);
+  const result = run("gh", [
+    "api", "-X", "GET", `repos/${repo}/actions/runs`,
+    "-f", `head_sha=${head}`,
+    "-f", "event=pull_request",
+    "-f", "per_page=100",
+  ], { allowFailure: true });
+  const payload = parseJsonOutput(result, { workflow_runs: [] }, "unable to read fixture workflow runs");
+  return Array.isArray(payload.workflow_runs) ? payload.workflow_runs : [];
 }
 
 function adapter(tempRoot) {
@@ -71,23 +105,15 @@ function adapter(tempRoot) {
     async evaluateGate(plan, pr) { return gateDecision(plan.repo, pr.number); },
     async markReady(plan, pr) { run("gh", ["pr", "ready", String(pr.number), "--repo", plan.repo]); },
     async waitForChecks(plan, pr) {
-      const deadline = Date.now() + Number(process.env.FIXTURE_CHECK_TIMEOUT_MS || 15 * 60 * 1000);
-      let observed = false;
-      while (Date.now() < deadline) {
-        const payload = JSON.parse(run("gh", ["pr", "view", String(pr.number), "--repo", plan.repo, "--json", "statusCheckRollup"]).stdout);
-        const checks = payload.statusCheckRollup || [];
-        if (checks.length) observed = true;
-        const complete = new Set(["SUCCESS", "FAILURE", "CANCELLED", "SKIPPED", "NEUTRAL", "TIMED_OUT", "ACTION_REQUIRED", "STALE"]);
-        const pending = checks.filter((check) => !complete.has(check.conclusion || check.state));
-        const failed = checks.filter((check) => new Set(["FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED"]).has(check.conclusion || check.state));
-        if (observed && pending.length === 0) {
-          if (failed.length) throw new Error(`fixture checks failed: ${failed.map((check) => check.name || check.context).join(", ")}`);
-          return { conclusion: "success", count: checks.length };
-        }
-        await new Promise((resolve) => setTimeout(resolve, 10000));
-      }
-      if (!observed) return { conclusion: "none", count: 0 };
-      throw new Error("timed out waiting for fixture checks");
+      return waitForExpectedChecks({
+        readChecks: async () => readPrChecks(plan.repo, pr.number),
+        readRuns: async () => readPrWorkflowRuns(plan.repo, pr.number),
+        timeoutMs: Number(process.env.FIXTURE_CHECK_TIMEOUT_MS || 15 * 60 * 1000),
+        intervalMs: Number(process.env.FIXTURE_CHECK_INTERVAL_MS || 10 * 1000),
+        onProgress(result) {
+          console.error(`[live-fixture] ${result.code}: ${result.message}`);
+        },
+      });
     },
     async captureSnapshot(plan, pr) {
       const path = join(tempRoot, "snapshot.json");
