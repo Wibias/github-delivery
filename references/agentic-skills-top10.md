@@ -2,7 +2,7 @@
 
 Use when `security-scope.mjs` sets **`requireAgenticSkillsTop10: true`** (skill packages, MCP install/config, agent skill manifests in the diff).
 
-This is **skill/MCP supply-chain review**, not a full classic app ASVS pass. Load skill **`ai-agent-security`** (especially `references/mcp-tool-security.md` + prompt-injection / tool governance) and walk this table.
+This is **skill/MCP supply-chain review**, not a full classic app ASVS pass. Load skill **`ai-agent-security`** (especially `<ai-agent-security>/references/mcp-tool-security.md` plus its prompt-injection and tool-governance references) and walk this table.
 
 Source shape: [OWASP Agentic Skills Top 10](https://owasp.org/www-project-agentic-skills-top-10/) (AST01–AST10). Mark each row `done` + one-liner, or `n/a` + why.
 
