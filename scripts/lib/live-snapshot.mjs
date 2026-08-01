@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { enrichSnapshotWithBaseHealth } from "./base-health-live.mjs";
 import { validateSnapshot } from "./snapshot-input.mjs";
 
 const SNAPSHOT_COMMAND = fileURLToPath(
@@ -36,5 +37,5 @@ export function captureLiveSnapshot({ repo, pr, maxAgeSeconds = 300 } = {}) {
   if (!validation.valid) {
     throw new Error(`Invalid live snapshot: ${validation.reasons.join(", ")}`);
   }
-  return snapshot;
+  return enrichSnapshotWithBaseHealth(snapshot);
 }
