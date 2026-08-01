@@ -11,8 +11,8 @@ export const DEFAULT_EXPECTED_CHECKS = Object.freeze([
 
 export const DEFAULT_EXPECTED_WORKFLOWS = Object.freeze([
   "CI",
-  "Dependency Review",
   "CodeQL",
+  "Dependency Review",
 ]);
 
 const APPROVAL_STATES = new Set(["action_required", "waiting"]);
