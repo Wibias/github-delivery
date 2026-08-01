@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
@@ -196,5 +197,17 @@ test("does not hide unrelated incomplete evidence", () => {
     repaired.incompleteReasons.some(
       (reason) => reason.source === "changedFiles",
     ),
+  );
+});
+
+test("live fixture invokes the Actions-aware snapshot adapter", () => {
+  const source = readFileSync(
+    new URL("../../scripts/live-github-fixture.mjs", import.meta.url),
+    "utf8",
+  );
+  assert.match(source, /scripts\/actions-ship-gate-snapshot\.mjs/);
+  assert.doesNotMatch(
+    source,
+    /run\(process\.execPath, \["scripts\/ship-gate-snapshot\.mjs"/,
   );
 });
