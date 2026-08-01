@@ -121,7 +121,10 @@ function validateReferences(payloads) {
   for (const [path, buffer] of payloads) {
     if (extension(path) !== ".md") continue;
     for (const reference of runtimeReferences(buffer.toString("utf8"))) {
-      if (!available.has(reference)) {
+      const bundled =
+        available.has(reference) ||
+        [...available].some((candidate) => candidate.startsWith(`${reference}/`));
+      if (!bundled) {
         throw new Error(`missing runtime reference: ${reference} (from ${path})`);
       }
     }
