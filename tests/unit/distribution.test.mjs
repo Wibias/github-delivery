@@ -18,16 +18,10 @@ function fixtureRoot() {
   mkdirSync(join(root, "tests", "evals"), { recursive: true });
   mkdirSync(join(root, "tests", "unit"), { recursive: true });
   mkdirSync(join(root, ".github", "workflows"), { recursive: true });
-  writeFileSync(
-    join(root, "SKILL.md"),
-    "---\nname: shipping-github\ndescription: Merge and review GitHub pull requests.\n---\n\nRead `references/shared-rules.md`. Run `scripts/ship-gate.mjs`.\n",
-  );
+  writeFileSync(join(root, "SKILL.md"), "---\nname: shipping-github\ndescription: Merge and review GitHub pull requests.\n---\n\nRead `references/shared-rules.md`. Run `scripts/ship-gate.mjs`.\n");
   writeFileSync(join(root, "README.md"), "# shipping-github\r\n");
   writeFileSync(join(root, "LICENSE"), "MIT\n");
-  writeFileSync(
-    join(root, "package.json"),
-    JSON.stringify({ name: "shipping-github", version: "0.1.0", private: true, type: "module", engines: { node: ">=20" } }, null, 2) + "\n",
-  );
+  writeFileSync(join(root, "package.json"), JSON.stringify({ name: "shipping-github", version: "0.1.0", private: true, type: "module", engines: { node: ">=20" } }, null, 2) + "\n");
   writeFileSync(join(root, "references", "shared-rules.md"), "# Rules\r\n");
   writeFileSync(join(root, "scripts", "ship-gate.mjs"), "#!/usr/bin/env node\nconsole.log('ok');\n");
   writeFileSync(join(root, "scripts", "lib", "helper.mjs"), "export const ok = true;\n");
@@ -52,7 +46,6 @@ test("builds only runtime payload and normalizes text", () => {
   const root = fixtureRoot();
   const out = join(root, "artifacts");
   const result = buildDistribution({ root, out, sourceCommit: "a".repeat(40) });
-
   const paths = result.manifest.files.map((file) => file.path);
   assert.deepEqual(paths, [...paths].sort());
   assert(paths.includes("SKILL.md"));
@@ -68,22 +61,20 @@ test("builds only runtime payload and normalizes text", () => {
 
 test("accepts references to bundled runtime directories", () => {
   const root = fixtureRoot();
-  writeFileSync(
-    join(root, "SKILL.md"),
-    "---\nname: shipping-github\ndescription: Merge PRs.\n---\n\nUse `overrides/babysit`.\n",
-  );
-  assert.doesNotThrow(() =>
-    buildDistribution({ root, out: join(root, "out"), sourceCommit: "d".repeat(40) }),
-  );
+  writeFileSync(join(root, "SKILL.md"), "---\nname: shipping-github\ndescription: Merge PRs.\n---\n\nUse `overrides/babysit`.\n");
+  assert.doesNotThrow(() => buildDistribution({ root, out: join(root, "out"), sourceCommit: "d".repeat(40) }));
+});
+
+test("ignores references owned by another named skill", () => {
+  const root = fixtureRoot();
+  writeFileSync(join(root, "references", "shared-rules.md"), "Read `<ai-agent-security>/references/mcp-tool-security.md`.\n");
+  assert.doesNotThrow(() => buildDistribution({ root, out: join(root, "out"), sourceCommit: "e".repeat(40) }));
 });
 
 test("fails when a bundled markdown file references a missing runtime resource", () => {
   const root = fixtureRoot();
   writeFileSync(join(root, "references", "shared-rules.md"), "Run `scripts/missing.mjs`.\n");
-  assert.throws(
-    () => buildDistribution({ root, out: join(root, "out"), sourceCommit: "b".repeat(40) }),
-    /missing runtime reference: scripts\/missing\.mjs/,
-  );
+  assert.throws(() => buildDistribution({ root, out: join(root, "out"), sourceCommit: "b".repeat(40) }), /missing runtime reference: scripts\/missing\.mjs/);
 });
 
 test("two builds from the same commit are byte-identical", () => {
