@@ -10,9 +10,10 @@ description: >
   make merge ready, research issue #N, create PR for issue, full review, or
   merge PR. Watch MUST run scripts/ship-gate.mjs every wake: exit 0 permits
   waiting, exit 1 means act on known blockers, and exit 2 forbids a readiness
-  claim until incomplete evidence is restored. Do not use for: local unit-test
-  debugging with no GitHub PR, filing PRDs (issue-workflow), or skill authoring
-  (skill-ratchet).
+  claim until incomplete evidence is restored. Default mutation mode is
+  read-only; every GitHub write must be permitted by the selected profile and
+  the stricter social rules. Do not use for: local unit-test debugging with no
+  GitHub PR, filing PRDs (issue-workflow), or skill authoring (skill-ratchet).
 ---
 
 # Shipping GitHub
@@ -62,7 +63,7 @@ Read `references/shared-rules.md` before acting. Non-negotiables:
 1. Scope lock — no drive-by refactors; never weaken CI to go green. For a red head, use the `baseHealth` component: PR-only failures are in scope; failures reproduced on the base tip may block merging but require a separate follow-up instead of silently expanding this PR; unknown origin is a hard evidence stop.
 2. Git safety — stop on dirty unrelated trees; never force-push; stop if push rejected; **fork-head unwritable → hard stop** (shared rules).
 3. Review triage — trusted owners/maintainers first; published feedback only; verify bots against code.
-4. Social mutation — no auto-replies to humans without exact-text confirmation; limited thread resolves.
+4. Social mutation — select one explicit mode: `read-only`, `review`, `maintainer`, or `autonomous`. The profile is an upper bound, never a waiver. Human replies always require exact-text confirmation; maintainer-grade thread resolution, draft changes, reviewer requests, merges, issue closure, and follow-up creation require direct instruction; use `scripts/mutation-policy.mjs` before a write when authority is not obvious.
 5. CI classify — **prefer fix/harden over reruns**; app/API test timeouts are not “infra”; never guess whether a required failure is unrelated. Use `ship-gate.mjs` base-health evidence: `fix_in_pr`, `separate_follow_up`, or `investigate`. Same failure twice on one SHA → stop blind reruns; true infra → `gh run rerun RUN_ID --failed` (or `--job <databaseId>`) and verify the failed leg actually restarted; max 3 true-infra reruns per SHA.
 6. Mode-aware waits — merge-ready / full-review / babysit-fix: **until green+comments clean** (or hard blocker); never abandon babysit on “3 rounds / 20m of work”; never invent a fixed **20 min CI sleep** (`windows-latest` usually **~12–15 min** — poll ~1 min; shared **CI wait expectations**); never invent soft “maintainer ack” stops; **thin settle** (~3–5 min quiet + recheck) before merge-ready / `approve-comment`; watch: **every wake run `ship-gate.mjs`**. Exit `1` means act on its namespaced blockers before idling; exit `2` means restore evidence and do not call the PR ready; exit `0` permits waiting. Use component helpers only to diagnose the authoritative result. Merge-queue queued still does not mean merged.
 7. Behind base + **compile against tip** — update from base, then verify build/tests on tip before merge-ready / full-review approve / merge. After push: re-check **stale approvals / last-push** policy.
@@ -75,7 +76,7 @@ Read `references/shared-rules.md` before acting. Non-negotiables:
 14. Comment idempotency — one intent → one `[shipping-github]` comment; edit to fix, never spam. Post/edit via UTF-8 file + `gh --input` / `--body-file` (never PowerShell string pipes — causes `�un…` mojibake). No Markdown backslash-escaping — use backticks. Route comments per shared **Comment / review routing**. **Depth:** use `references/comment-depth.md` — research/security/verdict/merge-ready/status must be evidence-rich (paths, SHAs, checks), not vague stubs.
 15. Merge-ready only when bots/humans are clear **and** own bug+security+spec reviews are done **and** thin settle elapsed; also post/edit one notify on each **linked issue** (not only on the PR). The final `ship-gate.mjs` result must be `ready`; unresolved GraphQL review threads remain blocking inside that decision.
 16. Status verdicts and merge operations must use the same authoritative `ship-gate.mjs` result and the same merge-ready bar. Individual helper output cannot overrule a blocked or unknown final decision. Watch milestones are not merge-ready.
-17. Draft→ready only after asking; inline replies in-thread; subagent checkout preflight; post-merge cleanup; backport only after ask; rate-limit backoff via Composio then gh; bare `#N` disambiguation; compose handoffs for stacks/split/finish/issue-workflow/git-workflow; CODEOWNERS **enforcement** vs suggestion-only.
+17. Draft→ready only after asking; inline replies in-thread; subagent checkout preflight; post-merge cleanup; backport only after ask; rate-limit backoff via Composio then gh; bare `#N` disambiguation; compose handoffs for stacks/split/finish/issue-workflow/git-workflow; CODEOWNERS enforcement vs suggestion-only; include the active mutation mode in mutation-capable command output.
 18. **>3 PRs (or research issues) in one ask → subagent fan-out** (one target per subagent, parallel/chunked) — never serialize large batches in the parent.
 
 ## Tooling
@@ -83,7 +84,8 @@ Read `references/shared-rules.md` before acting. Non-negotiables:
 - Prefer `gh` for GitHub reads/writes.
 - Detect the repo default branch; do not hardcode `main`.
 - Cross-use thin helpers when helpful: `review-bugbot` / `bugbot` (**Cursor bug axis only**, via `bug-review.md`), skill `review` (Spec+Standards), `manage-stacked-prs`, `split-to-prs`, `finishing-a-development-branch`, `git-workflow-and-versioning`, `issue-workflow`. **Do not** use `review-security` or Task `security-review` — use `references/security-review.md`.
-- **Authoritative gate:** `scripts/ship-gate.mjs` is mandatory before ready, status-ready, merge, or watch-idle decisions. `scripts/required-checks.mjs`, `scripts/codeowners-for-pr.mjs`, `scripts/review-threads.mjs`, `scripts/pr-policy-gate.mjs`, and `scripts/watch-wake-gate.mjs` are focused diagnostic or mutation helpers only. `scripts/security-scope.mjs` and `scripts/bug-scope.mjs` remain review-scope helpers (see `references/gate-helpers.md`).
+- **Authoritative gate:** `scripts/ship-gate.mjs` is mandatory before ready, status-ready, merge, or watch-idle decisions and must be run with the active `--mutation-mode`. `scripts/required-checks.mjs`, `scripts/codeowners-for-pr.mjs`, `scripts/review-threads.mjs`, `scripts/pr-policy-gate.mjs`, and `scripts/watch-wake-gate.mjs` are focused diagnostic or mutation helpers only. `scripts/security-scope.mjs` and `scripts/bug-scope.mjs` remain review-scope helpers (see `references/gate-helpers.md`).
+- **Mutation policy:** `scripts/mutation-policy.mjs MODE [ACTION]` is the machine-readable authorization check; default mode is `read-only` (see `references/mutation-modes.md`).
 - **Rate limits:** prefer Composio MCP `GITHUB_GET_GRAPHQL_RATE_LIMIT` when GitHub toolkit is connected; else `gh api rate_limit` / `gh api graphql` `rateLimit` (see shared rules).
 - **Inline replies:** Composio `GITHUB_CREATE_A_REPLY_FOR_A_REVIEW_COMMENT` or `gh api …/pulls/{pr}/comments/{id}/replies`.
 
@@ -103,6 +105,7 @@ Read `references/shared-rules.md` before acting. Non-negotiables:
 - references/merge-pr.md -- when to read: merge a PR with thanks and issue close-out
 - references/gate-helpers.md -- when to read: before ready/merge/status/watch-idle; `ship-gate.mjs` is authoritative
 - references/base-health.md -- when to read: when required checks fail or base drift may affect PR scope
+- references/mutation-modes.md -- when to read: before any GitHub write or when selecting workflow authority
 - references/comment-depth.md -- when to read: before posting research, security, verdict, merge-ready, status, or merge thanks
 - tests/evals/cases.jsonl -- when to read: before discovery, execution, or adversarial evaluation
 - tests/evals/regression-cases.jsonl -- when to read: before rerunning or appending retained regressions

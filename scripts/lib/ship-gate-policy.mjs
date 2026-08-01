@@ -28,6 +28,7 @@ function componentSummary(component) {
 
 export function combineShipGateResults({
   snapshot,
+  mutationProfile,
   requiredChecks,
   baseHealth,
   reviewPolicy,
@@ -117,6 +118,8 @@ export function combineShipGateResults({
     pr: snapshot?.pr || null,
     headOid: snapshot?.headOid || null,
     url: snapshot?.evidence?.pullRequest?.url || null,
+    mutationMode: mutationProfile?.mode || "read-only",
+    mutationProfile: mutationProfile || null,
     decision,
     ready: decision === "ready",
     blocked: decision === "blocked",

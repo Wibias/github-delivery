@@ -6,6 +6,10 @@
 import { captureLiveSnapshot } from "./lib/live-snapshot.mjs";
 import { evaluateBaseHealthSnapshot } from "./lib/base-health-policy.mjs";
 import {
+  extractMutationModeArgs,
+  mutationProfile,
+} from "./lib/mutation-policy.mjs";
+import {
   evaluateCodeownersSnapshot,
   evaluateRequiredChecksSnapshot,
   evaluateReviewPolicySnapshot,
@@ -19,10 +23,11 @@ import {
 import { combineShipGateResults } from "./lib/ship-gate-policy.mjs";
 
 const usage =
-  "Usage: node scripts/ship-gate.mjs OWNER/REPO PR_NUMBER [--snapshot FILE] [--expected-head SHA] [--max-age-seconds N]";
+  "Usage: node scripts/ship-gate.mjs OWNER/REPO PR_NUMBER [--snapshot FILE] [--expected-head SHA] [--max-age-seconds N] [--mutation-mode MODE]";
 
 try {
-  const args = parseSnapshotGateArgs(process.argv.slice(2), { usage });
+  const mutationArgs = extractMutationModeArgs(process.argv.slice(2));
+  const args = parseSnapshotGateArgs(mutationArgs.argv, { usage });
   const snapshot = args.snapshotPath
     ? readValidatedSnapshot({
         path: args.snapshotPath,
@@ -39,6 +44,7 @@ try {
 
   const output = combineShipGateResults({
     snapshot,
+    mutationProfile: mutationProfile(mutationArgs.mode),
     requiredChecks: evaluateRequiredChecksSnapshot(snapshot),
     baseHealth: evaluateBaseHealthSnapshot(snapshot),
     reviewPolicy: evaluateReviewPolicySnapshot(snapshot),
