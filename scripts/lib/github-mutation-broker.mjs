@@ -19,6 +19,7 @@ const PR_ACTIONS = new Set([
 const SOCIAL_ACTIONS = new Set([
   "post_review",
   "post_comment",
+  "post_issue_comment",
   "edit_own_comment",
   "reply_bot_thread",
   "reply_human_thread",
@@ -82,6 +83,17 @@ function commandFor(request) {
         "pr",
         "comment",
         String(positiveInteger(request.pr, "pr")),
+        "--repo",
+        repo,
+        "--body",
+        required(request.body, "body"),
+      ];
+    case "post_issue_comment":
+      return [
+        "gh",
+        "issue",
+        "comment",
+        String(positiveInteger(request.issue, "issue")),
         "--repo",
         repo,
         "--body",
