@@ -11,3 +11,5 @@ All notable changes to `shipping-github` are documented here.
 - Guarded GitHub mutation profiles and runtime capability discovery.
 - Executable offline routing and retained-regression evaluations.
 - Deterministic versioned skill bundles with checksums, installation planning, backups, and restore.
+- Tag-bound GitHub Releases with checksum verification, SPDX SBOMs, and artifact attestations.
+- Dependabot, Dependency Review, CodeQL, Scorecard, and executable repository workflow policy checks.
