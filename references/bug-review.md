@@ -40,28 +40,19 @@ Checkout PR head first (shared **Subagent preflight**).
 
 #### Cursor
 
-1. Launch **exactly one** `bugbot` via `review-bugbot`. The prompt's **first two lines** must be exactly:
+1. Launch **exactly one** `bugbot` via `review-bugbot`. The **entire prompt must contain exactly two lines, and both lines must be non-empty**:
 
    ```text
    Full Repository Path: <absolute path to the checked-out repository>
    Diff: branch changes
    ```
 
-   Replace the placeholder with the actual absolute local filesystem path after checkout. Do **not** use `OWNER/REPO`. Do not paraphrase, rename, bullet, or replace either field label. Optional PR/base context belongs only after those first two lines.
-2. For a PR whose base is not the repository default, keep the exact `Diff: branch changes` field and add `Base Reference: <base branch or merge-base>` after the required header.
-3. If the user explicitly asked for uncommitted-only review, change only the value to `Diff: uncommitted changes`; keep the `Full Repository Path:` line first.
-4. On a wrong invocation or missing-field validator error, retry **once** with the same exact two-field header.
-5. On an empty or uncomputable diff, retry **once** with:
-
-   ```text
-   Full Repository Path: <absolute path to the checked-out repository>
-   Diff: natural language
-   Change Description:
-   - <path>: <concise description of the change>
-   ```
-
-6. If Bugbot is unavailable after the one retry → say so in chat; continue with complementary only. **Do not** fake a Bugbot report.
-7. Then run **§2 Complementary** (additive — even if Bugbot found nothing).
+   Replace the placeholder with the actual absolute local filesystem path after checkout. Do **not** use `OWNER/REPO`. Do not paraphrase, rename, bullet, quote, or otherwise alter either field label or value.
+2. There must be **nothing after** the `Diff:` line: no blank-line payload, `Base Reference`, PR number or title, issue text, file list, review focus, explanation, or other prose. For a PR whose base is not the repository default, checkout the correct PR head and preserve the repository state locally; do not encode the base in the Bugbot prompt.
+3. If the user explicitly asked for uncommitted-only review, use the same exact two-line prompt and change only the second line to `Diff: uncommitted changes`.
+4. On a missing-field, unsupported-`Diff`, or wrong-invocation validator error, retry **once** with the appropriate exact two-line prompt and nothing else.
+5. If Bugbot still cannot compute the requested diff after that retry, state that Bugbot is unavailable for this review and continue with the complementary pass. Do **not** invent another prompt shape or fake a Bugbot report.
+6. Then run **§2 Complementary** (additive, even if Bugbot found nothing).
 
 #### Claude
 

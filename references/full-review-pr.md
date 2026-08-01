@@ -36,7 +36,7 @@ Skip 0.1% nits. No follow-up PR for in-scope fixes.
 
 1. Identify PR(s); checkout head (subagent preflight); note base, linked issues, draft/WIP gates. If draft and user wanted green/merge-ready: ask once about **Draft → ready**.
 2. Usefulness pass: real bug / claimed value? If not → `not-useful` verdict and stop that PR only.
-3. Parallel where useful: **Bug** via **`references/bug-review.md`** (scope → Bugbot when Cursor → complementary). On Cursor, use that file's literal `review-bugbot` prompt contract; do not construct or paraphrase a replacement prompt in this workflow. **Security** via **`references/security-review.md`** (never Cursor harness `security-review` / `review-security`). Plus **Spec + Standards** via skill `review` (or short in-session pass).
+3. Parallel where useful: **Bug** via **`references/bug-review.md`** (scope → Bugbot when Cursor → complementary). On Cursor, use that file's literal `review-bugbot` prompt contract; do not construct or paraphrase a replacement prompt in this workflow. **Security** via **`references/security-review.md`** (never Cursor harness `security-review` / `review-security`). Run **Spec + Standards** through the bundled **`references/spec-standards-review.md`** method. It owns the fixed comparison, source discovery, two independent axes, and advisory `references/code-smells.md` baseline; do not depend on an optional external review skill.
 4. Triage open human + bot comments (shared rules — owners/maintainers first). Fix useful; decline nits with rationale. Inline replies in-thread only.
 5. Push fixes; update from base if behind; **verify compile/tests against tip**; **wait and recheck** until useful threads quiet **and** required CI green on that tip SHA, or a hard blocker. Use **rate-limit backoff** (Composio → gh) on dense polls.
 6. Changelog nudge if user-facing.
@@ -53,7 +53,8 @@ If the verdict is `approve-comment` (clean): also post merge-ready PR + linked-i
 For **every** targeted PR:
 
 - Usefulness assessed
-- Bug + security + spec/standards reviews done
+- Bug + security reviews done
+- Bundled Spec + Standards method completed on the recorded base/head comparison, with sources and both axis results preserved
 - Useful bots/humans handled or declined with rationale
 - Required CI green **or** hard-blocker reported (flake budget exhausted / permissions / etc.) — **never** “done” with unexplained red CI
 - Thin settle completed before `approve-comment` / merge-ready (not for reject/gated labels)

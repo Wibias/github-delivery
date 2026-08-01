@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
 
 import { projectBugScope, projectSecurityScope } from "../../scripts/lib/review-scope-compat.mjs";
@@ -47,19 +47,64 @@ test("pure docs still skip both review axes", () => {
   assert.deepEqual(projectBugScope(reviewPlan).requiredLenses, []);
 });
 
-test("Cursor full review uses Bugbot's exact required prompt fields", () => {
+test("Cursor full review uses Bugbot's exact two-line prompt and nothing else", () => {
   const bugReview = readFileSync(new URL("../../references/bug-review.md", import.meta.url), "utf8");
   const fullReview = readFileSync(new URL("../../references/full-review-pr.md", import.meta.url), "utf8");
-  const promptFence = bugReview.match(
-    /```text\s*\n\s*Full Repository Path: <absolute path to the checked-out repository>\s*\n\s*Diff: branch changes\s*\n\s*```/,
-  );
+  const cursorSection = bugReview.match(/#### Cursor([\s\S]*?)#### Claude/)?.[1] || "";
+  const promptFence = cursorSection.match(/```text\s*\n([\s\S]*?)\n\s*```/)?.[1] || "";
+  const promptLines = promptFence
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
 
-  assert.ok(promptFence, "expected the canonical two-line Bugbot prompt fence");
-  assert.match(bugReview, /first two lines/i);
+  assert.deepEqual(promptLines, [
+    "Full Repository Path: <absolute path to the checked-out repository>",
+    "Diff: branch changes",
+  ]);
+  assert.doesNotMatch(cursorSection, /Base Reference:/);
+  assert.doesNotMatch(cursorSection, /Change Description:/);
+  assert.match(cursorSection, /exactly two lines/i);
+  assert.match(cursorSection, /nothing after/i);
   assert.match(bugReview, /do not paraphrase/i);
   assert.match(bugReview, /Do \*\*not\*\* use `OWNER\/REPO`/);
   assert.match(fullReview, /literal `review-bugbot` prompt contract/);
   assert.match(fullReview, /do not construct or paraphrase a replacement prompt/i);
+});
+
+test("full review owns a deterministic spec and standards method", () => {
+  const methodUrl = new URL("../../references/spec-standards-review.md", import.meta.url);
+  const smellsUrl = new URL("../../references/code-smells.md", import.meta.url);
+  const fullReview = readFileSync(new URL("../../references/full-review-pr.md", import.meta.url), "utf8");
+
+  assert.ok(existsSync(methodUrl), "expected bundled spec/standards review method");
+  assert.ok(existsSync(smellsUrl), "expected bundled code-smell baseline");
+
+  const method = readFileSync(methodUrl, "utf8");
+  const smells = readFileSync(smellsUrl, "utf8");
+  const expectedSmells = [
+    "Mysterious Name",
+    "Duplicated Code",
+    "Feature Envy",
+    "Data Clumps",
+    "Primitive Obsession",
+    "Repeated Switches",
+    "Shotgun Surgery",
+    "Divergent Change",
+    "Speculative Generality",
+    "Message Chains",
+    "Middle Man",
+    "Refused Bequest",
+  ];
+
+  assert.match(fullReview, /references\/spec-standards-review\.md/);
+  assert.match(method, /git diff <base>\.\.\.<head>/);
+  assert.match(method, /## Standards/);
+  assert.match(method, /## Spec/);
+  assert.match(method, /repo standards override/i);
+  assert.match(method, /judgement call/i);
+  for (const smell of expectedSmells) {
+    assert.match(smells, new RegExp(`\\*\\*${smell}\\*\\*`));
+  }
 });
 
 test("live fixture establishes Git credentials before pushing", () => {
