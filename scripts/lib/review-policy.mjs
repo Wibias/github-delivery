@@ -39,11 +39,6 @@ export function parseReviewThreadArgs(argv) {
   return { repo, pr, resolveId };
 }
 
-function reviewTimestamp(review) {
-  const value = Date.parse(review?.submittedAt || review?.submitted_at || "");
-  return Number.isFinite(value) ? value : 0;
-}
-
 function reviewAuthor(review) {
   return review?.author?.login || review?.user?.login || null;
 }
@@ -52,42 +47,60 @@ function reviewState(review) {
   return String(review?.state || "").toUpperCase();
 }
 
-export function reduceEffectiveReviews(reviews) {
-  const latestByAuthor = new Map();
-  const ordered = [...(reviews || [])].sort((a, b) => reviewTimestamp(a) - reviewTimestamp(b));
+export function summarizeLatestOpinionatedReviews(reviews = []) {
+  const approvals = [];
+  const changesRequested = [];
 
-  for (const review of ordered) {
+  for (const review of reviews) {
     const author = reviewAuthor(review);
     const state = reviewState(review);
-    if (!author || state === "COMMENTED" || state === "PENDING") continue;
+    if (!author) continue;
 
-    if (state === "DISMISSED") {
-      latestByAuthor.delete(author);
-      continue;
-    }
-
-    if (state === "APPROVED" || state === "CHANGES_REQUESTED") {
-      latestByAuthor.set(author, review);
-    }
+    if (state === "APPROVED") approvals.push(review);
+    if (state === "CHANGES_REQUESTED") changesRequested.push(review);
   }
 
-  return [...latestByAuthor.values()];
+  return { approvals, changesRequested };
 }
 
 export function maxRequiredApprovalCount({
-  matchingRules = [],
   restProtection = null,
-  rulesetPullRequest = [],
+  activePullRequestRules = [],
 } = {}) {
   const values = [
-    ...matchingRules.map((rule) => rule?.requiredApprovingReviewCount),
     restProtection?.requiredApprovingReviewCount,
-    ...rulesetPullRequest.map((rule) => rule?.required_approving_review_count),
+    ...activePullRequestRules.map(
+      (rule) => rule?.required_approving_review_count,
+    ),
   ]
     .map((value) => Number(value))
     .filter((value) => Number.isInteger(value) && value >= 0);
 
   return values.length ? Math.max(...values) : 0;
+}
+
+export function evaluatePolicyDataCompleteness({
+  branchProtectionGraphqlComplete = false,
+  matchingClassicRuleCount = 0,
+  classicProtectionReadable = false,
+  activeRulesComplete = false,
+} = {}) {
+  const reasons = [];
+
+  if (!branchProtectionGraphqlComplete) {
+    reasons.push("classic_branch_rules_incomplete");
+  }
+  if (matchingClassicRuleCount > 0 && !classicProtectionReadable) {
+    reasons.push("effective_classic_protection_unreadable");
+  }
+  if (!activeRulesComplete) {
+    reasons.push("active_rules_incomplete");
+  }
+
+  return {
+    complete: reasons.length === 0,
+    reasons,
+  };
 }
 
 export function evaluateReviewPolicy({
@@ -98,36 +111,41 @@ export function evaluateReviewPolicy({
   requireLastPushApproval = false,
   requiresConversationResolution = false,
   requiredApprovalCount = 0,
-  reviews = [],
+  latestOpinionatedReviews = [],
 } = {}) {
-  const effectiveReviews = reduceEffectiveReviews(reviews);
-  const approvals = effectiveReviews.filter((review) => reviewState(review) === "APPROVED");
-  const changesRequested = effectiveReviews.filter(
-    (review) => reviewState(review) === "CHANGES_REQUESTED",
-  );
+  const { approvals, changesRequested } =
+    summarizeLatestOpinionatedReviews(latestOpinionatedReviews);
   const decision = String(reviewDecision || "").toUpperCase();
   const blockers = [];
 
   if (isDraft) blockers.push("draft");
-  if (decision === "CHANGES_REQUESTED" || changesRequested.length > 0) {
+  if (decision === "CHANGES_REQUESTED") {
     blockers.push("changes_requested");
   }
   if (decision === "REVIEW_REQUIRED") {
     blockers.push("review_required");
+    if (requiredApprovalCount > 0) {
+      blockers.push("required_approvals_missing");
+    }
+    if (requiresCodeOwnerReviews) {
+      blockers.push("code_owner_review_required");
+    }
+    if (requireLastPushApproval) {
+      blockers.push("last_push_approval_needed");
+    }
   }
-  if (requiredApprovalCount > approvals.length) {
-    blockers.push("required_approvals_missing");
-  }
-  if (requiresCodeOwnerReviews && decision !== "APPROVED") {
-    blockers.push("code_owner_review_required");
-  }
-  if (requireLastPushApproval && decision !== "APPROVED") {
-    blockers.push("last_push_approval_needed");
+  if (
+    !decision &&
+    (requiresApprovingReviews ||
+      requiresCodeOwnerReviews ||
+      requireLastPushApproval ||
+      requiredApprovalCount > 0)
+  ) {
+    blockers.push("review_decision_unknown");
   }
 
   return {
     blockers: [...new Set(blockers)],
-    effectiveReviews,
     approvals,
     changesRequested,
     requiredApprovalCount,
