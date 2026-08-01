@@ -7,6 +7,7 @@
 import { Buffer } from "node:buffer";
 import { spawnSync } from "node:child_process";
 import {
+  evaluatePolicyDataCompleteness,
   evaluateReviewPolicy,
   maxRequiredApprovalCount,
 } from "./lib/review-policy.mjs";
@@ -20,7 +21,10 @@ if (!repo || !repo.includes("/") || !Number.isInteger(pr) || pr <= 0) {
 const [owner, name] = repo.split("/");
 
 function ghJson(args) {
-  const r = spawnSync("gh", args, { encoding: "utf8", maxBuffer: 20 * 1024 * 1024 });
+  const r = spawnSync("gh", args, {
+    encoding: "utf8",
+    maxBuffer: 20 * 1024 * 1024,
+  });
   if (r.status !== 0) {
     const err = (r.stderr || r.stdout || "").trim();
     throw new Error(err || `gh failed (${r.status})`);
@@ -29,33 +33,78 @@ function ghJson(args) {
 }
 
 function ghOk(args) {
-  const r = spawnSync("gh", args, { encoding: "utf8", maxBuffer: 20 * 1024 * 1024 });
-  return { ok: r.status === 0, stdout: r.stdout || "", stderr: r.stderr || "" };
+  const r = spawnSync("gh", args, {
+    encoding: "utf8",
+    maxBuffer: 20 * 1024 * 1024,
+  });
+  return {
+    ok: r.status === 0,
+    stdout: r.stdout || "",
+    stderr: r.stderr || "",
+  };
 }
 
 function apiPath(path) {
   return path.split("/").map(encodeURIComponent).join("/");
 }
 
-function fetchAllReviews() {
-  const reviews = [];
+function fetchAllActiveRules(base) {
+  const rules = [];
+
   for (let page = 1; page <= 100; page++) {
-    const chunk = ghJson([
+    const response = ghOk([
       "api",
-      `repos/${owner}/${name}/pulls/${pr}/reviews?per_page=100&page=${page}`,
+      `repos/${owner}/${name}/rules/branches/${encodeURIComponent(base)}?per_page=100&page=${page}`,
     ]);
-    if (!Array.isArray(chunk)) throw new Error("Unexpected pull-request reviews response");
-    reviews.push(
-      ...chunk.map((review) => ({
-        author: { login: review.user?.login || null },
-        state: review.state,
-        submittedAt: review.submitted_at,
-        commit: { oid: review.commit_id || null },
-      })),
-    );
-    if (chunk.length < 100) return { reviews, complete: true, pages: page };
+
+    if (!response.ok) {
+      return {
+        readable: false,
+        complete: false,
+        pages: page - 1,
+        rules,
+        error:
+          (response.stderr || response.stdout || "").trim() ||
+          "request failed",
+      };
+    }
+
+    let chunk;
+    try {
+      chunk = JSON.parse(response.stdout);
+    } catch {
+      return {
+        readable: false,
+        complete: false,
+        pages: page - 1,
+        rules,
+        error: "could not parse active rules",
+      };
+    }
+
+    if (!Array.isArray(chunk)) {
+      return {
+        readable: false,
+        complete: false,
+        pages: page - 1,
+        rules,
+        error: "unexpected active-rules response",
+      };
+    }
+
+    rules.push(...chunk);
+    if (chunk.length < 100) {
+      return { readable: true, complete: true, pages: page, rules };
+    }
   }
-  return { reviews, complete: false, pages: 100 };
+
+  return {
+    readable: true,
+    complete: false,
+    pages: 100,
+    rules,
+    error: "active rules exceeded pagination safety limit",
+  };
 }
 
 function scanTargetWorkflows(base, mergeQueueEnabled) {
@@ -105,7 +154,9 @@ function scanTargetWorkflows(base, mergeQueueEnabled) {
       const meta = JSON.parse(file.stdout);
       const text = Buffer.from(meta.content || "", "base64").toString("utf8");
       if (/\bmerge_group\b/.test(text)) hasMergeGroupTrigger = true;
-      if (/\bpull_request(?:_target)?\b/.test(text)) hasPullRequestTrigger = true;
+      if (/\bpull_request(?:_target)?\b/.test(text)) {
+        hasPullRequestTrigger = true;
+      }
     } catch {
       complete = false;
     }
@@ -153,6 +204,15 @@ const query = `
           state
           enqueuedAt
           estimatedTimeToMerge
+        }
+        latestOpinionatedReviews(first: 100) {
+          pageInfo { hasNextPage }
+          nodes {
+            author { login }
+            state
+            submittedAt
+            commit { oid }
+          }
         }
         commits(last: 1) {
           nodes { commit { oid committedDate } }
@@ -211,6 +271,7 @@ const matchingRules = (branchRulesConnection.nodes || []).filter((rule) =>
 );
 
 let restProtection = null;
+let classicProtectionReadable = false;
 const protectionResponse = ghOk([
   "api",
   `repos/${owner}/${name}/branches/${encodeURIComponent(base)}/protection`,
@@ -224,75 +285,78 @@ if (protectionResponse.ok) {
       requiresCodeOwnerReviews: reviews?.require_code_owner_reviews ?? null,
       dismissesStaleReviews: reviews?.dismiss_stale_reviews ?? null,
       requireLastPushApproval: reviews?.require_last_push_approval ?? null,
-      requiredApprovingReviewCount: reviews?.required_approving_review_count ?? null,
+      requiredApprovingReviewCount:
+        reviews?.required_approving_review_count ?? null,
     };
+    classicProtectionReadable = true;
   } catch {
-    restProtection = null;
+    classicProtectionReadable = false;
   }
 }
 
-const rulesetPullRequest = [];
-const rulesResponse = ghOk([
-  "api",
-  `repos/${owner}/${name}/rules/branches/${encodeURIComponent(base)}`,
-]);
-if (rulesResponse.ok) {
-  try {
-    const list = JSON.parse(rulesResponse.stdout);
-    if (Array.isArray(list)) {
-      for (const rule of list) {
-        if (rule?.type === "pull_request" && rule.parameters) {
-          rulesetPullRequest.push({
-            require_code_owner_review: rule.parameters.require_code_owner_review ?? null,
-            dismiss_stale_reviews_on_push: rule.parameters.dismiss_stale_reviews_on_push ?? null,
-            require_last_push_approval: rule.parameters.require_last_push_approval ?? null,
-            required_approving_review_count:
-              rule.parameters.required_approving_review_count ?? null,
-            required_review_thread_resolution:
-              rule.parameters.required_review_thread_resolution ?? null,
-          });
-        }
-        if (rule?.type === "merge_queue") {
-          rulesetPullRequest.push({ merge_queue_rule: true, parameters: rule.parameters || {} });
-        }
-      }
-    }
-  } catch {
-    // Keep the source marked unavailable below.
+const activeRulesFetch = fetchAllActiveRules(base);
+const activePullRequestRules = [];
+const activeMergeQueueRules = [];
+
+for (const rule of activeRulesFetch.rules) {
+  if (rule?.type === "pull_request" && rule.parameters) {
+    activePullRequestRules.push({
+      require_code_owner_review:
+        rule.parameters.require_code_owner_review ?? null,
+      dismiss_stale_reviews_on_push:
+        rule.parameters.dismiss_stale_reviews_on_push ?? null,
+      require_last_push_approval:
+        rule.parameters.require_last_push_approval ?? null,
+      required_approving_review_count:
+        rule.parameters.required_approving_review_count ?? null,
+      required_review_thread_resolution:
+        rule.parameters.required_review_thread_resolution ?? null,
+      ruleset_source_type: rule.ruleset_source_type ?? null,
+      ruleset_source: rule.ruleset_source ?? null,
+      ruleset_id: rule.ruleset_id ?? null,
+    });
+  }
+  if (rule?.type === "merge_queue") {
+    activeMergeQueueRules.push(rule);
   }
 }
 
 const requiredApprovalCount = maxRequiredApprovalCount({
-  matchingRules,
   restProtection,
-  rulesetPullRequest,
+  activePullRequestRules,
 });
-const requiresApprovingReviews = Boolean(
-  matchingRules.some((rule) => rule.requiresApprovingReviews) ||
-    restProtection?.requiresApprovingReviews ||
-    requiredApprovalCount > 0,
-);
 const requiresCodeOwnerReviews = Boolean(
-  matchingRules.some((rule) => rule.requiresCodeOwnerReviews) ||
-    restProtection?.requiresCodeOwnerReviews ||
-    rulesetPullRequest.some((rule) => rule.require_code_owner_review === true),
+  restProtection?.requiresCodeOwnerReviews ||
+    activePullRequestRules.some(
+      (rule) => rule.require_code_owner_review === true,
+    ),
 );
 const dismissesStaleReviews = Boolean(
-  matchingRules.some((rule) => rule.dismissesStaleReviews) ||
-    restProtection?.dismissesStaleReviews ||
-    rulesetPullRequest.some((rule) => rule.dismiss_stale_reviews_on_push === true),
+  restProtection?.dismissesStaleReviews ||
+    activePullRequestRules.some(
+      (rule) => rule.dismiss_stale_reviews_on_push === true,
+    ),
 );
 const requireLastPushApproval = Boolean(
-  matchingRules.some((rule) => rule.requireLastPushApproval) ||
-    restProtection?.requireLastPushApproval ||
-    rulesetPullRequest.some((rule) => rule.require_last_push_approval === true),
+  restProtection?.requireLastPushApproval ||
+    activePullRequestRules.some(
+      (rule) => rule.require_last_push_approval === true,
+    ),
 );
 const requiresConversationResolution = Boolean(
-  matchingRules.some((rule) => rule.requiresConversationResolution) ||
-    rulesetPullRequest.some((rule) => rule.required_review_thread_resolution === true),
+  activePullRequestRules.some(
+    (rule) => rule.required_review_thread_resolution === true,
+  ),
+);
+const requiresApprovingReviews = Boolean(
+  restProtection?.requiresApprovingReviews ||
+    requiredApprovalCount > 0 ||
+    requiresCodeOwnerReviews ||
+    requireLastPushApproval,
 );
 
-const reviewFetch = fetchAllReviews();
+const latestReviewsConnection = prNode.latestOpinionatedReviews || {};
+const latestOpinionatedReviews = latestReviewsConnection.nodes || [];
 const evaluation = evaluateReviewPolicy({
   isDraft: prNode.isDraft,
   reviewDecision: prNode.reviewDecision,
@@ -301,7 +365,7 @@ const evaluation = evaluateReviewPolicy({
   requireLastPushApproval,
   requiresConversationResolution,
   requiredApprovalCount,
-  reviews: reviewFetch.reviews,
+  latestOpinionatedReviews,
 });
 
 const approvalsOnHead = evaluation.approvals.filter(
@@ -310,13 +374,17 @@ const approvalsOnHead = evaluation.approvals.filter(
 const staleApprovals = evaluation.approvals.filter(
   (review) => review.commit?.oid && review.commit.oid !== headOid,
 );
+
+const policyCompleteness = evaluatePolicyDataCompleteness({
+  branchProtectionGraphqlComplete:
+    branchRulesConnection.pageInfo?.hasNextPage !== true,
+  matchingClassicRuleCount: matchingRules.length,
+  classicProtectionReadable,
+  activeRulesComplete: activeRulesFetch.complete,
+});
+
 const blockers = [...evaluation.blockers];
-const policyDataComplete =
-  branchRulesConnection.pageInfo?.hasNextPage !== true && reviewFetch.complete;
-if (!policyDataComplete) blockers.push("policy_data_incomplete");
-if (requiresApprovingReviews && !prNode.reviewDecision) {
-  blockers.push("review_decision_unknown");
-}
+if (!policyCompleteness.complete) blockers.push("policy_data_incomplete");
 if (prNode.isInMergeQueue && prNode.mergeStateStatus !== "CLEAN") {
   blockers.push("merge_queue_not_merged");
 }
@@ -333,11 +401,13 @@ const out = {
   headOid,
   lastCommitOid,
   url: prNode.url,
-  complete: policyDataComplete,
+  complete: policyCompleteness.complete,
+  incompleteReasons: policyCompleteness.reasons,
   mergeQueue: {
     enabled: prNode.isMergeQueueEnabled,
     inQueue: prNode.isInMergeQueue,
     entry: prNode.mergeQueueEntry || null,
+    activeRuleCount: activeMergeQueueRules.length,
     note: prNode.isInMergeQueue
       ? "PR is in merge queue; watch until merged or closed. Queued is not merged."
       : prNode.isMergeQueueEnabled
@@ -346,23 +416,33 @@ const out = {
   },
   mergeGroupWorkflowCoverage,
   reviewPolicy: {
-    matchingBranchProtectionPatterns: matchingRules.map((rule) => rule.pattern),
+    matchingBranchProtectionPatterns: matchingRules.map(
+      (rule) => rule.pattern,
+    ),
+    classicRuleSelectionNote:
+      "Classic branch-protection patterns are diagnostic only. The REST branch-protection response is the effective classic rule because GitHub applies one classic rule at a time.",
     requiresApprovingReviews,
     requiredApprovalCount,
     requiresCodeOwnerReviews,
     dismissesStaleReviews,
     requireLastPushApproval,
     requiresConversationResolution,
-    requiredFollowUpChecks: requiresConversationResolution ? ["review-threads"] : [],
+    requiredFollowUpChecks: requiresConversationResolution
+      ? ["review-threads"]
+      : [],
     restProtection,
-    rulesetPullRequest,
+    activePullRequestRules,
     sources: {
       branchProtectionGraphqlComplete:
         branchRulesConnection.pageInfo?.hasNextPage !== true,
-      classicProtectionReadable: protectionResponse.ok,
-      rulesetsReadable: rulesResponse.ok,
-      reviewsPages: reviewFetch.pages,
-      reviewsComplete: reviewFetch.complete,
+      matchingClassicRuleCount: matchingRules.length,
+      classicProtectionReadable,
+      activeRulesReadable: activeRulesFetch.readable,
+      activeRulesComplete: activeRulesFetch.complete,
+      activeRulesPages: activeRulesFetch.pages,
+      activeRulesError: activeRulesFetch.error || null,
+      latestOpinionatedReviewsComplete:
+        latestReviewsConnection.pageInfo?.hasNextPage !== true,
     },
     codeownersNote: requiresCodeOwnerReviews
       ? "CODEOWNERS reviews are enforced; GitHub reviewDecision remains authoritative."
@@ -371,11 +451,14 @@ const out = {
       ? "Conversation resolution is enabled. Run review-threads.mjs; the policy alone is not a blocker when zero threads remain."
       : "Conversation resolution is not required by the detected policy.",
     lastPushNote: requireLastPushApproval
-      ? "GitHub reviewDecision is authoritative for last-push approval; approvals are not approximated from commit timestamps."
+      ? "GitHub reviewDecision is authoritative for last-push approval; approvals are not reconstructed from review timestamps."
       : null,
   },
   approvals: {
     reviewDecision: prNode.reviewDecision,
+    diagnosticSource: "latestOpinionatedReviews",
+    diagnosticsComplete:
+      latestReviewsConnection.pageInfo?.hasNextPage !== true,
     effective: evaluation.approvals.map((review) => review.author?.login),
     onHeadSha: approvalsOnHead.map((review) => review.author?.login),
     staleAfterPush: staleApprovals.map((review) => ({
