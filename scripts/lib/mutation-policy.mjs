@@ -10,6 +10,7 @@ const ACTIONS = [
   "draft_text",
   "post_review",
   "post_comment",
+  "post_issue_comment",
   "edit_own_comment",
   "reply_bot_thread",
   "reply_human_thread",
@@ -51,6 +52,7 @@ function buildProfile(mode) {
     allow(profile, [
       "post_review",
       "post_comment",
+      "post_issue_comment",
       "edit_own_comment",
       "reply_bot_thread",
     ]);
