@@ -40,7 +40,7 @@ Checkout PR head first (shared **Subagent preflight**).
 
 #### Cursor
 
-1. Launch **exactly one** `bugbot` via `review-bugbot`. The **entire prompt must contain exactly two non-empty lines**:
+1. Launch **exactly one** `bugbot` via `review-bugbot`. The **entire prompt must contain exactly two lines, and both lines must be non-empty**:
 
    ```text
    Full Repository Path: <absolute path to the checked-out repository>
