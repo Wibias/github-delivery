@@ -1,0 +1,343 @@
+import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+
+import { authorizeMutation } from "./mutation-policy.mjs";
+
+const PR_ACTIONS = new Set([
+  "post_review",
+  "post_comment",
+  "edit_own_comment",
+  "reply_bot_thread",
+  "reply_human_thread",
+  "resolve_thread",
+  "change_draft_state",
+  "request_reviewers",
+  "merge_pr",
+  "post_resolution_record",
+]);
+
+const SOCIAL_ACTIONS = new Set([
+  "post_review",
+  "post_comment",
+  "edit_own_comment",
+  "reply_bot_thread",
+  "reply_human_thread",
+  "create_follow_up_issue",
+  "post_resolution_record",
+]);
+
+function sha256(value) {
+  return createHash("sha256").update(String(value ?? ""), "utf8").digest("hex");
+}
+
+function required(value, name) {
+  if (value === undefined || value === null || value === "") {
+    throw new Error(`${name}_required`);
+  }
+  return value;
+}
+
+function positiveInteger(value, name) {
+  const number = Number(value);
+  if (!Number.isInteger(number) || number <= 0) {
+    throw new Error(`${name}_invalid`);
+  }
+  return number;
+}
+
+function repoParts(repo) {
+  const parts = String(repo || "").split("/");
+  if (parts.length !== 2 || !parts[0] || !parts[1]) {
+    throw new Error("repo_invalid");
+  }
+  return { owner: parts[0], name: parts[1] };
+}
+
+function commandFor(request) {
+  const repo = required(request.repo, "repo");
+  switch (request.action) {
+    case "merge_pr": {
+      const method =
+        request.mergeMethod === "squash"
+          ? "--squash"
+          : request.mergeMethod === "rebase"
+            ? "--rebase"
+            : "--merge";
+      return [
+        "gh",
+        "pr",
+        "merge",
+        String(positiveInteger(request.pr, "pr")),
+        "--repo",
+        repo,
+        method,
+        "--match-head-commit",
+        required(request.expectedHead, "expected_head"),
+      ];
+    }
+    case "post_comment":
+    case "post_resolution_record":
+      return [
+        "gh",
+        "pr",
+        "comment",
+        String(positiveInteger(request.pr, "pr")),
+        "--repo",
+        repo,
+        "--body",
+        required(request.body, "body"),
+      ];
+    case "post_review":
+      return [
+        "gh",
+        "pr",
+        "review",
+        String(positiveInteger(request.pr, "pr")),
+        "--repo",
+        repo,
+        "--comment",
+        "--body",
+        required(request.body, "body"),
+      ];
+    case "edit_own_comment": {
+      const { owner, name } = repoParts(repo);
+      return [
+        "gh",
+        "api",
+        `repos/${owner}/${name}/issues/comments/${positiveInteger(request.commentId, "comment_id")}`,
+        "--method",
+        "PATCH",
+        "-f",
+        `body=${required(request.body, "body")}`,
+      ];
+    }
+    case "reply_bot_thread":
+    case "reply_human_thread": {
+      const { owner, name } = repoParts(repo);
+      return [
+        "gh",
+        "api",
+        `repos/${owner}/${name}/pulls/${positiveInteger(request.pr, "pr")}/comments/${positiveInteger(request.commentId, "comment_id")}/replies`,
+        "--method",
+        "POST",
+        "-f",
+        `body=${required(request.body, "body")}`,
+      ];
+    }
+    case "resolve_thread":
+      return [
+        "gh",
+        "api",
+        "graphql",
+        "-f",
+        "query=mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{id isResolved}}}",
+        "-F",
+        `id=${required(request.threadId, "thread_id")}`,
+      ];
+    case "change_draft_state":
+      return request.ready === false
+        ? [
+            "gh",
+            "pr",
+            "ready",
+            String(positiveInteger(request.pr, "pr")),
+            "--repo",
+            repo,
+            "--undo",
+          ]
+        : [
+            "gh",
+            "pr",
+            "ready",
+            String(positiveInteger(request.pr, "pr")),
+            "--repo",
+            repo,
+          ];
+    case "request_reviewers": {
+      const reviewers = Array.isArray(request.reviewers)
+        ? request.reviewers.filter(Boolean)
+        : [];
+      if (!reviewers.length) throw new Error("reviewers_required");
+      const command = [
+        "gh",
+        "pr",
+        "edit",
+        String(positiveInteger(request.pr, "pr")),
+        "--repo",
+        repo,
+      ];
+      for (const reviewer of reviewers) {
+        command.push("--add-reviewer", reviewer);
+      }
+      return command;
+    }
+    case "close_linked_issue":
+      return [
+        "gh",
+        "issue",
+        "close",
+        String(positiveInteger(request.issue, "issue")),
+        "--repo",
+        repo,
+      ];
+    case "create_follow_up_issue":
+      return [
+        "gh",
+        "issue",
+        "create",
+        "--repo",
+        repo,
+        "--title",
+        required(request.title, "title"),
+        "--body",
+        required(request.body, "body"),
+      ];
+    default:
+      throw new Error(`unsupported_action:${request.action}`);
+  }
+}
+
+function runOrThrow(runner, command) {
+  const [executable, ...args] = command;
+  const result = runner(executable, args, {
+    encoding: "utf8",
+    maxBuffer: 20 * 1024 * 1024,
+  });
+  if (result.status !== 0) {
+    const detail = String(result.stderr || result.stdout || "").trim();
+    throw new Error(detail || `mutation_command_failed:${result.status}`);
+  }
+  return String(result.stdout || "").trim();
+}
+
+function verifyHead({ request, runner }) {
+  if (!PR_ACTIONS.has(request.action)) return null;
+  const expectedHead = required(request.expectedHead, "expected_head");
+  const output = runOrThrow(runner, [
+    "gh",
+    "pr",
+    "view",
+    String(positiveInteger(request.pr, "pr")),
+    "--repo",
+    required(request.repo, "repo"),
+    "--json",
+    "headRefOid",
+    "--jq",
+    ".headRefOid",
+  ]);
+  if (output !== expectedHead) {
+    throw new Error(
+      `expected_head_mismatch: expected ${expectedHead}, observed ${output || "missing"}`,
+    );
+  }
+  return output;
+}
+
+function verificationCommand(request) {
+  switch (request.action) {
+    case "merge_pr":
+      return [
+        "gh",
+        "pr",
+        "view",
+        String(request.pr),
+        "--repo",
+        request.repo,
+        "--json",
+        "state,mergedAt,headRefOid",
+      ];
+    case "close_linked_issue":
+      return [
+        "gh",
+        "issue",
+        "view",
+        String(request.issue),
+        "--repo",
+        request.repo,
+        "--json",
+        "state",
+      ];
+    case "change_draft_state":
+      return [
+        "gh",
+        "pr",
+        "view",
+        String(request.pr),
+        "--repo",
+        request.repo,
+        "--json",
+        "isDraft,headRefOid",
+      ];
+    default:
+      return null;
+  }
+}
+
+export function planMutationRequest(request = {}) {
+  if (request.schemaVersion !== 1) {
+    throw new Error("unsupported_request_schema");
+  }
+  const authorization = authorizeMutation({
+    mode: request.mutationMode,
+    action: request.action,
+    explicitInstruction: request.explicitInstruction === true,
+    exactTextConfirmed: request.exactTextConfirmed === true,
+  });
+  if (!authorization.allowed) {
+    throw new Error(`mutation_denied:${authorization.reason}`);
+  }
+  required(request.repo, "repo");
+  if (PR_ACTIONS.has(request.action)) {
+    positiveInteger(request.pr, "pr");
+    required(request.expectedHead, "expected_head");
+  }
+  if (SOCIAL_ACTIONS.has(request.action)) {
+    required(request.idempotencyKey, "idempotency_key");
+  }
+  if (request.action === "reply_human_thread") {
+    const actualHash = sha256(required(request.body, "body"));
+    if (request.exactTextSha256 !== actualHash) {
+      throw new Error("exact_text_hash_mismatch");
+    }
+  }
+  const normalized = structuredClone(request);
+  const command = commandFor(normalized);
+  return {
+    schemaVersion: 1,
+    kind: "shipping-github/mutation-plan",
+    request: normalized,
+    requestHash: sha256(JSON.stringify(normalized)),
+    action: normalized.action,
+    repo: normalized.repo,
+    pr: normalized.pr ?? null,
+    expectedHead: normalized.expectedHead ?? null,
+    idempotencyKey: normalized.idempotencyKey ?? null,
+    authorization,
+    command,
+  };
+}
+
+export function executeMutationRequest({
+  request,
+  execute = false,
+  runner = (command, args, options) => spawnSync(command, args, options),
+} = {}) {
+  const plan = planMutationRequest(request);
+  if (!execute) {
+    return { ...plan, executed: false, status: "dry_run" };
+  }
+
+  const observedHead = verifyHead({ request: plan.request, runner });
+  const stdout = runOrThrow(runner, plan.command);
+  const verify = verificationCommand(plan.request);
+  const verification = verify ? runOrThrow(runner, verify) : null;
+
+  return {
+    ...plan,
+    executed: true,
+    status: "succeeded",
+    observedHead,
+    stdout,
+    verification,
+  };
+}
