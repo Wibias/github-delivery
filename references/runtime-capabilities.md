@@ -26,6 +26,7 @@ Capabilities that exist only in the host must be declared by the agent environme
 SHIPPING_GITHUB_HOST=codex|cursor|claude|unknown
 SHIPPING_GITHUB_CONNECTOR_READ=true|false
 SHIPPING_GITHUB_CONNECTOR_WRITE=true|false
+SHIPPING_GITHUB_BROKERED_CONNECTOR_WRITE=true|false
 SHIPPING_GITHUB_CONNECTOR_RULESETS=true|false
 SHIPPING_GITHUB_CONNECTOR_REVIEW_THREADS=true|false
 SHIPPING_GITHUB_COMPOSIO=true|false
@@ -33,6 +34,8 @@ SHIPPING_GITHUB_BUGBOT=true|false
 SHIPPING_GITHUB_SUBAGENTS=true|false
 SHIPPING_GITHUB_REVIEW_TOOL=true|false
 ```
+
+`CONNECTOR_WRITE` means the host connector has write permission. `BROKERED_CONNECTOR_WRITE` means the shipping-github mutation broker has an adapter that enforces the same request, expected-head, idempotency, exact-text, audit, and verification contract through that connector. Permission without an adapter is not a usable mutation path.
 
 A Node process cannot discover a host connector that was never exposed to it. Inventing those capabilities would be charmingly optimistic and operationally useless.
 
@@ -54,12 +57,13 @@ A Node process cannot discover a host connector that was never exposed to it. In
   "github": {
     "repoReadable": true,
     "headWritable": true,
+    "brokerWriteAvailable": true,
     "rulesetsReadable": true,
     "reviewThreadsReadable": true
   },
   "fallbacks": {
     "githubReads": "connector",
-    "githubWrites": "connector",
+    "githubWrites": "connector-broker",
     "rateLimits": "composio",
     "bugReview": "complementary-lenses",
     "standardsReview": "review-tool",
@@ -74,7 +78,9 @@ A Node process cannot discover a host connector that was never exposed to it. In
 - A read-only workflow requires `readyForReadOnly: true`.
 - A mutation workflow requires `readyForMutation: true` before the first broker execution.
 - Connected GitHub reads are preferred when declared; authenticated `gh` is the fallback.
-- Connected writes are preferred when declared; authenticated writable `gh` is the fallback used by `github-mutate.mjs`.
+- A connected write path is usable only when a broker adapter is declared. Otherwise authenticated writable `gh` is used through `github-mutate.mjs`.
+- The write fallback is reported as `connector-broker`, `gh-broker`, or `unavailable`.
+- Raw connector write permission without a broker adapter produces `github_write_not_brokered` and cannot make the workflow mutation-ready.
 - Composio rate-limit checks are preferred when declared; authenticated `gh` is the fallback.
 - Bugbot is used only on Cursor when both host and capability declarations permit it. Every other host uses complementary lenses.
 - Subagents are used only when declared. Otherwise run the work in-session without claiming fan-out occurred.
@@ -96,7 +102,7 @@ For `merge PR #32`, the agent:
 
 1. loads `shipping-github` and `references/merge-pr.md`;
 2. discovers capabilities;
-3. stops if no reliable GitHub read or write path exists;
+3. stops if no reliable GitHub read or brokered write path exists;
 4. runs the authoritative gate;
-5. executes broker mutations through the selected available write path;
+5. executes broker mutations through `connector-broker` or `gh-broker`;
 6. reports degraded fallbacks when the ideal tool was unavailable.
