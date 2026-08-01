@@ -124,3 +124,13 @@ test("workflow requires a dedicated fixture credential before mutation", () => {
   assert.match(source, /node scripts\/verify-live-fixture-token\.mjs/);
   assert.doesNotMatch(source, /GH_TOKEN:\s*\$\{\{\s*github\.token\s*\}\}/);
 });
+
+test("credential preflight preserves the verifier exit code through tee", () => {
+  const source = readFileSync(new URL("../../.github/workflows/live-integration.yml", import.meta.url), "utf8");
+  const preflight = source.indexOf("name: Verify live fixture credential");
+  const exercise = source.indexOf("name: Exercise live GitHub lifecycle");
+  const block = source.slice(preflight, exercise);
+
+  assert.match(block, /set\s+-o\s+pipefail/);
+  assert.match(block, /verify-live-fixture-token\.mjs[\s\S]*\|\s*tee\s+live-fixture-credential\.json/);
+});
