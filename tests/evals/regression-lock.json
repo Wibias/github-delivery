@@ -146,9 +146,5 @@
   {
     "id": "R-ci-fix-unrelated-required-2026-07-31",
     "sha256": "82f5e2b040b4660c5e5a72cc665e1e826b86a2f4a7872b773fd8b7d3a42188b6"
-  },
-  {
-    "id": "R-bare-at-mention-2026-07-31",
-    "sha256": "3bbaddf4f6d5123daa734db6e3e581ff418e5145b7ee157919abeb4897f2a108"
   }
 ]
