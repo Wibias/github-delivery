@@ -1,13 +1,16 @@
 # Mutation modes
 
-Every workflow has an explicit mutation mode. Default to `read-only` unless the user request or a higher-level authorized workflow selects another mode.
+Every workflow has an explicit mutation mode. Default to `read-only` unless the natural-language user request or a higher-level authorized workflow selects another mode.
+
+The user never needs to choose CLI flags. The agent derives the narrowest appropriate mode from the request, loads the matching workflow, and passes the mode to internal scripts.
 
 ## Profiles
 
 | Action | read-only | review | maintainer | autonomous |
 |---|---:|---:|---:|---:|
 | Read evidence and draft text | yes | yes | yes | yes |
-| Publish reviews/comments and reply to bots | no | yes | yes | yes |
+| Publish PR/issue comments and reviews | no | yes | yes | yes |
+| Reply to a bot thread | no | yes | yes | yes |
 | Reply to a human thread | no | exact text required | exact text required | exact text required |
 | Push scoped code | no | no | yes | yes |
 | Post feedback-resolution records | no | no | yes | yes |
@@ -16,11 +19,23 @@ Every workflow has an explicit mutation mode. Default to `read-only` unless the 
 | Merge PR / close linked issue | no | no | explicit instruction | yes, only inside the governing workflow |
 | Create a follow-up issue | no | no | explicit instruction | yes |
 
-The profile is an upper bound, not a waiver. Draft/WIP gates, exact-text confirmation for human replies, linked-issue thanks, stack handling, thread ownership, and other social rules still apply.
+The profile is an upper bound, not a waiver. Draft/WIP gates, exact-text confirmation, linked-issue thanks, stack handling, thread ownership, expected-head checks, and workflow-specific requirements still apply.
 
-## Commands
+## Natural-language selection
 
-Inspect a complete profile:
+Examples:
+
+- `what is left on PR #32?` → `read-only`
+- `review PR #32 and post the findings` → `review`
+- `fix PR #32 and make it merge ready` → `maintainer`
+- `merge PR #32` → `maintainer` with explicit authority for the merge workflow
+- `watch and autonomously fix/merge PR #32` → `autonomous` only when the wording truly grants that scope
+
+Do not ask users to run scripts. These mappings are agent behavior.
+
+## Machine-readable policy
+
+Inspect a profile:
 
 ```bash
 node scripts/mutation-policy.mjs maintainer
@@ -32,20 +47,16 @@ Authorize one action:
 node scripts/mutation-policy.mjs maintainer merge_pr --explicit
 ```
 
-Run the authoritative gate with the active profile included in its output:
+This policy check does not itself perform a write. All GitHub network writes must go through `scripts/github-mutate.mjs`; see `references/github-mutation-broker.md`.
+
+## Broker request
 
 ```bash
-node scripts/ship-gate.mjs OWNER/REPO N --mutation-mode maintainer
+node scripts/github-mutate.mjs --request request.json
+node scripts/github-mutate.mjs --request request.json --execute --audit mutations.jsonl
 ```
 
-Resolve a review thread only after both the profile and social policy permit it:
-
-```bash
-node scripts/review-threads.mjs OWNER/REPO N \
-  --resolve PRRT_xxx \
-  --mutation-mode maintainer \
-  --explicit
-```
+The first form is a dry run. The second executes and records a versioned receipt.
 
 ## Denial reasons
 
@@ -53,3 +64,5 @@ node scripts/review-threads.mjs OWNER/REPO N \
 - `explicit_instruction_required`: maintainer mode needs a direct instruction for the action
 - `exact_text_confirmation_required`: a human-facing reply needs exact-text confirmation
 - `unknown_action`: the requested mutation is not part of the policy schema
+- `expected_head_mismatch`: the PR changed after the decision was made
+- request validation failures such as `idempotency_key_required`

@@ -2,75 +2,118 @@
 
 **Trigger:** “merge pr #N”, “merge pr #A and #B”, “merge it”, “ship pr #N”.
 
+## Public interface
+
+The user speaks naturally. `merge PR #32` must load this workflow through `SKILL.md`; the agent then runs the required scripts internally. Never require the user to construct a broker request or invoke Node manually.
+
 ## Goal
 
-Merge PR `#N` after readiness checks, comment why it’s useful, `@thanks` the PR author when they aren’t you, then **always** thank the **issue creator(s)** on each linked/fixed issue (when they aren’t you) and close out those issues.
+Merge PR `#N` after readiness checks, comment why it is useful, thank the PR author when appropriate, then thank and close linked issues. Every visible GitHub write must pass through `scripts/github-mutate.mjs`; bare `gh pr merge`, direct issue comments, and direct issue closure are forbidden.
 
-**Never** run `gh pr merge` alone. Ceremony (PR why-comment → merge → issue thank(+close)) is part of merge — skipping issue thanks is a failed merge workflow even if GitHub closed the issue via `Fixes`.
+## Mutation mode
+
+A direct request such as `merge PR #32` authorizes `maintainer` mode with explicit instruction for the `merge_pr` action and the linked close-out actions required by this workflow. It does not authorize unrelated writes. Human replies still require exact-text confirmation.
+
+Read `references/mutation-modes.md` and `references/github-mutation-broker.md` before the first write.
 
 ## Targets
 
 - Default: one PR.
-- Several PRs (“merge 775 and 778”): run **this whole file for each PR** (preflight → PR comment → merge → **linked-issue thanks** → cleanup). Report a per-PR table. ≤3 in-parent OK; **>3 → subagent fan-out** (shared rules), each subagent must still do issue thanks.
+- Several PRs: run this entire workflow for each PR.
+- More than three PRs: fan out one target per subagent, but keep one mutation audit per PR.
+- A stacked PR must hand off to `manage-stacked-prs` and merge bottom-up.
 
-## Preflight (abort merge if failing)
+## Preflight
 
-- Not draft / WIP / do-not-merge (shared gates)
-- Not conflicted; not behind base; **compiles/tests against current tip** (update + verify first per shared rules)
-- Required CI green on **current** SHA (shared **Required checks + review gate**; non-required: note; ask if unclear). If required CI fails: classify per shared **CI — branch fix vs flake** — **harden test/app timeouts before burning reruns**; do not merge on “one more retry.”
-- `reviewDecision` / CODEOWNERS (**when enforced**) / required reviewers / **required labels** not blocking
-- Unresolved review threads cleared (`scripts/review-threads.mjs`) when conversation resolution or useful threads remain
-- Approvals fresh on **head SHA** when dismiss-stale / last-push-approval is on (`scripts/pr-policy-gate.mjs`)
-- No unresolved necessary owner/maintainer (or other human) blockers you agree with
-- **Own reviews evidence:** a prior `[shipping-github] Merge ready` / full-review `approve-comment` this session, **or** run abbreviated bug+security+spec now, **or** warn and get explicit “merge anyway”
-- **Not mid-stack for trunk:** if base is another open PR head, abort and hand off to `manage-stacked-prs` (merge bottom-up). Do not `gh pr merge` into a parent feature branch thinking it shipped to trunk.
-- Fork head: only merge if fixes are already on the head (or you could push); do not merge knowing required fixes were skipped for lack of push access
-- **PR body** still contains `Fixes #N` when squash-merging (trailers lost on squash)
-- **Merge queue:** if enabled/in-queue, prefer queue merge and wait until **merged** (not merely enqueued); warn on missing `merge_group` workflow triggers
+1. Load PR metadata, author, body, labels, linked issues, base/head refs, stack state, and fork permissions.
+2. Run runtime capability discovery. Stop if required read or write capabilities are unavailable.
+3. Run the authoritative gate using the active mutation mode:
 
-If preflight fails, do **not** merge; report blockers.
+   ```bash
+   node scripts/ship-gate.mjs OWNER/REPO N --mutation-mode maintainer
+   ```
 
-## Self-merge (no self-thanks on the PR)
+4. Require decision `ready` on the current head SHA. A blocked or unknown result forbids merge.
+5. Require the PR not to be draft, WIP, held, conflicted, behind, or mid-stack.
+6. Confirm required CI, review policy, unresolved threads, feedback, base health, and merge queue state are clear.
+7. Confirm own bug, security, and spec/standards evidence exists this session, or obtain an explicit merge-anyway instruction after explaining the missing evidence.
+8. Confirm the branch was built and tested against the current base tip.
+9. Resolve linked issues through both GitHub closing references and body keywords.
+10. Select the repository’s normal merge method. Do not silently squash when trailers or history matter.
 
-Compare PR author login to the authenticated GitHub user (`gh api user --jq .login`).
+## Internal mutation sequence
 
-- **Author is someone else:** `@thanks` them in the PR merge comment.
-- **Author is you:** no `@` / thanks on the PR — why-it-helps only, then merge.
+Create a temporary audit file for this PR, for example `shipping-github-pr-32-mutations.jsonl`. Every request is first planned without `--execute`, inspected, and then executed.
 
-## Steps
+### 1. Pre-merge PR comment
 
-1. Load PR `#N`: author, title, body, labels, draft state, linked issues, diff summary, CI, reviews, stack/fork flags. Resolve self-merge. Apply security-offer / changelog nudge if not already handled this session.
-2. Run preflight (behind-base update + compile-against-tip + required-checks/review gate + stack check). Enforce git safety (no force-push; stop if dirty unrelated / push rejected / fork-head unwritable when fixes needed).
-3. Post a PR comment **before** merge using the **Merge thanks** shapes in `references/comment-depth.md` (user-facing — no `[shipping-github]` prefix on ceremonial merge thanks). **Why it helps** must be 2–3 concrete sentences (user-visible effect + key `path`/behavior + linked issue) — not “fixes the bug.”
+Prepare an idempotent `post_comment` request containing:
 
-**Others’ PRs:** thanks `@{author}` + why it helps + “Ship it.”  
-**Your own PRs:** why it helps only (no self-`@thanks`).
-4. Merge with the repo’s normal strategy (`gh pr merge` — prefer repo default; squash only if that’s the norm or user asked). Prefer deleting the head branch when the repo/UI option allows and the branch is not long-lived.
-5. **Linked issues — thank + auto-close (required):**
-   - Resolve links via `closingIssuesReferences` **and** `Fixes`/`Closes`/`Resolves #N` in the PR body. If both empty: say so in chat; still do PR ceremony.
-   - Prefer that the PR already uses closing keywords so GitHub auto-closes on merge.
-   - **After merge, for each linked/fixed issue** (do this even when GitHub already closed the issue):
-     - Load `gh issue view N --json author,state`.
-     - Comment on the **issue** (UTF-8 `--body-file`) using the issue thanks shape in `comment-depth.md`:
+- `mutationMode: "maintainer"`
+- the exact repository, PR number, and current `expectedHead`
+- a stable `idempotencyKey`, such as `merge-thanks-pr-32`
+- a concrete 2–3 sentence why-it-helps comment
+- thanks to the PR author only when they are not the authenticated user
 
-       ```markdown
-       Thanks @{issue_author} — fixed by PR `#<n>` (`<short-sha>`): <what changed for users / which failure mode is gone>.
-       ```
+Run it through:
 
-     - If you are the issue author: omit thanks/`@`; use `Fixed by PR #<n> (\`<sha>\`): <what changed>.`
-     - If the issue is **still open** after merge (missing closing keyword, partial fix, epic): close it pointing at the PR when the fix is complete; if it should stay open, say why and leave it open.
-   - **Do not** treat auto-close as “thanks done.” Auto-close ≠ issue thank comment.
-   - PR author was already thanked (or skipped if self) in step 3 — that is the PR-side thanks only.
-6. **Post-merge cleanup** (shared rules): confirm merged; confirm issues closed; confirm **issue thank comments posted**; delete same-repo head branch when safe; if this was a stack parent → `manage-stacked-prs` to retarget/restack children **before** deleting the parent branch.
-7. If a release tag / semver / changelog authoring is needed next: hand off to `git-workflow-and-versioning` (ask once).
-8. If the feature branch/worktree should be cleaned up: hand off to `finishing-a-development-branch`.
-9. Confirm merge (+ issue state + branch deleted?); report URLs.
+```bash
+node scripts/github-mutate.mjs --request request.json
+node scripts/github-mutate.mjs --request request.json --execute --audit mutations.jsonl
+```
+
+### 2. Merge
+
+Prepare a `merge_pr` request:
+
+```json
+{
+  "schemaVersion": 1,
+  "action": "merge_pr",
+  "mutationMode": "maintainer",
+  "explicitInstruction": true,
+  "repo": "OWNER/REPO",
+  "pr": 32,
+  "expectedHead": "reviewed-head-sha",
+  "mergeMethod": "merge"
+}
+```
+
+The broker must re-read the head before mutation and pin the merge using `--match-head-commit`. A moved head is a hard stop requiring a fresh gate run.
+
+### 3. Linked issue comments and closure
+
+For every linked or fixed issue:
+
+1. Read the issue author and current state.
+2. Post one idempotent issue thank/fixed comment through the broker-supported social mutation path.
+3. If the fix is complete and the issue remains open, execute `close_linked_issue` through the broker with explicit instruction.
+4. Leave epics or partially fixed issues open and state why.
+
+Auto-close does not replace the required issue comment.
+
+### 4. Cleanup
+
+- Confirm the PR is actually merged, not merely queued.
+- Confirm every required issue comment exists and complete issues are closed.
+- Delete the same-repository head branch only when safe and not shared.
+- Retarget stack children before deleting a stack parent branch.
+- Hand off versioning or worktree cleanup to the appropriate skill.
+
+## Failure handling
+
+- Broker denial: report its structured reason; perform no bypass write.
+- Expected-head mismatch: rerun the full gate on the new head.
+- Partial ceremony: continue only the missing idempotent step; do not duplicate completed comments.
+- Mutation command failure: include the action, receipt or plan hash, and error; never claim success.
+- Verification mismatch: treat the mutation as unresolved until repository state confirms it.
 
 ## Done when
 
-- Why-good PR comment posted; PR `@thanks` only when author ≠ you
-- PR merged (or blockers reported with no merge)
-- **Every** linked/fixed issue has a thank (or self “Fixed by…”) comment — **even if** GitHub already auto-closed it. Missing issue thank = workflow incomplete; go post it before reporting done
-- Linked issues **closed** when the fix is complete (auto-close via `Fixes`/`Closes` and/or explicit close)
-- Post-merge cleanup done or explicitly skipped with reason (kept branch / stack handoff)
-- Multi-PR asks: every PR in the list reached this bar (or a hard blocker row)
+- the authoritative gate was ready on the merged head;
+- the pre-merge why/comment was posted through the broker;
+- the broker receipt verifies the PR merged;
+- every linked issue received its required comment;
+- complete linked issues are closed;
+- cleanup is done or explicitly deferred;
+- the final response reports PR, issue, branch, and mutation receipt states.
