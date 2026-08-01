@@ -29,6 +29,57 @@ Weekly execution is opt-in. Set the repository variable `LIVE_FIXTURE_ENABLED=tr
 
 The workflow intentionally uses the current repository so the fixture PR receives the same CI, CodeQL, and dependency-review behavior as ordinary changes. A future dedicated fixture repository can run the same CLI without changing the scenario contract.
 
+### Approval-required runs
+
+GitHub can place pull-request workflows created by `GITHUB_TOKEN` into an approval-required state. The parent lifecycle job remains alive and logs:
+
+```text
+fixture_workflows_approval_required
+```
+
+Open the temporary fixture PR and choose **Approve workflows to run** before the observation timeout. If approval never arrives, the lifecycle fails closed and cleans up its namespaced resources.
+
+## Required check evidence
+
+A successful fixture must observe all current hosted checks:
+
+- `CI / Node 20 / ubuntu-latest`
+- `CI / Node 20 / windows-latest`
+- `CI / Node 20 / macos-latest`
+- `CI / Node 22 / ubuntu-latest`
+- `CI / Node 22 / windows-latest`
+- `CI / Node 22 / macos-latest`
+- at least one check from `Dependency Review`
+- at least one check from `CodeQL`
+
+Additional checks are allowed and retained in the receipt. The fixture never treats an empty check set as success.
+
+The observer reports stable failure or waiting codes:
+
+| Code | Meaning |
+|---|---|
+| `fixture_workflows_approval_required` | GitHub is waiting for manual workflow approval |
+| `fixture_checks_not_observed` | No PR checks appeared |
+| `fixture_checks_pending` | Required checks appeared but are still running |
+| `fixture_required_checks_missing` | One or more required workflows or matrix jobs never appeared |
+| `fixture_checks_failed` | An observed check failed, was cancelled, skipped, or timed out |
+
+Approval, missing, and pending states remain pollable until the deadline. A failed check stops immediately. Any unresolved state at timeout fails the lifecycle and triggers best-effort cleanup.
+
 ## Evidence contract
 
-A successful receipt contains every required lifecycle event exactly once, records a non-ready draft decision, and records `stale_head_rejected` with outcome `rejected`. Missing cleanup or an accepted stale-head mutation fails the run.
+A successful receipt contains every required lifecycle event exactly once, records a non-ready draft decision, records `stale_head_rejected` with outcome `rejected`, and includes the complete normalized check evidence:
+
+```json
+{
+  "checks": {
+    "conclusion": "success",
+    "count": 8,
+    "expectedWorkflows": ["CI", "CodeQL", "Dependency Review"],
+    "observedWorkflows": ["CI", "CodeQL", "Dependency Review"],
+    "checks": []
+  }
+}
+```
+
+The real `checks` array contains one normalized entry for every observed check. A zero count, incomplete expected set, unsuccessful conclusion, missing cleanup, or accepted stale-head mutation invalidates the receipt.
