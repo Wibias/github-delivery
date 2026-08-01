@@ -29,6 +29,7 @@ function componentSummary(component) {
 export function combineShipGateResults({
   snapshot,
   requiredChecks,
+  baseHealth,
   reviewPolicy,
   reviewThreads,
   wake,
@@ -36,6 +37,7 @@ export function combineShipGateResults({
 } = {}) {
   const authoritative = {
     requiredChecks,
+    baseHealth,
     reviewPolicy,
     reviewThreads,
     wake,
@@ -82,6 +84,22 @@ export function combineShipGateResults({
       message: workflowWarning,
     });
   }
+  if ((baseHealth?.baseOnlyFailures || []).length) {
+    advisories.push({
+      code: "base_only_failures",
+      count: baseHealth.baseOnlyFailures.length,
+      message:
+        "The base tip has failures that are not present on this PR head; track them separately without expanding this PR.",
+    });
+  }
+  if ((baseHealth?.sharedFailures || []).length) {
+    advisories.push({
+      code: "base_preexisting_failures",
+      count: baseHealth.sharedFailures.length,
+      message:
+        "The same failures are present on the base tip. They may block merging, but they do not automatically belong in this PR's implementation scope.",
+    });
+  }
 
   const uniqueBlockers = [...new Set(blockers)];
   const uniqueUnknowns = [...new Set(unknowns)];
@@ -109,6 +127,16 @@ export function combineShipGateResults({
     advisories,
     components: {
       requiredChecks: componentSummary(requiredChecks),
+      baseHealth: {
+        ...componentSummary(baseHealth),
+        baseOid: baseHealth?.baseOid || null,
+        comparisonRequired: baseHealth?.comparisonRequired === true,
+        sharedFailureCount: (baseHealth?.sharedFailures || []).length,
+        prOnlyFailureCount: (baseHealth?.prOnlyFailures || []).length,
+        unknownFailureCount: (baseHealth?.unknownFailures || []).length,
+        baseOnlyFailureCount: (baseHealth?.baseOnlyFailures || []).length,
+        scopeRecommendation: baseHealth?.scopeRecommendation || "investigate",
+      },
       reviewPolicy: componentSummary(reviewPolicy),
       reviewThreads: componentSummary(reviewThreads),
       wake: componentSummary(wake),
