@@ -3,10 +3,15 @@
  * List unresolved review threads from one snapshot, or explicitly resolve one.
  * Usage:
  *   node scripts/review-threads.mjs OWNER/REPO PR_NUMBER [--snapshot FILE]
- *   node scripts/review-threads.mjs OWNER/REPO PR_NUMBER --resolve PRRT_xxx
+ *   node scripts/review-threads.mjs OWNER/REPO PR_NUMBER --resolve PRRT_xxx --mutation-mode maintainer --explicit
  */
 import { spawnSync } from "node:child_process";
 import { captureLiveSnapshot } from "./lib/live-snapshot.mjs";
+import {
+  authorizeMutation,
+  extractMutationModeArgs,
+  mutationProfile,
+} from "./lib/mutation-policy.mjs";
 import { evaluateReviewThreadsSnapshot } from "./lib/snapshot-evaluators.mjs";
 import {
   parseSnapshotGateArgs,
@@ -14,7 +19,7 @@ import {
 } from "./lib/snapshot-input.mjs";
 
 const usage =
-  "Usage: node scripts/review-threads.mjs OWNER/REPO PR_NUMBER [--snapshot FILE] [--resolve PRRT_xxx] [--expected-head SHA] [--max-age-seconds N]";
+  "Usage: node scripts/review-threads.mjs OWNER/REPO PR_NUMBER [--snapshot FILE] [--resolve PRRT_xxx] [--expected-head SHA] [--max-age-seconds N] [--mutation-mode MODE] [--explicit]";
 
 function resolveThread(threadId) {
   const mutation = `
@@ -45,12 +50,33 @@ function resolveThread(threadId) {
 }
 
 try {
-  const args = parseSnapshotGateArgs(process.argv.slice(2), {
+  const mutationArgs = extractMutationModeArgs(process.argv.slice(2));
+  const args = parseSnapshotGateArgs(mutationArgs.argv, {
     usage,
     allowResolve: true,
   });
   if (args.resolveId) {
-    process.stdout.write(`${JSON.stringify(resolveThread(args.resolveId), null, 2)}\n`);
+    const authorization = authorizeMutation({
+      mode: mutationArgs.mode,
+      action: "resolve_thread",
+      explicitInstruction: mutationArgs.explicitInstruction,
+    });
+    if (!authorization.allowed) {
+      throw new Error(
+        `Mutation denied for resolve_thread in ${authorization.mode}: ${authorization.reason}`,
+      );
+    }
+    process.stdout.write(
+      `${JSON.stringify(
+        {
+          mutationMode: mutationArgs.mode,
+          authorization,
+          data: resolveThread(args.resolveId),
+        },
+        null,
+        2,
+      )}\n`,
+    );
     process.exit(0);
   }
   const snapshot = args.snapshotPath
@@ -66,9 +92,18 @@ try {
         pr: args.pr,
         maxAgeSeconds: args.maxAgeSeconds,
       });
-  const output = evaluateReviewThreadsSnapshot(snapshot);
+  const output = {
+    ...evaluateReviewThreadsSnapshot(snapshot),
+    mutationMode: mutationArgs.mode,
+    mutationProfile: mutationProfile(mutationArgs.mode),
+  };
   process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
-  process.exitCode = output.decision === "ready" ? 0 : output.decision === "blocked" ? 1 : 2;
+  process.exitCode =
+    output.decision === "ready"
+      ? 0
+      : output.decision === "blocked"
+        ? 1
+        : 2;
 } catch (error) {
   console.error(String(error?.message || error));
   process.exit(2);
