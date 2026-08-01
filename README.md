@@ -1,235 +1,125 @@
 # shipping-github
 
-One Agent Skill for the whole GitHub **ship loop** — from “is this issue still a problem on latest `dev`?” to “merge it and thank the reporter” — without pasting the same long prompt every time.
+A GitHub shipping skill for agents. You speak naturally; the agent loads the skill, selects the workflow, runs the evidence and policy scripts internally, and performs only the GitHub writes authorized by that request.
 
-Thin babysit skills (Cursor built-in, OpenAI `babysit-pr`, Claude marketplace copies) mostly watch CI. This skill owns the **workflows you actually repeat**: research issues, open linked PRs only when needed, fix owner/bot review noise, wait for the next round, decide what’s left, review for real bugs/security, settle before claiming ready, and close the social loop when you merge.
+```text
+merge PR #32
+what is left on PR #41?
+fix the review comments on PR #18 and make it merge ready
+watch PR #77 until it merges or needs me
+research issue #90 on the latest development branch
+```
 
-## Why it helps
+You do **not** need to invoke Node scripts yourself. They are the skill’s internal safety and evidence machinery.
 
-| Pain | What the skill does |
+## How natural-language routing works
+
+1. The agent host discovers `SKILL.md` from its frontmatter.
+2. The request is routed to one focused workflow under `references/`.
+3. The workflow runs runtime capability discovery and the authoritative ship gate.
+4. Read-only helpers explain blockers when needed.
+5. Every visible GitHub write passes through the mutation broker.
+6. The agent verifies the resulting repository state and reports it.
+
+Example:
+
+```text
+merge PR #32
+```
+
+routes to `references/merge-pr.md`, runs `scripts/ship-gate.mjs`, prepares guarded mutation requests, posts the pre-merge explanation, performs a head-pinned merge, handles linked issue comments and closure, and verifies cleanup.
+
+## Core guarantees
+
+- One evidence snapshot per decision.
+- One authoritative `ready`, `blocked`, or `unknown` result.
+- Required checks preserve app/integration identity and fail closed on incomplete evidence.
+- Base-health comparison distinguishes PR-only failures from failures already reproduced on the base tip.
+- Current review policy, stale approvals, last-push approval, merge queue state, and unresolved review threads are evaluated.
+- Trusted feedback requires feedback-specific resolution records.
+- CODEOWNERS mapping is advisory; GitHub’s enforced review decision remains authoritative.
+- Natural-language requests select the narrowest mutation mode: `read-only`, `review`, `maintainer`, or `autonomous`.
+- Human replies always require exact-text confirmation.
+- PR mutations re-check the expected head immediately before execution.
+- Merge operations are pinned with `--match-head-commit`.
+- Social writes require idempotency keys and produce versioned receipts.
+- Stacked PRs are handed to `manage-stacked-prs` and merged bottom-up.
+
+## Internal architecture
+
+| Surface | Role |
 |---|---|
-| Same mega-prompt every session | Short triggers → dedicated workflows under `references/` |
-| Unclear if an issue is still real | Research on latest development tip: fixed? open PR? duplicate? **security relevance**? priority; **comment on the issue** |
-| Duplicate PRs / fork-only PRs / comment spam | Create-PR: one PR unless batch asked; canonical repo only; verify link + assign self; edit comments never double-post |
-| Bot + human review ping-pong | Triage owners/maintainers first, then bots; **own bug + security + Spec/Standards**; keep going until merge-ready |
-| Soft “needs maintainer ack” while CI is red | Soft opinions are **not** stop conditions; babysit until green / hard blocker |
-| 4+ PRs babysat one-by-one (too slow) | **>3 PRs/issues → subagent fan-out** (one per target, parallel/chunked) |
-| Green on a stale base | Update from base, then **compile against tip** before ready / approve / merge |
-| False merge-ready with open threads | GraphQL `reviewThreads` must be clear; linked-issue notify when ready is posted |
-| CI green, bots still arriving | **Thin settle** (~3–5 min quiet + recheck) before merge-ready / approve-comment |
-| Watch merges `dev` then only waits CI | Forbidden — run `watch-wake-gate.mjs`; exit `1` = fix OWNER top-level comments first |
-| Cursor/Codex thin babysit steals the prompt | Personal redirects `overrides/babysit` + `overrides/babysit-pr` → this skill |
-| Watch “ready” ≠ merge-ready | Watch milestones are CI/review quiet only — full bar is fix-pr/full-review |
-| Status looser than merge-ready | Status uses the **same** evidence bar (tip, protection, CODEOWNERS, stacks, policy) |
-| Required checks / CODEOWNERS / queue / stale approvals | Helpers: `required-checks`, `codeowners-for-pr`, `review-threads`, `pr-policy-gate` |
-| Merge queue “queued” treated as done | Queued ≠ merged; keep watching until actually merged |
-| CODEOWNERS file but no enforcement | Detect **require code owner reviews** vs suggestion-only |
-| Approval on old SHA after push | Re-check dismiss-stale / last-push-approval on tip |
-| Mid-stack merged as if trunk | Detect stack → hand off to **manage-stacked-prs** |
-| Oversized PR / finish branch | Hand off: **split-to-prs**, **finishing-a-development-branch** |
-| Can’t push fork head but “fixed” anyway | Fork-head unwritable → hard stop |
-| Windows comment mojibake (`Run` → `�un`) | UTF-8 file + `gh --input` / `--body-file` (never PowerShell string pipes) |
-| Markdown `\_` spam in comments | Backticks for identifiers; no backslash-escaping |
-| Agent spam on GitHub | No auto-replies to humans without your exact text; limited thread resolves; inline replies in-thread |
-| Vague “looks good / CI green” reviews | **`comment-depth.md`** — research, security, verdict, merge-ready, status with paths/SHAs/evidence |
-| Shallow security “no findings” | `security-scope.mjs` + coverage matrix + HIGH/MEDIUM confidence + Do-Not-Flag; crypto/session, business-logic, removed-controls, IaC/Docker, **Agentic Skills Top 10** when skill/MCP paths change; High+ pass gate; auto `ai-agent-security` / deps audit when flagged; **never** Cursor harness `security-review` / `review-security`; **never** auto red-team second pass |
-| Shallow own-bug “LGTM” | `bug-scope.mjs` + `bug-review.md`: Bugbot when Cursor + complementary lenses (silent failures / leaks / edges) **incl. Must-probe** error-propagation / lock→409/503; Claude/Codex never fake Bugbot; skip non-logic diffs; **never** auto deep multi-agent kits |
-| Flaky CI “fixed” by rewriting tests | Classify carefully — **don’t** weaken CI; **do** harden real test timeouts instead of burning reruns |
-| Required CI red but “unrelated / introduced elsewhere” left unfixed | Still **minimal-fix in this PR** after base update — required green is the goal; only true infra/permissions/product decisions hard-block |
-| Draft / WIP merged by accident | Hard gates before merge-ready claims or merge; draft→ready only after ask |
-| Rate-limit thrash on dense polls | Composio GraphQL rate limit → `gh` fallback; backoff |
-| Bare `gh pr merge` skips ceremony | Why-it-helps on PR; **thank issue author** even after `Fixes` auto-close; never done without that |
+| `SKILL.md` | Host discovery, natural-language routing, hard policy |
+| `references/*.md` | Focused workflows and review standards |
+| `scripts/ship-gate-snapshot.mjs` | Capture one paginated evidence snapshot |
+| `scripts/ship-gate.mjs` | Produce one authoritative ship decision |
+| `scripts/github-mutate.mjs` | Dry-run and execute authorized GitHub writes |
+| `scripts/runtime-capabilities.mjs` | Discover host/tool capabilities and safe fallbacks |
+| `scripts/validate-evals.mjs` | Execute offline routing and safety contracts |
 
-Shared rules live in one place (`references/shared-rules.md`): scope lock, git safety (no force-push, stop on dirty trees), evidence sweep before “ready.”
+The final two scripts are introduced by the next stacked PRs; the table documents the intended complete stack.
+
+## Mutation safety
+
+The public interface remains natural language. Internally, a workflow creates a versioned request such as:
+
+```json
+{
+  "schemaVersion": 1,
+  "action": "merge_pr",
+  "mutationMode": "maintainer",
+  "explicitInstruction": true,
+  "repo": "OWNER/REPO",
+  "pr": 32,
+  "expectedHead": "reviewed-head-sha",
+  "mergeMethod": "merge"
+}
+```
+
+The broker defaults to dry-run. Execution requires `--execute`, re-checks the PR head, and emits an auditable receipt. See `references/github-mutation-broker.md` and `references/mutation-modes.md`.
 
 ## Workflows
 
-| Ask something like… | Loads |
+| Request | Workflow |
 |---|---|
-| Fix CodeRabbit/Codex / humans → merge-ready | `references/fix-pr-bots.md` |
-| Watch / monitor / babysit until merged/closed | `references/watch-pr.md` |
-| Re-review after your review + new bots | `references/re-review-pr.md` |
-| Research issue(s) on latest development | `references/research-issue.md` |
-| Create PR for issue → merge-ready | `references/create-pr-for-issue.md` |
-| Full review + verdict (babysit to green) | `references/full-review-pr.md` |
+| Fix comments and make merge-ready | `references/fix-pr-bots.md` |
+| Watch or babysit a PR | `references/watch-pr.md` |
+| Re-review after commits or reviews | `references/re-review-pr.md` |
+| Research an issue on development tip | `references/research-issue.md` |
+| Create a linked PR for an issue | `references/create-pr-for-issue.md` |
+| Full bug, security, and standards review | `references/full-review-pr.md` |
 | Security review | `references/security-review.md` |
-| Bug review (own-bug axis; also via merge-ready/full-review) | `references/bug-review.md` |
-| What’s left / is it merge ready? | `references/status.md` |
-| Merge + thanks + issue close-out | `references/merge-pr.md` |
+| Status or merge-readiness | `references/status.md` |
+| Merge with linked-issue close-out | `references/merge-pr.md` |
 
-Router: `SKILL.md`. Always loads `references/shared-rules.md` first.
+## Installation
 
-## Gate helpers
-
-Concrete evidence scripts (see `references/gate-helpers.md`):
-
-| Script | Role |
-|---|---|
-| `scripts/required-checks.mjs` | Required CI contexts / modern checks / rulesets + live rollup |
-| `scripts/codeowners-for-pr.mjs` | Map PR files → CODEOWNERS on base + review requests |
-| `scripts/review-threads.mjs` | Paginate GraphQL unresolved review threads (+ optional resolve) |
-| `scripts/pr-policy-gate.mjs` | Code-owner **enforcement**, dismiss-stale / last-push approvals, merge queue / `merge_group` warn |
-| `scripts/watch-wake-gate.mjs` | Exit `1` until a **non-merge** commit addresses OWNER comments **and** PR is not DIRTY/BEHIND — ACK-only does not clear |
-| `scripts/security-scope.mjs` | PR file → required security surfaces (incl. crypto/session, business-logic, IaC/Docker, removed-controls, **agentic skills/MCP**); flags `ai-agent-security` + AST10 + deps audit; `adversarialPassDefault: false` |
-| `scripts/bug-scope.mjs` | PR file → `skipDeepBugReview` vs deep; complementary lenses; `requireBugbot: when_available`; `deepMultiAgentDefault: false` |
-
-### Bug review (own-bug axis)
-
-Merge-ready / full-review / create-PR run **`references/bug-review.md`**:
-
-| Host | Default deep path |
-|---|---|
-| **Cursor** | Bugbot (`review-bugbot`) **plus** one complementary lenses pass (silent failures / resource leaks / edge cases) |
-| **Claude** | Complementary lenses only (never claim Bugbot) |
-| **Codex** | Optional Codex `/review` once, then complementary (never claim Bugbot) |
-
-Complementary **Must-probe** (Bugbot often misses): typed catch in detached/OAuth work, `finally`/`close` not replacing the original error, lock contention → retryable 409/503, deterministic lock/cleanup regressions. Security Pass on lock/CAS paths does **not** skip that bug check.
-
-Docs/CSS/lockfile-only PRs may `skipDeepBugReview` (record n/a). Deep multi-agent kits (pr-review-toolkit, ultrareview, Codex adversarial-review) are **opt-in only** — same rule as security adversarial.
-
-### Security review + adversarial / red-team
-
-Normal **security review** (`references/security-review.md`) is defensive: scope script → coverage matrix → HIGH-confidence findings → High+ pass gate. Skill/MCP install paths also pull **Agentic Skills Top 10** (`references/agentic-skills-top10.md`) + `ai-agent-security`.
-
-**Full review / merge-ready / create-PR** use that **same** shipping-github security workflow for the security axis — **not** Cursor’s built-in Task `security-review` / skill `review-security` (forbidden; shallow harness stub).
-
-**Adversarial / red-team second pass** (garak, promptfoo, PyRIT, extra attack subagent):
-
-| Rule | Detail |
-|---|---|
-| Default | **Never** on the agent’s own initiative (`adversarialPassDefault: false` in scope JSON) |
-| When allowed | Only if **you** explicitly ask this session — e.g. “adversarial pass”, “red team”, “red-team”, “second security pass”, “run garak/promptfoo” |
-| Not enough | Saying “security review” / “yes” to the security offer / AST10 flag / `ai-agent-security` mentioning red-teaming |
-| Pass gate | Does **not** block a normal **Pass** unless you said the review is incomplete without it |
-
-Policy lives in `security-review.md` §1b, hard rule #12 in `SKILL.md`, `shared-rules.md`, and scope `instructions[]`.
-
-### Watch ordering (hard)
-
-Every watch wake:
-
-1. Run `watch-wake-gate.mjs` — exit `1` → triage OWNER comments (top-level conversation counts; not only inline threads). Clear with a **non-merge** commit or `[shipping-github] Addressed owner feedback — …`.
-2. Then tip-update if behind.
-3. Then CI / bots.
-
-Never: merge `dev` → idle on `windows-latest` + CodeRabbit while an owner note is still open.
-
-## Reliability bar (what “merge ready” means)
-
-Before `[shipping-github] Merge ready` (and full-review `approve-comment`):
-
-1. Useful human + bot threads clear (or declined with policy)
-2. Own **bug + security + Spec/Standards** done
-3. Up to date with base and **compiles against tip**
-4. Required CI green (flake budget respected)
-5. Protection / `reviewDecision` / enforced CODEOWNERS / stale-approval / merge-queue policy clear
-6. Unresolved GraphQL review threads clear
-7. **Thin settle** elapsed (~3–5 min quiet + recheck; activity resets; two-window cap)
-8. Linked-issue notify posted (when issues are linked)
-
-Watch may report “CI/reviews quiet — still watching” without claiming that full bar. Status never uses a looser bar than merge-ready.
-
-### Merge ceremony (required)
-
-`merge-pr` is not bare `gh pr merge`:
-
-1. Why-it-helps PR comment (`@thanks` PR author only if not you)
-2. Merge
-3. For **each** linked/fixed issue: thank the **issue** author (omit `@` if you are the reporter) — **even if** GitHub already auto-closed via `Fixes`
-4. Post-merge cleanup
-
-Multi-PR merges (“merge 775 and 778”) run the full ceremony **per PR**.
-
-## Competing babysit / security skills
-
-| Source | Path / install | Problem |
-|---|---|---|
-| Cursor built-in **babysit** | `~/.cursor/skills-cursor/babysit` (re-syncs if deleted) | Thin conflict/CI stub; merge-base → wait-on-CI |
-| OpenAI optional **babysit-pr** | `npx skills add … --skill babysit-pr` / `.codex/skills/babysit-pr` | Watcher script loop; steals watch/babysit prompts if installed |
-| Claude marketplace copies | e.g. ce-babysit-pr / skills.sh babysit-pr | Same class of conflict if installed |
-| Cursor built-in **review-security** | `~/.cursor/skills-cursor/review-security` | Launches harness Task `security-review` — shallow; skips our matrix/pass gate |
-
-**Mitigations shipped with this repo:**
-
-1. Prefer **shipping-github** (description leads with babysit/watch/monitor).
-2. Personal redirects from `overrides/`:
-   - `babysit` → shipping-github watch/fix
-   - `babysit-pr` → shipping-github watch/fix (preempt Codex/Claude installs)
-   - `review-security` → shipping-github `references/security-review.md` (never harness Task)
-3. Cursor user rule: prefer shipping-github over built-in babysit.
-4. Hard gate: `scripts/watch-wake-gate.mjs` on every watch wake.
-5. Hard rule: merge-ready / full-review / create-PR security axis = shipping-github security-review — **never** harness `security-review`.
-
-You cannot permanently delete Cursor’s built-ins; win on discovery + redirect instead.
-
-## Install
-
-Copy or symlink this folder into agent skills directories:
+Copy or symlink the repository into the skill directories used by your agent host:
 
 ```text
 ~/.agents/skills/shipping-github
 ~/.cursor/skills/shipping-github
-~/.codex/skills/shipping-github      # optional, for Codex
-~/.claude/skills/shipping-github     # optional, for Claude Code
+~/.codex/skills/shipping-github
+~/.claude/skills/shipping-github
 ```
 
-Also install the redirects (same machine):
-
-```text
-~/.agents/skills/babysit      ← overrides/babysit/
-~/.agents/skills/babysit-pr   ← overrides/babysit-pr/
-~/.agents/skills/review-security ← overrides/review-security/
-~/.cursor/skills/babysit
-~/.cursor/skills/babysit-pr
-~/.cursor/skills/review-security
-~/.codex/skills/babysit       # optional
-~/.codex/skills/babysit-pr    # optional
-~/.codex/skills/review-security  # optional
-```
-
-Folder name for the main skill must stay `shipping-github` (matches frontmatter `name`).
-
-## Requirements
+Requirements:
 
 - Git
-- [GitHub CLI](https://cli.github.com/) (`gh auth login`)
-- Node.js (for `scripts/*.mjs` helpers)
-- Optional: Composio GitHub toolkit connected (faster rate-limit checks + inline reply helper)
+- GitHub CLI authenticated with `gh auth login`
+- Node.js 20 or newer
+- Optional connected GitHub/Composio tools and host-specific review agents
 
-## Quick use
-
-- `research issue #88` / `research issues #88 #91`
-- `create a pr for issue #88 … merge ready, don't merge`
-- `create separate PRs for #52 and #62` — **explicit batch only**
-- `fix coderabbit/codex on pr #42 and make it merge ready`
-- `what's left on pr #42` — same evidence bar as merge-ready
-- `watch pr #42` / `babysit pr #42` — reviews first (wake gate), then CI, until merged/closed
-- `full review on pr #42` — babysit to green + verdict
-- `security review on pr #42`
-- `merge pr #42` / `merge pr 775 and 778` — full ceremony per PR, including issue-author thanks
-
-## Boundary
-
-| Skill | Owns |
-|---|---|
-| **shipping-github** | GitHub issue/PR ship loop, research-on-tip, watch CI/reviews, merge ceremony, gate helpers, babysit / review-security redirects |
-| **security-review** (knowledge) | Category checklist / secrets scan depth — **not** PR ship-loop entrypoint; shipping-github loads it when useful |
-| **issue-workflow** | Filing/breaking down tracker artifacts (PRDs, slices) — not “is it fixed on tip?” |
-| **git-workflow-and-versioning** | Local commit discipline, semver, changelog *authoring*, release tags (this skill only nudges missing entries) |
-| Cursor **babysit** / OpenAI **babysit-pr** | Thin watcher stubs — redirected away when personal overrides are installed |
-| **manage-stacked-prs** | Stack inspect / restack / retarget / bottom-up merge — shipping detects stacks and hands off |
-| **split-to-prs** | Split oversized branch into reviewable PRs — hand off when scope explodes |
-| **finishing-a-development-branch** | Post-ship branch/worktree cleanup menu — hand off after merge |
-| **review** | Spec + Standards axes — shipping runs/hands off on merge-ready paths |
-
-## Validation
-
-Structural + evidence gates use [Skill Ratchet](https://github.com/Wibias/skill-ratchet):
+## Development
 
 ```bash
-node /path/to/skill-ratchet/scripts/skill-ratchet.mjs validate --skill-root "$PWD"
+npm run check
 ```
 
-## License
+CI runs the complete suite on Node 20 and 22 across Ubuntu, Windows, and macOS.
 
-MIT
+## Current status
+
+The evidence and decision core, base-health classification, feedback resolution, mutation profiles, and guarded mutation broker are implemented. Runtime capability discovery, executable behavioral evaluations, deterministic packaging, release provenance, live GitHub integration fixtures, and deeper review-scope analysis remain planned.
+
+MIT licensed.
