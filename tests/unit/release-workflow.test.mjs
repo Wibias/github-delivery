@@ -19,7 +19,21 @@ test("release workflow uses least privilege and pinned actions", () => {
 
 test("tag publish rebuilds, attests, and refuses an existing release", () => {
   assert.match(workflow, /Rebuild from the tagged commit/);
-  assert.match(workflow, /actions\/attest@59d89421af93a897026c735860bf21b6eb4f7b26/);
+
+  const provenanceAttest = workflow.match(
+    /- name: Attest release provenance\n\s+uses: actions\/attest@([0-9a-f]{40})/,
+  );
+  const sbomAttest = workflow.match(
+    /- name: Attest release SBOM\n\s+uses: actions\/attest@([0-9a-f]{40})/,
+  );
+  assert.ok(provenanceAttest, "expected a pinned provenance attestation step");
+  assert.ok(sbomAttest, "expected a pinned SBOM attestation step");
+  assert.equal(
+    sbomAttest[1],
+    provenanceAttest[1],
+    "attestation steps must use the same action commit",
+  );
+
   assert.match(workflow, /gh release view/);
   assert.match(workflow, /--verify-tag/);
 });
