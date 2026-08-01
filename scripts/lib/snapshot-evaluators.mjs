@@ -10,7 +10,7 @@ import {
   maxRequiredApprovalCount,
 } from "./review-policy.mjs";
 import {
-  findUnaddressedFeedback,
+  evaluateFeedbackResolutions,
   normalizeFeedback,
 } from "./watch-feedback.mjs";
 
@@ -379,7 +379,8 @@ export function evaluateWakeSnapshot(snapshot) {
   ];
   const commits = normalizedCommits(snapshot);
   const myLogin = snapshot?.evidence?.viewer?.login || null;
-  const unaddressed = findUnaddressedFeedback({ feedback, commits, myLogin });
+  const resolution = evaluateFeedbackResolutions({ feedback, commits, myLogin });
+  const unaddressed = resolution.unaddressed;
   const blockers = [];
   if (
     DIRTY_STATES.has(pr.mergeStateStatus || "") ||
@@ -406,6 +407,7 @@ export function evaluateWakeSnapshot(snapshot) {
       line: comment.line,
       excerpt: comment.body.replace(/\s+/g, " ").slice(0, 220),
       reason: "trusted_human_feedback_needs_code",
+      howToClear: `[shipping-github] Addressed feedback\nfeedback: ${comment.key}\ncommit: <7-40 character PR commit SHA>`,
     });
   }
   const complete = [
@@ -435,5 +437,8 @@ export function evaluateWakeSnapshot(snapshot) {
     blockers,
     unknowns,
     feedbackCount: feedback.length,
+    addressedFeedbackKeys: resolution.addressedKeys,
+    resolutionRecords: resolution.validRecords,
+    resolutionDiagnostics: resolution.diagnostics,
   };
 }
