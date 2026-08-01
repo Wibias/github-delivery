@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { waitForExpectedChecks } from "./lib/live-fixture-checks.mjs";
+import { parseFixtureGateResult } from "./lib/live-fixture-gate-result.mjs";
 import { buildFixturePlan, runFixtureScenario } from "./lib/live-github-fixture.mjs";
 
 function parseArgs(argv) {
@@ -50,8 +51,7 @@ function numberFromUrl(url) {
 
 function gateDecision(repo, pr) {
   const result = run(process.execPath, ["scripts/ship-gate.mjs", repo, String(pr), "--mutation-mode", "read-only"], { allowFailure: true });
-  const parsed = JSON.parse(result.stdout);
-  return { decision: parsed.ready ? "ready" : parsed.blocked ? "blocked" : "unknown", raw: parsed };
+  return parseFixtureGateResult(result);
 }
 
 function currentHead(repo, pr) {
