@@ -1,0 +1,74 @@
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import test from "node:test";
+
+import {
+  createSpdxSbom,
+  validateReleaseContext,
+  verifyDistribution,
+  releaseNotesForVersion,
+} from "../../scripts/lib/release-contract.mjs";
+
+function fixture() {
+  const root = mkdtempSync(join(tmpdir(), "shipping-github-release-"));
+  const dist = join(root, "dist");
+  mkdirSync(join(dist, "shipping-github"), { recursive: true });
+  writeFileSync(join(root, "package.json"), JSON.stringify({ name: "shipping-github", version: "0.1.0" }));
+  const archive = Buffer.from("archive");
+  writeFileSync(join(dist, "shipping-github-v0.1.0.zip"), archive);
+  writeFileSync(join(dist, "shipping-github-v0.1.0.tar.gz"), Buffer.from("tar"));
+  writeFileSync(join(dist, "shipping-github", "SKILL.md"), "---\nname: shipping-github\n---\n");
+  writeFileSync(join(dist, "manifest.json"), JSON.stringify({
+    schemaVersion: 1,
+    kind: "shipping-github/distribution-manifest",
+    name: "shipping-github",
+    version: "0.1.0",
+    sourceCommit: "a".repeat(40),
+    files: [{ path: "SKILL.md", bytes: 36, mode: "0644", sha256: "deadbeef" }],
+  }, null, 2) + "\n");
+  const digest = (buffer) => createHash("sha256").update(buffer).digest("hex");
+  writeFileSync(join(dist, "SHA256SUMS"), [
+    `${digest(readFileSync(join(dist, "manifest.json")))}  manifest.json`,
+    `${digest(readFileSync(join(dist, "shipping-github-v0.1.0.tar.gz")))}  shipping-github-v0.1.0.tar.gz`,
+    `${digest(archive)}  shipping-github-v0.1.0.zip`,
+  ].join("\n") + "\n");
+  return { root, dist };
+}
+
+test("tag releases require an exact package version match", () => {
+  assert.deepEqual(validateReleaseContext({ eventName: "push", ref: "refs/tags/v0.1.0", version: "0.1.0" }), {
+    version: "0.1.0", tag: "v0.1.0", publish: true,
+  });
+  assert.throws(() => validateReleaseContext({ eventName: "push", ref: "refs/tags/v0.2.0", version: "0.1.0" }), /does not match package version/);
+});
+
+test("manual workflow runs are always dry-run", () => {
+  assert.deepEqual(validateReleaseContext({ eventName: "workflow_dispatch", ref: "refs/heads/main", version: "0.1.0" }), {
+    version: "0.1.0", tag: "v0.1.0", publish: false,
+  });
+});
+
+test("distribution verification binds version, source commit, and checksums", () => {
+  const { dist } = fixture();
+  assert.equal(verifyDistribution({ dist, version: "0.1.0", sourceCommit: "a".repeat(40) }).valid, true);
+  writeFileSync(join(dist, "shipping-github-v0.1.0.zip"), "tampered");
+  assert.throws(() => verifyDistribution({ dist, version: "0.1.0", sourceCommit: "a".repeat(40) }), /checksum mismatch/);
+});
+
+test("creates an SPDX 2.3 SBOM for release artifacts", () => {
+  const { dist } = fixture();
+  const sbom = createSpdxSbom({ dist, version: "0.1.0", sourceCommit: "a".repeat(40) });
+  assert.equal(sbom.spdxVersion, "SPDX-2.3");
+  assert.equal(sbom.name, "shipping-github-v0.1.0");
+  assert.equal(sbom.packages[0].versionInfo, "0.1.0");
+  assert(sbom.files.some((file) => file.fileName.endsWith(".zip")));
+});
+
+test("extracts exact-version release notes", () => {
+  const notes = releaseNotesForVersion("# Changelog\n\n## [0.1.0] - 2026-08-01\n\n- One\n\n## [0.0.9]\n\n- Old\n", "0.1.0");
+  assert.match(notes, /One/);
+  assert.doesNotMatch(notes, /Old/);
+});
