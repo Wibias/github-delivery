@@ -42,9 +42,10 @@ jobs:
           package-manager-cache: false
 
       - name: Run fixture contract tests
-        run: node --test tests/unit/live-github-fixture.test.mjs
+        run: node --test tests/unit/live-github-fixture.test.mjs tests/unit/live-fixture-cleanup.test.mjs
 
       - name: Exercise live GitHub lifecycle
+        timeout-minutes: 20
         env:
           GH_TOKEN: ${{ github.token }}
           DISPOSITION: ${{ inputs.disposition || 'close' }}
@@ -56,11 +57,28 @@ jobs:
           --disposition "${DISPOSITION}"
           --receipt live-fixture-receipt.json
 
-      - name: Upload lifecycle receipt
+      - name: Clean up fixture resources
+        if: always()
+        timeout-minutes: 5
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DISPOSITION: ${{ inputs.disposition || 'close' }}
+        run: >-
+          node scripts/cleanup-live-github-fixture.mjs
+          "${GITHUB_REPOSITORY}"
+          --run-id "gha-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          --base "main"
+          --disposition "${DISPOSITION}"
+          --receipt live-fixture-receipt.json
+          --cleanup-report live-fixture-cleanup.json
+
+      - name: Upload lifecycle evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: live-fixture-${{ github.run_id }}-${{ github.run_attempt }}
-          path: live-fixture-receipt.json
-          if-no-files-found: warn
+          path: |
+            live-fixture-receipt.json
+            live-fixture-cleanup.json
+          if-no-files-found: error
           retention-days: 30
