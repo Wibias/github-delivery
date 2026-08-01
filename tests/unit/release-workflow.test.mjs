@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-const workflow = readFileSync(new URL("../../.github/workflows/release.yml", import.meta.url), "utf8");
+const workflow = readFileSync(new URL("../../.github/workflows/release.yml", import.meta.url), "utf8").replace(/\r\n?/g, "\n");
 
 test("release workflow keeps manual runs non-publishing", () => {
   assert.match(workflow, /publish:\n[\s\S]*if: github\.event_name == 'push'/);
