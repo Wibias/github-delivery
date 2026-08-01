@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import {
   actionsPolicyQuery,
   actionsSnapshotRepairPlan,
+  latestOpinionatedReviewsFromRest,
   repairActionsSnapshot,
 } from "./lib/actions-snapshot-repair.mjs";
 
@@ -72,7 +73,7 @@ function parseJson(body, context) {
   }
 }
 
-function fetchActionsPolicy(owner, name, pr) {
+function fetchMergeQueuePolicy(owner, name, pr) {
   const response = ghOk([
     "api",
     "graphql",
@@ -86,30 +87,22 @@ function fetchActionsPolicy(owner, name, pr) {
     `number=${pr}`,
   ]);
   if (!response.ok) {
-    throw new Error(response.error || "Actions policy GraphQL request failed");
+    throw new Error(response.error || "Actions merge-queue GraphQL request failed");
   }
-  const payload = parseJson(response.body, "Actions policy GraphQL");
+  const payload = parseJson(response.body, "Actions merge-queue GraphQL");
   if (payload.errors?.length) {
-    throw new Error(`Actions policy GraphQL failed: ${JSON.stringify(payload.errors)}`);
+    throw new Error(
+      `Actions merge-queue GraphQL failed: ${JSON.stringify(payload.errors)}`,
+    );
   }
   const pullRequest = payload.data?.repository?.pullRequest;
   if (!pullRequest) {
-    throw new Error("Actions policy GraphQL returned an unexpected payload");
-  }
-  const latestOpinionatedReviews = pullRequest.latestOpinionatedReviews;
-  if (
-    !latestOpinionatedReviews ||
-    latestOpinionatedReviews.pageInfo?.hasNextPage === true
-  ) {
-    throw new Error("Actions policy GraphQL review pagination is incomplete");
+    throw new Error("Actions merge-queue GraphQL returned an unexpected payload");
   }
   return {
-    latestOpinionatedReviews,
-    mergeQueue: {
-      enabled: pullRequest.isMergeQueueEnabled === true,
-      inQueue: pullRequest.isInMergeQueue === true,
-      entry: pullRequest.mergeQueueEntry || null,
-    },
+    enabled: pullRequest.isMergeQueueEnabled === true,
+    inQueue: pullRequest.isInMergeQueue === true,
+    entry: pullRequest.mergeQueueEntry || null,
   };
 }
 
@@ -147,7 +140,12 @@ try {
     } else {
       const [owner, name] = repo.split("/");
       const policy = plan.repairPolicy
-        ? fetchActionsPolicy(owner, name, pr)
+        ? {
+            latestOpinionatedReviews: latestOpinionatedReviewsFromRest(
+              snapshot.evidence?.feedback?.reviews || [],
+            ),
+            mergeQueue: fetchMergeQueuePolicy(owner, name, pr),
+          }
         : null;
       const branchProtection = plan.repairPolicy
         ? fetchBranchProtection(
