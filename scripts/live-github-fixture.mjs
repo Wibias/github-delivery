@@ -117,7 +117,7 @@ function adapter(tempRoot) {
     },
     async captureSnapshot(plan, pr) {
       const path = join(tempRoot, "snapshot.json");
-      run(process.execPath, ["scripts/ship-gate-snapshot.mjs", plan.repo, String(pr.number), "--output", path]);
+      run(process.execPath, ["scripts/actions-ship-gate-snapshot.mjs", plan.repo, String(pr.number), "--output", path]);
       const snapshot = JSON.parse(readFileSync(path, "utf8"));
       return { head: snapshot.headOid, path };
     },
