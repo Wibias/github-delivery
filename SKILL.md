@@ -9,13 +9,13 @@ description: >
   that stub only does conflicts/CI and will merge-dev-then-wait — wrong.
   Use when the user says babysit, watch PR, monitor CI, keep an eye on a PR,
   make merge ready, research issue #N, create PR for issue, full review,
-  simplify PR, clean up PR, deduplicate PR, or merge PR. Watch MUST run
-  scripts/ship-gate.mjs every wake: exit 0 permits waiting, exit 1 means act on
-  known blockers, and exit 2 forbids a readiness claim until incomplete
-  evidence is restored. Default mutation mode is read-only; every GitHub write
-  must be permitted by the selected profile and the stricter social rules. Do
-  not use for: local unit-test debugging with no GitHub PR, filing PRDs
-  (issue-workflow), or skill authoring (skill-ratchet).
+  simplify PR, clean up PR, deduplicate PR, or merge PR.
+  Watch MUST run scripts/ship-gate.mjs every wake: exit 0 permits waiting,
+  exit 1 means act on known blockers, and exit 2 forbids a readiness claim until
+  incomplete evidence is restored. Default mutation mode is read-only; every
+  GitHub write must be permitted by the selected profile and the stricter social
+  rules. Do not use for: local unit-test debugging with no GitHub PR, filing
+  PRDs (issue-workflow), or skill authoring (skill-ratchet).
 ---
 
 # Shipping GitHub
