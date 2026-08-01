@@ -66,6 +66,17 @@ test("builds only runtime payload and normalizes text", () => {
   assert.match(readFileSync(join(out, "SHA256SUMS"), "utf8"), /shipping-github-v0\.1\.0\.zip/);
 });
 
+test("accepts references to bundled runtime directories", () => {
+  const root = fixtureRoot();
+  writeFileSync(
+    join(root, "SKILL.md"),
+    "---\nname: shipping-github\ndescription: Merge PRs.\n---\n\nUse `overrides/babysit`.\n",
+  );
+  assert.doesNotThrow(() =>
+    buildDistribution({ root, out: join(root, "out"), sourceCommit: "d".repeat(40) }),
+  );
+});
+
 test("fails when a bundled markdown file references a missing runtime resource", () => {
   const root = fixtureRoot();
   writeFileSync(join(root, "references", "shared-rules.md"), "Run `scripts/missing.mjs`.\n");
