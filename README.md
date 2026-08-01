@@ -8,6 +8,9 @@ what is left on PR #41?
 fix the review comments on PR #18 and make it merge ready
 watch PR #77 until it merges or needs me
 research issue #90 on the latest development branch
+full review PR #42
+simplify PR #42 without changing behavior
+full review PR #42 and simplify it safely
 ```
 
 You do **not** need to invoke Node scripts yourself. They are the skill’s internal safety and evidence machinery.
@@ -19,7 +22,8 @@ You do **not** need to invoke Node scripts yourself. They are the skill’s inte
 3. The workflow runs runtime capability discovery and the authoritative ship gate.
 4. Read-only helpers explain blockers when needed.
 5. Every visible GitHub write passes through the mutation broker.
-6. The agent verifies the resulting repository state and reports it.
+6. Optional simplification runs only when explicitly requested and approved.
+7. The agent verifies the resulting repository state and reports it.
 
 Example:
 
@@ -28,6 +32,14 @@ merge PR #32
 ```
 
 routes to `references/merge-pr.md`, runs `scripts/ship-gate.mjs`, prepares guarded mutation requests, posts the pre-merge explanation, performs a head-pinned merge, handles linked issue comments and closure, and verifies cleanup.
+
+A combined request such as:
+
+```text
+full review PR #42 and simplify it safely
+```
+
+routes through `references/full-review-pr.md`. The normal bug, security, standards, feedback, base-health, and CI review completes first. Worthwhile simplification candidates are then presented for explicit approval. Approved changes are validated, pushed, and followed automatically by a complete full review on the new head before the final verdict.
 
 ## Core guarantees
 
@@ -45,7 +57,10 @@ routes to `references/merge-pr.md`, runs `scripts/ship-gate.mjs`, prepares guard
 - Social writes require idempotency keys and produce versioned receipts.
 - Stacked PRs are handed to `manage-stacked-prs` and merged bottom-up.
 - Review depth is derived from changed paths, patches, symbols, removed controls, dependencies, workflow permissions, and uncertainty rather than filenames alone.
-- Live lifecycle fixtures exercise GitHub issues, branches, PRs, checks, snapshots, stale-head rejection, and cleanup against the real platform.
+- Simplification is explicit-only, requires explicit approval before mutation, and always preserves behavior and safety boundaries.
+- Line count is never a simplification success metric; **nothing worth simplifying** is a valid result.
+- Every changed simplification head receives focused validation, required repository gates, and a complete full review with simplification disabled.
+- Live lifecycle fixtures exercise GitHub issues, branches, PRs, checks, snapshots, delayed head propagation, stale-head rejection, and cleanup against the real platform.
 
 ## Internal architecture
 
@@ -92,9 +107,34 @@ The broker defaults to dry-run. Execution requires `--execute`, re-checks the PR
 | Research an issue on development tip | `references/research-issue.md` |
 | Create a linked PR for an issue | `references/create-pr-for-issue.md` |
 | Full bug, security, and standards review | `references/full-review-pr.md` |
+| Simplify, clean up, or deduplicate a PR without behavior changes | `references/simplify-pr.md` |
+| Full review plus optional approved simplification and mandatory re-review | `references/full-review-pr.md` + `references/simplify-pr.md` |
 | Security review | `references/security-review.md` |
 | Status or merge-readiness | `references/status.md` |
 | Merge with linked-issue close-out | `references/merge-pr.md` |
+
+## Safe simplification
+
+The simplify workflow is deliberately conservative. Its goal is lower cognitive load and safer maintenance, not a smaller diff or fewer lines.
+
+It may propose high-confidence changes such as proven dead-code removal, clearer control flow, removal of valueless wrappers, genuine deduplication, or use of an equivalent repository-standard facility. It rejects changes that could alter APIs, errors, ordering, concurrency, side effects, UI, persistence, compatibility, validation, security, authorization, CI, evidence, or fail-closed behavior.
+
+The flow is:
+
+1. Finish concrete bug, security, standards, feedback, base, and CI work first.
+2. Produce a bounded candidate list with locations, preserved invariants, risk, and validation.
+3. Report **nothing worth simplifying** when no clear improvement exists.
+4. Require explicit approval before any simplification mutation.
+5. Apply only approved candidates and revert failed candidates individually.
+6. Run focused validation and all required repository gates.
+7. Push the new head and automatically run the complete full review again with simplification disabled.
+8. Issue the final verdict only from that post-simplification head.
+
+There is no second continuation prompt after approval and no recursive simplification loop.
+
+## Security reporting
+
+Do not disclose suspected vulnerabilities in public issues or pull requests. Use GitHub private vulnerability reporting as documented in [`SECURITY.md`](SECURITY.md). The policy defines what to include, acknowledgement and assessment expectations, remediation targets, and coordinated disclosure guidance.
 
 ## Installation
 
@@ -126,14 +166,14 @@ Requirements:
 npm run check
 ```
 
-CI runs the complete suite on Node 20 and 22 across Ubuntu, Windows, and macOS. CodeQL, dependency review, workflow-policy validation, deterministic distribution checks, offline behavioral evaluations, and focused unit contracts are part of the repository controls.
+CI runs the complete suite on Node 20 and 22 across Ubuntu, Windows, and macOS. CodeQL, dependency review, workflow-policy validation, deterministic distribution checks, offline behavioral evaluations, documentation contracts, and focused unit tests are part of the repository controls.
 
 Use the **Live Integration** workflow to exercise the real lifecycle. Scheduled execution is opt-in through `LIVE_FIXTURE_ENABLED=true`.
 
 ## Current status
 
-The planned implementation roadmap is complete: evidence snapshots, authoritative ship decisions, base-health isolation, feedback resolution, guarded mutations, capability discovery, behavioral evaluations, deterministic packaging, provenance-backed releases, repository security controls, live GitHub integration fixtures, and evidence-based review scoping are implemented.
+The planned implementation roadmap is complete: evidence snapshots, authoritative ship decisions, base-health isolation, feedback resolution, guarded mutations, capability discovery, behavioral evaluations, deterministic packaging, provenance-backed releases, repository security controls, private vulnerability reporting, live GitHub integration fixtures, evidence-based review scoping, and explicit behavior-preserving simplification with mandatory post-change full review are implemented.
 
-Remaining work is operational rather than architectural: apply the documented live repository rules, enable available GitHub security features, run release acceptance, and maintain the regression corpus as GitHub and agent hosts evolve.
+Remaining work is operational rather than architectural: maintain the documented live repository rules, keep available GitHub security features enabled, run release acceptance for new versions, and extend the regression corpus as GitHub and agent hosts evolve.
 
 MIT licensed.
