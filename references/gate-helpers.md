@@ -1,76 +1,93 @@
-# Gate helpers (required checks, CODEOWNERS, threads, policy)
+# Gate helpers
 
-Load with the evidence sweep when claiming merge-ready, status “merge-ready”, or merge.
+Load this reference before a merge-ready claim, status-ready verdict, merge, or watch transition into waiting.
 
 Resolve `<shipping-github>` to this skill’s install directory (repo root or `~/.agents/skills/shipping-github`).
 
-## Required checks
+## Authoritative ship decision
+
+Run exactly one authoritative decision first:
+
+```bash
+node "<shipping-github>/scripts/ship-gate.mjs" OWNER/REPO N
+```
+
+The command captures one evidence snapshot and evaluates required checks, review policy, unresolved threads, trusted feedback, merge state, and advisory CODEOWNERS against that same head SHA.
+
+Decision contract:
+
+- exit `0`, `decision: "ready"`: the automated gate permits a ready/wait transition; workflow-specific bug, security, spec, social, and thin-settle requirements still apply
+- exit `1`, `decision: "blocked"`: act on the namespaced blockers before waiting, claiming ready, or merging
+- exit `2`, `decision: "unknown"`: evidence is stale, incomplete, mismatched, or unreadable; restore evidence and rerun
+
+Known blockers outrank unknown evidence. Unknown evidence outranks readiness. No individual helper may overrule the final decision.
+
+### Capture and replay
+
+```bash
+node "<shipping-github>/scripts/ship-gate-snapshot.mjs" OWNER/REPO N --output snapshot.json
+node "<shipping-github>/scripts/ship-gate.mjs" OWNER/REPO N --snapshot snapshot.json
+```
+
+Snapshot replay validates schema, repository, PR number, head SHA when supplied with `--expected-head`, completeness, and age. Snapshot mode performs no GitHub API calls.
+
+## Focused diagnostics
+
+Use these only to explain or repair a component reported by `ship-gate.mjs`.
+
+### Required checks
 
 ```bash
 node "<shipping-github>/scripts/required-checks.mjs" OWNER/REPO N
 ```
 
-Unions classic protection **legacy** `contexts` + **modern** `checks[].context`, branch **rulesets**, and live rollup. Exit `1` if required jobs fail/pending/missing. See **Required checks + review gate** in `shared-rules.md`.
+Preserves classic and ruleset source identity and fails closed on incomplete check evidence.
 
-## CODEOWNERS paths
+### Advisory CODEOWNERS paths
 
 ```bash
 node "<shipping-github>/scripts/codeowners-for-pr.mjs" OWNER/REPO N
 ```
 
-Maps PR files → owners on **base** CODEOWNERS + `codeowners/errors` + review requests.
+Maps PR files to owners on the base branch. GitHub `reviewDecision` remains authoritative for enforced CODEOWNERS approval.
 
-## Unresolved review threads (GraphQL)
+### Unresolved review threads
 
 ```bash
 node "<shipping-github>/scripts/review-threads.mjs" OWNER/REPO N
-# optional (only when social policy allows resolve):
+# mutation only when the active social policy permits it:
 node "<shipping-github>/scripts/review-threads.mjs" OWNER/REPO N --resolve PRRT_xxx
 ```
 
-Paginates `reviewThreads`; exit `1` if any unresolved. Prefer this over guessing from the UI. See **Review threads (GraphQL)** in `shared-rules.md`.
-
-## Security scope (PR → required surfaces)
-
-Before a security review on a PR:
-
-```bash
-node "<shipping-github>/scripts/security-scope.mjs" OWNER/REPO N
-```
-
-Returns `requiredSurfaces`, `requireAiAgentSecurity`, `requireAgenticSkillsTop10`, `requireDepsAudit`, `removedControlLeads`, `adversarialPassDefault: false`, and instructions (incl. crypto/session, business logic, IaC/Docker, AST01–10, confidence discipline). Cover every required surface; load `ai-agent-security` / AST10 checklist / deps audit when flagged. **Never** auto-launch adversarial/red-team second pass. See `security-review.md`.
-
-## Bug scope (PR → deep vs skip + lenses)
-
-Before own-bug review on a PR (merge-ready / full-review / create-PR):
-
-```bash
-node "<shipping-github>/scripts/bug-scope.mjs" OWNER/REPO N
-```
-
-Returns `skipDeepBugReview`, `requiredLenses`, `requireBugbot: "when_available"`, `deepMultiAgentDefault: false`, and instructions (incl. Must-probe error-propagation / lock→409/503 when those surfaces change). If skip: record n/a. Else run `references/bug-review.md` (Bugbot when available on Cursor + one complementary lenses pass). **Never** auto-launch deep multi-agent bug toolkits. See `bug-review.md`.
-
-## Watch wake gate (owner comments)
-
-Before any watch “waiting for CI/CodeRabbit” heartbeat:
+### Watch and trusted feedback
 
 ```bash
 node "<shipping-github>/scripts/watch-wake-gate.mjs" OWNER/REPO N
 ```
 
-Exit `1` = must act: unacked OWNER/MEMBER top-level comments (**code** required — ACK comment alone does not clear) and/or `DIRTY`/`CONFLICTING`/`BEHIND`. Fix or rebase, then re-run. Exit `0` = wait allowed. See `watch-pr.md`.
+Use this to inspect the `wake` component. Clearing feedback requires a verified exact resolution record:
 
-## Merge queue + review policy
+```text
+[shipping-github] Addressed feedback
+feedback: review_comment:67890
+commit: abc1234
+```
+
+An unrelated later commit does not clear feedback.
+
+### Merge queue and review policy
 
 ```bash
 node "<shipping-github>/scripts/pr-policy-gate.mjs" OWNER/REPO N
 ```
 
-Reports:
+Use this to inspect review policy, last-push approval, merge queue, and `merge_group` workflow coverage.
 
-- `isMergeQueueEnabled` / `isInMergeQueue` / queue entry state
-- Whether local workflows mention `merge_group` (stall risk if queue on + CI only on `pull_request`)
-- `requiresCodeOwnerReviews` (enforced vs suggestion-only)
-- `dismissesStaleReviews` / `requireLastPushApproval` and approvals vs **current head SHA**
+## Review-scope helpers
 
-See **Merge queue** and **Stale approvals / last-push** in `shared-rules.md`.
+These classify review work; they are not substitutes for the authoritative ship decision.
+
+```bash
+node "<shipping-github>/scripts/security-scope.mjs" OWNER/REPO N
+node "<shipping-github>/scripts/bug-scope.mjs" OWNER/REPO N
+```
