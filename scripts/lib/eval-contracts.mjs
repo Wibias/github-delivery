@@ -52,7 +52,11 @@ function validateCase(row, root, seenIds, errors) {
   } else {
     seenIds.add(item.id);
   }
-  for (const field of ["expected_resources", "unnecessary_resources", "assertion_ids"]) {
+  for (const field of [
+    "expected_resources",
+    "unnecessary_resources",
+    "assertion_ids",
+  ]) {
     if (!Array.isArray(item[field])) {
       errors.push({ code: "field_not_array", id: item.id, field });
     }
@@ -75,12 +79,11 @@ function validateCase(row, root, seenIds, errors) {
 
 function inferredWorkflow(item) {
   if (item.expected_workflow !== undefined) return item.expected_workflow;
-  if (!['must-trigger', 'routing'].includes(item.category)) return undefined;
-  const workflows = (item.expected_resources || []).filter(
-    (resource) =>
-      /^references\/(fix-pr-bots|watch-pr|re-review-pr|research-issue|create-pr-for-issue|full-review-pr|security-review|status|merge-pr)\.md$/.test(
-        resource,
-      ),
+  if (!["must-trigger", "routing"].includes(item.category)) return undefined;
+  const workflows = (item.expected_resources || []).filter((resource) =>
+    /^references\/(fix-pr-bots|watch-pr|re-review-pr|research-issue|create-pr-for-issue|full-review-pr|security-review|status|merge-pr)\.md$/.test(
+      resource,
+    ),
   );
   return workflows.length === 1 ? workflows[0] : undefined;
 }
@@ -156,7 +159,12 @@ function validateRegressionLock(regressionRows, lockPath, errors) {
     }
     const actual = sha256(row.raw);
     if (actual !== locked) {
-      errors.push({ code: "regression_hash_mismatch", id, expected: locked, actual });
+      errors.push({
+        code: "regression_hash_mismatch",
+        id,
+        expected: locked,
+        actual,
+      });
     }
   }
   for (const id of expected.keys()) {
@@ -196,7 +204,7 @@ export function validateEvalRepository({ root }) {
     schemaVersion: 1,
     kind: "shipping-github/offline-eval-report",
     valid: errors.length === 0,
-    files: files.map(basename),
+    files: files.map((name) => basename(name)),
     caseCount: allRows.length - regressionRows.length,
     regressionCount: regressionRows.length,
     routeChecks: routes.length,
