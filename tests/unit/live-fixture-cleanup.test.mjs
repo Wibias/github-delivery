@@ -6,7 +6,10 @@ import {
   buildInterruptedReceipt,
   cleanupFixtureResources,
 } from "../../scripts/lib/live-fixture-cleanup.mjs";
-import { buildFixturePlan } from "../../scripts/lib/live-github-fixture.mjs";
+import {
+  buildFixturePlan,
+  runFixtureScenario,
+} from "../../scripts/lib/live-github-fixture.mjs";
 
 test("builds a failed receipt for an interrupted lifecycle", () => {
   const plan = buildFixturePlan({ repo: "acme/widget", runId: "gha-42-1" });
@@ -20,6 +23,31 @@ test("builds a failed receipt for an interrupted lifecycle", () => {
   assert.equal(receipt.runId, "gha-42-1");
   assert.deepEqual(receipt.events, []);
   assert.equal(receipt.checks, null);
+});
+
+test("scenario errors carry a partial failed receipt", async () => {
+  const adapter = {
+    async createIssue() { return { number: 7 }; },
+    async createBranch() {},
+    async createDraftPr() { return { number: 9 }; },
+    async evaluateGate() { return { decision: "blocked" }; },
+    async markReady() {},
+    async waitForChecks() {
+      const error = new Error("fixture_checks_not_observed: no checks");
+      error.code = "fixture_checks_not_observed";
+      throw error;
+    },
+    async bestEffortCleanup() {},
+  };
+  await assert.rejects(
+    runFixtureScenario(adapter, { repo: "acme/widget", runId: "gha-42-1" }),
+    (error) => {
+      assert.equal(error.fixtureReceipt.passed, false);
+      assert.equal(error.fixtureReceipt.failure.code, "fixture_checks_not_observed");
+      assert.ok(error.fixtureReceipt.events.some((event) => event.name === "draft_pr_created"));
+      return true;
+    },
+  );
 });
 
 test("cleanup closes exact open fixture resources and deletes its branch", async () => {
