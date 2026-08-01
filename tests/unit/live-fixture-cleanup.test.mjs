@@ -108,3 +108,19 @@ test("workflow runs cancellation-safe cleanup before uploading both reports", ()
   assert.match(source, /live-fixture-cleanup\.json/);
   assert.doesNotMatch(source, /if-no-files-found:\s*warn/);
 });
+
+test("workflow requires a dedicated fixture credential before mutation", () => {
+  const source = readFileSync(new URL("../../.github/workflows/live-integration.yml", import.meta.url), "utf8");
+  const preflight = source.indexOf("name: Verify live fixture credential");
+  const exercise = source.indexOf("name: Exercise live GitHub lifecycle");
+  const cleanup = source.indexOf("name: Clean up fixture resources");
+  const upload = source.indexOf("name: Upload lifecycle evidence");
+
+  assert.ok(preflight >= 0, "expected a credential preflight step");
+  assert.ok(preflight < exercise, "credential preflight must run before fixture mutation");
+  assert.match(source.slice(preflight, exercise), /secrets\.LIVE_FIXTURE_TOKEN/);
+  assert.match(source.slice(exercise, cleanup), /GH_TOKEN:\s*\$\{\{\s*secrets\.LIVE_FIXTURE_TOKEN\s*\}\}/);
+  assert.match(source.slice(cleanup, upload), /GH_TOKEN:\s*\$\{\{\s*secrets\.LIVE_FIXTURE_TOKEN\s*\}\}/);
+  assert.match(source, /node scripts\/verify-live-fixture-token\.mjs/);
+  assert.doesNotMatch(source, /GH_TOKEN:\s*\$\{\{\s*github\.token\s*\}\}/);
+});
