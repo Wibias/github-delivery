@@ -135,7 +135,7 @@ none / draft|WIP|do-not-merge / hard blocker: <…>
 
 ### Bottom line
 <One paragraph: ship / fix these N items / not useful because …>
-When pinging a person, use bare `@login` (e.g. @lidge-jun) — never `` `@login` ``.
+When pinging a person, use bare `@login` (e.g. @user) — never `` `@login` ``.
 ```
 
 ## Merge-ready (PR)
