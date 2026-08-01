@@ -27,6 +27,15 @@ function input(overrides = {}) {
       },
     },
     requiredChecks: component(),
+    baseHealth: component("ready", {
+      baseOid: "base123",
+      comparisonRequired: false,
+      sharedFailures: [],
+      prOnlyFailures: [],
+      unknownFailures: [],
+      baseOnlyFailures: [],
+      scopeRecommendation: "none",
+    }),
     reviewPolicy: component(),
     reviewThreads: component(),
     wake: component(),
@@ -78,6 +87,46 @@ test("returns unknown when evidence is incomplete and no blocker is known", () =
   assert.equal(result.decision, "unknown");
   assert.equal(result.complete, false);
   assert.ok(result.unknowns.includes("wake:feedback_data_incomplete"));
+});
+
+test("base health origin uncertainty prevents readiness", () => {
+  const result = combineShipGateResults(
+    input({
+      baseHealth: component("unknown", {
+        complete: false,
+        unknowns: ["failure_origin_unknown:check_run\u0000CI\u000010"],
+        sharedFailures: [],
+        prOnlyFailures: [],
+        unknownFailures: [{ context: "CI" }],
+        baseOnlyFailures: [],
+        scopeRecommendation: "investigate",
+      }),
+    }),
+  );
+  assert.equal(result.decision, "unknown");
+  assert.ok(
+    result.unknowns.some((item) => item.startsWith("baseHealth:failure_origin_unknown")),
+  );
+});
+
+test("shared base failures stay blocked but produce separate-scope guidance", () => {
+  const result = combineShipGateResults(
+    input({
+      baseHealth: component("blocked", {
+        blockers: ["base_preexisting_failure:check_run\u0000CI\u000010"],
+        sharedFailures: [{ context: "CI" }],
+        prOnlyFailures: [],
+        unknownFailures: [],
+        baseOnlyFailures: [],
+        scopeRecommendation: "separate_follow_up",
+      }),
+    }),
+  );
+  assert.equal(result.decision, "blocked");
+  assert.equal(result.components.baseHealth.scopeRecommendation, "separate_follow_up");
+  assert.ok(
+    result.advisories.some((item) => item.code === "base_preexisting_failures"),
+  );
 });
 
 test("CODEOWNERS remains advisory and cannot block or make the final decision unknown", () => {
