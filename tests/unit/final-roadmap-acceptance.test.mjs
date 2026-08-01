@@ -47,19 +47,20 @@ test("pure docs still skip both review axes", () => {
   assert.deepEqual(projectBugScope(reviewPlan).requiredLenses, []);
 });
 
-test("Cursor Bugbot instructions provide the exact required prompt fields", () => {
+test("Cursor full review uses Bugbot's exact required prompt fields", () => {
   const bugReview = readFileSync(new URL("../../references/bug-review.md", import.meta.url), "utf8");
-  const sharedRules = readFileSync(new URL("../../references/shared-rules.md", import.meta.url), "utf8");
+  const fullReview = readFileSync(new URL("../../references/full-review-pr.md", import.meta.url), "utf8");
   const requiredHeader = [
     "Full Repository Path: <absolute path to the checked-out repository>",
     "Diff: branch changes",
   ].join("\n");
 
-  for (const source of [bugReview, sharedRules]) {
-    assert.ok(source.includes(requiredHeader), "expected the canonical two-line Bugbot prompt header");
-    assert.match(source, /first two lines/i);
-    assert.match(source, /do not paraphrase|do not replace/i);
-  }
+  assert.ok(bugReview.includes(requiredHeader), "expected the canonical two-line Bugbot prompt header");
+  assert.match(bugReview, /first two lines/i);
+  assert.match(bugReview, /do not paraphrase/i);
+  assert.match(bugReview, /Do \*\*not\*\* use `OWNER\/REPO`/);
+  assert.match(fullReview, /literal `review-bugbot` prompt contract/);
+  assert.match(fullReview, /do not construct or paraphrase a replacement prompt/i);
 });
 
 test("live fixture establishes Git credentials before pushing", () => {
