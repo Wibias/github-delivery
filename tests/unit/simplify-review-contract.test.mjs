@@ -44,3 +44,17 @@ test("simplification is explicit, behavior-preserving, and followed by full re-r
   assert.match(simplify, /complete full-review workflow/i);
   assert.match(simplify, /simplification disabled/i);
 });
+
+test("README documents the current public workflows and safety model", () => {
+  const readme = readFileSync(new URL("../../README.md", import.meta.url), "utf8");
+
+  assert.match(readme, /simplify PR #42 without changing behavior/i);
+  assert.match(readme, /full review PR #42 and simplify it safely/i);
+  assert.match(readme, /references\/simplify-pr\.md/);
+  assert.match(readme, /explicit approval/i);
+  assert.match(readme, /complete full review/i);
+  assert.match(readme, /line count is never/i);
+  assert.match(readme, /nothing worth simplifying/i);
+  assert.match(readme, /SECURITY\.md/);
+  assert.match(readme, /private vulnerability reporting/i);
+});
