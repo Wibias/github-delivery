@@ -57,6 +57,8 @@ routes through `references/full-review-pr.md`. The normal bug, security, standar
 - Social writes require idempotency keys and produce versioned receipts.
 - Stacked PRs are handed to `manage-stacked-prs` and merged bottom-up.
 - Review depth is derived from changed paths, patches, symbols, removed controls, dependencies, workflow permissions, and uncertainty rather than filenames alone.
+- Full-review execution plans end with a mandatory `Publish final verdict` item and cannot terminate while that item or any required prerequisite remains `pending` or `in_progress`.
+- Optional reviewers such as Cursor Bugbot cannot suppress the final verdict; unavailable reviewer evidence is recorded and the complementary review continues.
 - Simplification is explicit-only, requires explicit approval before mutation, and always preserves behavior and safety boundaries.
 - Line count is never a simplification success metric; **nothing worth simplifying** is a valid result.
 - Every changed simplification head receives focused validation, required repository gates, and a complete full review with simplification disabled.
@@ -64,19 +66,19 @@ routes through `references/full-review-pr.md`. The normal bug, security, standar
 
 ## Internal architecture
 
-| Surface | Role |
-|---|---|
-| `SKILL.md` | Host discovery, natural-language routing, hard policy |
-| `references/*.md` | Focused workflows and review standards |
-| `scripts/ship-gate-snapshot.mjs` | Capture one paginated evidence snapshot |
-| `scripts/ship-gate.mjs` | Produce one authoritative ship decision |
-| `scripts/github-mutate.mjs` | Dry-run and execute authorized GitHub writes |
-| `scripts/runtime-capabilities.mjs` | Discover host/tool capabilities and safe fallbacks |
-| `scripts/validate-evals.mjs` | Execute offline routing and safety contracts |
-| `scripts/live-github-fixture.mjs` | Exercise the real GitHub lifecycle with namespaced temporary resources |
-| `scripts/review-scope.mjs` | Produce one evidence-ranked bug and security review plan |
-| `scripts/build-dist.mjs` | Build deterministic versioned skill bundles |
-| `scripts/prepare-release.mjs` | Verify release identity, checksums, SBOM, notes, and provenance subjects |
+| Surface                            | Role                                                                     |
+| ---------------------------------- | ------------------------------------------------------------------------ |
+| `SKILL.md`                         | Host discovery, natural-language routing, hard policy                    |
+| `references/*.md`                  | Focused workflows and review standards                                   |
+| `scripts/ship-gate-snapshot.mjs`   | Capture one paginated evidence snapshot                                  |
+| `scripts/ship-gate.mjs`            | Produce one authoritative ship decision                                  |
+| `scripts/github-mutate.mjs`        | Dry-run and execute authorized GitHub writes                             |
+| `scripts/runtime-capabilities.mjs` | Discover host/tool capabilities and safe fallbacks                       |
+| `scripts/validate-evals.mjs`       | Execute offline routing and safety contracts                             |
+| `scripts/live-github-fixture.mjs`  | Exercise the real GitHub lifecycle with namespaced temporary resources   |
+| `scripts/review-scope.mjs`         | Produce one evidence-ranked bug and security review plan                 |
+| `scripts/build-dist.mjs`           | Build deterministic versioned skill bundles                              |
+| `scripts/prepare-release.mjs`      | Verify release identity, checksums, SBOM, notes, and provenance subjects |
 
 ## Mutation safety
 
@@ -99,19 +101,19 @@ The broker defaults to dry-run. Execution requires `--execute`, re-checks the PR
 
 ## Workflows
 
-| Request | Workflow |
-|---|---|
-| Fix comments and make merge-ready | `references/fix-pr-bots.md` |
-| Watch or babysit a PR | `references/watch-pr.md` |
-| Re-review after commits or reviews | `references/re-review-pr.md` |
-| Research an issue on development tip | `references/research-issue.md` |
-| Create a linked PR for an issue | `references/create-pr-for-issue.md` |
-| Full bug, security, and standards review | `references/full-review-pr.md` |
-| Simplify, clean up, or deduplicate a PR without behavior changes | `references/simplify-pr.md` |
+| Request                                                                   | Workflow                                                     |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| Fix comments and make merge-ready                                         | `references/fix-pr-bots.md`                                  |
+| Watch or babysit a PR                                                     | `references/watch-pr.md`                                     |
+| Re-review after commits or reviews                                        | `references/re-review-pr.md`                                 |
+| Research an issue on development tip                                      | `references/research-issue.md`                               |
+| Create a linked PR for an issue                                           | `references/create-pr-for-issue.md`                          |
+| Full bug, security, and standards review                                  | `references/full-review-pr.md`                               |
+| Simplify, clean up, or deduplicate a PR without behavior changes          | `references/simplify-pr.md`                                  |
 | Full review plus optional approved simplification and mandatory re-review | `references/full-review-pr.md` + `references/simplify-pr.md` |
-| Security review | `references/security-review.md` |
-| Status or merge-readiness | `references/status.md` |
-| Merge with linked-issue close-out | `references/merge-pr.md` |
+| Security review                                                           | `references/security-review.md`                              |
+| Status or merge-readiness                                                 | `references/status.md`                                       |
+| Merge with linked-issue close-out                                         | `references/merge-pr.md`                                     |
 
 ## Safe simplification
 

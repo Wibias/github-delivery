@@ -2,16 +2,36 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
 
-import { projectBugScope, projectSecurityScope } from "../../scripts/lib/review-scope-compat.mjs";
+import {
+  projectBugScope,
+  projectSecurityScope,
+} from "../../scripts/lib/review-scope-compat.mjs";
 import { planReviewScope } from "../../scripts/lib/review-scope.mjs";
 
 function plan(files) {
-  return planReviewScope({ repo: "acme/widget", pr: 42, headRefOid: "abc", files });
+  return planReviewScope({
+    repo: "acme/widget",
+    pr: 42,
+    headRefOid: "abc",
+    files,
+  });
 }
 
 test("logic diffs preserve mandatory security baseline surfaces", () => {
-  const output = projectSecurityScope(plan([{ path: "src/math.ts", patch: "+export function add(a, b) { return a + b; }" }]));
-  assert.deepEqual(output.baselineSurfaces, ["authn", "authz", "secrets_config", "injection"]);
+  const output = projectSecurityScope(
+    plan([
+      {
+        path: "src/math.ts",
+        patch: "+export function add(a, b) { return a + b; }",
+      },
+    ]),
+  );
+  assert.deepEqual(output.baselineSurfaces, [
+    "authn",
+    "authz",
+    "secrets_config",
+    "injection",
+  ]);
   for (const surface of output.baselineSurfaces) {
     assert.ok(output.requiredSurfaces.includes(surface));
     assert.equal(output.matched[surface].baseline, true);
@@ -19,15 +39,30 @@ test("logic diffs preserve mandatory security baseline surfaces", () => {
 });
 
 test("evidence surfaces remain required alongside baselines", () => {
-  const output = projectSecurityScope(plan([{ path: "src/admin.ts", patch: "-requireAdmin(user)\n+destroyAccount()" }]));
+  const output = projectSecurityScope(
+    plan([
+      { path: "src/admin.ts", patch: "-requireAdmin(user)\n+destroyAccount()" },
+    ]),
+  );
   assert.ok(output.evidenceRequiredSurfaces.includes("authz"));
   assert.ok(output.requiredSurfaces.includes("authz"));
   assert.equal(output.matched.authz.confidence, "high");
 });
 
 test("logic diffs preserve complementary bug umbrellas", () => {
-  const output = projectBugScope(plan([{ path: "src/math.ts", patch: "+export function add(a, b) { return a + b; }" }]));
-  assert.deepEqual(output.baselineLenses, ["silent_failures", "resource_leaks", "edge_cases"]);
+  const output = projectBugScope(
+    plan([
+      {
+        path: "src/math.ts",
+        patch: "+export function add(a, b) { return a + b; }",
+      },
+    ]),
+  );
+  assert.deepEqual(output.baselineLenses, [
+    "silent_failures",
+    "resource_leaks",
+    "edge_cases",
+  ]);
   for (const lens of output.baselineLenses) {
     assert.ok(output.requiredLenses.includes(lens));
     assert.equal(output.lensEvidence[lens].baseline, true);
@@ -35,7 +70,14 @@ test("logic diffs preserve complementary bug umbrellas", () => {
 });
 
 test("detailed bug evidence is additive to umbrella lenses", () => {
-  const output = projectBugScope(plan([{ path: "src/worker.ts", patch: "+const worker = new Worker(url);\n+worker.terminate();" }]));
+  const output = projectBugScope(
+    plan([
+      {
+        path: "src/worker.ts",
+        patch: "+const worker = new Worker(url);\n+worker.terminate();",
+      },
+    ]),
+  );
   assert.ok(output.requiredLenses.includes("resource_leaks"));
   assert.ok(output.requiredLenses.includes("resource_lifecycle"));
   assert.ok(output.evidenceRequiredLenses.includes("resource_lifecycle"));
@@ -48,10 +90,18 @@ test("pure docs still skip both review axes", () => {
 });
 
 test("Cursor full review uses Bugbot's exact two-line prompt and nothing else", () => {
-  const bugReview = readFileSync(new URL("../../references/bug-review.md", import.meta.url), "utf8");
-  const fullReview = readFileSync(new URL("../../references/full-review-pr.md", import.meta.url), "utf8");
-  const cursorSection = bugReview.match(/#### Cursor([\s\S]*?)#### Claude/)?.[1] || "";
-  const promptFence = cursorSection.match(/```text\s*\n([\s\S]*?)\n\s*```/)?.[1] || "";
+  const bugReview = readFileSync(
+    new URL("../../references/bug-review.md", import.meta.url),
+    "utf8",
+  );
+  const fullReview = readFileSync(
+    new URL("../../references/full-review-pr.md", import.meta.url),
+    "utf8",
+  );
+  const cursorSection =
+    bugReview.match(/#### Cursor([\s\S]*?)#### Claude/)?.[1] || "";
+  const promptFence =
+    cursorSection.match(/```text\s*\n([\s\S]*?)\n\s*```/)?.[1] || "";
   const promptLines = promptFence
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -68,15 +118,89 @@ test("Cursor full review uses Bugbot's exact two-line prompt and nothing else", 
   assert.match(bugReview, /do not paraphrase/i);
   assert.match(bugReview, /Do \*\*not\*\* use `OWNER\/REPO`/);
   assert.match(fullReview, /literal `review-bugbot` prompt contract/);
-  assert.match(fullReview, /do not construct or paraphrase a replacement prompt/i);
+  assert.match(
+    fullReview,
+    /do not construct or paraphrase a replacement prompt/i,
+  );
+});
+
+test("full review refuses to stop while its verdict plan item is pending", () => {
+  const skill = readFileSync(
+    new URL("../../SKILL.md", import.meta.url),
+    "utf8",
+  );
+  const sharedRules = readFileSync(
+    new URL("../../references/shared-rules.md", import.meta.url),
+    "utf8",
+  );
+  const fullReview = readFileSync(
+    new URL("../../references/full-review-pr.md", import.meta.url),
+    "utf8",
+  );
+  const bugReview = readFileSync(
+    new URL("../../references/bug-review.md", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(skill, /Full-review completion lock/);
+  assert.match(skill, /Publish final verdict/);
+  assert.match(skill, /pending.*in_progress/is);
+  assert.match(skill, /Only explicit user cancellation/i);
+
+  assert.match(sharedRules, /Full-review verdict completion lock/);
+  assert.match(sharedRules, /Publish final verdict/);
+  assert.match(sharedRules, /pending.*in_progress.*never a done state/is);
+  assert.match(
+    sharedRules,
+    /A blocker changes the verdict; it does not permit the workflow to omit it/i,
+  );
+  assert.match(sharedRules, /Only explicit user cancellation/i);
+
+  const requiredFullReviewContracts = [
+    "## Mandatory execution plan and completion lock",
+    "`Publish final verdict`",
+    "The run **MUST NOT stop, return, hand off, emit a final response, or report",
+    "A blocker is input to the final verdict, not permission to skip it.",
+    "The only permitted exit without a verdict is explicit user cancellation.",
+  ];
+
+  for (const contract of requiredFullReviewContracts) {
+    assert.ok(
+      fullReview.includes(contract),
+      `missing full-review completion contract: ${contract}`,
+    );
+  }
+
+  assert.match(fullReview, /Planning next moves/i);
+  assert.match(fullReview, /pending CI/i);
+  assert.match(fullReview, /failed Bugbot invocation/i);
+  assert.match(fullReview, /GitHub publication is unavailable/i);
+  assert.match(fullReview, /complete verdict in chat/i);
+
+  assert.match(bugReview, /Cursor Bugbot liveness rule/);
+  assert.match(bugReview, /Bugbot supplies advisory evidence/i);
+  assert.match(bugReview, /Bugbot unavailable/i);
+  assert.match(
+    bugReview,
+    /Never keep `Publish final verdict` pending.*wait indefinitely/is,
+  );
 });
 
 test("full review owns a deterministic spec and standards method", () => {
-  const methodUrl = new URL("../../references/spec-standards-review.md", import.meta.url);
+  const methodUrl = new URL(
+    "../../references/spec-standards-review.md",
+    import.meta.url,
+  );
   const smellsUrl = new URL("../../references/code-smells.md", import.meta.url);
-  const fullReview = readFileSync(new URL("../../references/full-review-pr.md", import.meta.url), "utf8");
+  const fullReview = readFileSync(
+    new URL("../../references/full-review-pr.md", import.meta.url),
+    "utf8",
+  );
 
-  assert.ok(existsSync(methodUrl), "expected bundled spec/standards review method");
+  assert.ok(
+    existsSync(methodUrl),
+    "expected bundled spec/standards review method",
+  );
   assert.ok(existsSync(smellsUrl), "expected bundled code-smell baseline");
 
   const method = readFileSync(methodUrl, "utf8");
@@ -108,16 +232,28 @@ test("full review owns a deterministic spec and standards method", () => {
 });
 
 test("live fixture establishes Git credentials before pushing", () => {
-  const source = readFileSync(new URL("../../scripts/live-github-fixture.mjs", import.meta.url), "utf8");
+  const source = readFileSync(
+    new URL("../../scripts/live-github-fixture.mjs", import.meta.url),
+    "utf8",
+  );
   const setup = source.indexOf('run("gh", ["auth", "setup-git"]);');
   const push = source.indexOf('run("git", ["push", "origin"');
   assert.ok(setup >= 0, "expected gh auth setup-git");
-  assert.ok(push > setup, "Git authentication must be configured before the first push");
+  assert.ok(
+    push > setup,
+    "Git authentication must be configured before the first push",
+  );
 });
 
 test("ship-gate snapshot does not request org-scoped reviewer identities through gh pr view", () => {
-  const source = readFileSync(new URL("../../scripts/ship-gate-snapshot.mjs", import.meta.url), "utf8");
-  const prViewFields = source.match(/"number,title,state,isDraft,url,baseRefName,headRefOid,mergeStateStatus,mergeable,reviewDecision,[^"]+"/)?.[0] || "";
+  const source = readFileSync(
+    new URL("../../scripts/ship-gate-snapshot.mjs", import.meta.url),
+    "utf8",
+  );
+  const prViewFields =
+    source.match(
+      /"number,title,state,isDraft,url,baseRefName,headRefOid,mergeStateStatus,mergeable,reviewDecision,[^"]+"/,
+    )?.[0] || "";
 
   assert.doesNotMatch(prViewFields, /reviewRequests/);
   assert.match(source, /pulls\/\$\{pr\}\/requested_reviewers/);

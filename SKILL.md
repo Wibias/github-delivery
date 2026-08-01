@@ -88,6 +88,8 @@ Read `references/shared-rules.md` before acting. Non-negotiables:
 
 19. **Simplification is explicit-only.** Lower cognitive load and maintainability are the goals; **line count is never a success metric**. Do not simplify during an ordinary review. Before any simplify mutation, present bounded candidates and obtain explicit approval. Preserve behavior, APIs, errors, ordering, concurrency, output, UI, persistence, compatibility, validation, tests, security, CI, authorization, evidence, and fail-closed behavior. After approved changes, run focused and required gates, then automatically rerun the complete full review on the new head with simplification disabled; no second continuation prompt and no recursive simplify pass.
 
+20. **Full-review completion lock.** Every `full-review-pr` run must maintain an execution plan whose final required item is `Publish final verdict`. Before any stop, return, handoff, final response, or completion claim, inspect the current plan. If `Publish final verdict` or any required prerequisite is `pending` or `in_progress`, continue the workflow instead of stopping. Reviewer or tool failure, pending CI, a hard blocker, unavailable evidence, or a host state such as `planning next moves` is evidence for the verdict, never permission to omit it. Only explicit user cancellation may end a full-review run without a verdict. If publishing the verdict to GitHub is unavailable, deliver the complete verdict in chat and then mark the verdict item complete.
+
 ## Tooling
 
 - Prefer `gh` for GitHub reads/writes.

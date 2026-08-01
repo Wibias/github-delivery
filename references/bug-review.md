@@ -48,11 +48,37 @@ Checkout PR head first (shared **Subagent preflight**).
    ```
 
    Replace the placeholder with the actual absolute local filesystem path after checkout. Do **not** use `OWNER/REPO`. Do not paraphrase, rename, bullet, quote, or otherwise alter either field label or value.
+
 2. There must be **nothing after** the `Diff:` line: no blank-line payload, `Base Reference`, PR number or title, issue text, file list, review focus, explanation, or other prose. For a PR whose base is not the repository default, checkout the correct PR head and preserve the repository state locally; do not encode the base in the Bugbot prompt.
 3. If the user explicitly asked for uncommitted-only review, use the same exact two-line prompt and change only the second line to `Diff: uncommitted changes`.
 4. On a missing-field, unsupported-`Diff`, or wrong-invocation validator error, retry **once** with the appropriate exact two-line prompt and nothing else.
 5. If Bugbot still cannot compute the requested diff after that retry, state that Bugbot is unavailable for this review and continue with the complementary pass. Do **not** invent another prompt shape or fake a Bugbot report.
 6. Then run **§2 Complementary** (additive, even if Bugbot found nothing).
+
+### Cursor Bugbot liveness rule
+
+Bugbot supplies advisory evidence; it does not own full-review completion.
+
+Do not leave the parent full-review run with a pending verdict solely because
+Bugbot has not produced a usable result. When the host supports parallel
+reviewer execution, launch Bugbot without making it the sole blocking parent
+task and continue the complementary review axes.
+
+At the Bugbot join point:
+
+- accept a completed Bugbot result;
+- allow the single documented exact-schema retry after a validator rejection;
+- if Bugbot remains at `Planning next moves`, returns no usable result, or is
+  otherwise unavailable, record `Bugbot unavailable` with the observed reason;
+- complete the complementary in-session bug review;
+- continue automatically through security review, Spec and Standards review,
+  head refresh, authoritative ship gate, and the mandatory final verdict.
+
+Bugbot unavailability is evidence to include in the final verdict. It is not a
+terminal workflow state.
+
+Never keep `Publish final verdict` pending merely to wait indefinitely for
+Bugbot.
 
 #### Claude
 
@@ -69,11 +95,11 @@ Checkout PR head first (shared **Subagent preflight**).
 
 **One** structured pass (parent or one helper subagent) covering all of:
 
-| Lens | What to prove |
-|---|---|
-| **silent_failures** | Empty/swallowed `catch`; ignored promises; missing error paths; fail-open that hides breakage; **error propagation** (below) |
-| **resource_leaks** | Timers/listeners/handles/connections/streams not cleaned; missing `AbortSignal` / dispose on cancel |
-| **edge_cases** | Null/empty/partial collections; off-by-one bounds; races/TOCTOU on shared state; partial failure mid-batch; **lock/contention → caller contract** (below) |
+| Lens                | What to prove                                                                                                                                             |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **silent_failures** | Empty/swallowed `catch`; ignored promises; missing error paths; fail-open that hides breakage; **error propagation** (below)                              |
+| **resource_leaks**  | Timers/listeners/handles/connections/streams not cleaned; missing `AbortSignal` / dispose on cancel                                                       |
+| **edge_cases**      | Null/empty/partial collections; off-by-one bounds; races/TOCTOU on shared state; partial failure mid-batch; **lock/contention → caller contract** (below) |
 
 On Cursor this is **additive to Bugbot** (Bugbot leans precision and can under-index leaks / silent fails / API contracts).
 
@@ -94,11 +120,11 @@ If this session’s **security** pass already touched lock/CAS/auth-refresh/erro
 
 ### 3. Validate findings (confidence)
 
-| Level | Criteria | Action |
-|---|---|---|
-| **HIGH** | Concrete failure path + file evidence | **Confirmed** with severity |
-| **MEDIUM** | Suspicious pattern; path unclear | **Needs verification** only |
-| **LOW** | Style, rename, theoretical | Residual only — Do-Not-Flag as Confirmed |
+| Level      | Criteria                              | Action                                   |
+| ---------- | ------------------------------------- | ---------------------------------------- |
+| **HIGH**   | Concrete failure path + file evidence | **Confirmed** with severity              |
+| **MEDIUM** | Suspicious pattern; path unclear      | **Needs verification** only              |
+| **LOW**    | Style, rename, theoretical            | Residual only — Do-Not-Flag as Confirmed |
 
 #### Do Not Flag
 

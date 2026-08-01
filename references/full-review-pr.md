@@ -2,6 +2,66 @@
 
 **Trigger:** “full review on pr #N…”, “bug + security review + rabbit/codex + verdict”, “is this PR useful?”, a list of existing PRs to full-review, or an explicit “full review + simplify” request.
 
+## Mandatory execution plan and completion lock
+
+At the start of every full-review run, create or maintain an explicit execution
+plan. Its final required item MUST be named exactly:
+
+`Publish final verdict`
+
+That item starts as `pending` and may be marked `completed` only after the final
+verdict has actually been delivered for the currently reviewed PR head.
+
+The required plan must include, at minimum:
+
+1. Resolve repository, PR, base, and current head.
+2. Review usefulness and claimed behavior.
+3. Complete bug review.
+4. Complete security review.
+5. Complete Spec and Standards review.
+6. Triage human and bot feedback.
+7. Validate the current head and required CI.
+8. Refresh the authoritative ship gate.
+9. Publish final verdict.
+
+The run **MUST NOT stop, return, hand off, emit a final response, or report
+completion** while `Publish final verdict` or any required prerequisite is
+`pending` or `in_progress`.
+
+Before every attempted stop:
+
+1. Inspect the current execution plan.
+2. Continue with the next unfinished required item.
+3. Refresh the PR head.
+4. Invalidate stale evidence when the head changed.
+5. Obtain the authoritative `ship-gate.mjs` result for that head.
+6. Publish exactly one final verdict:
+   - `approve-comment`;
+   - `changes-requested`;
+   - `not-useful`;
+   - `gated`.
+7. Mark `Publish final verdict` complete only after delivery.
+
+A blocker is input to the final verdict, not permission to skip it.
+
+The following are never terminal full-review states:
+
+- `Planning next moves`;
+- a progress update;
+- pending CI;
+- an unavailable optional reviewer;
+- a failed Bugbot invocation;
+- unavailable optional tooling;
+- incomplete or unavailable API evidence;
+- waiting for another continuation prompt;
+- completion of review work without publication of the verdict.
+
+If GitHub publication is unavailable, provide the complete verdict in chat,
+including the reviewed head, findings, blockers, evidence limitations, and next
+action. That chat verdict satisfies the required verdict item.
+
+The only permitted exit without a verdict is explicit user cancellation.
+
 ## Goal
 
 Same babysit bar as **make merge-ready**: clear useful human + bot comments, own bug + security + **spec/standards**, fix in-PR, **required CI green**, then a **verdict** comment (usefulness included). Do **not** merge unless asked.
@@ -20,12 +80,12 @@ A normal full review does not simplify code merely because an opportunity is vis
 
 ## Verdict labels (strict)
 
-| Label | When allowed |
-|---|---|
-| `approve-comment` | Useful; bots/humans clear; own reviews + spec/standards clean; up to date with base; **compiles against tip**; **required CI green**; protection/`reviewDecision`/CODEOWNERS clear; not mid-stack-for-trunk; no draft/WIP gate; **thin settle** done |
-| `changes-requested` | Concrete necessary blockers remain that you cannot/should not silently fix |
-| `not-useful` | Usefulness pass failed — stop expanding work on that PR |
-| `gated` | **Only** GitHub draft / WIP / do-not-merge (shared draft gates). **Not** “wants maintainer ack”, “security feels sensitive”, or “Windows looks flaky” |
+| Label               | When allowed                                                                                                                                                                                                                                         |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `approve-comment`   | Useful; bots/humans clear; own reviews + spec/standards clean; up to date with base; **compiles against tip**; **required CI green**; protection/`reviewDecision`/CODEOWNERS clear; not mid-stack-for-trunk; no draft/WIP gate; **thin settle** done |
+| `changes-requested` | Concrete necessary blockers remain that you cannot/should not silently fix                                                                                                                                                                           |
+| `not-useful`        | Usefulness pass failed — stop expanding work on that PR                                                                                                                                                                                              |
+| `gated`             | **Only** GitHub draft / WIP / do-not-merge (shared draft gates). **Not** “wants maintainer ack”, “security feels sensitive”, or “Windows looks flaky”                                                                                                |
 
 **Forbidden stop excuses** (report in chat if relevant, but **keep fixing CI + comments**):
 
