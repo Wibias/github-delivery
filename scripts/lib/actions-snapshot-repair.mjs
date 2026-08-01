@@ -12,6 +12,45 @@ function sourceRestricted(snapshot, name) {
   );
 }
 
+function reviewLogin(review) {
+  return review?.user?.login || review?.author?.login || null;
+}
+
+function reviewState(review) {
+  return String(review?.state || "").toUpperCase();
+}
+
+function reviewSubmittedAt(review) {
+  return review?.submitted_at || review?.submittedAt || null;
+}
+
+function reviewCommitOid(review) {
+  return review?.commit_id || review?.commit?.oid || null;
+}
+
+export function latestOpinionatedReviewsFromRest(reviews = []) {
+  const latest = new Map();
+  for (const review of reviews) {
+    const login = reviewLogin(review);
+    const state = reviewState(review);
+    if (!login || !new Set(["APPROVED", "CHANGES_REQUESTED"]).has(state)) {
+      continue;
+    }
+    latest.set(login, {
+      author: { login },
+      state,
+      submittedAt: reviewSubmittedAt(review),
+      commit: reviewCommitOid(review)
+        ? { oid: reviewCommitOid(review) }
+        : null,
+    });
+  }
+  return {
+    pageInfo: { hasNextPage: false },
+    nodes: [...latest.values()],
+  };
+}
+
 export function actionsPolicyQuery() {
   return `
     query($owner: String!, $name: String!, $number: Int!) {
@@ -24,15 +63,6 @@ export function actionsPolicyQuery() {
             state
             enqueuedAt
             estimatedTimeToMerge
-          }
-          latestOpinionatedReviews(first: 100) {
-            pageInfo { hasNextPage }
-            nodes {
-              author { login }
-              state
-              submittedAt
-              commit { oid }
-            }
           }
         }
       }
