@@ -149,10 +149,10 @@ test("full review refuses to stop while its verdict plan item is pending", () =>
 
   assert.match(sharedRules, /Full-review verdict completion lock/);
   assert.match(sharedRules, /Publish final verdict/);
-  assert.match(sharedRules, /pending.*in_progress.*never a done state/is);
+  assert.match(sharedRules, /pending.*in_progress.*never a completed state/is);
   assert.match(
     sharedRules,
-    /A blocker changes the verdict; it does not permit the workflow to omit it/i,
+    /A blocker changes the verdict\. It does not permit the workflow to omit the verdict\./i,
   );
   assert.match(sharedRules, /Only explicit user cancellation/i);
 

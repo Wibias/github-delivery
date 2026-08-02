@@ -41,14 +41,15 @@ Confirm this request is **one** issue (or an explicit batch). Otherwise pick/ask
 1. Resolve `owner/repo` from the **issue** (not from a fork remote you happen to be in). Always use `--repo OWNER/REPO`.
 2. Base branch = that repo’s development/default as appropriate.
 3. Push the head branch (upstream if you can; else fork head is OK for the head ref).
-4. Create with UTF-8 **`--body-file`** (Windows-safe; shared encoding rules). Body must include same-repo `Fixes #N` on its own line:
+4. Load **`references/pr-description.md`**. Build the body from the issue and acceptance criteria, the actual current diff, and completed validation — not from the planned work or commit narration.
+5. Create with UTF-8 **`--body-file`** (Windows-safe; shared encoding rules). The body must follow the PR-description policy and include same-repo `Fixes #N` on its own line:
 
    ```bash
    gh pr create --repo OWNER/REPO --base <base> --head <head> \
      --title "…" --body-file body.md
    ```
 
-5. Confirm the PR URL is `https://github.com/OWNER/REPO/pull/…`. If it is fork-only (`https://github.com/<your-fork>/…`): **wrong** — close it and recreate against `OWNER/REPO`.
+6. Confirm the PR URL is `https://github.com/OWNER/REPO/pull/…`. If it is fork-only (`https://github.com/<your-fork>/…`): **wrong** — close it and recreate against `OWNER/REPO`.
 
 ### E. Link + assign + opened comment
 
@@ -83,12 +84,14 @@ Confirm this request is **one** issue (or an explicit batch). Otherwise pick/ask
 4. **Own reviews (required):** **bug** via **`references/bug-review.md`**; **security** via **`references/security-review.md`** (never Cursor harness `security-review` / `review-security`); **Spec + Standards** (`review` skill or short pass). Checkout preflight still applies.
 5. CODEOWNERS path check (`scripts/codeowners-for-pr.mjs` when helpful).
 6. Changelog nudge if user-facing → `git-workflow-and-versioning` for authoring.
-7. Final evidence sweep; **thin settle** (~3–5 min quiet + recheck; shared rules); then post merge-ready PR + linked-issue notify (idempotent). Do **not** merge.
+7. Final evidence sweep: reconcile the PR body with the final head using **`references/pr-description.md`**. Update stale scope, behavior, validation, review notes, or limitations and confirm the closing issue reference still resolves.
+8. **Thin settle** (~3–5 min quiet + recheck; shared rules); then post merge-ready PR + linked-issue notify (idempotent). Do **not** merge.
 
 ## Done when
 
 - Exactly the requested PR count (default **one**); no surprise batch
 - PR on **issue’s** repo (not fork-only)
+- PR body is evidence-grounded, follows `references/pr-description.md`, and matches the final head
 - `closingIssuesReferences` includes the issue; **issue** self-assigned when possible
 - Single complete opened-PR comment (no duplicates/cut-offs)
 - Screenshot gate passed (or N/A)
