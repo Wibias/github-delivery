@@ -45,6 +45,30 @@ test("simplification is explicit, behavior-preserving, and followed by full re-r
   assert.match(simplify, /simplification disabled/i);
 });
 
+test("simplify candidate pass includes concrete readability and state lenses", () => {
+  const simplify = readFileSync(
+    new URL("../../references/simplify-pr.md", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(simplify, /Readability, vocabulary, and state lenses/);
+  assert.match(simplify, /one concept has multiple names/i);
+  assert.match(simplify, /repeat context already supplied/i);
+  assert.match(simplify, /restate visible code/i);
+  assert.match(simplify, /non-obvious constraints/i);
+  assert.match(simplify, /primary behavior buried beneath low-level helpers/i);
+  assert.match(simplify, /safely derivable from an existing authoritative value/i);
+  assert.match(simplify, /introduced and superseded entirely within the same unmerged PR/i);
+  assert.match(simplify, /without reading the issue, conversation, or commit history/i);
+  assert.match(simplify, /existing repository utilities or abstractions/i);
+
+  assert.match(simplify, /candidate signals, not automatic edits/i);
+  assert.match(simplify, /established repository or domain term/i);
+  assert.match(simplify, /performance, timing, snapshot semantics/i);
+  assert.match(simplify, /never shipped, persisted, externally consumed/i);
+  assert.match(simplify, /fixtures, generated artifacts, downstream branches, or tests/i);
+});
+
 test("README documents the current public workflows and safety model", () => {
   const readme = readFileSync(new URL("../../README.md", import.meta.url), "utf8");
 
