@@ -258,13 +258,92 @@ When research (or the user) finds **fixed on development tip but not on release/
 2. Wait for new review rounds and CI — backoff polling, not a busy loop. See **CI wait expectations** below.
 3. Re-triage; repeat until the mode’s **done** condition or a **hard blocker**.
 
-| Mode                                                              | Keep going until                                                                                                                                                                                                                                                                           | Hard stop (report, don’t pretend done)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Fix / create → merge-ready** (`fix-pr-bots`, create-PR cleanup) | Each targeted PR is merge-ready (or draft/WIP gated with an explained blocker)                                                                                                                                                                                                             | Permissions / **fork-head unwritable** / dirty unrelated tree / push rejected / flake retry budget exhausted on required checks / product decision / human reply needs confirmation / user interrupt / **stacked trunk merge needs `manage-stacked-prs`**. **Do not** abandon the babysit just because wall-clock elapsed (e.g. “20 minutes of work”) while CI/comments are still fixable. **Do not** invent a fixed **20 min sleep** after CI starts — see CI wait expectations. **Do not** stop for soft “needs maintainer ack” while CI/comments are still fixable |
-| **Full review** (`full-review-pr`)                                | Each targeted PR has a **published final verdict** for the currently reviewed head **and** required CI green (or hard blocker / `not-useful` / draft-only `gated`). The execution-plan item `Publish final verdict` must be `completed`; `pending` or `in_progress` is never a done state. | Same hard blockers. A blocker changes the verdict; it does not permit the workflow to omit it. Only explicit user cancellation may end without a verdict.                                                                                                                                                                                                                                                                                                                                                                                                             |
-| **Watch** (`watch-pr`)                                            | PR merged/closed (green+mergeable is a milestone — keep watching for new comments)                                                                                                                                                                                                         | Same hard blockers, or user stop                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| **Re-review**                                                     | Concerns re-checked and fixed or changes-requested                                                                                                                                                                                                                                         | Same hard blockers                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| **Status**                                                        | One snapshot — no wait loop; verdict **cannot be looser** than merge-ready bar                                                                                                                                                                                                             | —                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+### Mode completion rules
+
+#### Fix / create → merge-ready
+
+Applies to `fix-pr-bots` and create-PR cleanup workflows.
+
+**Continue until:**
+
+- every targeted PR is merge-ready; or
+- a draft/WIP gate prevents merge and the blocker is clearly explained.
+
+**Hard stops:**
+
+- missing permissions;
+- fork head is not writable;
+- unrelated dirty working tree;
+- push rejected;
+- retry budget exhausted for required flaky checks;
+- unresolved product decision;
+- a human reply requires user confirmation;
+- user interruption;
+- stacked trunk merge requires `manage-stacked-prs`.
+
+**Not valid reasons to stop:**
+
+- an arbitrary wall-clock limit such as “20 minutes of work” while CI or comments remain fixable;
+- inventing a fixed 20-minute sleep after CI starts;
+- a soft “needs maintainer acknowledgement” opinion while CI or comments remain fixable.
+
+#### Full review
+
+Applies to `full-review-pr`.
+
+**Continue until:**
+
+- the semantic propagation audit is completed;
+- the final verdict is published for the currently reviewed head;
+- `Complete the semantic propagation audit` is marked `completed`;
+- `Publish final verdict` is marked `completed`; and
+- required CI is green, or the final verdict is `changes-requested`, `not-useful`, or draft-only `gated` and records all remaining blockers.
+
+A `pending` or `in_progress` required plan item is never a completed state.
+
+**Approval blockers include:**
+
+- an affected surface was not mapped;
+- variant equivalence was assumed rather than proved;
+- canonical and derived representations disagree;
+- test coverage is not representative of the changed abstraction;
+- evidence belongs to an older head;
+- required CI is incomplete.
+
+A blocker changes the verdict. It does not permit the workflow to omit the verdict.
+
+Only explicit user cancellation may end a full-review run without a published verdict.
+
+#### Watch
+
+Applies to `watch-pr`.
+
+**Continue until:**
+
+- the PR is merged; or
+- the PR is closed.
+
+Green CI and a mergeable state are milestones, not completion. Continue watching for new comments or state changes.
+
+**Hard stops:**
+
+- the same hard blockers defined above; or
+- an explicit user request to stop.
+
+#### Re-review
+
+**Continue until:**
+
+- every reported concern has been re-checked; and
+- each concern is either fixed or included in a `changes-requested` verdict.
+
+The same hard blockers apply.
+
+#### Status
+
+Return one current snapshot only.
+
+Do not enter a wait loop, and do not produce a verdict that is looser than the merge-ready bar.
 
 If the user named **several** existing PRs (“full review these”, “babysit these”, “make 778–782 merge ready”), keep working **each** until that mode’s done condition or a hard blocker — same no-early-exit rule. That is not “creating” a batch; it’s finishing open PRs they listed. If **more than 3** PRs: use **Multi-PR fan-out** (subagents) above — do not serialize them in the parent.
 
@@ -298,6 +377,51 @@ action. That chat verdict satisfies the required plan item.
 
 Only explicit user cancellation permits ending a full-review run without a
 verdict.
+
+### Full-review semantic completeness
+
+Running every named review axis is not sufficient for a completed full review.
+
+Every `full-review-pr` run must execute
+`references/semantic-propagation-review.md` and trace each changed domain
+concept through:
+
+- its authoritative source;
+- all producers and transformations;
+- all consumers;
+- all public, derived, cached, generated, serialized, and persisted forms;
+- all materially distinct variants;
+- positive and negative tests.
+
+The review must search beyond changed files.
+
+When shared logic affects a family or collection, one representative member is
+insufficient unless equivalence is proved from implementation and source data.
+Different canonical values, defaults, capabilities, permissions, errors, or
+compatibility behavior create separate review partitions.
+
+Whenever canonical and derived representations coexist, compare them directly
+for every material partition. Presence-only assertions do not establish
+correctness when an extra observable value would be a defect.
+
+The following block an approval verdict:
+
+- an affected surface was not mapped;
+- source-of-truth authority is unknown or ambiguous;
+- variant equivalence was assumed rather than proved;
+- canonical and derived representations disagree;
+- a family-wide change is tested through only one non-equivalent member;
+- unexpected values are not tested for absence;
+- a material behavior partition lacks coverage;
+- current-head CI or validation is incomplete;
+- the PR description materially misstates current-head scope or validation.
+
+Use the finding:
+
+`Coverage is not representative of the changed abstraction.`
+
+when production logic applies across several behavior partitions but tests do
+not cover those partitions and provide no proof of equivalence.
 
 ## CI wait expectations
 

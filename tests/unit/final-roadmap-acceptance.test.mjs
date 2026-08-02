@@ -230,7 +230,7 @@ test("new full-review runs publish new immutable verdict comments", () => {
   assert.match(fullReview, /### Final verdict publication/);
   assert.match(
     fullReview,
-    /Every completed full-review run MUST publish a new top-level PR conversation comment/i,
+    /Every completed full-review run MUST publish a new top-level PR conversation\s+comment/i,
   );
   assert.match(
     fullReview,
@@ -255,6 +255,132 @@ test("new full-review runs publish new immutable verdict comments", () => {
     commentDepth,
     /shipping-github:full-review-verdict run:<full-review-run-id> head:<reviewed-head-sha>/,
   );
+});
+
+test("full review requires repository-wide semantic propagation and variant parity", () => {
+  const skill = readFileSync(
+    new URL("../../SKILL.md", import.meta.url),
+    "utf8",
+  );
+  const sharedRules = readFileSync(
+    new URL("../../references/shared-rules.md", import.meta.url),
+    "utf8",
+  );
+  const fullReview = readFileSync(
+    new URL("../../references/full-review-pr.md", import.meta.url),
+    "utf8",
+  );
+  const commentDepth = readFileSync(
+    new URL("../../references/comment-depth.md", import.meta.url),
+    "utf8",
+  );
+  const semanticReviewUrl = new URL(
+    "../../references/semantic-propagation-review.md",
+    import.meta.url,
+  );
+
+  assert.ok(
+    existsSync(semanticReviewUrl),
+    "expected bundled semantic propagation review method",
+  );
+
+  const semanticReview = readFileSync(semanticReviewUrl, "utf8");
+
+  assert.match(skill, /Semantic propagation audit/);
+  assert.match(
+    skill,
+    /Search the repository beyond the changed files/i,
+  );
+  assert.match(
+    skill,
+    /One representative member is insufficient unless equivalence is proved/i,
+  );
+  assert.match(
+    skill,
+    /expected absences and rejected values/i,
+  );
+  assert.match(
+    skill,
+    /references\/semantic-propagation-review\.md/,
+  );
+
+  assert.match(sharedRules, /Full-review semantic completeness/);
+  assert.match(
+    sharedRules,
+    /Running every named review axis is not sufficient/i,
+  );
+  assert.match(
+    sharedRules,
+    /canonical and derived representations coexist/i,
+  );
+  assert.match(
+    sharedRules,
+    /Coverage is not representative of the changed abstraction/,
+  );
+
+  assert.match(
+    fullReview,
+    /Complete the semantic propagation audit/,
+  );
+  assert.match(
+    fullReview,
+    /Every full-review run MUST read and execute[\s\S]*references\/semantic-propagation-review\.md/,
+  );
+  assert.match(
+    fullReview,
+    /changed files are only seeds for repository-wide tracing/i,
+  );
+  assert.match(
+    fullReview,
+    /one representative was tested without proving equivalence/i,
+  );
+  assert.match(
+    fullReview,
+    /A full review cannot produce `approve-comment` while the semantic propagation\s+axis is blocked/,
+  );
+
+  const requiredSemanticContracts = [
+    "# Semantic Propagation Review",
+    "## Step 1: Name the changed concepts",
+    "## Step 2: Find the authoritative source",
+    "## Step 3: Search beyond the diff",
+    "## Step 4: Build the propagation matrix",
+    "## Step 5: Partition families by behavior",
+    "## Step 6: Reconcile canonical and derived representations",
+    "## Step 7: Audit test representativeness",
+    "## Step 8: Reconcile claims and current evidence",
+    "## Blocking conditions",
+    "## Required output",
+  ];
+
+  for (const contract of requiredSemanticContracts) {
+    assert.ok(
+      semanticReview.includes(contract),
+      `missing semantic propagation contract: ${contract}`,
+    );
+  }
+
+  assert.match(
+    semanticReview,
+    /single representative test is valid only when equivalence is proved/i,
+  );
+  assert.match(
+    semanticReview,
+    /expected values are present[\s\S]*unexpected values are absent/i,
+  );
+  assert.match(
+    semanticReview,
+    /derived\(entity\) == canonical\(entity\)/,
+  );
+  assert.match(
+    semanticReview,
+    /Coverage is not representative of the changed abstraction/,
+  );
+
+  assert.match(commentDepth, /### Semantic propagation/);
+  assert.match(commentDepth, /Material variant partitions checked/);
+  assert.match(commentDepth, /Unproven equivalence assumptions/);
+  assert.match(commentDepth, /Variant coverage gaps/);
 });
 
 test("full review owns a deterministic spec and standards method", () => {

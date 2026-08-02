@@ -16,13 +16,14 @@ The required plan must include, at minimum:
 
 1. Resolve repository, PR, base, and current head.
 2. Review usefulness and claimed behavior.
-3. Complete bug review.
-4. Complete security review.
-5. Complete Spec and Standards review.
-6. Triage human and bot feedback.
-7. Validate the current head and required CI.
-8. Refresh the authoritative ship gate.
-9. Publish final verdict.
+3. Complete the semantic propagation audit.
+4. Complete bug review.
+5. Complete security review.
+6. Complete Spec and Standards review.
+7. Triage human and bot feedback.
+8. Validate the current head and required CI.
+9. Refresh the authoritative ship gate.
+10. Publish final verdict.
 
 The run **MUST NOT stop, return, hand off, emit a final response, or report
 completion** while `Publish final verdict` or any required prerequisite is
@@ -61,6 +62,69 @@ including the reviewed head, findings, blockers, evidence limitations, and next
 action. That chat verdict satisfies the required verdict item.
 
 The only permitted exit without a verdict is explicit user cancellation.
+
+### Mandatory semantic propagation audit
+
+Every full-review run MUST read and execute
+`references/semantic-propagation-review.md`.
+
+This axis runs after usefulness review and before the ordinary bug, security,
+and Spec/Standards conclusions are finalized.
+
+For each changed domain concept:
+
+1. Name the concept independently of its filenames.
+2. Identify its authoritative source of truth.
+3. Search the entire repository for producers, consumers, sibling
+   implementations, derived forms, public output, serialization, persistence,
+   fixtures, and tests.
+4. Enumerate all affected members when shared code operates on a family,
+   catalog, registry, provider set, model set, capability table, enum, feature
+   flag, permission set, default table, schema, or platform matrix.
+5. Partition those members by materially different behavior.
+6. Prove equivalence before using one member as representative coverage.
+7. Compare every derived representation against the canonical source.
+8. Verify expected values are present and unexpected values are absent.
+9. Require exact equality for observable lists, sets, enums, permissions,
+   efforts, features, defaults, and capabilities unless an intentional
+   difference is supported by explicit evidence.
+10. Record the completed propagation matrix in the review evidence.
+
+The changed files are only seeds for repository-wide tracing. They are never
+the complete scope of this axis.
+
+The following block completion of this plan item:
+
+- no authoritative source identified;
+- an affected producer, consumer, or public representation was not inspected;
+- a family was not partitioned by behavior;
+- one representative was tested without proving equivalence;
+- canonical and derived representations disagree;
+- tests prove only expected presence where accidental widening is possible;
+- a materially distinct variant lacks positive or negative coverage;
+- PR claims, probes, or validation evidence refer to an older head;
+- required CI is incomplete.
+
+When any blocker remains, keep `Complete the semantic propagation audit`
+complete only as a performed axis, record its result as `blocked`, and carry
+every blocker into the mandatory final verdict. Never silently downgrade these
+items to optional follow-up suggestions.
+
+The final verdict MUST contain a `Semantic propagation` section listing:
+
+- concepts audited;
+- authoritative sources;
+- derived and public representations checked;
+- material variant partitions checked;
+- negative assertions checked;
+- unmapped surfaces;
+- unproven equivalence assumptions;
+- representation mismatches;
+- coverage gaps;
+- axis verdict.
+
+A full review cannot produce `approve-comment` while the semantic propagation
+axis is blocked.
 
 ### Full-review run and publication identity
 

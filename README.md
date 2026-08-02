@@ -59,6 +59,9 @@ routes through `references/full-review-pr.md`. The normal bug, security, standar
 - Review depth is derived from changed paths, patches, symbols, removed controls, dependencies, workflow permissions, and uncertainty rather than filenames alone.
 - Full-review execution plans end with a mandatory `Publish final verdict` item and cannot terminate while that item or any required prerequisite remains `pending` or `in_progress`.
 - Optional reviewers such as Cursor Bugbot cannot suppress the final verdict; unavailable reviewer evidence is recorded and the complementary review continues.
+
+- Full review traces every changed domain concept from its authoritative source through all producers, consumers, public or derived representations, materially distinct variants, and positive and negative tests.
+- Family-wide behavior cannot be approved from one representative test unless equivalence is proved; canonical and derived representations must be reconciled for every material behavior partition.
 - Simplification is explicit-only, requires explicit approval before mutation, and always preserves behavior and safety boundaries.
 - Line count is never a simplification success metric; **nothing worth simplifying** is a valid result.
 - Every changed simplification head receives focused validation, required repository gates, and a complete full review with simplification disabled.
