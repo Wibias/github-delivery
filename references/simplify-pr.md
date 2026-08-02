@@ -28,6 +28,24 @@ Look for high-confidence opportunities such as:
 - native language, platform, or existing repository facilities that are behaviorally equivalent and clearer
 - comments, names, or structure that obscure intent and can be clarified without changing behavior
 
+### Readability, vocabulary, and state lenses
+
+Also inspect for:
+
+- inconsistent vocabulary: one concept has multiple names, or one name represents multiple concepts
+- names that repeat context already supplied by the module, type, namespace, or owning object
+- comments that restate visible code, narrate the PR or conversation, or depend on implementation history to make sense
+- missing comments or documentation for non-obvious constraints, lifecycle rules, side effects, or failure behavior that the code cannot express clearly on its own
+- primary behavior buried beneath low-level helpers when repository conventions support a clearer reading order
+- stored, passed, cached, or synchronized state that is safely derivable from an existing authoritative value
+- aliases, adapters, fallback formats, old signatures, or compatibility paths introduced and superseded entirely within the same unmerged PR
+- names, comments, or structure that a reader cannot understand without reading the issue, conversation, or commit history
+- existing repository utilities or abstractions that already express the same operation more clearly without widening coupling
+
+Treat these as candidate signals, not automatic edits. Prefer the clearest established repository or domain term over shorter but less precise vocabulary. Do not shorten names, derive state, remove compatibility, reorder files, replace local code with shared utilities, or combine concepts unless the resulting behavior and relevant invariants can be proven equivalent.
+
+For derivable state, explicitly check whether recomputation would alter performance, timing, snapshot semantics, consistency boundaries, or side effects. For branch-local compatibility, prove that the superseded form was never shipped, persisted, externally consumed, or relied on by fixtures, generated artifacts, downstream branches, or tests.
+
 Do not treat every code smell as an instruction to refactor. Repository conventions and the local design override generic style preferences.
 
 For every proposed candidate, report:
