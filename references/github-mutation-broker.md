@@ -60,7 +60,7 @@ merge PR #32
 
 Agent flow:
 
-1. Load `shipping-github` from its frontmatter trigger.
+1. Load `github-delivery` from its frontmatter trigger.
 2. Route to `references/merge-pr.md`.
 3. Run runtime capability discovery and `ship-gate.mjs`.
 4. Prepare the PR comment request and execute it through the broker.

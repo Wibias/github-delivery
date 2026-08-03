@@ -89,7 +89,7 @@ export function buildRuntimeCapabilities({
 
   return {
     schemaVersion: 1,
-    kind: "shipping-github/runtime-capabilities",
+    kind: "github-delivery/runtime-capabilities",
     capturedAt: new Date().toISOString(),
     host: String(host || "unknown").toLowerCase(),
     os,

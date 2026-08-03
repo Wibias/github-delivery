@@ -36,7 +36,7 @@ Run in order. Skip a step only with an explicit `n/a` reason (tool missing, surf
 ### 0. Scope script (required for PRs)
 
 ```bash
-node "<shipping-github>/scripts/security-scope.mjs" OWNER/REPO N
+node "<github-delivery>/scripts/security-scope.mjs" OWNER/REPO N
 ```
 
 - Cover every `requiredSurfaces[]` row in the chat matrix.
@@ -51,14 +51,14 @@ Issue-only (no PR): derive surfaces manually from implicated paths using the sam
 
 ### 1. In-session security pass (required for PR diffs)
 
-**HARD RULE — never use the Cursor harness security agent.** Do **not** launch Task `subagent_type: "security-review"`, skill **`review-security`**, or any other built-in “Security Review” harness stub. Those are shallow and steal the prompt from this workflow. Security for shipping-github is **this file** only.
+**HARD RULE — never use the Cursor harness security agent.** Do **not** launch Task `subagent_type: "security-review"`, skill **`review-security`**, or any other built-in “Security Review” harness stub. Those are shallow and steal the prompt from this workflow. Security for github-delivery is **this file** only.
 
 1. Checkout PR head (shared **Subagent preflight** — checkout rules still apply; bugbot may use them separately).
-2. Review **branch changes vs PR base** in this session (parent), **or** one **general-purpose** subagent whose prompt says: follow `shipping-github` `references/security-review.md` + shared-rules for this PR — **never** `subagent_type: "security-review"`.
+2. Review **branch changes vs PR base** in this session (parent), **or** one **general-purpose** subagent whose prompt says: follow `github-delivery` `references/security-review.md` + shared-rules for this PR — **never** `subagent_type: "security-review"`.
 3. Load personal skill **`security-review`** (category checklist / `<security-review>/references/security-checks.md`) when available — that is a knowledge skill, not the Cursor harness launcher.
 4. If scope says `requireAiAgentSecurity`: load **`ai-agent-security`** and apply its decision tree to touched LLM/tool/MCP/RAG paths (**defensive** controls only).
 5. If scope says `requireAgenticSkillsTop10`: also load **`references/agentic-skills-top10.md`** and complete the AST01–AST10 matrix for skill/MCP install files.
-6. If a helper subagent fails: retry once with the same shipping-github brief. If still failing → finish the matrix manually in-session; say the helper failed.
+6. If a helper subagent fails: retry once with the same github-delivery brief. If still failing → finish the matrix manually in-session; say the helper failed.
 
 ### 1b. Adversarial / red-team second pass (**explicit user ask only**)
 

@@ -45,10 +45,10 @@ export function verifyDistribution({ dist, version, sourceCommit }) {
   const sumsPath = join(dist, "SHA256SUMS");
   if (!existsSync(manifestPath) || !existsSync(sumsPath)) throw new Error("distribution manifest or checksums are missing");
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
-  if (manifest.kind !== "shipping-github/distribution-manifest" || manifest.schemaVersion !== 1) throw new Error("unsupported distribution manifest");
-  if (manifest.name !== "shipping-github" || manifest.version !== version) throw new Error("distribution version does not match package version");
+  if (manifest.kind !== "github-delivery/distribution-manifest" || manifest.schemaVersion !== 1) throw new Error("unsupported distribution manifest");
+  if (manifest.name !== "github-delivery" || manifest.version !== version) throw new Error("distribution version does not match package version");
   if (manifest.sourceCommit !== sourceCommit.toLowerCase()) throw new Error("distribution source commit does not match release commit");
-  const expectedNames = ["manifest.json", `shipping-github-v${version}.tar.gz`, `shipping-github-v${version}.zip`];
+  const expectedNames = ["manifest.json", `github-delivery-v${version}.tar.gz`, `github-delivery-v${version}.zip`];
   const sums = parseSums(readFileSync(sumsPath, "utf8"));
   for (const name of expectedNames) {
     const path = join(dist, name);
@@ -85,17 +85,17 @@ export function createSpdxSbom({ dist, version, sourceCommit }) {
     spdxVersion: "SPDX-2.3",
     dataLicense: "CC0-1.0",
     SPDXID: "SPDXRef-DOCUMENT",
-    name: `shipping-github-v${version}`,
-    documentNamespace: `https://github.com/Wibias/shipping-github/releases/tag/v${version}#${sourceCommit}`,
+    name: `github-delivery-v${version}`,
+    documentNamespace: `https://github.com/Wibias/github-delivery/releases/tag/v${version}#${sourceCommit}`,
     creationInfo: {
-      creators: ["Organization: Wibias", "Tool: shipping-github-release-contract/1"],
+      creators: ["Organization: Wibias", "Tool: github-delivery-release-contract/1"],
       created: "1980-01-01T00:00:00Z",
     },
     packages: [{
-      name: "shipping-github",
-      SPDXID: "SPDXRef-Package-shipping-github",
+      name: "github-delivery",
+      SPDXID: "SPDXRef-Package-github-delivery",
       versionInfo: version,
-      downloadLocation: `https://github.com/Wibias/shipping-github/releases/tag/v${version}`,
+      downloadLocation: `https://github.com/Wibias/github-delivery/releases/tag/v${version}`,
       filesAnalyzed: true,
       licenseConcluded: "MIT",
       licenseDeclared: "MIT",
@@ -103,7 +103,7 @@ export function createSpdxSbom({ dist, version, sourceCommit }) {
     }],
     files,
     relationships: files.map((file) => ({
-      spdxElementId: "SPDXRef-Package-shipping-github",
+      spdxElementId: "SPDXRef-Package-github-delivery",
       relationshipType: "CONTAINS",
       relatedSpdxElement: file.SPDXID,
     })),
@@ -114,5 +114,5 @@ export function releaseNotesForVersion(changelog, version) {
   const escaped = version.replace(/[.\\]/g, (char) => `\\${char}`);
   const match = new RegExp(`^## \\[${escaped}\\][^\\n]*\\n([\\s\\S]*?)(?=^## \\[|(?![\\s\\S]))`, "m").exec(changelog.replace(/\r\n?/g, "\n"));
   if (!match || !match[1].trim()) throw new Error(`CHANGELOG.md has no release notes for ${version}`);
-  return `# shipping-github v${version}\n\n${match[1].trim()}\n`;
+  return `# github-delivery v${version}\n\n${match[1].trim()}\n`;
 }

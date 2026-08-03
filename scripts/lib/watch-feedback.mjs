@@ -1,8 +1,32 @@
 const TRUSTED = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
 const BOT_RE = /\[bot\]$/i;
-const AGENT_PREFIX_RE = /^#{0,3}\s*\[shipping-github\]/i;
-const RESOLUTION_HEADER_RE =
-  /^#{0,3}\s*\[shipping-github\]\s*Addressed feedback\s*$/i;
+const LEGACY_AGENT_PREFIXES = [
+  ["github", "delivery"].join("-"),
+  ["shipping", "github"].join("-"),
+];
+
+function escapeRegex(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+const AGENT_PREFIX_PATTERN = ["GD", ...LEGACY_AGENT_PREFIXES]
+  .map(escapeRegex)
+  .join("|");
+const MARKER_NAMESPACE_PATTERN = ["gd", ...LEGACY_AGENT_PREFIXES]
+  .map(escapeRegex)
+  .join("|");
+const AGENT_PREFIX_RE = new RegExp(
+  `^#{0,3}\\s*\\[(?:${AGENT_PREFIX_PATTERN})\\]`,
+  "i",
+);
+const RESOLUTION_HEADER_RE = new RegExp(
+  `^#{0,3}\\s*\\[(?:${AGENT_PREFIX_PATTERN})\\]\\s*Addressed feedback\\s*$`,
+  "i",
+);
+const RESOLUTION_MARKER_RE = new RegExp(
+  `^<!--\\s*(?:${MARKER_NAMESPACE_PATTERN}):addressed-feedback\\s+head:([0-9a-f]{40})\\s*-->$`,
+  "i",
+);
 const MERGE_COMMIT_RE =
   /^(Merge (branch|remote-tracking|pull request)|merge .* into |chore:\s*merge\b)/i;
 const FEEDBACK_KEY_RE =
@@ -47,26 +71,59 @@ export function parseFeedbackResolution(comment) {
     .filter(Boolean);
   if (!lines.length || !RESOLUTION_HEADER_RE.test(lines[0])) return null;
 
-  let feedbackKey = null;
+  const feedbackKeys = [];
   let commitRef = null;
+  let headRef = null;
+  let inFeedbackList = false;
   const errors = [];
+
+  function addFeedbackKey(value) {
+    if (!FEEDBACK_KEY_RE.test(value)) {
+      errors.push("invalid_feedback");
+      return;
+    }
+    if (feedbackKeys.includes(value)) {
+      errors.push("duplicate_feedback");
+      return;
+    }
+    feedbackKeys.push(value);
+  }
+
   for (const line of lines.slice(1)) {
+    const marker = RESOLUTION_MARKER_RE.exec(line);
+    if (marker) {
+      if (headRef !== null) errors.push("duplicate_head_marker");
+      headRef = marker[1].toLowerCase();
+      inFeedbackList = false;
+      continue;
+    }
+    if (/^<!--.*addressed-feedback/i.test(line)) {
+      errors.push("invalid_head_marker");
+      inFeedbackList = false;
+      continue;
+    }
+    if (/^feedbacks:\s*$/i.test(line)) {
+      inFeedbackList = true;
+      continue;
+    }
+    if (inFeedbackList && /^-\s+/.test(line)) {
+      addFeedbackKey(line.replace(/^-\s+/, "").trim());
+      continue;
+    }
+    inFeedbackList = false;
+
     const separator = line.indexOf(":");
     if (separator < 0) continue;
     const name = line.slice(0, separator).trim().toLowerCase();
     const value = line.slice(separator + 1).trim();
-    if (name === "feedback") {
-      if (feedbackKey !== null) errors.push("duplicate_feedback");
-      feedbackKey = value;
-    }
+    if (name === "feedback") addFeedbackKey(value);
     if (name === "commit") {
       if (commitRef !== null) errors.push("duplicate_commit");
       commitRef = value;
     }
   }
-  if (!feedbackKey || !FEEDBACK_KEY_RE.test(feedbackKey)) {
-    errors.push("invalid_feedback");
-  }
+
+  if (!feedbackKeys.length) errors.push("invalid_feedback");
   if (!commitRef || !COMMIT_REF_RE.test(commitRef)) {
     errors.push("invalid_commit");
   }
@@ -77,8 +134,10 @@ export function parseFeedbackResolution(comment) {
     login: comment?.login || null,
     createdAt: comment?.createdAt || null,
     url: comment?.url || null,
-    feedbackKey,
+    feedbackKey: feedbackKeys.length === 1 ? feedbackKeys[0] : null,
+    feedbackKeys,
     commitRef,
+    headRef,
     syntaxValid: errors.length === 0,
     errors: [...new Set(errors)],
   };
@@ -88,7 +147,7 @@ function diagnostic(record, code, extra = {}) {
   return {
     recordKey: record?.recordKey || null,
     code,
-    feedbackKey: record?.feedbackKey || null,
+    feedbackKey: extra.feedbackKey || record?.feedbackKey || null,
     commitRef: record?.commitRef || null,
     ...extra,
   };
@@ -102,6 +161,7 @@ export function evaluateFeedbackResolutions({
   feedback = [],
   commits = [],
   myLogin = null,
+  headOid = null,
 } = {}) {
   const actionableFeedback = feedback.filter((comment) =>
     isTrustedHumanFeedback(comment, { myLogin }),
@@ -127,10 +187,17 @@ export function evaluateFeedbackResolutions({
       diagnostics.push(diagnostic(record, "resolution_author_mismatch"));
       continue;
     }
-
-    const target = actionableByKey.get(record.feedbackKey);
-    if (!target) {
-      diagnostics.push(diagnostic(record, "feedback_not_found"));
+    if (
+      record.headRef &&
+      headOid &&
+      record.headRef.toLowerCase() !== String(headOid).toLowerCase()
+    ) {
+      diagnostics.push(
+        diagnostic(record, "resolution_head_mismatch", {
+          recordHead: record.headRef,
+          currentHead: headOid,
+        }),
+      );
       continue;
     }
 
@@ -156,19 +223,10 @@ export function evaluateFeedbackResolutions({
       continue;
     }
 
-    const feedbackTime = Date.parse(target.createdAt || "");
     const fixedTime = commitTimestamp(commit);
     const recordTime = Date.parse(record.createdAt || "");
-    if (
-      !Number.isFinite(feedbackTime) ||
-      !Number.isFinite(fixedTime) ||
-      !Number.isFinite(recordTime)
-    ) {
+    if (!Number.isFinite(fixedTime) || !Number.isFinite(recordTime)) {
       diagnostics.push(diagnostic(record, "timestamp_invalid"));
-      continue;
-    }
-    if (fixedTime <= feedbackTime) {
-      diagnostics.push(diagnostic(record, "commit_not_after_feedback"));
       continue;
     }
     if (recordTime < fixedTime) {
@@ -176,14 +234,45 @@ export function evaluateFeedbackResolutions({
       continue;
     }
 
-    addressed.add(target.key);
-    validRecords.push({
-      ...record,
-      resolvedCommitOid: commit.oid,
-      feedbackCreatedAt: target.createdAt,
-      commitCreatedAt:
-        commit.authoredDate || commit.committedDate || null,
-    });
+    const resolvedFeedbackKeys = [];
+    for (const feedbackKey of record.feedbackKeys) {
+      const target = actionableByKey.get(feedbackKey);
+      if (!target) {
+        diagnostics.push(
+          diagnostic(record, "feedback_not_found", { feedbackKey }),
+        );
+        continue;
+      }
+      const feedbackTime = Date.parse(target.createdAt || "");
+      if (!Number.isFinite(feedbackTime)) {
+        diagnostics.push(
+          diagnostic(recor, "timestamp_invalid", { feedbackKey }),
+        );
+        continue;
+      }
+      if (fixedTime <= feedbackTime) {
+        diagnostics.push(
+          diagnostic(record, "commit_not_after_feedback", { feedbackKey }),
+       );
+        continue;
+      }
+      addressed.add(target.key);
+      resolvedFeedbackKeys.push(target.key);
+    }
+
+    if (resolvedFeedbackKeys.length) {
+      const sortedKeys = [...resolvedFeedbackKeys].sort();
+      validRecords.push({
+        ...record,
+        resolvedFeedbackKeys: sortedKeys,
+        resolvedCommitOid: commit.oid,
+        commitCreatedAt: commit.authoredDate || commit.committedDate || null,
+        feedbackCreatedAt:
+          sortedKeys.length === 1
+            ? actionableByKey.get(sortedKeys[0])?.createdAt || null
+            : null,
+      });
+    }
   }
 
   return {

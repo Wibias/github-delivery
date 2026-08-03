@@ -3,7 +3,7 @@ import test from "node:test";
 import { enrichSnapshotWithBaseHealth } from "../../scripts/lib/base-health-live.mjs";
 
 const original = {
-  repo: "Wibias/shipping-github",
+  repo: "Wibias/github-delivery",
   sources: {},
   evidence: { pullRequest: { baseRefName: "main" } },
 };

@@ -27,7 +27,7 @@ Anti-patterns (rewrite before posting):
 ## Research (issue)
 
 ```markdown
-## [shipping-github] Research review
+## [GD] Research review
 
 **Claim:** <what the reporter asserts, in one precise sentence>
 **Checked against:** `<dev-branch>@<short-sha>` (release/default: `<branch>@<sha or n/a>`)
@@ -59,7 +59,7 @@ Anti-patterns (rewrite before posting):
 Keep the **public** comment short and scannable. Full matrix, scope-script JSON, abuse paths → **chat**.
 
 ```markdown
-## [shipping-github] Security review
+## [GD] Security review
 
 **PR / issue:** `#N` @ `<short-sha>`  
 **Decision:** Pass | Pass after fixes | Do not ship yet  
@@ -92,7 +92,7 @@ none confirmed
 **Do not** put on the public comment (chat-only / omit):
 
 - Long `requiredSurfaces=[…]` / scope-script dumps
-- Method essays (“shipping-github security-review.md + … not Cursor harness…”)
+- Method essays (“github-delivery security-review.md + … not Cursor harness…”)
 - Path laundry lists in **Scope** (at most 3–5 key surfaces in Summary if needed)
 - A findings table whose only row is “none confirmed…” stuffed into every column
 - Full coverage matrix (done/n/a for every surface)
@@ -104,8 +104,8 @@ Full coverage matrix + abuse paths stay in **chat**. If too sensitive for a usef
 ## Full-review / re-review verdict (PR)
 
 ```markdown
-## [shipping-github] Verdict: <approve-comment | changes-requested | not-useful | gated>
-<!-- shipping-github:full-review-verdict run:<full-review-run-id> head:<reviewed-head-sha> -->
+## [GD] Verdict: <approve-comment | changes-requested | not-useful | gated>
+<!-- github-delivery:full-review-verdict run:<full-review-run-id> head:<reviewed-head-sha> -->
 
 **PR:** `#N` — <title>
 **Head:** `<short-sha>` on `<base>` (mergeStateStatus: `…`)
@@ -170,7 +170,7 @@ When pinging a person, use bare `@login` (e.g. @user) — never `` `@login` ``.
 ## Merge-ready (PR)
 
 ```markdown
-## [shipping-github] Merge ready
+## [GD] Merge ready
 
 **PR:** `#N` — <title>  
 **Head:** `<short-sha>` → `<base>` (`mergeStateStatus: CLEAN`)  
@@ -204,7 +204,7 @@ Ready to merge.
 ## Merge-ready notify (linked issue)
 
 ```markdown
-## [shipping-github] PR merge-ready
+## [GD] PR merge-ready
 
 PR `#<pr>` (`<short title>`) is merge-ready on `<base>@<sha>`:
 
@@ -219,7 +219,7 @@ Not merged yet — waiting on merge when you want it.
 Same evidence depth as merge-ready, labeled **Status** (not Merge ready). Each blocker gets a concrete next action.
 
 ```markdown
-## [shipping-github] Status
+## [GD] Status
 
 **Verdict:** not merge-ready / merge-ready bar met (not posted) / gated
 **Head:** `<sha>` → `<base>` (`mergeStateStatus`)

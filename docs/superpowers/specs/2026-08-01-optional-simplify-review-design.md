@@ -2,7 +2,7 @@
 
 ## Goal
 
-Add an explicit, optional simplification phase to `shipping-github` that can be requested on its own or alongside a full PR review. The phase improves maintainability only when behavior can be preserved with high confidence. Reducing line count is never a goal by itself.
+Add an explicit, optional simplification phase to `github-delivery` that can be requested on its own or alongside a full PR review. The phase improves maintainability only when behavior can be preserved with high confidence. Reducing line count is never a goal by itself.
 
 ## User flow
 

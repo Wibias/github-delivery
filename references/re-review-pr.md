@@ -19,7 +19,7 @@ If the user also wants **merge-ready**, continue into `fix-pr-bots` after re-rev
 7. Do not auto-reply on human threads without exact-text confirmation (shared social policy).
 8. Security-offer + changelog nudge when applicable.
 9. If the user asked merge-ready / “then make it ready”: continue with `fix-pr-bots` (full own reviews + evidence sweep).
-10. Else if clean enough for a re-review-only ask: post a **detailed** review comment using the **Verdict** template in `references/comment-depth.md` (or a condensed version that still covers concerns vs new commits with paths/SHAs). Approve only if asked. Do **not** post `[shipping-github] Merge ready` unless the full merge-ready bar was completed.
+10. Else if clean enough for a re-review-only ask: post a **detailed** review comment using the **Verdict** template in `references/comment-depth.md` (or a condensed version that still covers concerns vs new commits with paths/SHAs). Approve only if asked. Do **not** post `[GD] Merge ready` unless the full merge-ready bar was completed.
 
 ## Done when
 
