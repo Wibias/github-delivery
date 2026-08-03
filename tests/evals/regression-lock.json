@@ -158,5 +158,9 @@
   {
     "id": "E1-matrix-2026-07-29",
     "sha256": "a8b76330e1066ecb2dd080178587e0c242a30acef9020420781b30da953ef8bb"
+  },
+  {
+    "id": "R-adaptive-settle-visible-polling-2026-08-03",
+    "sha256": "bbe587acd5f0be718c8657560a8bdb6d04c3e4c9f1eb449418df451b8ba2fd3a"
   }
 ]
