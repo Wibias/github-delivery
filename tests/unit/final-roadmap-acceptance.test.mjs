@@ -253,7 +253,7 @@ test("new full-review runs publish new immutable verdict comments", () => {
   );
   assert.match(
     commentDepth,
-    /shipping-github:full-review-verdict run:<full-review-run-id> head:<reviewed-head-sha>/,
+    /github-delivery:full-review-verdict run:<full-review-run-id> head:<reviewed-head-sha>/,
   );
 });
 

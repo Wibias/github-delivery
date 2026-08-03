@@ -40,7 +40,7 @@ export function main(argv = process.argv.slice(2)) {
   writeFileSync(notesPath, notes);
   const report = {
     schemaVersion: 1,
-    kind: "shipping-github/release-preparation",
+    kind: "github-delivery/release-preparation",
     ...context,
     sourceCommit: options.sourceCommit,
     artifacts: verified.artifacts,

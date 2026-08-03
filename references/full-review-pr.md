@@ -152,7 +152,7 @@ when it targets the same PR and the same head.
 Every completed full-review run MUST publish a new top-level PR conversation
 comment containing:
 
-`<!-- shipping-github:full-review-verdict run:<full-review-run-id> head:<reviewed-head-sha> -->`
+`<!-- github-delivery:full-review-verdict run:<full-review-run-id> head:<reviewed-head-sha> -->`
 
 Before publishing:
 
@@ -162,7 +162,7 @@ Before publishing:
    malformed, or truncated, use `edit_own_comment` to repair it.
 4. Never edit a completed verdict from an earlier full-review run.
 5. Never use another head’s verdict as the editable target.
-6. Never select the newest generic `[shipping-github] Verdict` comment without
+6. Never select the newest generic `[github-delivery] Verdict` comment without
    matching both run ID and reviewed head.
 
 Once `Publish final verdict` is marked complete, that comment becomes immutable

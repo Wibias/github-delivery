@@ -25,7 +25,7 @@ export function main(argv = process.argv.slice(2)) {
   const options = parseBuildArgs(argv);
   let reproducible = null;
   if (options.verifyReproducible) {
-    const temporary = mkdtempSync(join(tmpdir(), "shipping-github-repro-"));
+    const temporary = mkdtempSync(join(tmpdir(), "github-delivery-repro-"));
     const first = join(temporary, "first");
     const second = join(temporary, "second");
     try {

@@ -94,8 +94,8 @@ export function repairActionsSnapshot({
   branchProtection = undefined,
   actor = null,
 } = {}) {
-  if (!snapshot || snapshot.kind !== "shipping-github/evidence-snapshot") {
-    throw new Error("snapshot must be a shipping-github evidence snapshot");
+  if (!snapshot || snapshot.kind !== "github-delivery/evidence-snapshot") {
+    throw new Error("snapshot must be a github-delivery evidence snapshot");
   }
 
   const sources = structuredClone(snapshot.sources || {});

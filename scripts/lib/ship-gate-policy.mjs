@@ -112,7 +112,7 @@ export function combineShipGateResults({
 
   return {
     schemaVersion: 1,
-    kind: "shipping-github/ship-gate-decision",
+    kind: "github-delivery/ship-gate-decision",
     snapshotId: snapshot?.snapshotId || null,
     repo: snapshot?.repo || null,
     pr: snapshot?.pr || null,

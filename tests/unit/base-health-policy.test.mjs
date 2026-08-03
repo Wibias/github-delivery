@@ -16,7 +16,7 @@ function run(name, conclusion) {
 function snapshot({ head = [], base = [], baseComplete = true } = {}) {
   return {
     snapshotId: "snap",
-    repo: "Wibias/shipping-github",
+    repo: "Wibias/github-delivery",
     pr: 9,
     headOid: "head",
     sources: {

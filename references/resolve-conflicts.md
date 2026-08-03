@@ -1,10 +1,10 @@
 # Resolve Conflicts During a GitHub PR Workflow
 
-Use this reference only when the active `shipping-github` workflow encounters
+Use this reference only when the active `github-delivery` workflow encounters
 Git conflicts while updating, rebasing, merging, cherry-picking, reverting, or
 otherwise preparing a pull-request branch.
 
-`shipping-github` remains the owning workflow. This reference resolves the
+`github-delivery` remains the owning workflow. This reference resolves the
 conflict phase only, then returns control to the workflow that invoked it.
 
 ## 1. Inspect the active operation
@@ -93,7 +93,7 @@ Do not:
 
 ## 6. Return to the owning workflow
 
-After the Git operation completes, resume the original `shipping-github`
+After the Git operation completes, resume the original `github-delivery`
 workflow.
 
 Re-check at minimum:

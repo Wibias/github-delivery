@@ -19,8 +19,8 @@ function review(login, state, submittedAt, commit = "head") {
 }
 
 test("review-threads read mode preserves OWNER/REPO", () => {
-  assert.deepEqual(parseReviewThreadArgs(["Wibias/shipping-github", "42"]), {
-    repo: "Wibias/shipping-github",
+  assert.deepEqual(parseReviewThreadArgs(["Wibias/github-delivery", "42"]), {
+    repo: "Wibias/github-delivery",
     pr: 42,
     resolveId: null,
   });
@@ -29,13 +29,13 @@ test("review-threads read mode preserves OWNER/REPO", () => {
 test("review-threads resolve mode parses the thread ID", () => {
   assert.deepEqual(
     parseReviewThreadArgs([
-      "Wibias/shipping-github",
+      "Wibias/github-delivery",
       "42",
       "--resolve",
       "PRRT_example",
     ]),
     {
-      repo: "Wibias/shipping-github",
+      repo: "Wibias/github-delivery",
       pr: 42,
       resolveId: "PRRT_example",
     },
@@ -44,7 +44,7 @@ test("review-threads resolve mode parses the thread ID", () => {
 
 test("review-threads rejects a missing resolve value", () => {
   assert.throws(
-    () => parseReviewThreadArgs(["Wibias/shipping-github", "42", "--resolve"]),
+    () => parseReviewThreadArgs(["Wibias/github-delivery", "42", "--resolve"]),
     /requires a review thread ID/,
   );
 });

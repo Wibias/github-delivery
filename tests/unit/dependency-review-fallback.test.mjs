@@ -7,7 +7,7 @@ import test from "node:test";
 import { evaluateDependencyReviewFallback } from "../../scripts/lib/dependency-review-fallback.mjs";
 
 function fixture(packageJson = { name: "fixture", version: "1.0.0" }) {
-  const root = mkdtempSync(join(tmpdir(), "shipping-github-dependency-review-"));
+  const root = mkdtempSync(join(tmpdir(), "github-delivery-dependency-review-"));
   writeFileSync(join(root, "package.json"), JSON.stringify(packageJson, null, 2) + "\n");
   return root;
 }

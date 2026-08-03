@@ -97,12 +97,12 @@ export function injectSkillMetadata(source, { version }) {
   if (end === -1) throw new Error("SKILL.md frontmatter is not closed");
   const frontmatter = stripExistingDistributionMetadata(source.slice(4, end));
   const body = source.slice(end + 4).replace(/^\n?/, "\n");
-  return `---\n${frontmatter}\nlicense: MIT\ncompatibility: Requires Node.js 20+, git, GitHub network access, and an authenticated gh or brokered connector for writes.\nmetadata:\n  author: Wibias\n  version: "${version}"\n  repository: "https://github.com/Wibias/shipping-github"\n---${body}`;
+  return `---\n${frontmatter}\nlicense: MIT\ncompatibility: Requires Node.js 20+, git, GitHub network access, and an authenticated gh or brokered connector for writes.\nmetadata:\n  author: Wibias\n  version: "${version}"\n  repository: "https://github.com/Wibias/github-delivery"\n---${body}`;
 }
 
 function runtimeReferences(markdown) {
   const found = new Set();
-  const pattern = /(?<![A-Za-z0-9_<>/-])(?:<shipping-github>\/)?((?:references|scripts|overrides|tests\/evals)\/[A-Za-z0-9_.@<>/-]+)/g;
+  const pattern = /(?<![A-Za-z0-9_<>/-])(?:<github-delivery>\/)?((?:references|scripts|overrides|tests\/evals)\/[A-Za-z0-9_.@<>/-]+)/g;
   for (const match of markdown.matchAll(pattern)) {
     const cleaned = match[1].replace(/[),.;:`'"\]}]+$/g, "");
     if (!cleaned.includes("<") && !cleaned.includes("*")) found.add(cleaned);
@@ -238,7 +238,7 @@ function tarArchive(entries) {
 
 function readPackage(root) {
   const value = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-  if (value.name !== "shipping-github") throw new Error("package name must be shipping-github");
+  if (value.name !== "github-delivery") throw new Error("package name must be github-delivery");
   if (!/^\d+\.\d+\.\d+$/.test(value.version || "")) throw new Error("package version must be semantic x.y.z");
   return value;
 }
@@ -275,8 +275,8 @@ export function buildDistribution({ root = process.cwd(), out = join(root, "dist
   validateReferences(payloads);
   const manifest = {
     schemaVersion: 1,
-    kind: "shipping-github/distribution-manifest",
-    name: "shipping-github",
+    kind: "github-delivery/distribution-manifest",
+    name: "github-delivery",
     version,
     sourceCommit: resolveSourceCommit(root, sourceCommit),
     files: [...payloads.entries()].map(([path, content]) => ({
@@ -291,16 +291,16 @@ export function buildDistribution({ root = process.cwd(), out = join(root, "dist
   archivePayloads.set("manifest.json", manifestBuffer);
   rmSync(out, { recursive: true, force: true });
   mkdirSync(out, { recursive: true });
-  const unpacked = join(out, "shipping-github");
+  const unpacked = join(out, "github-delivery");
   writePayloadDirectory(unpacked, archivePayloads);
   writeFileSync(join(out, "manifest.json"), manifestBuffer);
   const entries = [...archivePayloads.entries()].map(([path, content]) => ({
-    path: `shipping-github/${path}`,
+    path: `github-delivery/${path}`,
     content,
     mode: path.startsWith("scripts/") ? 0o755 : 0o644,
   }));
-  const zipName = `shipping-github-v${version}.zip`;
-  const tarName = `shipping-github-v${version}.tar.gz`;
+  const zipName = `github-delivery-v${version}.zip`;
+  const tarName = `github-delivery-v${version}.tar.gz`;
   const zip = zipArchive(entries);
   const tar = tarArchive(entries);
   writeFileSync(join(out, zipName), zip);
@@ -355,7 +355,7 @@ function compareVersions(left, right) {
 
 function installedPackage(path) {
   const value = JSON.parse(readFileSync(join(path, "package.json"), "utf8"));
-  if (value.name !== "shipping-github") throw new Error("target is not a shipping-github installation");
+  if (value.name !== "github-delivery") throw new Error("target is not a github-delivery installation");
   semverParts(value.version);
   return value;
 }
@@ -381,9 +381,9 @@ export function applyInstallation({ source, target, backupRoot, allowDowngrade =
   if (!plan.allowed) throw new Error(`installation is not allowed: ${plan.action}`);
   let backupPath = null;
   if (existsSync(plan.target)) {
-    const root = resolve(backupRoot || join(dirname(plan.target), ".shipping-github-backups"));
+    const root = resolve(backupRoot || join(dirname(plan.target), ".github-delivery-backups"));
     mkdirSync(root, { recursive: true });
-    backupPath = join(root, `shipping-github-${Date.now()}-${plan.targetVersion || "unknown"}`);
+    backupPath = join(root, `github-delivery-${Date.now()}-${plan.targetVersion || "unknown"}`);
     renameSync(plan.target, backupPath);
   }
   try { cpSync(plan.source, plan.target, { recursive: true, errorOnExist: true, force: false }); }
@@ -392,7 +392,7 @@ export function applyInstallation({ source, target, backupRoot, allowDowngrade =
     if (backupPath && existsSync(backupPath)) renameSync(backupPath, plan.target);
     throw error;
   }
-  return { schemaVersion: 1, kind: "shipping-github/install-receipt", action: plan.action, sourceVersion: plan.sourceVersion, previousVersion: plan.targetVersion, target: plan.target, backupPath };
+  return { schemaVersion: 1, kind: "github-delivery/install-receipt", action: plan.action, sourceVersion: plan.sourceVersion, previousVersion: plan.targetVersion, target: plan.target, backupPath };
 }
 
 export function restoreBackup({ backup, target } = {}) {
@@ -401,5 +401,5 @@ export function restoreBackup({ backup, target } = {}) {
   if (!existsSync(backup) || !statSync(backup).isDirectory()) throw new Error("backup directory does not exist");
   rmSync(target, { recursive: true, force: true });
   renameSync(backup, target);
-  return { schemaVersion: 1, kind: "shipping-github/restore-receipt", backup, target };
+  return { schemaVersion: 1, kind: "github-delivery/restore-receipt", backup, target };
 }

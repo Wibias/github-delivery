@@ -38,7 +38,7 @@ export function evaluateDependencyReviewFallback({ outcome, root = process.cwd()
   if (outcome === "success") {
     return {
       schemaVersion: 1,
-      kind: "shipping-github/dependency-review-fallback",
+      kind: "github-delivery/dependency-review-fallback",
       decision: "authoritative_pass",
       degraded: false,
       dependencies: [],
@@ -49,7 +49,7 @@ export function evaluateDependencyReviewFallback({ outcome, root = process.cwd()
   const dependencyFree = inventory.dependencies.length === 0 && inventory.lockfiles.length === 0;
   return {
     schemaVersion: 1,
-    kind: "shipping-github/dependency-review-fallback",
+    kind: "github-delivery/dependency-review-fallback",
     decision: dependencyFree ? "dependency_free_degraded_pass" : "blocked",
     degraded: true,
     reason: dependencyFree

@@ -26,7 +26,7 @@ Create a classic personal access token under the maintainer account:
 2. Open **Developer settings**.
 3. Open **Personal access tokens** → **Tokens (classic)**.
 4. Choose **Generate new token (classic)**.
-5. Use a descriptive note such as `shipping-github live fixture`.
+5. Use a descriptive note such as `github-delivery live fixture`.
 6. Select a short expiration, such as 90 days.
 7. Select only the `public_repo` scope.
 
@@ -40,7 +40,7 @@ A classic token cannot be restricted to one repository. Limit its lifetime, stor
 
 ## Store the token
 
-In `Wibias/shipping-github`:
+In `Wibias/github-delivery`:
 
 1. Open **Settings** → **Secrets and variables** → **Actions**.
 2. Choose **New repository secret**.
@@ -54,7 +54,7 @@ The secret is not available to pull-request workflows. The Live Integration work
 Before creating any fixture resource, the workflow runs:
 
 ```bash
-node scripts/verify-live-fixture-token.mjs Wibias/shipping-github --base main
+node scripts/verify-live-fixture-token.mjs Wibias/github-delivery --base main
 ```
 
 The verifier performs read-only probes for:

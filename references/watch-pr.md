@@ -30,7 +30,7 @@ Do **not** merge unless they also asked to merge (then hand off to `merge-pr` on
 ### Mandatory script (every wake)
 
 ```bash
-node "<shipping-github>/scripts/watch-wake-gate.mjs" OWNER/REPO N
+node "<github-delivery>/scripts/watch-wake-gate.mjs" OWNER/REPO N
 ```
 
 - **Exit `1` / `canWait: false`:** you are **forbidden** to say you are waiting on CI, `windows-latest`, CodeRabbit, or Codex. Act on `blockers[]`:
@@ -39,7 +39,7 @@ node "<shipping-github>/scripts/watch-wake-gate.mjs" OWNER/REPO N
   - Optional paper trail **after** the fix commit:
 
     ```markdown
-    [shipping-github] Addressed owner feedback — <one line what changed on tip>
+    [github-delivery] Addressed owner feedback — <one line what changed on tip>
     ```
 
   - **ACK-only does not clear the gate** (script requires a later non-merge commit).
@@ -83,7 +83,7 @@ On **every** poll / wake (including the first):
 6. **Then** if behind/conflicted **or** wake-gate reports `base_dirty_or_behind`: update from base, resolve or ask, push; verify compile-against-tip. Prefer combining with review fixes in the **same** push. **Never** enter the 1–2 min poll loop while `DIRTY`/`CONFLICTING`.
 7. **Then CI:** classify branch vs flake. Fix branch-related **and** pre-existing/“unrelated” required failures (minimal patch); rerun flakes (max 3 / SHA); stop on exhausted infra failures. After push: re-check stale-approval / last-push via `pr-policy-gate`.
 8. Security-offer / changelog nudge once if applicable.
-9. Only if green + mergeable + **useful threads/comments quiet** on **current** SHA **and** wake-gate exit `0`: report milestone **“CI/reviews quiet — still watching (not full merge-ready bar)”**. Do **not** post `[shipping-github] Merge ready` from watch alone. Keep polling while open. If auto-merge **or merge-queue** queued: watch until **actually merged**.
+9. Only if green + mergeable + **useful threads/comments quiet** on **current** SHA **and** wake-gate exit `0`: report milestone **“CI/reviews quiet — still watching (not full merge-ready bar)”**. Do **not** post `[github-delivery] Merge ready` from watch alone. Keep polling while open. If auto-merge **or merge-queue** queued: watch until **actually merged**.
 10. Stop only when:
    - PR **merged** or **closed**, or
    - Hard blocker (permissions, fork-head unwritable, dirty unrelated tree, push rejected, flake budget exhausted, product decision, human reply needs confirmation, stack needs `manage-stacked-prs` for trunk, merge-queue stuck with `merge_group` CI gap), or

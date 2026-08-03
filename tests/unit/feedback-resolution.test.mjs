@@ -48,7 +48,7 @@ function resolution({
     createdAt,
     body:
       body ??
-      `[shipping-github] Addressed feedback\nfeedback: ${feedbackKey}\ncommit: ${commitRef}`,
+      `[github-delivery] Addressed feedback\nfeedback: ${feedbackKey}\ncommit: ${commitRef}`,
   });
 }
 
@@ -191,7 +191,7 @@ test("merge commits and records from another author cannot clear feedback", () =
 
 test("malformed records are reported and never clear feedback", () => {
   const malformed = resolution({
-    body: "[shipping-github] Addressed feedback\nfeedback: review_comment:77",
+    body: "[github-delivery] Addressed feedback\nfeedback: review_comment:77",
   });
   const result = evaluateFeedbackResolutions({
     feedback: [target, malformed],
@@ -210,9 +210,9 @@ test("snapshot wake evaluation exposes valid resolution evidence", () => {
   const completeSource = { required: true, readable: true, complete: true, error: null };
   const snapshot = {
     schemaVersion: 1,
-    kind: "shipping-github/evidence-snapshot",
+    kind: "github-delivery/evidence-snapshot",
     snapshotId: "resolution-snapshot",
-    repo: "Wibias/shipping-github",
+    repo: "Wibias/github-delivery",
     pr: 42,
     headOid: fixCommit.oid,
     sources: {
@@ -242,7 +242,7 @@ test("snapshot wake evaluation exposes valid resolution evidence", () => {
             user: { login: "Wibias" },
             author_association: "OWNER",
             created_at: "2026-08-01T00:03:00Z",
-            body: "[shipping-github] Addressed feedback\nfeedback: review_comment:77\ncommit: abcdef1",
+            body: "[github-delivery] Addressed feedback\nfeedback: review_comment:77\ncommit: abcdef1",
           },
         ],
         reviewComments: [

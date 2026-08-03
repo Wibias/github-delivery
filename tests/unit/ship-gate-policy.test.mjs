@@ -17,12 +17,12 @@ function input(overrides = {}) {
   return {
     snapshot: {
       snapshotId: "snap-42",
-      repo: "Wibias/shipping-github",
+      repo: "Wibias/github-delivery",
       pr: 42,
       headOid: "abc123",
       evidence: {
         pullRequest: {
-          url: "https://github.com/Wibias/shipping-github/pull/42",
+          url: "https://github.com/Wibias/github-delivery/pull/42",
         },
       },
     },

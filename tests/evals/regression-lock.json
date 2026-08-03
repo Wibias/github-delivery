@@ -1,166 +1,166 @@
 [
   {
     "id": "E1-2026-07-30",
-    "sha256": "63790b28785252b5e91eb5515e8a8e55425a3cc0a38164b69d9d75f7b4810159"
+    "sha256": "46b0e330ee9a45525241ee8feb2b1c21326b34cf1256459526d94fd88ccd3676"
   },
   {
     "id": "R-false-merge-ready-2026-07-31",
-    "sha256": "a6ff8d85fb49a5cdc759afcd3d18f091f307ee4745ee2919c06ee77c6dbbc956"
+    "sha256": "d6fe2ad7e47081a0b59d0a6e8c655d2f968608bb87143ad2f3ba3a9597210a9a"
   },
   {
     "id": "R-soft-gated-2026-07-31",
-    "sha256": "dcfa67a204ff94d9226e407ee2775e1c91966ccc0e63a2ff935f158248808fac"
+    "sha256": "bc1be4ed461c8dfc8415a98dd18d4130a4987df74aee2dcd52b469d01b781a75"
   },
   {
     "id": "R-issue-notify-2026-07-31",
-    "sha256": "c01b2cdd0896b56b81c9cd60611d0be9dff300768621bfc99714dd1f62507d32"
+    "sha256": "e0feb7307cddbd6b2a43e9f1c28bdba8b24f5fc64f6dc8ebb4b9d11f515487fb"
   },
   {
     "id": "R-compile-tip-2026-07-31",
-    "sha256": "cc907f792fbbe8980590ac7ef2d33d77304ceecffc2199a12ef5b32fa6f8c210"
+    "sha256": "533a07a82f64fbd9c74c310dc5f031e3fe2bd3a8515357347ca8c78c7d3667a9"
   },
   {
     "id": "R-bare-number-2026-07-31",
-    "sha256": "be2b441b4e94cc36df67ac610068ab31591b541dd620dac2cf6f3c8dd139301a"
+    "sha256": "0393e39ed9760f448463afaa8fdf6cf9949a98ef15c98b99ff017be99e37a0be"
   },
   {
     "id": "R-watch-not-ready-2026-07-31",
-    "sha256": "0e1666b63a911532ab22aca75bbdd1bbbcd0cfa3d84e6238d6844d91bae62f38"
+    "sha256": "f87e1914a34af6f91c9b08014428d503447f977ed5c373f15450e5dbd3ce29d1"
   },
   {
     "id": "R-stack-handoff-2026-07-31",
-    "sha256": "611de472760852349f3d4880ee52e3952f3484077ca92add65d8d70153221c3d"
+    "sha256": "7c5415eccca9b59a8f28fa86a9c93760865282395c911026be1d3d4c79e5df29"
   },
   {
     "id": "R-encoding-2026-07-31",
-    "sha256": "8272bb8324d10be75f0ffb84bef6ecb42beaf44272851ad64463734d337817a6"
+    "sha256": "3d82f8af8974f6d483a00b91537a87e987b8c5dd43c71e5c91b8da94aa833ec9"
   },
   {
     "id": "R-fork-head-2026-07-31",
-    "sha256": "b7e2e61ff57dde3e9186844179d20d7cf37c35a1a5025d3ac11a87d6cfebe300"
+    "sha256": "001db259dfe6e220ffa8f86fd6c65b193861eb618e3e81ddc2e67c2342cd39b3"
   },
   {
     "id": "R-review-threads-2026-07-31",
-    "sha256": "62c0bfec360276cba9698cc9ceaa6a2ac769540922f63579544ebdf905f7e3e6"
+    "sha256": "83022da9c9f53f7bfddf3d8631ef3536b3723a6a93fc52b18c4fd043371ad9d7"
   },
   {
     "id": "R-merge-queue-2026-07-31",
-    "sha256": "0a9ccbb7d72331e1ceeec4ec4e2c375fce82e126d35b0477dedfe410bd75825d"
+    "sha256": "67bc0b141a7e8220d59a5eb32bbff850ecb8d7d077525b8884f767739d7cbe19"
   },
   {
     "id": "R-codeowner-enforce-2026-07-31",
-    "sha256": "53bc5d038dbd22a476325026d986fd657c1dac274a33b590733e64c6566bcee4"
+    "sha256": "a48a13d8c1b9e3400a6bf2a5c24f9a9efdba354cc865d01f284fd1361d8928a8"
   },
   {
     "id": "R-stale-approval-2026-07-31",
-    "sha256": "179594882aecc08f6abf61a7e8de1385e55efe9bdbaa451eb9487a7fc886c522"
+    "sha256": "a1e23811835e73d4744915bccd6ccdc5a59e0a5c88f2c0bed1b4dc58219bb58c"
   },
   {
     "id": "R-thin-settle-2026-07-31",
-    "sha256": "b217091ce6bbaefd15fb928620fa1647dc10259760486b4240719ad29938d33e"
+    "sha256": "e73fec35a0d5feebe2a9550647cf999d414b2c0e99f036cecc6eaf8a0f443838"
   },
   {
     "id": "R-multi-pr-fanout-2026-07-31",
-    "sha256": "9da99d796e049c38cb2dbb9de0d8cca386bd849ad8af40b954411435b528e083"
+    "sha256": "48f23acec8cfbab8fc32f22336db7c848e4251d8380c326392ca201b834528da"
   },
   {
     "id": "R-merge-issue-thanks-2026-07-31",
-    "sha256": "d9746345081a3642c5a1919972061bc2ebcdd894b63f53b8ec9f4e5c9aceffe7"
+    "sha256": "5b6865d36a8bc8a8266bc95a4798eb34fe76a2df0f3b0bc9c3e9fb65dba1b236"
   },
   {
     "id": "R-watch-reviews-before-ci-2026-07-31",
-    "sha256": "af8b8b5e64b7d5d23ee4358350767016a6094a3280dcf56f240370c7235bb465"
+    "sha256": "9bfcc1efd1bf80ad11d0f8b5ade265019694b9e267ec98b089f265c129307981"
   },
   {
     "id": "R-watch-no-wait-coderabbit-2026-07-31",
-    "sha256": "06268fea87d5d17d01028a92e2c015aabe28c014db9213540dcd950b17308ecc"
+    "sha256": "90bd806871e4e658372cca44ce797996021598761e3560165a5c96d033b28e7a"
   },
   {
     "id": "R-watch-wake-gate-script-2026-07-31",
-    "sha256": "eb99620f4c3c1f7084022c858e7f455c2c52fcdb64561180c9e8f2d6d546e9be"
+    "sha256": "a151a7c23fa5387c6aa7fad8fd0f7ce5509afba4cf67bf2b35f4a2d2a70e281a"
   },
   {
     "id": "R-wake-gate-ack-not-enough-2026-07-31",
-    "sha256": "009ae28fe2844cd9e6a8aa08461bbb656b1258f6e4edc524b526b191bcbae6da"
+    "sha256": "c890291c91a934226d8aee637c351bb19a2f93ff08093d4360e1c52ec6357abb"
   },
   {
     "id": "R-ci-fix-not-rerun-timeout-2026-07-31",
-    "sha256": "adfcf740ee6a495cfe80e45b8a8bcfe5dd2f68a1761a27b0998f1e058fbe70c2"
+    "sha256": "6ba069d512a50b19cba8fd7966a12d309fc497a4fd0e4c8c20d0c0ff4eef8b63"
   },
   {
     "id": "R-ci-rerun-failed-job-only-2026-07-31",
-    "sha256": "f931646368887eda4f8e111a5d11a89ea66edb3d9f845016b807ed66eb45bdba"
+    "sha256": "fbfed753cb2d469b3f49f75270b3d2fcccd37e370d8a03501dd0b0ba33726577"
   },
   {
     "id": "R-security-coverage-matrix-2026-07-31",
-    "sha256": "aa6a2286063a08031689927c0263ac0e26e6231ee7982b0afc046e2d4645ae29"
+    "sha256": "b286715c4c1daf952db3ca3aee113af99a6c3c2d7b53b574042d4fb441b1c844"
   },
   {
     "id": "R-security-scope-script-2026-07-31",
-    "sha256": "d4f27318e03f924005e3b1cd47b8be548918478d578ca55a9c3ac386eec38992"
+    "sha256": "6a043483245070b91f20e763db3b181e95a052f6560c2bc81ed8d57b984822e9"
   },
   {
     "id": "R-security-high-pass-gate-2026-07-31",
-    "sha256": "b5d18c34adc5d3e3bd2adbf716a1767b5dc289a464f228aa35a49fe9734b178d"
+    "sha256": "2071d060a9c3c3fe2be7b332817db632f920cabbb288b82a246ddb3aa718298d"
   },
   {
     "id": "R-security-confidence-dof-2026-07-31",
-    "sha256": "a8b2d0c7b3989e09700b247448773e5237a112e525f9c93b58c0e52a391adb11"
+    "sha256": "43f9080fdbd92ac9302ab8d5d4092553f33ec77314efd62cebdae52899bcd9fb"
   },
   {
     "id": "R-security-iac-removed-crypto-2026-07-31",
-    "sha256": "3b9f3688d04fb32df1c1125fdffae099072a40d219c3a235e364db9ae50b64c9"
+    "sha256": "d4f5de58f37d565e5156112222db2f0c2953181e91fc03e3759cb3049c84f751"
   },
   {
     "id": "R-security-ast10-skills-2026-07-31",
-    "sha256": "4ceefcc8b10299a0bb591c122fa03728772883010fa31817f5b20e0c82df27e5"
+    "sha256": "54ba7c95e447714462ae4557aa5449dfd4e8936ef924451d642759946026523d"
   },
   {
     "id": "R-security-no-auto-adversarial-2026-07-31",
-    "sha256": "b8a0d519e084d412d6afafa5961b0507c05b72bd5f051b8ea81e28a252ecfc7e"
+    "sha256": "fbe12f11d37188bfca6a0a76e82468675a5a950fd4f580e22d818fdb4d124479"
   },
   {
     "id": "R-no-harness-security-review-2026-07-31",
-    "sha256": "91b0386dc6089f4dd0851dc1778d5c63983aa3b7c8b2ad897c96cca4c1184d1f"
+    "sha256": "254c8221356123dc0826b826bfcfa379772b224e84de2c61f300f4ff0f31173e"
   },
   {
     "id": "R-bug-scope-skip-docs-2026-07-31",
-    "sha256": "0831a3015fbd96a3cd47740f38783e041de5842b0ba5a12e601e98dc2f3dcdc6"
+    "sha256": "589bca68a1283e7188e94f448d212cc4e4d773b81bd49feaa2f341c08db12cb5"
   },
   {
     "id": "R-bug-cursor-bugbot-plus-complementary-2026-07-31",
-    "sha256": "11a5a5301db961df011c133930797de0c1c81b7d3f7af3a7d3c1ae1b0212d26f"
+    "sha256": "30868fd1aa39e0a17664f0bf2e6a02af97022c23bd97967e93330d2eadf71325"
   },
   {
     "id": "R-bug-no-fake-bugbot-claude-2026-07-31",
-    "sha256": "5d9f37f5eb171878d1b1ddc2dbb79be3b8a72848aa854f315cd19919efb69a7c"
+    "sha256": "22a3e206040fe3f92bfc6e0c6548ea6ad9f1d4a718dbc733456f379f305e6f64"
   },
   {
     "id": "R-bug-no-auto-deep-multiagent-2026-07-31",
-    "sha256": "1772f07179bdc3aaf2edcd7d630cbf1a602a011914d9516db1b47dc8aeb290f0"
+    "sha256": "cc11c25ebc89dfb929f46222f108b05ca3d78607a1193679f2cddb70fdef9ec4"
   },
   {
     "id": "R-bug-error-propagation-must-probe-2026-07-31",
-    "sha256": "eea357302f5c82497232423290e71b80033ecba106800d3a7a9387fff1b2d1ff"
+    "sha256": "83441a719283de0642b628de47979b55bc8ecb09213a0734fd1f5213e4a73b15"
   },
   {
     "id": "R-ci-fix-unrelated-required-2026-07-31",
-    "sha256": "82f5e2b040b4660c5e5a72cc665e1e826b86a2f4a7872b773fd8b7d3a42188b6"
+    "sha256": "d3160f4bf30b89dca67884b460785c1479de0a982c536de644a1856682799e1b"
   },
   {
     "id": "E1-2026-07-29",
-    "sha256": "79bbbffaa3b4db11354dc164df07aa6b2bd7d22b20737158921dc90635cabc89"
+    "sha256": "0897d56f2f811fad1ba440cd6bd34dfcc7c9224ccae0121b3734971a7536f38a"
   },
   {
     "id": "E1-2026-07-29b",
-    "sha256": "7bad4af3f007c04d936584db9e7bec8d1772727efcb9471025cded7571efe5d8"
+    "sha256": "459ee2a9c305e5e7edc760f9ae11eb2888eed7a1eb9db00eaaa4811833be9b5c"
   },
   {
     "id": "E1-matrix-2026-07-29",
-    "sha256": "a8b76330e1066ecb2dd080178587e0c242a30acef9020420781b30da953ef8bb"
+    "sha256": "192c324a995f005ec7d029cdd16663646544a1a05a0979ec8adfb7de4eadb86c"
   },
   {
     "id": "R-adaptive-settle-visible-polling-2026-08-03",
-    "sha256": "bbe587acd5f0be718c8657560a8bdb6d04c3e4c9f1eb449418df451b8ba2fd3a"
+    "sha256": "12dfcc066704af7b483984cd757c03b4f7f5e4f989bf8b462955deb1a32fe7ca"
   }
 ]
