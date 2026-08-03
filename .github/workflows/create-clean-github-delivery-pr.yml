@@ -1,0 +1,109 @@
+name: Create clean github-delivery branch
+
+on:
+  push:
+    branches:
+      - agent/rename-github-delivery
+
+permissions:
+  contents: write
+
+concurrency:
+  group: create-clean-github-delivery-branch
+  cancel-in-progress: false
+
+jobs:
+  create-clean-branch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: agent/rename-github-delivery
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+
+      - name: Build clean rename from main
+        shell: bash
+        run: |
+          git switch --force-create agent/github-delivery origin/main
+
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+          import json
+          import subprocess
+
+          old = "shipping-github"
+          new = "github-delivery"
+          tracked = [
+              item.decode()
+              for item in subprocess.check_output(["git", "ls-files", "-z"]).split(b"\0")
+              if item
+          ]
+
+          for name in tracked:
+              path = Path(name)
+              data = path.read_bytes()
+              try:
+                  text = data.decode("utf-8")
+              except UnicodeDecodeError:
+                  continue
+              updated = text.replace("Shipping GitHub", "GitHub Delivery").replace(old, new)
+              if updated != text:
+                  path.write_text(updated, encoding="utf-8", newline="\n")
+
+          for source in sorted(
+              (name for name in tracked if old in name),
+              key=lambda value: (value.count("/"), len(value)),
+              reverse=True,
+          ):
+              target = source.replace(old, new)
+              Path(target).parent.mkdir(parents=True, exist_ok=True)
+              subprocess.run(["git", "mv", source, target], check=True)
+
+          regression_path = Path("tests/evals/regression-cases.jsonl")
+          lock = []
+          for raw in regression_path.read_text(encoding="utf-8").splitlines():
+              if not raw.strip():
+                  continue
+              item = json.loads(raw)
+              lock.append({
+                  "id": item["id"],
+                  "sha256": hashlib.sha256(raw.encode("utf-8")).hexdigest(),
+              })
+          Path("tests/evals/regression-lock.json").write_text(
+              json.dumps(lock, indent=2, ensure_ascii=False) + "\n",
+              encoding="utf-8",
+              newline="\n",
+          )
+          PY
+
+      - name: Verify complete rename
+        shell: bash
+        run: |
+          grep -q '^name: github-delivery$' SKILL.md
+          test "$(node -p "require('./package.json').name")" = "github-delivery"
+          test -z "$(git ls-files | grep 'shipping-github' || true)"
+          test -z "$(git grep -n 'shipping-github' || true)"
+
+      - name: Run repository checks
+        run: npm run check
+
+      - name: Restore protected workflows for separate app commit
+        run: git checkout origin/main -- .github/workflows
+
+      - name: Commit and push clean rename
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m 'chore: rename skill to github-delivery'
+          git push origin HEAD:refs/heads/agent/github-delivery
