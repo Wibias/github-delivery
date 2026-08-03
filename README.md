@@ -57,6 +57,7 @@ routes through `references/full-review-pr.md`. The normal bug, security, standar
 - CODEOWNERS mapping is advisory; GitHub’s enforced review decision remains authoritative.
 - Natural-language requests select the narrowest mutation mode: `read-only`, `review`, `maintainer`, or `autonomous`.
 - Human replies always require exact-text confirmation.
+- Base updates (push to latest dev) and simplification edits happen only on PRs authored by the authenticated user; foreign PRs receive the owner instructions in the verdict/status instead.
 - PR mutations re-check the expected head immediately before execution.
 - Merge operations are pinned with `--match-head-commit`.
 - Social writes require idempotency keys and produce versioned receipts.

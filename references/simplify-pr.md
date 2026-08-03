@@ -15,6 +15,7 @@ Prefer reporting **nothing worth simplifying** over manufacturing edits.
 - Do not expand into unrelated refactors, repository-wide cleanup, formatting churn, dependency changes, or architectural redesign.
 - Simplification cannot overrule bug, security, Spec/Standards, review, CI, base-health, mutation-policy, or `ship-gate.mjs` authority.
 - Code changes require a mutation mode that permits `push_code`, but the selected mode does not replace the explicit approval required below.
+- **PR ownership (shared rules):** only PRs authored by the authenticated user may be edited and pushed. On a foreign PR, run the candidate pass but apply nothing; deliver the complete bounded candidate list to the PR owner (verdict for full-review composition; comment or chat for standalone) and skip the approval-to-apply, validation, push, and re-review flow.
 
 ## Candidate pass
 
@@ -85,10 +86,13 @@ If candidates remain:
 3. Do not interpret approval of the original full review, permission to fix bugs, or a broad maintainer mutation mode as approval to simplify.
 4. Record which candidates were approved and apply only those candidates.
 
+On a foreign PR this gate is skipped: candidates are delivered to the PR owner instead of being applied.
+
 For a combined full-review request, this approval is the only continuation gate. Once approval is given, automatically continue through implementation, validation, full re-review, and final verdict. Do not ask a second continuation question.
 
 ## Application and rollback
 
+- Foreign PRs: nothing is applied or pushed; the bounded candidate list goes to the PR owner.
 - Apply approved candidates in small, independently attributable changes.
 - Preserve existing tests and add or strengthen tests when equivalence is not already directly covered.
 - Run the candidate's focused validation immediately after applying it.
@@ -123,6 +127,7 @@ For a standalone simplify request, candidate approval and application are follow
 
 - activation was explicit
 - candidates were either rejected with rationale, reported as nothing worth simplifying, or explicitly approved
+- on foreign PRs: the bounded candidate list was delivered to the PR owner and nothing was edited or pushed
 - only approved behavior-preserving changes were applied
 - failed candidates were reverted individually
 - focused validation and all required repository gates passed

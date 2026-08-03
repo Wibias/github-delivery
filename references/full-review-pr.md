@@ -202,6 +202,8 @@ A normal full review does not simplify code merely because an opportunity is vis
 | `not-useful`        | Usefulness pass failed — stop expanding work on that PR                                                                                                                                                                                              |
 | `gated`             | **Only** GitHub draft / WIP / do-not-merge (shared draft gates). **Not** “wants maintainer ack”, “security feels sensitive”, or “Windows looks flaky”                                                                                                |
 
+`changes-requested` also covers owner actions on a foreign PR: update from the latest base and apply the listed simplification candidates.
+
 **Forbidden stop excuses** (report in chat if relevant, but **keep fixing CI + comments**):
 
 - “Needs maintainer security ack” / “should get human OK first”
@@ -211,23 +213,24 @@ A normal full review does not simplify code merely because an opportunity is vis
 
 ## Steps
 
-1. Identify PR(s); checkout head (subagent preflight); note base, linked issues, draft/WIP gates. If draft and user wanted green/merge-ready: ask once about **Draft → ready**.
+1. Identify PR(s); checkout head (subagent preflight); note base, linked issues, draft/WIP gates, and the PR author vs authenticated viewer (shared **PR ownership boundary**). If draft and user wanted green/merge-ready: ask once about **Draft → ready**.
 2. Usefulness pass: real bug / claimed value? If not → `not-useful` verdict and stop that PR only.
 3. Parallel where useful: **Bug** via **`references/bug-review.md`** (scope → Bugbot when Cursor → complementary). On Cursor, use that file's literal `review-bugbot` prompt contract; do not construct or paraphrase a replacement prompt in this workflow. **Security** via **`references/security-review.md`** (never Cursor harness `security-review` / `review-security`). Run **Spec + Standards** through the bundled **`references/spec-standards-review.md`** method. It owns the fixed comparison, source discovery, two independent axes, and advisory `references/code-smells.md` baseline; do not depend on an optional external review skill.
 4. Triage open human + bot comments (shared rules — owners/maintainers first). Fix useful; decline nits with rationale. Inline replies in-thread only.
-5. Push fixes; update from base if behind; **verify compile/tests against tip**; **wait and recheck** until useful threads quiet **and** required CI green on that tip SHA, or a hard blocker. Use **rate-limit backoff** (Composio → gh) on dense polls.
+5. Update from base and push the base sync **only when the PR is ours** (shared **PR ownership boundary**); on a foreign PR, record the owner actions (update from latest base / resolve conflicts) for the verdict and do not push the base sync. Push scoped fixes under the existing fork-head/push rules; **verify compile/tests against tip**; **wait and recheck** until useful threads quiet **and** required CI green on that tip SHA, or a hard blocker. Use **rate-limit backoff** (Composio → gh) on dense polls.
 6. Changelog nudge if user-facing.
 7. **Optional simplify phase:** only when the user explicitly asks, run `references/simplify-pr.md` after the concrete bug, security, spec, review, base, and CI work above is clean but before posting the verdict.
+   - **Foreign PRs (not ours):** run the candidate pass, then **do not edit or push**; include the complete bounded candidate list in the verdict for the PR owner and skip the approval-to-apply, validation, push, and re-review flow.
    - Keep simplification findings separate from required review findings.
    - If the simplify pass reports **nothing worth simplifying**, continue to the normal verdict without changing code.
-   - If it reports candidates, present the complete bounded list and wait for **explicit approval** before changing code. Hold the verdict while approval is pending.
+   - If it reports candidates on **our own PR**, present the complete bounded list and wait for **explicit approval** before changing code. Hold the verdict while approval is pending.
    - Approval automatically resumes application of only the approved candidates, focused validation, required repository gates, push, and the **complete full-review workflow** on the new head. There is **no second continuation prompt**.
    - Rerun this complete workflow on the exact **post-simplification head** with simplification disabled. Re-run usefulness, bug, security, Spec/Standards, comments, base synchronization, compile/tests, required CI, thin settle, and `ship-gate.mjs`; do not merely review the cleanup diff.
    - Publish the final verdict only from that post-simplification head. Any regression introduced by simplification is a blocker and must be fixed or the responsible candidate rolled back.
    - There is **no recursive simplification** pass during the mandatory re-review.
 8. If concrete necessary issues remain: GitHub **changes requested** with those blockers only.
 9. Before `approve-comment` (or merge-ready notify): **thin settle** (shared rules) — ~3–5 min quiet + recheck; activity resets; two-window cap. Skip settle for `changes-requested` / `not-useful` / draft `gated`.
-10. Post a **detailed** verdict comment **only after** CI+comments are handled (and settle, when approving) or a real hard blocker / `not-useful` / draft `gated` applies. Use the **Full-review / re-review verdict** template in `references/comment-depth.md` — fill Usefulness, Bugs, Security, Spec, Reviews, Base/CI, Gate, Bottom line with paths/SHAs/checks. Do not post a bullet stub of “bots: addressed / CI: green.” When simplification ran, include the approved candidates, rollback status, validation evidence, and exact post-simplification head.
+10. Post a **detailed** verdict comment **only after** CI+comments are handled (and settle, when approving) or a real hard blocker / `not-useful` / draft `gated` applies. Use the **Full-review / re-review verdict** template in `references/comment-depth.md` — fill Usefulness, Bugs, Security, Spec, Reviews, Base/CI, Gate, Bottom line with paths/SHAs/checks. Do not post a bullet stub of “bots: addressed / CI: green.” When simplification ran, include the approved candidates, rollback status, validation evidence, and exact post-simplification head. When the PR is not ours, also fill the **Base sync (for the PR owner)** line and **Simplification (for the PR owner)** section with the owner actions.
 
 Approve via GitHub only if the user asked for approval; otherwise comment or request changes.
 
@@ -243,6 +246,7 @@ For **every** targeted PR:
 - Useful bots/humans handled or declined with rationale
 - Required CI green **or** hard-blocker reported (flake budget exhausted / permissions / etc.) — **never** “done” with unexplained red CI
 - When simplification was explicitly requested: candidates were reported, explicit approval preceded every simplification mutation, approved changes passed focused and repository validation, and the complete full-review workflow reran on the post-simplification head with simplification disabled and no recursive simplification
+- Foreign PRs: no base-sync push and no simplification edits; the verdict delivered the owner actions (update from latest base / apply the listed simplification candidates)
 - Thin settle completed before `approve-comment` / merge-ready (not for reject/gated labels)
 - Verdict posted with a **valid** label (see table)
 - No invented maintainer-ack / soft-security stop

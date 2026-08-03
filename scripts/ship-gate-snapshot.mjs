@@ -599,7 +599,7 @@ try {
     "--repo",
     repo,
     "--json",
-    "number,title,state,isDraft,url,baseRefName,headRefOid,mergeStateStatus,mergeable,reviewDecision,commits",
+    "number,title,state,isDraft,url,baseRefName,headRefOid,mergeStateStatus,mergeable,reviewDecision,commits,author",
   ]);
   const reviewRequests = restCollection(
     `repos/${owner}/${name}/pulls/${pr}/requested_reviewers`,

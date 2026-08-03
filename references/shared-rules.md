@@ -106,6 +106,7 @@ Report the gate and stop that step. Fix/review may continue, but say merge-ready
 
 1. Check whether the PR head is behind its base (often `dev`) and whether it has conflicts.
 2. If behind or conflicted: **update from the base** (merge or rebase per repo norm). Preserve intent; if intents conflict, stop and ask.
+   This base update (and its push) applies **only when the PR is ours** — see **PR ownership boundary** below. On a foreign PR, do not update the branch or push the base sync; tell the PR owner to update from the latest base instead.
 3. After the update (or if already up to date): verify the branch **still builds against current base tip**:
    - Prefer the repo’s normal local gate for this change (typecheck / compile / focused tests / project CLI).
    - Then push and wait for **required CI on the new SHA**.
@@ -113,6 +114,17 @@ Report the gate and stop that step. Fix/review may continue, but say merge-ready
 5. Never claim merge-ready or merge while conflicted, behind base, or failing compile/tests against current tip.
 
 Applies to: `fix-pr-bots`, `full-review-pr`, `create-pr-for-issue`, `re-review-pr`, `merge-pr`, and `watch-pr` when auto-fixing.
+
+## PR ownership boundary
+
+A PR is **ours** only when the PR author login equals the authenticated viewer login. Determine both from live evidence: `gh pr view --json author` (or snapshot `evidence.pullRequest.author.login`) and `gh api user --jq .login` (or snapshot `evidence.viewer.login`). When identity evidence is missing or ambiguous, treat the PR as **not ours** (fail closed).
+
+- Only our own PRs may be **updated from base / pushed for latest-dev sync** and only our own PRs may receive **simplification edits**. Our own same-repo branches and our own writable fork heads are ours; anyone else's PR is not, even when `maintainerCanModify` allows pushing.
+- On a PR owned by someone else: never update the branch from base, never push the base sync, and never apply simplification changes. Tell the PR owner exactly what to do: the base update / conflict resolution needed and, when simplification was requested, the complete bounded candidate list. Full review publishes these owner instructions in its verdict comment; other workflows say them in chat or a status/review comment.
+- Do not claim merge-ready, `approve-comment`, or a green status for a foreign PR whose head is behind base, conflicted, or awaiting owner-side simplification. The verdict/status must record the owner action as required.
+- The fork-head unwritable hard stop still applies to our own PRs; ownership never waives Git safety.
+
+Applies to: `fix-pr-bots`, `full-review-pr`, `simplify-pr`, `re-review-pr`, and `watch-pr`.
 
 ## Review triage (humans + bots)
 

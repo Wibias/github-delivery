@@ -69,6 +69,26 @@ test("simplify candidate pass includes concrete readability and state lenses", (
   assert.match(simplify, /fixtures, generated artifacts, downstream branches, or tests/i);
 });
 
+test("foreign PRs receive owner instructions instead of base-sync pushes or simplification edits", () => {
+  const shared = readFileSync(new URL("../../references/shared-rules.md", import.meta.url), "utf8");
+  const fullReview = readFileSync(new URL("../../references/full-review-pr.md", import.meta.url), "utf8");
+  const simplify = readFileSync(new URL("../../references/simplify-pr.md", import.meta.url), "utf8");
+
+  assert.match(shared, /PR ownership boundary/);
+  assert.match(shared, /authenticated viewer login/);
+  assert.match(shared, /never update the branch from base/);
+  assert.match(shared, /never apply simplification changes/);
+  assert.match(shared, /Applies to: `fix-pr-bots`, `full-review-pr`, `simplify-pr`/);
+
+  assert.match(fullReview, /PR ownership boundary/);
+  assert.match(fullReview, /do not edit or push/);
+  assert.match(fullReview, /for the PR owner/);
+
+  assert.match(simplify, /PR ownership/);
+  assert.match(simplify, /delivered to the PR owner/);
+  assert.match(simplify, /nothing is applied or pushed/);
+});
+
 test("README documents the current public workflows and safety model", () => {
   const readme = readFileSync(new URL("../../README.md", import.meta.url), "utf8");
 

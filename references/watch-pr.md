@@ -35,7 +35,7 @@ node "<github-delivery>/scripts/watch-wake-gate.mjs" OWNER/REPO N
 
 - **Exit `1` / `canWait: false`:** you are **forbidden** to say you are waiting on CI, `windows-latest`, CodeRabbit, or Codex. Act on `blockers[]`:
   - `trusted_human_comment_needs_code` — owner/member said something actionable (including “half landed elsewhere, keep the rest”): **rebase onto tip, drop duplicated work, keep leftovers, fix conflicts, push**. Do **not** only post an ACK comment.
-  - `base_dirty_or_behind` — `DIRTY` / `CONFLICTING` / `BEHIND`: update from base and resolve **now**. Polling while conflicted is forbidden.
+  - `base_dirty_or_behind` — `DIRTY` / `CONFLICTING` / `BEHIND`: update from base and resolve **now** — only when the PR is ours (shared **PR ownership boundary**); on a foreign PR, surface the required owner action instead of pushing. Polling while conflicted is forbidden.
   - Optional paper trail **after** the fix commit:
 
     ```markdown
@@ -90,7 +90,7 @@ On **every** poll / wake (including the first):
 5. **Reviews first (mandatory):** triage per shared rules — **CODEOWNERS / owners / maintainers first**, then other humans, then bots.
    - Patch+push actionable items (narrow scope / drop work already on tip / rebase per owner note).
    - Human written replies → chat confirm. Inline replies in-thread. Resolve only allowed threads after verified fixes.
-6. **Then** if behind/conflicted **or** wake-gate reports `base_dirty_or_behind`: update from base, resolve or ask, push; verify compile-against-tip. Prefer combining with review fixes in the **same** push. **Never** enter the 1–2 min poll loop while `DIRTY`/`CONFLICTING`.
+6. **Then** if behind/conflicted **or** wake-gate reports `base_dirty_or_behind`: update from base, resolve or ask, push — only when the PR is ours (shared **PR ownership boundary**); on a foreign PR, tell the owner to update from the latest base and do not push the base sync. Verify compile-against-tip. Prefer combining with review fixes in the **same** push. **Never** enter the 1–2 min poll loop while `DIRTY`/`CONFLICTING`.
 7. **Then CI:** classify branch vs flake. Fix branch-related **and** pre-existing/“unrelated” required failures (minimal patch); rerun flakes (max 3 / SHA); stop on exhausted infra failures. After push: re-check stale-approval / last-push via `pr-policy-gate`.
 8. Security-offer / changelog nudge once if applicable.
 9. Only if green + mergeable + **useful threads/comments quiet** on **current** SHA **and** wake-gate exit `0`: report milestone **“CI/reviews quiet — still watching (not full merge-ready bar)”**. Do **not** post `[GD] Merge ready` from watch alone. Keep polling while open. If auto-merge **or merge-queue** queued: watch until **actually merged**.

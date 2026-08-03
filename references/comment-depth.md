@@ -153,9 +153,13 @@ Full coverage matrix + abuse paths stay in **chat**. If too sensitive for a usef
 
 ### Base / CI
 
-- Behind/conflicts: clean / updated in `<sha>` / **DIRTY** (blocker)
+- Behind/conflicts: clean / updated in `<sha>` / **owner action: update from `<base>`** (foreign PR) / **DIRTY** (blocker)
 - Required checks: green / failing `job-name` (branch vs flake)
 - Local tip compile/tests: <command + result>
+
+### Simplification (for the PR owner)
+
+- <only when simplify was requested and the PR is not ours: bounded candidate list with file/location, problem, proposed change, risk, and validation per candidate; nothing was edited or pushed>
 
 ### Gate
 
