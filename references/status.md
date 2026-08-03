@@ -21,13 +21,14 @@ Report merge readiness **using the same bar as merge-ready / full-review** — w
    - merge-queue queued vs merged
    - linked issues; security/API cue; changelog gap if user-facing
    - whether this session already ran own bug+security+spec (if unknown: say **unknown — not run this session**; do **not** invent “own reviews done”)
+   - whether valid adaptive-settle evidence exists for the unchanged current PR and immediate-base heads; status is one-shot and must not start a wait loop
 
 2. Emit using the **Status** template in `references/comment-depth.md` (gate table + “What’s left” with concrete actions). Include the same fields as below at minimum — expand with evidence (job names, SHAs, thread counts):
 
 ```markdown
 ## [shipping-github] Status
 
-**Verdict:** not merge-ready / merge-ready bar met (not posted) / gated
+**Verdict:** not merge-ready / gates currently clear, settle not performed / merge-ready bar met from existing current-head evidence / gated
 **Head:** `<sha>` → `<base>` (`mergeStateStatus`)
 
 | Gate | State | Detail |
@@ -38,14 +39,17 @@ Report merge readiness **using the same bar as merge-ready / full-review** — w
 | Tip / conflicts | … | … |
 | Required CI | … | name jobs |
 | Policy (CODEOWNERS/approvals/queue) | … | … |
+| Stability settle | complete / missing / stale / not applicable | head/base SHAs and evidence time |
 
 **What’s left:** <ordered concrete actions>
 ```
 
 Do **not** post a vague “CI mostly green, some comments” summary.
 3. **Verdict rules (same as merge-ready — stricter than “CI green”):**
-   - `merge-ready` only if gate clear, up to date (or you positively know tip compiles), required CI green on current SHA, reviews/CODEOWNERS clear, useful bot/human threads clear, not mid-stack-for-trunk, and own bug+security done **or** you explicitly say status cannot confirm own reviews and therefore verdict is **blocked / incomplete** — never “merge-ready” when own reviews are unknown.
-   - Prefer **blocked** when read-only status cannot verify compile-against-tip or own reviews.
+   - Status never waits. It reports the current snapshot and any already-existing settle evidence.
+   - `merge-ready` only if the gate is clear, the branch is up to date (or you positively know tip compiles), required CI is green on the current SHA, reviews/CODEOWNERS and useful bot/human threads are clear, the PR is not mid-stack-for-trunk, own bug+security+spec evidence is complete, **and** valid adaptive-settle evidence exists for the unchanged PR and immediate-base heads.
+   - When automated gates are green but settle evidence is missing or stale, use `gates currently clear, settle not performed`; do not say `All green` or `merge-ready`.
+   - Prefer **blocked / incomplete** when read-only status cannot verify compile-against-tip, own reviews, or current-head settle evidence.
 
 4. If security/API cue and not yet asked this session: ask whether to run security review (do not run until yes).
 5. If draft/WIP and user asked about merge-ready: remind **Draft → ready** ask (do not convert in status — status is read-only).

@@ -17,11 +17,24 @@ The command captures one evidence snapshot and evaluates required checks, base h
 
 Decision contract:
 
-- exit `0`, `decision: "ready"`: the automated gate permits a ready/wait transition; workflow-specific bug, security, spec, social, and thin-settle requirements still apply
+- exit `0`, `decision: "ready"`: the automated gate permits a ready/wait transition; workflow-specific bug, security, spec, social, and adaptive-settle requirements still apply
 - exit `1`, `decision: "blocked"`: act on the namespaced blockers before waiting, claiming ready, or merging
 - exit `2`, `decision: "unknown"`: evidence is stale, incomplete, mismatched, or unreadable; restore evidence and rerun
 
 Known blockers outrank unknown evidence. Unknown evidence outranks readiness. No individual helper may overrule the final decision.
+
+## Adaptive readiness settle
+
+Use this only after the authoritative decision is `ready`.
+
+1. Record the PR head SHA, immediate base head SHA, completed workflow set, required-check state, reviews, unresolved threads, merge state, and last observable change.
+2. Select **60 seconds by default** or **180 seconds** after a push, rebase, restack, force-with-lease, base movement, approval/thread change, draft/ready transition, or newly discovered workflow. A visible bot review-in-progress signal may extend one window to 300 seconds.
+3. Announce that the gates are **currently green and stability verification is in progress**. Include the reason, duration, both heads, remaining time, and next verification. Never emit only `All green`.
+4. Run a fresh authoritative `ship-gate.mjs` poll every **20 seconds**. Do not use snapshot replay for these polls. Never perform or expose one silent `sleep` / `Start-Sleep` longer than **30 seconds**.
+5. Any material change resets the window. Exit `1` requires action; exit `2` requires evidence restoration.
+6. At expiry, run one final authoritative gate and verify both recorded heads are unchanged. Only then may the governing workflow claim merge-ready, publish `approve-comment`, or begin a direct merge that lacked prior current-head settle evidence.
+
+`status` does not initiate this wait; it reports whether valid settle evidence already exists. Watch mode uses its normal polling cadence and must not convert a green milestone into a merge-ready claim.
 
 ### Capture and replay
 

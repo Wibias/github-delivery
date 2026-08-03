@@ -96,9 +96,10 @@ On **every** poll / wake (including the first):
 - **Open actionable reviews:** act immediately; do not burn the poll interval “waiting for CI” or “waiting for CodeRabbit.”
 - CI pending/failing **and** wake gate clear: poll ~1 minute (longer if rate-limit remaining is low). Expect `windows-latest` often **~12–13 min**, typically done by **~15 min** — do **not** sleep a fixed 20 min after CI started (shared **CI wait expectations**).
 - Before dense multi-PR / watch polls: check Composio `GITHUB_GET_GRAPHQL_RATE_LIMIT` (or `gh api rate_limit` / GraphQL `rateLimit`).
-- CI green, PR still open: keep polling (~1–2 minutes) for new reviews/conflicts.
+- CI green, PR still open: report `automated gates currently green — still watching`, then keep polling (~1–2 minutes) for new reviews/conflicts. Do not present green as a terminal readiness claim.
+- Waiting must remain visible: state the reason and next verification time before idling; never expose a raw unexplained `sleep` / `Start-Sleep`; split any shell wait into chunks no longer than 30 seconds while preserving the API polling cadence.
 - On any change (new SHA, check flip, **new comment**): reset to wake gate; **re-run reviews-first**.
-- Heartbeat only when wake gate is clear **and** status changed — never a wait line that skips owner triage.
+- Heartbeat only when wake gate is clear **and** status changed — never a wait line that skips owner triage. Countdown output during an explicitly announced stability check is allowed.
 
 ## Done when
 

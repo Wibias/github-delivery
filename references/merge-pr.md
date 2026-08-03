@@ -38,8 +38,10 @@ Read `references/mutation-modes.md` and `references/github-mutation-broker.md` b
 6. Confirm required CI, review policy, unresolved threads, feedback, base health, and merge queue state are clear.
 7. Confirm own bug, security, and spec/standards evidence exists this session, or obtain an explicit merge-anyway instruction after explaining the missing evidence.
 8. Confirm the branch was built and tested against the current base tip.
-9. Resolve linked issues through both GitHub closing references and body keywords.
-10. Select the repository’s normal merge method. Do not silently squash when trailers or history matter.
+9. Confirm valid adaptive-settle evidence exists for the unchanged PR and immediate-base heads. If it does not, run the adaptive settle from `references/shared-rules.md`: announce that green is provisional, choose 60 or 180 seconds from the observed activity, poll `ship-gate.mjs` every 20 seconds without a silent sleep longer than 30 seconds, reset on changes, and require the final gate to return `ready`.
+10. Immediately before the first mutation, rerun the authoritative gate and verify both recorded heads are unchanged.
+11. Resolve linked issues through both GitHub closing references and body keywords.
+12. Select the repository’s normal merge method. Do not silently squash when trailers or history matter.
 
 ## Internal mutation sequence
 
@@ -105,7 +107,7 @@ Auto-close does not replace the required issue comment.
 ## Failure handling
 
 - Broker denial: report its structured reason; perform no bypass write.
-- Expected-head mismatch: rerun the full gate on the new head.
+- Expected-head mismatch: rerun the full gate and adaptive settle on the new head and immediate-base head.
 - Partial ceremony: continue only the missing idempotent step; do not duplicate completed comments.
 - Mutation command failure: include the action, receipt or plan hash, and error; never claim success.
 - Verification mismatch: treat the mutation as unresolved until repository state confirms it.
