@@ -14,6 +14,7 @@ Vague posts are a bug. Prefer **structured detail** over one-liners — still sc
 6. **Security public posts stay redacted** (shared disclosure) — detail ≠ exploit steps.
 7. **Idempotent within one publication identity:** repair or complete the current run’s own comment instead of duplicating it. A new explicit full-review invocation is a new publication identity and MUST post a new verdict comment; never overwrite a completed verdict from an earlier full-review run.
 8. **Chat can be fuller** than GitHub for security abuse paths and long dumps.
+9. **Full-review verdicts:** lead with a **TLDR** that carries the decision, every axis outcome, blockers, owner actions, and bottom line; put the complete verdict in a `<details>` dropdown. The TLDR never drops a blocker, owner action, or required next step.
 
 Anti-patterns (rewrite before posting):
 
@@ -107,8 +108,23 @@ Full coverage matrix + abuse paths stay in **chat**. If too sensitive for a usef
 ## [GD] Verdict: <approve-comment | changes-requested | not-useful | gated>
 <!-- github-delivery:full-review-verdict run:<full-review-run-id> head:<reviewed-head-sha> -->
 
-**PR:** `#N` — <title>
-**Head:** `<short-sha>` on `<base>` (mergeStateStatus: `…`)
+### TLDR
+
+- **PR:** `#N` — <title>
+- **Head:** `<short-sha>` on `<base>` (mergeStateStatus: `…`)
+- **Decision:** <one line: useful and ready / needs N fixes / not useful / gated>
+- **Usefulness:** <one line — fixes real bug or delivers claimed value; cite issue>
+- **Bugs:** none blocking / <each concrete blocker in one line with `path` and why it matters>
+- **Security:** none / <redacted finding class + severity>
+- **Spec / standards:** clean / <gap in one line>
+- **Reviews:** <humans + bots state in one line>
+- **Base / CI:** green on `<sha>` / failing `job-name` / **owner action: update from `<base>`** (foreign PR)
+- **Gate:** none / draft|WIP|do-not-merge / hard blocker: <…>
+- **Owner actions (foreign PR):** none / update from latest base / apply N simplification candidates (list in the full verdict)
+- **Bottom line:** <one paragraph: ship / fix these N items / not useful because …>
+
+<details>
+<summary><b>Full verdict</b></summary>
 
 ### Semantic propagation
 
@@ -168,6 +184,8 @@ none / draft|WIP|do-not-merge / hard blocker: <…>
 ### Bottom line
 
 <One paragraph: ship / fix these N items / not useful because …>
+
+</details>
 When pinging a person, use bare `@login` (e.g. @user) — never `` `@login` ``.
 ```
 

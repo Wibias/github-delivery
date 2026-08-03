@@ -170,5 +170,9 @@
   {
     "id": "R-foreign-pr-owner-instructions-2026-08-03",
     "sha256": "0799121c0126022d073c89b7f3368bc3a62775e16c694ed793a28243cb174321"
+  },
+  {
+    "id": "R-verdict-tldr-collapsible-2026-08-03",
+    "sha256": "0b8d372679be4d1766434156bdfd60fa81d640cfb2a82b24f2cdb2d731435bfd"
   }
 ]

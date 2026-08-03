@@ -457,3 +457,30 @@ test("ship-gate snapshot does not request org-scoped reviewer identities through
   assert.match(source, /users/);
   assert.match(source, /teams/);
 });
+
+test("full-review verdict comments lead with a TLDR and keep the full verdict in a dropdown", () => {
+  const commentDepth = readFileSync(
+    new URL("../../references/comment-depth.md", import.meta.url),
+    "utf8",
+  );
+  const fullReview = readFileSync(
+    new URL("../../references/full-review-pr.md", import.meta.url),
+    "utf8",
+  );
+
+  const tldr = commentDepth.indexOf("### TLDR");
+  const summary = commentDepth.indexOf("<summary><b>Full verdict</b></summary>");
+  const semantic = commentDepth.indexOf("### Semantic propagation");
+  const close = commentDepth.lastIndexOf("</details>");
+
+  assert.ok(tldr >= 0, "verdict template must lead with a TLDR section");
+  assert.ok(summary > tldr, "full verdict must follow the TLDR inside a details block");
+  assert.ok(semantic > summary, "full verdict sections must stay inside the details block");
+  assert.ok(close > semantic, "the details block must close after the full verdict");
+  assert.match(
+    commentDepth,
+    /The TLDR never drops a blocker, owner action, or required next step/,
+  );
+  assert.match(fullReview, /lead with the \*\*TLDR\*\*/);
+  assert.match(fullReview, /<details>/);
+});
