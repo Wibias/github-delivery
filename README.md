@@ -3,6 +3,11 @@
 A GitHub shipping skill for agents. You speak naturally; the agent loads the skill, selects the workflow, runs the evidence and policy scripts internally, and performs only the GitHub writes authorized by that request.
 
 ```text
+create a PRD for the onboarding flow
+break the roadmap into implementation issues
+triage the open issues in this repo
+run QA intake on the payment bug report
+plan a refactor of the storage layer
 merge PR #32
 what is left on PR #41?
 fix the review comments on PR #18 and make it merge ready
@@ -55,7 +60,10 @@ routes through `references/full-review-pr.md`. The normal bug, security, standar
 - PR mutations re-check the expected head immediately before execution.
 - Merge operations are pinned with `--match-head-commit`.
 - Social writes require idempotency keys and produce versioned receipts.
-- Stacked PRs are handed to `manage-stacked-prs` and merged bottom-up.
+- Stacked PR topology is discovered from GitHub PR bases and managed inside the skill through `references/stacked-prs.md`; stacks restack bottom-up and merge bottom-up with revalidation after every parent lands.
+- Issue lifecycle workflows cover PRDs, issue breakdown, triage, QA intake, refactor plans, `ready-for-agent` briefs, and persistent out-of-scope records.
+- Merge-ready and full-review claims require an adaptive visible-polling settle on unchanged heads: 60 seconds by default, 180 seconds after a push, rebase, restack, force-with-lease, or review/thread change, with the authoritative gate re-polled every 20 seconds.
+- Active Git conflicts while updating or shipping a PR are resolved through `references/resolve-conflicts.md` from the intent and evidence of both sides, never from markers alone.
 - Review depth is derived from changed paths, patches, symbols, removed controls, dependencies, workflow permissions, and uncertainty rather than filenames alone.
 - Full-review execution plans end with a mandatory `Publish final verdict` item and cannot terminate while that item or any required prerequisite remains `pending` or `in_progress`.
 - Optional reviewers such as Cursor Bugbot cannot suppress the final verdict; unavailable reviewer evidence is recorded and the complementary review continues.
@@ -77,6 +85,7 @@ routes through `references/full-review-pr.md`. The normal bug, security, standar
 | `scripts/ship-gate.mjs`            | Produce one authoritative ship decision                                  |
 | `scripts/github-mutate.mjs`        | Dry-run and execute authorized GitHub writes                             |
 | `scripts/runtime-capabilities.mjs` | Discover host/tool capabilities and safe fallbacks                       |
+| `scripts/inspect-stack.mjs`        | Discover the PR stack graph and report the safe restack/merge order      |
 | `scripts/validate-evals.mjs`       | Execute offline routing and safety contracts                             |
 | `scripts/live-github-fixture.mjs`  | Exercise the real GitHub lifecycle with namespaced temporary resources   |
 | `scripts/review-scope.mjs`         | Produce one evidence-ranked bug and security review plan                 |
@@ -106,17 +115,27 @@ The broker defaults to dry-run. Execution requires `--execute`, re-checks the PR
 
 | Request                                                                   | Workflow                                                     |
 | ------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| Create a PRD from conversation or repository context                      | `references/issue-workflows.md` → PRD Workflow               |
+| Break a PRD, plan, spec, or issue into implementation issues              | `references/issue-workflows.md` → Issue Breakdown            |
+| Triage issue(s), labels, state, readiness, or rejection                   | `references/issue-workflows.md` → Triage Workflow            |
+| Run QA intake or file reproducible bug reports                            | `references/issue-workflows.md` → QA Intake                  |
+| Create a refactor request, RFC, or tiny-commit plan                       | `references/issue-workflows.md` → Refactor Plan              |
+| Write or update a `ready-for-agent` issue contract                        | `references/agent-brief.md`                                  |
+| Record, match, or remove a rejected enhancement decision                  | `references/out-of-scope.md`                                 |
 | Fix comments and make merge-ready                                         | `references/fix-pr-bots.md`                                  |
 | Watch or babysit a PR                                                     | `references/watch-pr.md`                                     |
 | Re-review after commits or reviews                                        | `references/re-review-pr.md`                                 |
 | Research an issue on development tip                                      | `references/research-issue.md`                               |
 | Create a linked PR for an issue                                           | `references/create-pr-for-issue.md`                          |
 | Full bug, security, and standards review                                  | `references/full-review-pr.md`                               |
+| Spec and Standards review on a PR                                         | `references/spec-standards-review.md`                        |
 | Simplify, clean up, or deduplicate a PR without behavior changes          | `references/simplify-pr.md`                                  |
 | Full review plus optional approved simplification and mandatory re-review | `references/full-review-pr.md` + `references/simplify-pr.md` |
 | Security review                                                           | `references/security-review.md`                              |
 | Status or merge-readiness                                                 | `references/status.md`                                       |
 | Merge with linked-issue close-out                                         | `references/merge-pr.md`                                     |
+| Resolve an active Git conflict while updating or shipping a PR            | `references/resolve-conflicts.md`, then resume the workflow  |
+| Inspect, restack, retarget, recover, or merge stacked PRs                 | `references/stacked-prs.md`                                  |
 
 ## Safe simplification
 
@@ -177,7 +196,7 @@ Use the **Live Integration** workflow to exercise the real lifecycle. Scheduled 
 
 ## Current status
 
-The planned implementation roadmap is complete: evidence snapshots, authoritative ship decisions, base-health isolation, feedback resolution, guarded mutations, capability discovery, behavioral evaluations, deterministic packaging, provenance-backed releases, repository security controls, private vulnerability reporting, live GitHub integration fixtures, evidence-based review scoping, and explicit behavior-preserving simplification with mandatory post-change full review are implemented.
+The planned implementation roadmap is complete: evidence snapshots, authoritative ship decisions, base-health isolation, feedback resolution, guarded mutations, capability discovery, behavioral evaluations, deterministic packaging, provenance-backed releases, repository security controls, private vulnerability reporting, live GitHub integration fixtures, evidence-based review scoping, the issue lifecycle (PRDs, breakdowns, triage, QA intake, refactor plans, agent briefs, out-of-scope records), internal stacked-PR lifecycle with bottom-up merging, conflict resolution, adaptive settle verification, spec and standards review, and explicit behavior-preserving simplification with mandatory post-change full review are implemented.
 
 Remaining work is operational rather than architectural: maintain the documented live repository rules, keep available GitHub security features enabled, run release acceptance for new versions, and extend the regression corpus as GitHub and agent hosts evolve.
 
