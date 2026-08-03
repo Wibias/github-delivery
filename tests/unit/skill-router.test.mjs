@@ -5,7 +5,7 @@ import { routeShippingGithubPrompt } from "../../scripts/lib/skill-router.mjs";
 
 test("routes a natural-language merge request to the merge workflow", () => {
   assert.deepEqual(routeShippingGithubPrompt("merge PR #32"), {
-    skill: "shipping-github",
+    skill: "github-delivery",
     workflow: "references/merge-pr.md",
     mutationMode: "maintainer",
     explicitActions: ["merge_pr", "post_comment", "post_issue_comment", "close_linked_issue"],

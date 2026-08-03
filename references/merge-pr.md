@@ -45,7 +45,7 @@ Read `references/mutation-modes.md` and `references/github-mutation-broker.md` b
 
 ## Internal mutation sequence
 
-Create a temporary audit file for this PR, for example `shipping-github-pr-32-mutations.jsonl`. Every request is first planned without `--execute`, inspected, and then executed.
+Create a temporary audit file for this PR, for example `github-delivery-pr-32-mutations.jsonl`. Every request is first planned without `--execute`, inspected, and then executed.
 
 ### 1. Pre-merge PR comment
 

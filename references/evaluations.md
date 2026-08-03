@@ -32,7 +32,7 @@ The deterministic router is a test oracle for skill behavior, not a replacement 
 merge PR #32
 ```
 
-The host discovers `shipping-github` from `SKILL.md`. The skill then routes to `references/merge-pr.md`, selects `maintainer` mode for the explicit merge workflow, discovers capabilities, runs the authoritative gate, and uses the mutation broker internally.
+The host discovers `github-delivery` from `SKILL.md`. The skill then routes to `references/merge-pr.md`, selects `maintainer` mode for the explicit merge workflow, discovers capabilities, runs the authoritative gate, and uses the mutation broker internally.
 
 The routing oracle catches accidental contract drift in that chain.
 

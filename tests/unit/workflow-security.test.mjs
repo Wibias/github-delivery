@@ -11,7 +11,7 @@ import {
 } from "../../scripts/lib/workflow-security.mjs";
 
 function workflowRoot(source) {
-  const root = mkdtempSync(join(tmpdir(), "shipping-github-workflow-policy-"));
+  const root = mkdtempSync(join(tmpdir(), "github-delivery-workflow-policy-"));
   mkdirSync(join(root, ".github", "workflows"), { recursive: true });
   writeFileSync(join(root, ".github", "workflows", "fixture.yml"), source);
   return root;

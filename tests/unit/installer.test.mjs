@@ -12,12 +12,12 @@ import {
 
 function skill(dir, version, marker = version) {
   mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "shipping-github", version }, null, 2));
+  writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "github-delivery", version }, null, 2));
   writeFileSync(join(dir, "marker.txt"), marker);
 }
 
 test("plans a new install without mutating the target", () => {
-  const root = mkdtempSync(join(tmpdir(), "shipping-github-install-test-"));
+  const root = mkdtempSync(join(tmpdir(), "github-delivery-install-test-"));
   const source = join(root, "source");
   const target = join(root, "target");
   skill(source, "0.1.0");
@@ -28,7 +28,7 @@ test("plans a new install without mutating the target", () => {
 });
 
 test("plans upgrades and blocks downgrades unless explicitly allowed", () => {
-  const root = mkdtempSync(join(tmpdir(), "shipping-github-install-test-"));
+  const root = mkdtempSync(join(tmpdir(), "github-delivery-install-test-"));
   const source = join(root, "source");
   const target = join(root, "target");
   skill(source, "0.2.0");
@@ -40,7 +40,7 @@ test("plans upgrades and blocks downgrades unless explicitly allowed", () => {
 });
 
 test("classifies symlink targets as conflicts", { skip: process.platform === "win32" }, () => {
-  const root = mkdtempSync(join(tmpdir(), "shipping-github-install-test-"));
+  const root = mkdtempSync(join(tmpdir(), "github-delivery-install-test-"));
   const source = join(root, "source");
   const linked = join(root, "linked");
   const target = join(root, "target");
@@ -54,16 +54,16 @@ test("classifies symlink targets as conflicts", { skip: process.platform === "wi
 
 
 test("apply creates missing target parents for a new install", () => {
-  const root = mkdtempSync(join(tmpdir(), "shipping-github-install-test-"));
+  const root = mkdtempSync(join(tmpdir(), "github-delivery-install-test-"));
   const source = join(root, "source");
-  const target = join(root, "nested", "skills", "shipping-github");
+  const target = join(root, "nested", "skills", "github-delivery");
   skill(source, "0.1.0", "fresh");
   applyInstallation({ source, target });
   assert.equal(readFileSync(join(target, "marker.txt"), "utf8"), "fresh");
 });
 
 test("apply creates a backup before replacing and restore reverses it", () => {
-  const root = mkdtempSync(join(tmpdir(), "shipping-github-install-test-"));
+  const root = mkdtempSync(join(tmpdir(), "github-delivery-install-test-"));
   const source = join(root, "source");
   const target = join(root, "target");
   const backups = join(root, "backups");

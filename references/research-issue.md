@@ -12,7 +12,7 @@ Do **not** open a PR unless the user also asked to create one.
 
 | Skill | Owns |
 |---|---|
-| **shipping-github / this workflow** | Codebase + GitHub evidence, still-broken-on-dev?, open PR?, duplicate?, priority, **comment on the issue** |
+| **github-delivery / this workflow** | Codebase + GitHub evidence, still-broken-on-dev?, open PR?, duplicate?, priority, **comment on the issue** |
 | **issue-workflow** | Filing/breaking down tracker artifacts (PRDs, slices) — not live “is it fixed on tip?” research |
 
 ## Inputs
@@ -67,7 +67,7 @@ Run for **each** issue (batch in parallel when independent). If **>3** issues: f
 
 Post on **each** researched issue. Use the **Research (issue)** template in `references/comment-depth.md` (structured table + Evidence / Gaps / Recommended next). Fill every field; name paths, SHAs, and commands — do not post a vague stub.
 
-Prefix agent research comments with `[shipping-github]`. Edit if updating; never a truncated stub then a full second comment.
+Prefix agent research comments with `[github-delivery]`. Edit if updating; never a truncated stub then a full second comment.
 
 Also summarize the same table(s) to the user in chat. For multiple issues, one chat summary with a row per issue, plus per-issue GitHub comments.
 

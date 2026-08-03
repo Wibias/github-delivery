@@ -26,7 +26,7 @@ test("prefers connected capabilities and records safe brokered fallbacks", () =>
     },
   });
   assert.equal(result.schemaVersion, 1);
-  assert.equal(result.kind, "shipping-github/runtime-capabilities");
+  assert.equal(result.kind, "github-delivery/runtime-capabilities");
   assert.equal(result.github.repoReadable, true);
   assert.equal(result.github.headWritable, true);
   assert.equal(result.github.brokerWriteAvailable, true);

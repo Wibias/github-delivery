@@ -4,7 +4,7 @@ The unit suite proves policy behavior with deterministic fixtures. The live life
 
 ## Scenario
 
-Each run uses a unique `[shipping-github-fixture:<run-id>]` marker and a branch below `shipping-github-fixture/`. It performs these steps:
+Each run uses a unique `[github-delivery-fixture:<run-id>]` marker and a branch below `github-delivery-fixture/`. It performs these steps:
 
 1. Create a temporary issue.
 2. Create and push a temporary fixture branch.

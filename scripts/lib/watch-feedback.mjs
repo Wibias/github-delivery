@@ -1,8 +1,8 @@
 const TRUSTED = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
 const BOT_RE = /\[bot\]$/i;
-const AGENT_PREFIX_RE = /^#{0,3}\s*\[shipping-github\]/i;
+const AGENT_PREFIX_RE = /^#{0,3}\s*\[github-delivery\]/i;
 const RESOLUTION_HEADER_RE =
-  /^#{0,3}\s*\[shipping-github\]\s*Addressed feedback\s*$/i;
+  /^#{0,3}\s*\[github-delivery\]\s*Addressed feedback\s*$/i;
 const MERGE_COMMIT_RE =
   /^(Merge (branch|remote-tracking|pull request)|merge .* into |chore:\s*merge\b)/i;
 const FEEDBACK_KEY_RE =

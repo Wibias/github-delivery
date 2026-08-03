@@ -43,7 +43,7 @@ The output includes the snapshot ID, head SHA, namespaced blockers and unknowns,
 Trusted feedback is identified by a stable key such as `review_comment:67890`. A feedback item is cleared only by a structured resolution record:
 
 ```text
-[shipping-github] Addressed feedback
+[github-delivery] Addressed feedback
 feedback: review_comment:67890
 commit: abc1234
 ```

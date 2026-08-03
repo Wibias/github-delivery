@@ -23,7 +23,7 @@ When (and only when) the user asks (“deep bug review”, “run pr-review-tool
 ### 0. Scope script (required for PRs)
 
 ```bash
-node "<shipping-github>/scripts/bug-scope.mjs" OWNER/REPO N
+node "<github-delivery>/scripts/bug-scope.mjs" OWNER/REPO N
 ```
 
 - If `skipDeepBugReview: true` → record **n/a** in chat (and comment templates); stop the bug axis for this PR. Do **not** invent Bugbot.

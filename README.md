@@ -1,4 +1,4 @@
-# shipping-github
+# github-delivery
 
 A GitHub shipping skill for agents. You speak naturally; the agent loads the skill, selects the workflow, runs the evidence and policy scripts internally, and performs only the GitHub writes authorized by that request.
 
@@ -171,10 +171,10 @@ npm run build:dist
 Install through the dry-run-first installer documented in `docs/installation.md`, or place the verified skill directory in a host skill path such as:
 
 ```text
-~/.agents/skills/shipping-github
-~/.cursor/skills/shipping-github
-~/.codex/skills/shipping-github
-~/.claude/skills/shipping-github
+~/.agents/skills/github-delivery
+~/.cursor/skills/github-delivery
+~/.codex/skills/github-delivery
+~/.claude/skills/github-delivery
 ```
 
 Requirements:

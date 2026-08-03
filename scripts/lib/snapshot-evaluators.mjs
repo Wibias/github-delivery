@@ -407,7 +407,7 @@ export function evaluateWakeSnapshot(snapshot) {
       line: comment.line,
       excerpt: comment.body.replace(/\s+/g, " ").slice(0, 220),
       reason: "trusted_human_feedback_needs_code",
-      howToClear: `[shipping-github] Addressed feedback\nfeedback: ${comment.key}\ncommit: <7-40 character PR commit SHA>`,
+      howToClear: `[github-delivery] Addressed feedback\nfeedback: ${comment.key}\ncommit: <7-40 character PR commit SHA>`,
     });
   }
   const complete = [
