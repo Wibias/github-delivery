@@ -10,27 +10,27 @@ permissions:
   contents: write
 
 jobs:
-  create-release-candidate-branch:
-    name: Create release candidate branch
+  create-ready-pr-branch:
+    name: Create ready PR branch
     if: github.event_name == 'pull_request' && github.head_ref == 'agent/github-delivery' && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
-      - name: Check out verified source branch
+      - name: Check out release candidate source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-          ref: agent/github-delivery-final
+          ref: agent/github-delivery-pr
 
       - name: Build one clean non-workflow commit from main
         shell: bash
         run: |
           git diff --binary origin/main..HEAD -- . ':(exclude).github/**' > /tmp/github-delivery.patch
-          git switch --force-create agent/github-delivery-pr origin/main
+          git switch --force-create agent/github-delivery-ready origin/main
           git apply --index /tmp/github-delivery.patch
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git commit -m 'chore: rename skill and harden feedback comments'
-          git push origin HEAD:refs/heads/agent/github-delivery-pr
+          git push origin HEAD:refs/heads/agent/github-delivery-ready
 
   test:
     name: Node ${{ matrix.node }} / ${{ matrix.os }}
