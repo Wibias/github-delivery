@@ -64,12 +64,12 @@ test("cleanup closes exact open fixture resources and deletes its branch", async
   assert.equal(report.complete, true);
   assert.deepEqual(report.actions.map((action) => action.action), ["close_pr", "close_issue", "delete_branch"]);
   assert.deepEqual(calls, [
-    ["find-pr", "[shipping-github-fixture:gha-42-1] lifecycle PR"],
-    ["find-issue", "[shipping-github-fixture:gha-42-1] lifecycle issue"],
-    ["branch-exists", "shipping-github-fixture/gha-42-1"],
+    ["find-pr", "[github-delivery-fixture:gha-42-1] lifecycle PR"],
+    ["find-issue", "[github-delivery-fixture:gha-42-1] lifecycle issue"],
+    ["branch-exists", "github-delivery-fixture/gha-42-1"],
     ["close-pr", 9],
     ["close-issue", 7],
-    ["delete-branch", "shipping-github-fixture/gha-42-1"],
+    ["delete-branch", "github-delivery-fixture/gha-42-1"],
   ]);
 });
 

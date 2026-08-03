@@ -26,7 +26,7 @@ Report merge readiness **using the same bar as merge-ready / full-review** — w
 2. Emit using the **Status** template in `references/comment-depth.md` (gate table + “What’s left” with concrete actions). Include the same fields as below at minimum — expand with evidence (job names, SHAs, thread counts):
 
 ```markdown
-## [shipping-github] Status
+## [GD] Status
 
 **Verdict:** not merge-ready / gates currently clear, settle not performed / merge-ready bar met from existing current-head evidence / gated
 **Head:** `<sha>` → `<base>` (`mergeStateStatus`)

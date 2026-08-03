@@ -2,14 +2,14 @@
 
 Load this reference before a merge-ready claim, status-ready verdict, merge, or watch transition into waiting.
 
-Resolve `<shipping-github>` to this skill’s install directory (repo root or `~/.agents/skills/shipping-github`).
+Resolve `<github-delivery>` to this skill’s install directory (repo root or `~/.agents/skills/github-delivery`).
 
 ## Authoritative ship decision
 
 Run exactly one authoritative decision first:
 
 ```bash
-node "<shipping-github>/scripts/ship-gate.mjs" OWNER/REPO N \
+node "<github-delivery>/scripts/ship-gate.mjs" OWNER/REPO N \
   --mutation-mode read-only
 ```
 
@@ -39,8 +39,8 @@ Use this only after the authoritative decision is `ready`.
 ### Capture and replay
 
 ```bash
-node "<shipping-github>/scripts/ship-gate-snapshot.mjs" OWNER/REPO N --output snapshot.json
-node "<shipping-github>/scripts/ship-gate.mjs" OWNER/REPO N \
+node "<github-delivery>/scripts/ship-gate-snapshot.mjs" OWNER/REPO N --output snapshot.json
+node "<github-delivery>/scripts/ship-gate.mjs" OWNER/REPO N \
   --snapshot snapshot.json \
   --mutation-mode read-only
 ```
@@ -52,8 +52,8 @@ Snapshot replay validates schema, repository, PR number, head SHA when supplied 
 Default to `read-only`. Select `review`, `maintainer`, or `autonomous` only when the user request or governing workflow authorizes that level.
 
 ```bash
-node "<shipping-github>/scripts/mutation-policy.mjs" maintainer
-node "<shipping-github>/scripts/mutation-policy.mjs" maintainer merge_pr --explicit
+node "<github-delivery>/scripts/mutation-policy.mjs" maintainer
+node "<github-delivery>/scripts/mutation-policy.mjs" maintainer merge_pr --explicit
 ```
 
 The profile is an upper bound. Human replies still require exact-text confirmation even in autonomous mode. See `references/mutation-modes.md`.
@@ -76,7 +76,7 @@ Use these only to explain or repair a component reported by `ship-gate.mjs`.
 ### Required checks
 
 ```bash
-node "<shipping-github>/scripts/required-checks.mjs" OWNER/REPO N
+node "<github-delivery>/scripts/required-checks.mjs" OWNER/REPO N
 ```
 
 Preserves classic and ruleset source identity and fails closed on incomplete check evidence.
@@ -84,7 +84,7 @@ Preserves classic and ruleset source identity and fails closed on incomplete che
 ### Advisory CODEOWNERS paths
 
 ```bash
-node "<shipping-github>/scripts/codeowners-for-pr.mjs" OWNER/REPO N
+node "<github-delivery>/scripts/codeowners-for-pr.mjs" OWNER/REPO N
 ```
 
 Maps PR files to owners on the base branch. GitHub `reviewDecision` remains authoritative for enforced CODEOWNERS approval.
@@ -92,9 +92,9 @@ Maps PR files to owners on the base branch. GitHub `reviewDecision` remains auth
 ### Unresolved review threads
 
 ```bash
-node "<shipping-github>/scripts/review-threads.mjs" OWNER/REPO N
+node "<github-delivery>/scripts/review-threads.mjs" OWNER/REPO N
 # mutation only when the active mode and social policy permit it:
-node "<shipping-github>/scripts/review-threads.mjs" OWNER/REPO N \
+node "<github-delivery>/scripts/review-threads.mjs" OWNER/REPO N \
   --resolve PRRT_xxx \
   --mutation-mode maintainer \
   --explicit
@@ -103,23 +103,29 @@ node "<shipping-github>/scripts/review-threads.mjs" OWNER/REPO N \
 ### Watch and trusted feedback
 
 ```bash
-node "<shipping-github>/scripts/watch-wake-gate.mjs" OWNER/REPO N
+node "<github-delivery>/scripts/watch-wake-gate.mjs" OWNER/REPO N
 ```
 
 Use this to inspect the `wake` component. Clearing feedback requires a verified exact resolution record:
 
 ```text
-[shipping-github] Addressed feedback
-feedback: review_comment:67890
+[GD] Addressed feedback
+
+feedbacks:
+- issue_comment:12345
+- review_comment:67890
+
 commit: abc1234
+
+<!-- gd:addressed-feedback head:<40-char-current-head-sha> -->
 ```
 
-An unrelated later commit does not clear feedback.
+Aggregate all feedback resolved by the same current head into this single comment. Before creating it, search for the exact head marker and edit that comment when present. An unrelated later commit does not clear feedback.
 
 ### Merge queue and review policy
 
 ```bash
-node "<shipping-github>/scripts/pr-policy-gate.mjs" OWNER/REPO N
+node "<github-delivery>/scripts/pr-policy-gate.mjs" OWNER/REPO N
 ```
 
 Use this to inspect review policy, last-push approval, merge queue, and `merge_group` workflow coverage.
@@ -129,6 +135,6 @@ Use this to inspect review policy, last-push approval, merge queue, and `merge_g
 These classify review work; they are not substitutes for the authoritative ship decision.
 
 ```bash
-node "<shipping-github>/scripts/security-scope.mjs" OWNER/REPO N
-node "<shipping-github>/scripts/bug-scope.mjs" OWNER/REPO N
+node "<github-delivery>/scripts/security-scope.mjs" OWNER/REPO N
+node "<github-delivery>/scripts/bug-scope.mjs" OWNER/REPO N
 ```

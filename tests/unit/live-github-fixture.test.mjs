@@ -29,8 +29,8 @@ function requiredChecks(overrides = {}) {
 
 test("builds namespaced deterministic fixture plans", () => {
   const plan = buildFixturePlan({ repo: "acme/widget", runId: "run-42" });
-  assert.equal(plan.branch, "shipping-github-fixture/run-42");
-  assert.equal(plan.fixturePath, ".shipping-github-fixtures/run-42.json");
+  assert.equal(plan.branch, "github-delivery-fixture/run-42");
+  assert.equal(plan.fixturePath, ".github-delivery-fixtures/run-42.json");
   assert.match(plan.idempotencyKey, /^[a-f0-9]{64}$/);
   assert.deepEqual(plan.requiredEvents, REQUIRED_EVENTS);
   assertSafeFixturePlan(plan);

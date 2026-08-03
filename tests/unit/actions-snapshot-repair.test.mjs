@@ -43,7 +43,7 @@ function snapshot(overrides = {}) {
     ...overrides.sources,
   };
   return createSnapshotEnvelope({
-    repo: "Wibias/shipping-github",
+    repo: "Wibias/github-delivery",
     pr: 35,
     headOid: "head123",
     capturedAt: "2026-08-01T06:01:58.208Z",

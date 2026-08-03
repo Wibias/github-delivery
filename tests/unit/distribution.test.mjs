@@ -11,17 +11,17 @@ import {
 } from "../../scripts/lib/distribution.mjs";
 
 function fixtureRoot() {
-  const root = mkdtempSync(join(tmpdir(), "shipping-github-dist-test-"));
+  const root = mkdtempSync(join(tmpdir(), "github-delivery-dist-test-"));
   mkdirSync(join(root, "references"), { recursive: true });
   mkdirSync(join(root, "scripts", "lib"), { recursive: true });
   mkdirSync(join(root, "overrides", "babysit"), { recursive: true });
   mkdirSync(join(root, "tests", "evals"), { recursive: true });
   mkdirSync(join(root, "tests", "unit"), { recursive: true });
   mkdirSync(join(root, ".github", "workflows"), { recursive: true });
-  writeFileSync(join(root, "SKILL.md"), "---\nname: shipping-github\ndescription: Merge and review GitHub pull requests.\n---\n\nRead `references/shared-rules.md`. Run `scripts/ship-gate.mjs`.\n");
-  writeFileSync(join(root, "README.md"), "# shipping-github\r\n");
+  writeFileSync(join(root, "SKILL.md"), "---\nname: github-delivery\ndescription: Merge and review GitHub pull requests.\n---\n\nRead `references/shared-rules.md`. Run `scripts/ship-gate.mjs`.\n");
+  writeFileSync(join(root, "README.md"), "# github-delivery\r\n");
   writeFileSync(join(root, "LICENSE"), "MIT\n");
-  writeFileSync(join(root, "package.json"), JSON.stringify({ name: "shipping-github", version: "0.1.0", private: true, type: "module", engines: { node: ">=20" } }, null, 2) + "\n");
+  writeFileSync(join(root, "package.json"), JSON.stringify({ name: "github-delivery", version: "0.1.0", private: true, type: "module", engines: { node: ">=20" } }, null, 2) + "\n");
   writeFileSync(join(root, "references", "shared-rules.md"), "# Rules\r\n");
   writeFileSync(join(root, "scripts", "ship-gate.mjs"), "#!/usr/bin/env node\nconsole.log('ok');\n");
   writeFileSync(join(root, "scripts", "lib", "helper.mjs"), "export const ok = true;\n");
@@ -33,12 +33,12 @@ function fixtureRoot() {
 }
 
 test("injects Agent Skills metadata from package version", () => {
-  const source = "---\nname: shipping-github\ndescription: Merge PRs.\n---\n\nBody\n";
+  const source = "---\nname: github-delivery\ndescription: Merge PRs.\n---\n\nBody\n";
   const result = injectSkillMetadata(source, { version: "0.1.0" });
   assert.match(result, /license: MIT/);
   assert.match(result, /compatibility: Requires Node\.js 20\+/);
   assert.match(result, /version: "0\.1\.0"/);
-  assert.match(result, /repository: "https:\/\/github\.com\/Wibias\/shipping-github"/);
+  assert.match(result, /repository: "https:\/\/github\.com\/Wibias\/github-delivery"/);
   assert.equal((result.match(/^---$/gm) || []).length, 2);
 });
 
@@ -52,16 +52,16 @@ test("builds only runtime payload and normalizes text", () => {
   assert(paths.includes("tests/evals/cases.jsonl"));
   assert(!paths.includes("tests/unit/ignored.test.mjs"));
   assert(!paths.includes(".github/workflows/ignored.yml"));
-  assert.equal(readFileSync(join(out, "shipping-github", "README.md"), "utf8"), "# shipping-github\n");
-  assert.match(readFileSync(join(out, "shipping-github", "SKILL.md"), "utf8"), /version: "0\.1\.0"/);
-  assert.equal(readFileSync(join(out, "shipping-github-v0.1.0.zip")).subarray(0, 2).toString("hex"), "504b");
-  assert.equal(readFileSync(join(out, "shipping-github-v0.1.0.tar.gz")).subarray(0, 2).toString("hex"), "1f8b");
-  assert.match(readFileSync(join(out, "SHA256SUMS"), "utf8"), /shipping-github-v0\.1\.0\.zip/);
+  assert.equal(readFileSync(join(out, "github-delivery", "README.md"), "utf8"), "# github-delivery\n");
+  assert.match(readFileSync(join(out, "github-delivery", "SKILL.md"), "utf8"), /version: "0\.1\.0"/);
+  assert.equal(readFileSync(join(out, "github-delivery-v0.1.0.zip")).subarray(0, 2).toString("hex"), "504b");
+  assert.equal(readFileSync(join(out, "github-delivery-v0.1.0.tar.gz")).subarray(0, 2).toString("hex"), "1f8b");
+  assert.match(readFileSync(join(out, "SHA256SUMS"), "utf8"), /github-delivery-v0\.1\.0\.zip/);
 });
 
 test("accepts references to bundled runtime directories", () => {
   const root = fixtureRoot();
-  writeFileSync(join(root, "SKILL.md"), "---\nname: shipping-github\ndescription: Merge PRs.\n---\n\nUse `overrides/babysit`.\n");
+  writeFileSync(join(root, "SKILL.md"), "---\nname: github-delivery\ndescription: Merge PRs.\n---\n\nUse `overrides/babysit`.\n");
   assert.doesNotThrow(() => buildDistribution({ root, out: join(root, "out"), sourceCommit: "d".repeat(40) }));
 });
 

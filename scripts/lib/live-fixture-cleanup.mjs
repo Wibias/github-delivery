@@ -20,7 +20,7 @@ export function buildInterruptedReceipt(plan, {
   assertSafeFixturePlan(plan);
   return {
     schemaVersion: 1,
-    kind: "shipping-github/live-fixture-receipt",
+    kind: "github-delivery/live-fixture-receipt",
     repo: plan.repo,
     runId: plan.runId,
     disposition: plan.disposition,
@@ -87,7 +87,7 @@ export async function cleanupFixtureResources(adapter, options) {
 
   return {
     schemaVersion: 1,
-    kind: "shipping-github/live-fixture-cleanup-report",
+    kind: "github-delivery/live-fixture-cleanup-report",
     repo: plan.repo,
     runId: plan.runId,
     marker: plan.marker,

@@ -13,18 +13,18 @@ import {
 } from "../../scripts/lib/release-contract.mjs";
 
 function fixture() {
-  const root = mkdtempSync(join(tmpdir(), "shipping-github-release-"));
+  const root = mkdtempSync(join(tmpdir(), "github-delivery-release-"));
   const dist = join(root, "dist");
-  mkdirSync(join(dist, "shipping-github"), { recursive: true });
-  writeFileSync(join(root, "package.json"), JSON.stringify({ name: "shipping-github", version: "0.1.0" }));
+  mkdirSync(join(dist, "github-delivery"), { recursive: true });
+  writeFileSync(join(root, "package.json"), JSON.stringify({ name: "github-delivery", version: "0.1.0" }));
   const archive = Buffer.from("archive");
-  writeFileSync(join(dist, "shipping-github-v0.1.0.zip"), archive);
-  writeFileSync(join(dist, "shipping-github-v0.1.0.tar.gz"), Buffer.from("tar"));
-  writeFileSync(join(dist, "shipping-github", "SKILL.md"), "---\nname: shipping-github\n---\n");
+  writeFileSync(join(dist, "github-delivery-v0.1.0.zip"), archive);
+  writeFileSync(join(dist, "github-delivery-v0.1.0.tar.gz"), Buffer.from("tar"));
+  writeFileSync(join(dist, "github-delivery", "SKILL.md"), "---\nname: github-delivery\n---\n");
   writeFileSync(join(dist, "manifest.json"), JSON.stringify({
     schemaVersion: 1,
-    kind: "shipping-github/distribution-manifest",
-    name: "shipping-github",
+    kind: "github-delivery/distribution-manifest",
+    name: "github-delivery",
     version: "0.1.0",
     sourceCommit: "a".repeat(40),
     files: [{ path: "SKILL.md", bytes: 36, mode: "0644", sha256: "deadbeef" }],
@@ -32,8 +32,8 @@ function fixture() {
   const digest = (buffer) => createHash("sha256").update(buffer).digest("hex");
   writeFileSync(join(dist, "SHA256SUMS"), [
     `${digest(readFileSync(join(dist, "manifest.json")))}  manifest.json`,
-    `${digest(readFileSync(join(dist, "shipping-github-v0.1.0.tar.gz")))}  shipping-github-v0.1.0.tar.gz`,
-    `${digest(archive)}  shipping-github-v0.1.0.zip`,
+    `${digest(readFileSync(join(dist, "github-delivery-v0.1.0.tar.gz")))}  github-delivery-v0.1.0.tar.gz`,
+    `${digest(archive)}  github-delivery-v0.1.0.zip`,
   ].join("\n") + "\n");
   return { root, dist };
 }
@@ -54,7 +54,7 @@ test("manual workflow runs are always dry-run", () => {
 test("distribution verification binds version, source commit, and checksums", () => {
   const { dist } = fixture();
   assert.equal(verifyDistribution({ dist, version: "0.1.0", sourceCommit: "a".repeat(40) }).valid, true);
-  writeFileSync(join(dist, "shipping-github-v0.1.0.zip"), "tampered");
+  writeFileSync(join(dist, "github-delivery-v0.1.0.zip"), "tampered");
   assert.throws(() => verifyDistribution({ dist, version: "0.1.0", sourceCommit: "a".repeat(40) }), /checksum mismatch/);
 });
 
@@ -62,7 +62,7 @@ test("creates an SPDX 2.3 SBOM for release artifacts", () => {
   const { dist } = fixture();
   const sbom = createSpdxSbom({ dist, version: "0.1.0", sourceCommit: "a".repeat(40) });
   assert.equal(sbom.spdxVersion, "SPDX-2.3");
-  assert.equal(sbom.name, "shipping-github-v0.1.0");
+  assert.equal(sbom.name, "github-delivery-v0.1.0");
   assert.equal(sbom.packages[0].versionInfo, "0.1.0");
   assert(sbom.files.some((file) => file.fileName.endsWith(".zip")));
 });
