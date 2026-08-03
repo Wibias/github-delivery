@@ -4,7 +4,7 @@ function normalized(prompt) {
 
 function result(workflow, mutationMode = "read-only", explicitActions = []) {
   return {
-    skill: "shipping-github",
+    skill: "github-delivery",
     workflow,
     mutationMode,
     explicitActions,

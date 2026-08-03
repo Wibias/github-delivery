@@ -34,7 +34,7 @@ export function createSnapshotEnvelope({
   const snapshotId = createHash("sha256").update(identity).digest("hex");
   return {
     schemaVersion: 1,
-    kind: "shipping-github/evidence-snapshot",
+    kind: "github-delivery/evidence-snapshot",
     snapshotId,
     capturedAt,
     repo,

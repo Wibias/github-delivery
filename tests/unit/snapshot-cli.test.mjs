@@ -12,14 +12,14 @@ function source(required = true) {
 }
 
 function writeSnapshot() {
-  const directory = mkdtempSync(join(tmpdir(), "shipping-github-cli-"));
+  const directory = mkdtempSync(join(tmpdir(), "github-delivery-cli-"));
   const path = join(directory, "snapshot.json");
   const snapshot = {
     schemaVersion: 1,
-    kind: "shipping-github/evidence-snapshot",
+    kind: "github-delivery/evidence-snapshot",
     snapshotId: "cli-snapshot",
     capturedAt: "2026-08-01T00:00:00.000Z",
-    repo: "Wibias/shipping-github",
+    repo: "Wibias/github-delivery",
     pr: 42,
     headOid: "head123",
     complete: true,
@@ -44,7 +44,7 @@ function writeSnapshot() {
     evidence: {
       pullRequest: {
         number: 42,
-        url: "https://github.com/Wibias/shipping-github/pull/42",
+        url: "https://github.com/Wibias/github-delivery/pull/42",
         baseRefName: "main",
         headRefOid: "head123",
         mergeStateStatus: "CLEAN",
@@ -108,7 +108,7 @@ for (const script of [
       process.execPath,
       [
         join(ROOT, "scripts", script),
-        "Wibias/shipping-github",
+        "Wibias/github-delivery",
         "42",
         "--snapshot",
         path,

@@ -6,8 +6,8 @@ import { applyInstallation, planInstallation, restoreBackup } from "./lib/distri
 
 export function parseInstallArgs(argv) {
   const options = {
-    source: join(process.cwd(), "dist", "shipping-github"),
-    target: join(homedir(), ".agents", "skills", "shipping-github"),
+    source: join(process.cwd(), "dist", "github-delivery"),
+    target: join(homedir(), ".agents", "skills", "github-delivery"),
     backupRoot: undefined,
     apply: false,
     allowDowngrade: false,
