@@ -9,7 +9,7 @@ const ROOT = resolve(import.meta.dirname, "../..");
 const COMMAND = join(ROOT, "scripts", "runtime-capabilities.mjs");
 
 function fixture(input) {
-  const directory = mkdtempSync(join(tmpdir(), "shipping-github-capabilities-"));
+  const directory = mkdtempSync(join(tmpdir(), "github-delivery-capabilities-"));
   const path = join(directory, "input.json");
   writeFileSync(path, JSON.stringify(input), "utf8");
   return path;

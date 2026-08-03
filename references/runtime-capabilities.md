@@ -35,7 +35,7 @@ SHIPPING_GITHUB_SUBAGENTS=true|false
 SHIPPING_GITHUB_REVIEW_TOOL=true|false
 ```
 
-`CONNECTOR_WRITE` means the host connector has write permission. `BROKERED_CONNECTOR_WRITE` means the shipping-github mutation broker has an adapter that enforces the same request, expected-head, idempotency, exact-text, audit, and verification contract through that connector. Permission without an adapter is not a usable mutation path.
+`CONNECTOR_WRITE` means the host connector has write permission. `BROKERED_CONNECTOR_WRITE` means the github-delivery mutation broker has an adapter that enforces the same request, expected-head, idempotency, exact-text, audit, and verification contract through that connector. Permission without an adapter is not a usable mutation path.
 
 A Node process cannot discover a host connector that was never exposed to it. Inventing those capabilities would be charmingly optimistic and operationally useless.
 
@@ -44,7 +44,7 @@ A Node process cannot discover a host connector that was never exposed to it. In
 ```json
 {
   "schemaVersion": 1,
-  "kind": "shipping-github/runtime-capabilities",
+  "kind": "github-delivery/runtime-capabilities",
   "host": "codex",
   "os": "win32",
   "repo": "OWNER/REPO",
@@ -100,7 +100,7 @@ This mode is safe with an empty `PATH` and is used by CI.
 
 For `merge PR #32`, the agent:
 
-1. loads `shipping-github` and `references/merge-pr.md`;
+1. loads `github-delivery` and `references/merge-pr.md`;
 2. discovers capabilities;
 3. stops if no reliable GitHub read or brokered write path exists;
 4. runs the authoritative gate;

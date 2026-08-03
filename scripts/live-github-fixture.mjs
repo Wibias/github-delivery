@@ -93,10 +93,10 @@ function adapter(tempRoot) {
       run("git", ["fetch", "origin", plan.baseBranch]);
       run("git", ["switch", "--detach", `origin/${plan.baseBranch}`]);
       run("git", ["switch", "-C", plan.branch]);
-      mkdirSync(join(process.cwd(), ".shipping-github-fixtures"), { recursive: true });
+      mkdirSync(join(process.cwd(), ".github-delivery-fixtures"), { recursive: true });
       writeFileSync(plan.fixturePath, JSON.stringify({ marker: plan.marker, generation: 1 }, null, 2) + "\n");
       run("git", ["add", plan.fixturePath]);
-      run("git", ["-c", "user.name=shipping-github fixture", "-c", "user.email=fixture@users.noreply.github.com", "commit", "-m", `${plan.marker} create fixture`]);
+      run("git", ["-c", "user.name=github-delivery fixture", "-c", "user.email=fixture@users.noreply.github.com", "commit", "-m", `${plan.marker} create fixture`]);
       run("git", ["push", "origin", `HEAD:refs/heads/${plan.branch}`]);
     },
     async createDraftPr(plan, issue) {
@@ -125,7 +125,7 @@ function adapter(tempRoot) {
     async changeHead(plan, pr) {
       writeFileSync(plan.fixturePath, JSON.stringify({ marker: plan.marker, generation: 2 }, null, 2) + "\n");
       run("git", ["add", plan.fixturePath]);
-      run("git", ["-c", "user.name=shipping-github fixture", "-c", "user.email=fixture@users.noreply.github.com", "commit", "-m", `${plan.marker} advance fixture head`]);
+      run("git", ["-c", "user.name=github-delivery fixture", "-c", "user.email=fixture@users.noreply.github.com", "commit", "-m", `${plan.marker} advance fixture head`]);
       const expectedHead = run("git", ["rev-parse", "HEAD"]).stdout;
       run("git", ["push", "origin", `HEAD:refs/heads/${plan.branch}`]);
       await waitForObservedHead({
@@ -158,7 +158,7 @@ function adapter(tempRoot) {
   };
 }
 
-const tempRoot = mkdtempSync(join(tmpdir(), "shipping-github-fixture-"));
+const tempRoot = mkdtempSync(join(tmpdir(), "github-delivery-fixture-"));
 let parsedArgs = null;
 try {
   parsedArgs = parseArgs(process.argv.slice(2));

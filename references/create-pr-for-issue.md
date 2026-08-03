@@ -68,10 +68,10 @@ Confirm this request is **one** issue (or an explicit batch). Otherwise pick/ask
    ```
 
    If assign fails (permissions), report once and continue.
-4. **One issue comment** (idempotent — edit if a prior `[shipping-github] Opened PR` exists):
+4. **One issue comment** (idempotent — edit if a prior `[GD] Opened PR` exists):
 
    ```markdown
-   [shipping-github] Opened PR #<pr> to address this.
+   [GD] Opened PR #<pr> to address this.
    ```
 
 5. Spot-check Development sidebar / linked PRs still point at the **canonical** PR.

@@ -6,7 +6,7 @@ Security fixes are applied to the latest `0.1.x` release and to the current `mai
 
 ## System and scope
 
-`shipping-github` is an Agent Skill that reads GitHub evidence, evaluates pull-request policy, reviews code, and performs explicitly authorized GitHub mutations. Security-sensitive components include:
+`github-delivery` is an Agent Skill that reads GitHub evidence, evaluates pull-request policy, reviews code, and performs explicitly authorized GitHub mutations. Security-sensitive components include:
 
 - natural-language routing and workflow instructions in `SKILL.md` and `references/`
 - evidence capture and the authoritative ship gate
@@ -49,7 +49,7 @@ Do not open a public issue for an undisclosed vulnerability.
 
 Submit reports privately through GitHub's vulnerability reporting form:
 
-https://github.com/Wibias/shipping-github/security/advisories/new
+https://github.com/Wibias/github-delivery/security/advisories/new
 
 Include:
 

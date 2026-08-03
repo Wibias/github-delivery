@@ -4,7 +4,7 @@ Use this workflow for an **existing GitHub PR stack**: inspect its topology,
 review or update a member safely, restack after parent or trunk drift, retarget
 bases, recover a rewritten branch, or merge the stack bottom-up.
 
-`shipping-github` remains authoritative for the complete GitHub lifecycle.
+`github-delivery` remains authoritative for the complete GitHub lifecycle.
 This reference owns only stack topology and stack-specific mutation order. The
 selected PR workflow still owns review depth, issue linkage, comments, CI,
 security, readiness, merge thanks, and close-out.
@@ -44,7 +44,7 @@ Restacking, retargeting, recovering, editing stack body blocks, pushing rewritte
 heads, closing empty PRs, or merging are external or history mutations. Before
 the first mutation:
 
-1. select the active `shipping-github` mutation mode;
+1. select the active `github-delivery` mutation mode;
 2. verify the requested action is authorized;
 3. show the complete bounded plan;
 4. identify every branch and PR that may change;
@@ -55,7 +55,7 @@ Never mutate repository trunk or another protected/shared branch.
 
 Never use bare `--force`. A stack history rewrite may use
 `--force-with-lease` only under the narrow exception defined in
-`shipping-github/SKILL.md`.
+`github-delivery/SKILL.md`.
 
 ## 1. State preflight
 
@@ -285,7 +285,7 @@ When deletion could strand children:
 1. identify immediate open children;
 2. determine their intended surviving base;
 3. retarget them before the parent branch disappears when required;
-4. merge the parent only through the normal `shipping-github` merge workflow;
+4. merge the parent only through the normal `github-delivery` merge workflow;
 5. confirm the parent is actually merged, not merely queued;
 6. re-inspect child bases;
 7. restack the next child onto the surviving base;
@@ -301,7 +301,7 @@ For every level:
 
 1. Verify the current bottom PR targets trunk or the explicitly intended
    integration branch.
-2. Run its ordinary `shipping-github` merge-ready workflow and obtain a current
+2. Run its ordinary `github-delivery` merge-ready workflow and obtain a current
    authoritative `ship-gate.mjs` result.
 3. Merge through `references/merge-pr.md`, including thanks and linked-issue
    handling.

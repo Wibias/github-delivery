@@ -316,7 +316,7 @@ export function planMutationRequest(request = {}) {
   const command = commandFor(normalized);
   return {
     schemaVersion: 1,
-    kind: "shipping-github/mutation-plan",
+    kind: "github-delivery/mutation-plan",
     request: normalized,
     requestHash: sha256(JSON.stringify(normalized)),
     action: normalized.action,

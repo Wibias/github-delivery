@@ -23,23 +23,23 @@ function safeSegment(value) {
   return String(value).replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
-export function buildFixturePlan({ repo, runId, baseBranch = "main", disposition = "close", prefix = "shipping-github-fixture" } = {}) {
+export function buildFixturePlan({ repo, runId, baseBranch = "main", disposition = "close", prefix = "github-delivery-fixture" } = {}) {
   if (!REPO_RE.test(repo || "")) throw new Error("repo must be OWNER/REPO");
   if (!RUN_ID_RE.test(runId || "")) throw new Error("runId must be 3-64 safe characters");
   if (!/^[A-Za-z0-9._/-]+$/.test(baseBranch || "")) throw new Error("unsafe baseBranch");
   if (!new Set(["close", "merge"]).has(disposition)) throw new Error("disposition must be close or merge");
   const token = safeSegment(runId);
-  const marker = `[shipping-github-fixture:${token}]`;
+  const marker = `[github-delivery-fixture:${token}]`;
   return Object.freeze({
     schemaVersion: 1,
-    kind: "shipping-github/live-fixture-plan",
+    kind: "github-delivery/live-fixture-plan",
     repo,
     runId: token,
     baseBranch,
     disposition,
     marker,
     branch: `${safeSegment(prefix)}/${token}`,
-    fixturePath: `.shipping-github-fixtures/${token}.json`,
+    fixturePath: `.github-delivery-fixtures/${token}.json`,
     issueTitle: `${marker} lifecycle issue`,
     prTitle: `${marker} lifecycle PR`,
     idempotencyKey: createHash("sha256").update(`${repo}\0${token}`).digest("hex"),
@@ -50,7 +50,7 @@ export function buildFixturePlan({ repo, runId, baseBranch = "main", disposition
 export function assertSafeFixturePlan(plan) {
   const expected = buildFixturePlan(plan);
   if (expected.branch !== plan.branch || expected.marker !== plan.marker) throw new Error("fixture plan derived fields do not match inputs");
-  if (!plan.branch.startsWith("shipping-github-fixture/")) throw new Error("refusing to mutate a non-fixture branch");
+  if (!plan.branch.startsWith("github-delivery-fixture/")) throw new Error("refusing to mutate a non-fixture branch");
   return expected;
 }
 
@@ -76,7 +76,7 @@ export function evaluateFixtureReceipt(plan, events) {
   if (finalGate && !new Set(["ready", "blocked", "unknown"]).has(finalGate.decision)) problems.push("final gate decision is invalid");
   return {
     schemaVersion: 1,
-    kind: "shipping-github/live-fixture-receipt",
+    kind: "github-delivery/live-fixture-receipt",
     repo: plan.repo,
     runId: plan.runId,
     disposition: plan.disposition,
