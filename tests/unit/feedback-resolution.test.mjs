@@ -48,7 +48,7 @@ function resolution({
     createdAt,
     body:
       body ??
-      `[github-delivery] Addressed feedback\nfeedback: ${feedbackKey}\ncommit: ${commitRef}`,
+      `[GD] Addressed feedback\nfeedback: ${feedbackKey}\ncommit: ${commitRef}`,
   });
 }
 
@@ -191,7 +191,7 @@ test("merge commits and records from another author cannot clear feedback", () =
 
 test("malformed records are reported and never clear feedback", () => {
   const malformed = resolution({
-    body: "[github-delivery] Addressed feedback\nfeedback: review_comment:77",
+    body: "[GD] Addressed feedback\nfeedback: review_comment:77",
   });
   const result = evaluateFeedbackResolutions({
     feedback: [target, malformed],
@@ -242,7 +242,7 @@ test("snapshot wake evaluation exposes valid resolution evidence", () => {
             user: { login: "Wibias" },
             author_association: "OWNER",
             created_at: "2026-08-01T00:03:00Z",
-            body: "[github-delivery] Addressed feedback\nfeedback: review_comment:77\ncommit: abcdef1",
+            body: "[GD] Addressed feedback\nfeedback: review_comment:77\ncommit: abcdef1",
           },
         ],
         reviewComments: [

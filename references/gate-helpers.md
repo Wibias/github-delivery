@@ -109,12 +109,18 @@ node "<github-delivery>/scripts/watch-wake-gate.mjs" OWNER/REPO N
 Use this to inspect the `wake` component. Clearing feedback requires a verified exact resolution record:
 
 ```text
-[github-delivery] Addressed feedback
-feedback: review_comment:67890
+[GD] Addressed feedback
+
+feedbacks:
+- issue_comment:12345
+- review_comment:67890
+
 commit: abc1234
+
+<!-- gd:addressed-feedback head:<40-char-current-head-sha> -->
 ```
 
-An unrelated later commit does not clear feedback.
+Aggregate all feedback resolved by the same current head into this single comment. Before creating it, search for the exact head marker and edit that comment when present. An unrelated later commit does not clear feedback.
 
 ### Merge queue and review policy
 

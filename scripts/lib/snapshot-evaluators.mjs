@@ -379,7 +379,7 @@ export function evaluateWakeSnapshot(snapshot) {
   ];
   const commits = normalizedCommits(snapshot);
   const myLogin = snapshot?.evidence?.viewer?.login || null;
-  const resolution = evaluateFeedbackResolutions({ feedback, commits, myLogin });
+  const resolution = evaluateFeedbackResolutions({ feedback, commits, myLogin, headOid: snapshot.headOid });
   const unaddressed = resolution.unaddressed;
   const blockers = [];
   if (
@@ -394,6 +394,18 @@ export function evaluateWakeSnapshot(snapshot) {
       excerpt: `mergeStateStatus=${pr.mergeStateStatus || ""} mergeable=${pr.mergeable || ""}`,
     });
   }
+  const addressedFeedbackComment = unaddressed.length
+    ? [
+        "[GD] Addressed feedback",
+        "",
+        "feedbacks:",
+        ...unaddressed.map((comment) => "- " + comment.key),
+        "",
+        "commit: <7-40 character PR commit SHA>",
+        "",
+        "<!-- gd:addressed-feedback head:" + snapshot.headOid + " -->",
+      ].join("\n")
+    : null;
   for (const comment of unaddressed) {
     blockers.push({
       key: comment.key,
@@ -407,7 +419,7 @@ export function evaluateWakeSnapshot(snapshot) {
       line: comment.line,
       excerpt: comment.body.replace(/\s+/g, " ").slice(0, 220),
       reason: "trusted_human_feedback_needs_code",
-      howToClear: `[github-delivery] Addressed feedback\nfeedback: ${comment.key}\ncommit: <7-40 character PR commit SHA>`,
+      howToClear: addressedFeedbackComment,
     });
   }
   const complete = [
@@ -440,5 +452,6 @@ export function evaluateWakeSnapshot(snapshot) {
     addressedFeedbackKeys: resolution.addressedKeys,
     resolutionRecords: resolution.validRecords,
     resolutionDiagnostics: resolution.diagnostics,
+    addressedFeedbackComment,
   };
 }

@@ -81,7 +81,7 @@
   },
   {
     "id": "R-wake-gate-ack-not-enough-2026-07-31",
-    "sha256": "c890291c91a934226d8aee637c351bb19a2f93ff08093d4360e1c52ec6357abb"
+    "sha256": "a428132c67aba8b5ee7d611b6eaab4c8b5167eb27bde65a6c0419a30a963cacc"
   },
   {
     "id": "R-ci-fix-not-rerun-timeout-2026-07-31",
