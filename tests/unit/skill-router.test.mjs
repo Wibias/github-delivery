@@ -12,6 +12,13 @@ test("routes a natural-language merge request to the merge workflow", () => {
   });
 });
 
+test("routes a bare full review with verdict-comment authority", () => {
+  const route = routeShippingGithubPrompt("full review on PR #32");
+  assert.equal(route.workflow, "references/full-review-pr.md");
+  assert.equal(route.mutationMode, "review");
+  assert.deepEqual(route.explicitActions, []);
+});
+
 test("routes status and watch requests without granting mutation authority", () => {
   assert.equal(
     routeShippingGithubPrompt("what is left on PR #41?").workflow,

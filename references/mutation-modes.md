@@ -25,6 +25,7 @@ The profile is an upper bound, not a waiver. Draft/WIP gates, exact-text confirm
 
 Examples:
 
+- `full review PR #32` → `review` (the full-review workflow publishes its verdict comment)
 - `what is left on PR #32?` → `read-only`
 - `review PR #32 and post the findings` → `review`
 - `fix PR #32 and make it merge ready` → `maintainer`

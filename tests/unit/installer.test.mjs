@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import test from "node:test";
 
 import {
@@ -10,11 +11,25 @@ import {
   restoreBackup,
 } from "../../scripts/lib/distribution.mjs";
 
+const ROOT = resolve(import.meta.dirname, "../..");
+
 function skill(dir, version, marker = version) {
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "github-delivery", version }, null, 2));
   writeFileSync(join(dir, "marker.txt"), marker);
 }
+
+test("install CLI entry point runs from a file path", () => {
+  const command = join(ROOT, "scripts", "install-skill.mjs");
+  const result = spawnSync(process.execPath, [command], {
+    cwd: ROOT,
+    encoding: "utf8",
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const plan = JSON.parse(result.stdout);
+  assert.equal(plan.apply, false);
+  assert.equal(typeof plan.allowed, "boolean");
+});
 
 test("plans a new install without mutating the target", () => {
   const root = mkdtempSync(join(tmpdir(), "github-delivery-install-test-"));

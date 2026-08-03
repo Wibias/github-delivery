@@ -162,5 +162,9 @@
   {
     "id": "R-adaptive-settle-visible-polling-2026-08-03",
     "sha256": "12dfcc066704af7b483984cd757c03b4f7f5e4f989bf8b462955deb1a32fe7ca"
+  },
+  {
+    "id": "R-full-review-verdict-mode-2026-08-03",
+    "sha256": "6cc41d6b75b91c81cf700ac138f74b0c5f6c97abaadc075aee19a089967cc43b"
   }
 ]

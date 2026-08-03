@@ -22,6 +22,12 @@ test("mutation mode reference keeps autonomous human replies constrained", () =>
   assert.match(reference, /profile is an upper bound, not a waiver/);
 });
 
+test("bare full review selects review mode with verdict authority", () => {
+  const reference = read("references/mutation-modes.md");
+  assert.match(reference, /full review PR #32/);
+  assert.match(reference, /full review PR #32[\s\S]*→ `review`/);
+});
+
 test("gate helper invocation carries the active mutation mode", () => {
   const reference = read("references/gate-helpers.md");
   assert.match(reference, /ship-gate\.mjs[\s\S]*--mutation-mode read-only/);
