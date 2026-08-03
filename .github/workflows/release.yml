@@ -47,15 +47,15 @@ jobs:
       - name: Upload verified dry-run evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: shipping-github-release-${{ github.sha }}
+          name: github-delivery-release-${{ github.sha }}
           path: |
             dist/manifest.json
             dist/SHA256SUMS
             dist/sbom.spdx.json
             dist/RELEASE_NOTES.md
             dist/release-metadata.json
-            dist/shipping-github-v*.zip
-            dist/shipping-github-v*.tar.gz
+            dist/github-delivery-v*.zip
+            dist/github-delivery-v*.tar.gz
           if-no-files-found: error
           retention-days: 14
 
@@ -94,13 +94,13 @@ jobs:
         uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1
         with:
           subject-path: |
-            dist/shipping-github-v*.zip
-            dist/shipping-github-v*.tar.gz
+            dist/github-delivery-v*.zip
+            dist/github-delivery-v*.tar.gz
 
       - name: Attest release SBOM
         uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1
         with:
-          subject-path: dist/shipping-github-v*.zip
+          subject-path: dist/github-delivery-v*.zip
           sbom-path: dist/sbom.spdx.json
 
       - name: Publish GitHub Release
@@ -112,11 +112,11 @@ jobs:
             exit 1
           }
           gh release create "${GITHUB_REF_NAME}" \
-            dist/shipping-github-v*.zip \
-            dist/shipping-github-v*.tar.gz \
+            dist/github-delivery-v*.zip \
+            dist/github-delivery-v*.tar.gz \
             dist/manifest.json \
             dist/SHA256SUMS \
             dist/sbom.spdx.json \
             --verify-tag \
-            --title "shipping-github ${GITHUB_REF_NAME}" \
+            --title "github-delivery ${GITHUB_REF_NAME}" \
             --notes-file dist/RELEASE_NOTES.md
