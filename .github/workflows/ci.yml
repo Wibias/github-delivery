@@ -38,11 +38,6 @@ jobs:
 
           old = "shipping-github"
           new = "github-delivery"
-          protected = {
-              "https://github.com/Wibias/shipping-github": "__REPOSITORY_URL__",
-              "Wibias/shipping-github": "__REPOSITORY_SLUG__",
-          }
-
           tracked = [
               item.decode()
               for item in subprocess.check_output(["git", "ls-files", "-z"]).split(b"\0")
@@ -61,13 +56,7 @@ jobs:
                   text = data.decode("utf-8")
               except UnicodeDecodeError:
                   continue
-              updated = text
-              for value, token in protected.items():
-                  updated = updated.replace(value, token)
-              updated = updated.replace("Shipping GitHub", "GitHub Delivery")
-              updated = updated.replace(old, new)
-              for value, token in protected.items():
-                  updated = updated.replace(token, value)
+              updated = text.replace("Shipping GitHub", "GitHub Delivery").replace(old, new)
               if updated != text:
                   path.write_text(updated, encoding="utf-8", newline="\n")
 
@@ -106,22 +95,7 @@ jobs:
           grep -q '^name: github-delivery$' SKILL.md
           test "$(node -p "require('./package.json').name")" = "github-delivery"
           test -z "$(git ls-files | grep 'shipping-github' || true)"
-
-          git grep -n 'shipping-github' > /tmp/legacy-name.txt || true
-          python - <<'PY'
-          from pathlib import Path
-
-          allowed = (
-              "https://github.com/Wibias/shipping-github",
-              "Wibias/shipping-github",
-          )
-          bad = []
-          for line in Path('/tmp/legacy-name.txt').read_text(encoding='utf-8').splitlines():
-              if not any(value in line for value in allowed):
-                  bad.append(line)
-          if bad:
-              raise SystemExit("Unexpected legacy identifiers remain:\n" + "\n".join(bad))
-          PY
+          test -z "$(git grep -n 'shipping-github' || true)"
 
       - name: Run repository checks
         run: npm run check
