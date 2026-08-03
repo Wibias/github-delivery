@@ -32,6 +32,8 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          import hashlib
+          import json
           import subprocess
 
           old = "shipping-github"
@@ -77,6 +79,22 @@ jobs:
               target = source.replace(old, new)
               Path(target).parent.mkdir(parents=True, exist_ok=True)
               subprocess.run(["git", "mv", source, target], check=True)
+
+          regression_path = Path("tests/evals/regression-cases.jsonl")
+          lock = []
+          for raw in regression_path.read_text(encoding="utf-8").splitlines():
+              if not raw.strip():
+                  continue
+              item = json.loads(raw)
+              lock.append({
+                  "id": item["id"],
+                  "sha256": hashlib.sha256(raw.encode("utf-8")).hexdigest(),
+              })
+          Path("tests/evals/regression-lock.json").write_text(
+              json.dumps(lock, indent=2, ensure_ascii=False) + "\n",
+              encoding="utf-8",
+              newline="\n",
+          )
           PY
 
           rm -f .github/workflows/rename-github-delivery.yml
