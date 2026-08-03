@@ -1,0 +1,92 @@
+name: Rename skill to github-delivery
+
+on:
+  push:
+    branches:
+      - agent/rename-github-delivery
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rename-github-delivery
+  cancel-in-progress: false
+
+jobs:
+  rename:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: agent/rename-github-delivery
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Rename skill identifiers and paths
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          old = "shipping-github"
+          new = "github-delivery"
+          old_title = "Shipping GitHub"
+          new_title = "GitHub Delivery"
+          repository_url = "https://github.com/Wibias/shipping-github"
+          repository_url_token = "__SHIPPING_GITHUB_REPOSITORY_URL__"
+
+          files = subprocess.check_output(["git", "ls-files", "-z"]).split(b"\0")
+          for raw in files:
+              if not raw:
+                  continue
+              path = Path(raw.decode())
+              if path.as_posix() == ".github/workflows/rename-github-delivery.yml":
+                  continue
+              data = path.read_bytes()
+              try:
+                  text = data.decode("utf-8")
+              except UnicodeDecodeError:
+                  continue
+              updated = text.replace(repository_url, repository_url_token)
+              updated = updated.replace(old_title, new_title)
+              updated = updated.replace(old, new)
+              updated = updated.replace(repository_url_token, repository_url)
+              if updated != text:
+                  path.write_text(updated, encoding="utf-8", newline="\n")
+
+          paths = [p.decode() for p in subprocess.check_output(["git", "ls-files", "-z"]).split(b"\0") if p]
+          for source in sorted((p for p in paths if old in p), key=lambda p: (p.count("/"), len(p)), reverse=True):
+              target = source.replace(old, new)
+              Path(target).parent.mkdir(parents=True, exist_ok=True)
+              subprocess.run(["git", "mv", source, target], check=True)
+          PY
+
+          rm .github/workflows/rename-github-delivery.yml
+
+      - name: Verify rename completeness
+        shell: bash
+        run: |
+          if git grep -n 'shipping-github' -- ':!README.md' ':!INSTALL.md' ':!SKILL.md' ':!package.json' ':!scripts/lib/distribution.mjs' >/tmp/old-name.txt; then
+            cat /tmp/old-name.txt
+            echo 'Unexpected legacy identifier remains outside protected repository URL locations.' >&2
+            exit 1
+          fi
+          test "$(node -p "require('./package.json').name")" = "github-delivery"
+          grep -q '^name: github-delivery$' SKILL.md
+
+      - name: Run repository checks
+        run: npm run check
+
+      - name: Commit rename
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m 'chore: rename skill to github-delivery'
+          git push origin HEAD:agent/rename-github-delivery
