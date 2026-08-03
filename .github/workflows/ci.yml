@@ -7,9 +7,116 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
+  rename-bootstrap:
+    name: Rename skill to github-delivery
+    if: github.event_name == 'pull_request' && github.head_ref == 'agent/rename-github-delivery' && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out PR branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: agent/rename-github-delivery
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+
+      - name: Rename tracked skill identifiers and paths
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          old = "shipping-github"
+          new = "github-delivery"
+          protected = {
+              "https://github.com/Wibias/shipping-github": "__REPOSITORY_URL__",
+              "Wibias/shipping-github": "__REPOSITORY_SLUG__",
+          }
+
+          tracked = [
+              item.decode()
+              for item in subprocess.check_output(["git", "ls-files", "-z"]).split(b"\0")
+              if item
+          ]
+
+          for name in tracked:
+              path = Path(name)
+              if name in {
+                  ".github/workflows/ci.yml",
+                  ".github/workflows/rename-github-delivery.yml",
+              }:
+                  continue
+              data = path.read_bytes()
+              try:
+                  text = data.decode("utf-8")
+              except UnicodeDecodeError:
+                  continue
+              updated = text
+              for value, token in protected.items():
+                  updated = updated.replace(value, token)
+              updated = updated.replace("Shipping GitHub", "GitHub Delivery")
+              updated = updated.replace(old, new)
+              for value, token in protected.items():
+                  updated = updated.replace(token, value)
+              if updated != text:
+                  path.write_text(updated, encoding="utf-8", newline="\n")
+
+          for source in sorted(
+              (name for name in tracked if old in name),
+              key=lambda value: (value.count("/"), len(value)),
+              reverse=True,
+          ):
+              target = source.replace(old, new)
+              Path(target).parent.mkdir(parents=True, exist_ok=True)
+              subprocess.run(["git", "mv", source, target], check=True)
+          PY
+
+          rm -f .github/workflows/rename-github-delivery.yml
+          git checkout origin/main -- .github/workflows/ci.yml
+
+      - name: Verify repository rename
+        shell: bash
+        run: |
+          grep -q '^name: github-delivery$' SKILL.md
+          test "$(node -p "require('./package.json').name")" = "github-delivery"
+          test -z "$(git ls-files | grep 'shipping-github' || true)"
+
+          git grep -n 'shipping-github' > /tmp/legacy-name.txt || true
+          python - <<'PY'
+          from pathlib import Path
+
+          allowed = (
+              "https://github.com/Wibias/shipping-github",
+              "Wibias/shipping-github",
+          )
+          bad = []
+          for line in Path('/tmp/legacy-name.txt').read_text(encoding='utf-8').splitlines():
+              if not any(value in line for value in allowed):
+                  bad.append(line)
+          if bad:
+              raise SystemExit("Unexpected legacy identifiers remain:\n" + "\n".join(bad))
+          PY
+
+      - name: Run repository checks
+        run: npm run check
+
+      - name: Commit repository-wide rename
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m 'chore: rename skill to github-delivery'
+          git push origin HEAD:agent/rename-github-delivery
+
   test:
     name: Node ${{ matrix.node }} / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
