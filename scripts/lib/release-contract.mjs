@@ -111,7 +111,7 @@ export function createSpdxSbom({ dist, version, sourceCommit }) {
 }
 
 export function releaseNotesForVersion(changelog, version) {
-  const escaped = version.replace(/\./g, "\\.");
+  const escaped = version.replace(/[.\\]/g, (char) => `\\${char}`);
   const match = new RegExp(`^## \\[${escaped}\\][^\\n]*\\n([\\s\\S]*?)(?=^## \\[|(?![\\s\\S]))`, "m").exec(changelog.replace(/\r\n?/g, "\n"));
   if (!match || !match[1].trim()) throw new Error(`CHANGELOG.md has no release notes for ${version}`);
   return `# shipping-github v${version}\n\n${match[1].trim()}\n`;
