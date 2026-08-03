@@ -55,8 +55,8 @@ For a specific issue:
 3. Explore relevant code and docs enough to understand domain behavior.
 4. For bugs, attempt reproduction before grilling the reporter.
 5. Recommend category/state with reasoning.
-6. For `ready-for-agent`, post an agent brief. Read `references/AGENT-BRIEF.md` first.
-7. For rejected enhancements, read `references/OUT-OF-SCOPE.md`, update `.out-of-scope/`, comment, and close only after maintainer confirmation.
+6. For `ready-for-agent`, post an agent brief. Read `references/agent-brief.md` first.
+7. For rejected enhancements, read `references/out-of-scope.md`, update `.out-of-scope/`, comment, and close only after maintainer confirmation.
 
 Needs-info notes should capture established facts and ask specific actionable questions.
 

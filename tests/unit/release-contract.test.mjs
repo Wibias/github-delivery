@@ -72,3 +72,8 @@ test("extracts exact-version release notes", () => {
   assert.match(notes, /One/);
   assert.doesNotMatch(notes, /Old/);
 });
+
+test("escapes regex special characters in version", () => {
+  const notes = releaseNotesForVersion("# Changelog\n\n## [1.0.0-beta.1\\build] - 2026-08-01\n\n- Built\n", "1.0.0-beta.1\\build");
+  assert.match(notes, /Built/);
+});
