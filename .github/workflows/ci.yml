@@ -7,9 +7,31 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
+  create-clean-pr-branch:
+    name: Create clean PR branch
+    if: github.event_name == 'pull_request' && github.head_ref == 'agent/github-delivery' && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: agent/github-delivery
+
+      - name: Build clean non-workflow commit from main
+        shell: bash
+        run: |
+          git diff --binary origin/main..HEAD -- . ':(exclude).github/workflows/**' > /tmp/github-delivery.patch
+          git switch --force-create agent/github-delivery-clean origin/main
+          git apply --index /tmp/github-delivery.patch
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git commit -m 'chore: rename skill to github-delivery'
+          git push origin HEAD:refs/heads/agent/github-delivery-clean
+
   test:
     name: Node ${{ matrix.node }} / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
