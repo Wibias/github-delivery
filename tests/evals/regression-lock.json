@@ -146,5 +146,17 @@
   {
     "id": "R-ci-fix-unrelated-required-2026-07-31",
     "sha256": "82f5e2b040b4660c5e5a72cc665e1e826b86a2f4a7872b773fd8b7d3a42188b6"
+  },
+  {
+    "id": "E1-2026-07-29",
+    "sha256": "79bbbffaa3b4db11354dc164df07aa6b2bd7d22b20737158921dc90635cabc89"
+  },
+  {
+    "id": "E1-2026-07-29b",
+    "sha256": "7bad4af3f007c04d936584db9e7bec8d1772727efcb9471025cded7571efe5d8"
+  },
+  {
+    "id": "E1-matrix-2026-07-29",
+    "sha256": "a8b76330e1066ecb2dd080178587e0c242a30acef9020420781b30da953ef8bb"
   }
 ]
