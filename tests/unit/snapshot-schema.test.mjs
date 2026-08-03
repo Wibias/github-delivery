@@ -8,7 +8,7 @@ import {
 
 test("required complete sources produce a complete snapshot", () => {
   const snapshot = createSnapshotEnvelope({
-    repo: "Wibias/shipping-github",
+    repo: "Wibias/github-delivery",
     pr: 42,
     headOid: "abc",
     capturedAt: "2026-08-01T00:00:00.000Z",
@@ -41,7 +41,7 @@ test("an incomplete required source makes the snapshot incomplete", () => {
 
 test("snapshot identity is deterministic for the same capture", () => {
   const args = {
-    repo: "Wibias/shipping-github",
+    repo: "Wibias/github-delivery",
     pr: 42,
     headOid: "abc",
     capturedAt: "2026-08-01T00:00:00.000Z",

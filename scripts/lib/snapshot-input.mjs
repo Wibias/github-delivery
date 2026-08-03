@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { summarizeSources } from "./snapshot-schema.mjs";
 
-const SNAPSHOT_KIND = "shipping-github/evidence-snapshot";
+const SNAPSHOT_KIND = "github-delivery/evidence-snapshot";
 const SNAPSHOT_SCHEMA_VERSION = 1;
 
 function positiveNumber(value, option) {

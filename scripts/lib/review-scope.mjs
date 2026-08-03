@@ -195,7 +195,7 @@ export function planReviewScope(input = {}) {
 
   return {
     schemaVersion: 2,
-    kind: "shipping-github/review-scope-plan",
+    kind: "github-delivery/review-scope-plan",
     repo: input.repo || null,
     pr: input.pr || null,
     headRefOid: input.headRefOid || null,

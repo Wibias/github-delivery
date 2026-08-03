@@ -25,10 +25,10 @@ function source(required = true) {
 function snapshot(overrides = {}) {
   const value = {
     schemaVersion: 1,
-    kind: "shipping-github/evidence-snapshot",
+    kind: "github-delivery/evidence-snapshot",
     snapshotId: "snap-1",
     capturedAt: "2026-07-31T23:59:30.000Z",
-    repo: "Wibias/shipping-github",
+    repo: "Wibias/github-delivery",
     pr: 42,
     headOid: "head123",
     complete: true,
@@ -53,7 +53,7 @@ function snapshot(overrides = {}) {
     evidence: {
       pullRequest: {
         number: 42,
-        url: "https://github.com/Wibias/shipping-github/pull/42",
+        url: "https://github.com/Wibias/github-delivery/pull/42",
         baseRefName: "main",
         headRefOid: "head123",
         mergeStateStatus: "CLEAN",
@@ -131,7 +131,7 @@ function snapshot(overrides = {}) {
 test("validates snapshot identity, age, and head consistency", () => {
   const result = validateSnapshot({
     snapshot: snapshot(),
-    repo: "Wibias/shipping-github",
+    repo: "Wibias/github-delivery",
     pr: 42,
     expectedHead: "head123",
     maxAgeSeconds: 60,
@@ -151,7 +151,7 @@ test("rejects mismatched, stale, incomplete, and internally inconsistent snapsho
 
   const stale = validateSnapshot({
     snapshot: snapshot({ capturedAt: "2026-07-31T23:00:00.000Z" }),
-    repo: "Wibias/shipping-github",
+    repo: "Wibias/github-delivery",
     pr: 42,
     maxAgeSeconds: 60,
     now: NOW,
@@ -162,7 +162,7 @@ test("rejects mismatched, stale, incomplete, and internally inconsistent snapsho
   incompleteValue.sources.checkRuns.complete = false;
   const incomplete = validateSnapshot({
     snapshot: incompleteValue,
-    repo: "Wibias/shipping-github",
+    repo: "Wibias/github-delivery",
     pr: 42,
     now: NOW,
   });
@@ -172,7 +172,7 @@ test("rejects mismatched, stale, incomplete, and internally inconsistent snapsho
   inconsistentValue.evidence.pullRequest.headRefOid = "different";
   const inconsistent = validateSnapshot({
     snapshot: inconsistentValue,
-    repo: "Wibias/shipping-github",
+    repo: "Wibias/github-delivery",
     pr: 42,
     now: NOW,
   });
@@ -180,12 +180,12 @@ test("rejects mismatched, stale, incomplete, and internally inconsistent snapsho
 });
 
 test("reads and validates a snapshot file", () => {
-  const directory = mkdtempSync(join(tmpdir(), "shipping-github-snapshot-"));
+  const directory = mkdtempSync(join(tmpdir(), "github-delivery-snapshot-"));
   const path = join(directory, "snapshot.json");
   writeFileSync(path, JSON.stringify(snapshot()), "utf8");
   const result = readValidatedSnapshot({
     path,
-    repo: "Wibias/shipping-github",
+    repo: "Wibias/github-delivery",
     pr: 42,
     maxAgeSeconds: 60,
     now: NOW,

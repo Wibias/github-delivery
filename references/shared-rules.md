@@ -1,6 +1,6 @@
 # Shared rules
 
-Read this before every `shipping-github` workflow.
+Read this before every `github-delivery` workflow.
 
 ## Scope lock
 
@@ -43,7 +43,7 @@ MUST publish a new top-level PR verdict comment. This remains true when:
 - the PR number is unchanged;
 - the reviewed head SHA is unchanged;
 - the verdict category is unchanged;
-- an earlier `[shipping-github] Verdict` comment already exists.
+- an earlier `[GD] Verdict` comment already exists.
 
 At the start of the full-review run, create one unique `full-review-run-id`. Keep
 that identifier unchanged while the same run waits for CI, retries tools,
@@ -51,7 +51,7 @@ continues after compaction, or repairs an incomplete publication.
 
 Every full-review verdict comment MUST include:
 
-`<!-- shipping-github:full-review-verdict run:<full-review-run-id> head:<reviewed-head-sha> -->`
+`<!-- github-delivery:full-review-verdict run:<full-review-run-id> head:<reviewed-head-sha> -->`
 
 Publication behavior:
 
@@ -64,7 +64,7 @@ Publication behavior:
 - a completed verdict from an earlier run is immutable historical evidence.
 
 Never choose an editable verdict merely because it is the newest
-`[shipping-github]` comment. Both the `full-review-run-id` and reviewed head must
+`[GD]` comment. Both the `full-review-run-id` and reviewed head must
 match.
 
 The idempotency boundary is the workflow run, not the PR number, verdict type,
@@ -144,7 +144,7 @@ Visible GitHub actions must not impersonate the user.
 | Action                            | Policy                                                                                                                                                                                                                        |
 | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Patch + push code                 | Allowed when the workflow is a fix/watch/create flow                                                                                                                                                                          |
-| Reply on **bot** threads          | Allowed when declining/skipping or noting a fix; prefix with `[shipping-github]`                                                                                                                                              |
+| Reply on **bot** threads          | Allowed when declining/skipping or noting a fix; prefix with `[GD]`                                                                                                                                              |
 | Reply on **human** threads        | **Forbidden** unless the user confirms the **exact** reply text first                                                                                                                                                         |
 | Inline review-thread replies      | Prefer **in-thread** replies (below), never a top-level PR comment that duplicates the thread                                                                                                                                 |
 | Resolve review threads            | Only after the fix is verified, and only for: (a) threads from the user who requested this run, or (b) trusted bot threads you addressed. Do **not** resolve other humans’ threads that others participated in without asking |
@@ -349,7 +349,7 @@ If the user named **several** existing PRs (“full review these”, “babysit 
 
 **Batch tip race:** before each PR’s merge-ready / approve claim, re-check behind-base + compile-against-tip on **that** PR — base may have moved while you fixed an earlier one.
 
-**Single writer:** do not run watch + fix-pr merge-ready posting concurrently on the same PR in a way that double-posts; one workflow owns the `[shipping-github] Merge ready` comment.
+**Single writer:** do not run watch + fix-pr concurrently on the same PR in a way that double-posts. One workflow owns the `[GD] Merge ready` comment, and one exact PR head owns one `[GD] Addressed feedback` comment.
 
 ### Full-review verdict completion lock
 
@@ -439,7 +439,7 @@ Adaptive settle (**normally 60 seconds after green; 180 seconds after material a
 
 ## Adaptive settle window (before merge-ready / approve-comment)
 
-Do **not** post `[shipping-github] Merge ready`, linked-issue merge-ready notify, or full-review `approve-comment` from a **single** green snapshot. Green means the automated gates are currently clear; it is not a final readiness claim until the stability window and final authoritative gate complete.
+Do **not** post `[GD] Merge ready`, linked-issue merge-ready notify, or full-review `approve-comment` from a **single** green snapshot. Green means the automated gates are currently clear; it is not a final readiness claim until the stability window and final authoritative gate complete.
 
 **Applies to:** `fix-pr-bots`, create-PR cleanup → merge-ready, full-review when posting `approve-comment` / merge-ready, and a direct merge workflow when no valid current-head settle evidence already exists.
 
@@ -563,7 +563,7 @@ When the user targets **more than 3** existing PRs (or research issues) in one a
 
 1. **Must** fan out with **subagents** — one PR (or issue) per subagent. Do **not** babysit 4+ sequentially in the parent; that is too slow.
 2. **≤3** targets: parent may work them itself (still parallelize bug+security _within_ each PR when the workflow requires it).
-3. Launch independent subagents **in the same turn** (parallel). Give each a complete brief: `OWNER/REPO`, PR/issue number, which workflow (`fix-pr-bots` / `full-review-pr` / `watch-pr` / `research-issue`), and “follow `shipping-github` shared-rules + that workflow; return a one-row summary (status, blockers, comments posted).”
+3. Launch independent subagents **in the same turn** (parallel). Give each a complete brief: `OWNER/REPO`, PR/issue number, which workflow (`fix-pr-bots` / `full-review-pr` / `watch-pr` / `research-issue`), and “follow `github-delivery` shared-rules + that workflow; return a one-row summary (status, blockers, comments posted).”
 4. Parent **aggregates** a per-PR (or per-issue) table when subagents finish. Do not abandon the batch because one PR is blocked — report that row and continue others.
 5. **Concurrency / rate limits:** if >~6 targets or GraphQL remaining is low, chunk (e.g. waves of 4–6). Apply **Rate-limit backoff** between waves. Prefer one writer per PR (each subagent owns that PR’s GitHub comments).
 6. Create-PR **opening** many PRs is still only on explicit batch ask; when that batch is **>3** issues, fan out creation/merge-ready the same way.
@@ -631,7 +631,7 @@ Before claiming merge-ready (or reporting a watch **CI/review milestone**), also
 
 “CI green” alone is **not** merge-ready. Green on a **stale** SHA while behind tip is **not** merge-ready. A rate-limited bot summary is **not** “bots clean.” Approvals on an **old** SHA are **not** approvals on tip when dismiss-stale / last-push rules apply. A single quiet snapshot without the adaptive settle and final unchanged-head gate is **not** merge-ready.
 
-**Watch milestones** may say only “CI/reviews quiet — still watching (not full merge-ready bar)” unless own bug+security+spec were already completed this session via fix-pr/full-review. Never post `[shipping-github] Merge ready` from watch alone. If `isInMergeQueue`: report queue position/state and keep watching until merged/closed.
+**Watch milestones** may say only “CI/reviews quiet — still watching (not full merge-ready bar)” unless own bug+security+spec were already completed this session via fix-pr/full-review. Never post `[GD] Merge ready` from watch alone. If `isInMergeQueue`: report queue position/state and keep watching until merged/closed.
 
 When merge-ready **is** valid, also notify linked issues (see `fix-pr-bots`).
 
@@ -642,7 +642,7 @@ Before merge-ready / full-review `approve-comment` / merge / status “merge-rea
 1. **Prefer helper** (modern `checks[]` + legacy `contexts` + rulesets + live rollup):
 
    ```bash
-   node "<shipping-github>/scripts/required-checks.mjs" OWNER/REPO N
+   node "<github-delivery>/scripts/required-checks.mjs" OWNER/REPO N
    # see references/gate-helpers.md
    ```
 
@@ -689,7 +689,7 @@ Before merge-ready / full-review `approve-comment` / merge / status “merge-rea
 `gh pr view` does **not** expose `reviewThreads`. Always use GraphQL (helper preferred):
 
 ```bash
-node "<shipping-github>/scripts/review-threads.mjs" OWNER/REPO N
+node "<github-delivery>/scripts/review-threads.mjs" OWNER/REPO N
 ```
 
 Manual pagination sketch:
@@ -735,7 +735,7 @@ Do not rely only on the Files-changed UI hover.
 1. **Prefer helper:**
 
    ```bash
-   node "<shipping-github>/scripts/codeowners-for-pr.mjs" OWNER/REPO N
+   node "<github-delivery>/scripts/codeowners-for-pr.mjs" OWNER/REPO N
    ```
 
    It loads CODEOWNERS from the **PR base** (`.github/CODEOWNERS` → root → `docs/`), maps each changed file to owners (last matching rule wins), unions owners, lists `reviewRequests`, and surfaces `GET …/codeowners/errors?ref=BASE`.
@@ -796,12 +796,36 @@ When opening a PR for an issue:
 
 ## Comment idempotency (never spam / never cut-off doubles)
 
-For any `[shipping-github]` comment intent on an issue or PR (opened-PR notice, research review, security review, merge-ready, etc.):
+For any `[GD]` comment intent on an issue or PR (opened-PR notice, research review, security review, merge-ready, etc.):
 
-1. Before posting, look for an existing comment **you** authored with the same intent prefix on that thread.
+1. Before posting, look for an existing comment **you** authored with the same publication identity on that thread.
 2. If one exists: **edit that comment** to the full final body. Do **not** post a second comment.
 3. Compose the **full** body first; post once. If the create fails or the body is truncated/incomplete: **edit the same comment** to the complete text — never add a follow-up “completion” comment.
-4. One intent → one comment. Truncated + full = bug; fix by edit.
+4. One publication identity → one comment. Truncated + full = bug; fix by edit.
+
+### Addressed-feedback identity (one comment per head)
+
+For `[GD] Addressed feedback`, the identity key is `PR + exact current head SHA`; an individual feedback ID is **not** a publication identity.
+
+1. Collect every trusted feedback item resolved by the current head before publishing.
+2. Search your existing PR conversation comments for the exact marker `<!-- gd:addressed-feedback head:<40-char-head-sha> -->`.
+3. If an exact marker match exists, edit that comment and merge the full deduplicated feedback-key set into it. If none exists, create exactly one comment.
+4. Never create separate top-level comments for multiple feedback items resolved by the same head or commit.
+5. Use this canonical body:
+
+```markdown
+[GD] Addressed feedback
+
+feedbacks:
+- issue_comment:123
+- review_comment:456
+
+commit: abc1234
+
+<!-- gd:addressed-feedback head:<40-char-head-sha> -->
+```
+
+Legacy long-form resolution records remain readable as migration evidence, but every new publication uses `[GD]` and the head marker.
 
 ### Safe create / edit encoding (Windows)
 
@@ -836,7 +860,7 @@ gh pr comment N --repo OWNER/REPO --body-file body.md
 
 - **Depth:** follow `references/comment-depth.md` for research, security, verdict, merge-ready, status, and merge thanks. Vague one-liners (“bots clean / CI green / looks good”) are a bug — name paths, SHAs, checks, and evidence.
 - Merge-ready, status, and verdict comments: **structured and concrete**, not cryptic.
-- Agent-authored GitHub comments: prefix with `[shipping-github]` when posting as the agent; follow **Comment idempotency** above.
+- Agent-authored GitHub comments: prefix with `[GD]` when posting as the agent; follow **Comment idempotency** above.
 - **Markdown hygiene (no backslash spam):** never write `\_` or `\name` to “escape” identifiers. Put code, check names, symbols, and camelCase/snake_case tokens in **backticks** (e.g. `` `mergeStateStatus` ``, `` `previewArchivedCleanup` ``). Raw prose must not contain stray `\`.
 - Merge-ready body should follow the **Merge ready** template in `comment-depth.md`, not a slash-escaped dump.
 - Merge thanks on the PR: `@` author only if not you — use the concrete “Why it helps” shape in `comment-depth.md`.

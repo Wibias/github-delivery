@@ -3,7 +3,7 @@
 Run the unified planner before bug or security review:
 
 ```bash
-node "<shipping-github>/scripts/review-scope.mjs" OWNER/REPO N
+node "<github-delivery>/scripts/review-scope.mjs" OWNER/REPO N
 ```
 
 The compatibility commands `security-scope.mjs` and `bug-scope.mjs` consume the same plan and retain their established output fields.

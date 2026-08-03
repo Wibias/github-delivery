@@ -53,7 +53,7 @@ export function buildCredentialReport({ repo, base, login, probes = {} } = {}) {
 
   return {
     schemaVersion: 1,
-    kind: "shipping-github/live-fixture-credential-report",
+    kind: "github-delivery/live-fixture-credential-report",
     repo,
     base,
     login: login || null,

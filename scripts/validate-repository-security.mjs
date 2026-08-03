@@ -9,7 +9,7 @@ const policy = JSON.parse(readFileSync(join(root, ".github", "repository-policy.
 const policyErrors = validateRepositoryPolicy(policy);
 const report = {
   schemaVersion: 1,
-  kind: "shipping-github/repository-security-report",
+  kind: "github-delivery/repository-security-report",
   valid: workflowReport.valid && policyErrors.length === 0,
   workflows: workflowReport,
   repositoryPolicy: { valid: policyErrors.length === 0, errors: policyErrors },

@@ -11,7 +11,7 @@ function run(extraArgs = []) {
     process.execPath,
     [
       COMMAND,
-      "Wibias/shipping-github",
+      "Wibias/github-delivery",
       "42",
       "--resolve",
       "PRRT_example",

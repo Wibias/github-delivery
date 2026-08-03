@@ -202,7 +202,7 @@ export function validateEvalRepository({ root }) {
 
   return {
     schemaVersion: 1,
-    kind: "shipping-github/offline-eval-report",
+    kind: "github-delivery/offline-eval-report",
     valid: errors.length === 0,
     files: files.map((name) => basename(name)),
     caseCount: allRows.length - regressionRows.length,

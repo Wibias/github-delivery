@@ -70,7 +70,7 @@ export function validateWorkflowTree(root = process.cwd()) {
     const path = posix(relative(root, absolute));
     return validateWorkflowFile(path, readFileSync(absolute, "utf8"));
   });
-  return { schemaVersion: 1, kind: "shipping-github/workflow-security-report", valid: errors.length === 0, files: files.map((file) => posix(relative(root, file))), errors };
+  return { schemaVersion: 1, kind: "github-delivery/workflow-security-report", valid: errors.length === 0, files: files.map((file) => posix(relative(root, file))), errors };
 }
 
 export function validateRepositoryPolicy(policy) {
