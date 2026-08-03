@@ -100,25 +100,22 @@ jobs:
       - name: Run repository checks
         run: npm run check
 
-      - name: Prepare verified rename artifact
+      - name: Restore workflow files for token-scoped push
+        shell: bash
+        run: |
+          git checkout HEAD -- \
+            .github/workflows/ci.yml \
+            .github/workflows/release.yml \
+            .github/workflows/rename-github-delivery.yml
+
+      - name: Commit and push non-workflow rename
         shell: bash
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add -A
           git commit -m 'chore: rename skill to github-delivery'
-          mkdir -p /tmp/github-delivery-output
-          git archive --format=tar.gz --output=/tmp/github-delivery-output/github-delivery-tree.tar.gz HEAD
-          git diff --name-status -M origin/main..HEAD > /tmp/github-delivery-output/changed-files.txt
-          git rev-parse HEAD > /tmp/github-delivery-output/generated-commit.txt
-
-      - name: Upload verified rename artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: github-delivery-verified-tree
-          path: /tmp/github-delivery-output
-          if-no-files-found: error
-          retention-days: 1
+          git push origin HEAD:agent/rename-github-delivery
 
   test:
     name: Node ${{ matrix.node }} / ${{ matrix.os }}
