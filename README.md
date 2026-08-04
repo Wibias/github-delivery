@@ -68,6 +68,8 @@ routes through `references/full-review-pr.md`. The normal bug, security, standar
 - Review depth is derived from changed paths, patches, symbols, removed controls, dependencies, workflow permissions, and uncertainty rather than filenames alone.
 - Full-review execution plans end with a mandatory `Publish final verdict` item and cannot terminate while that item or any required prerequisite remains `pending` or `in_progress`.
 - Optional reviewers such as Cursor Bugbot cannot suppress the final verdict; unavailable reviewer evidence is recorded and the complementary review continues.
+- The bug axis runs a built-in adversarial **Finder → Challenger → Arbiter** trio (`references/bug-hunt-method.md`) with static-analysis leads (typecheck/lint/Semgrep/CodeQL when installed plus tool-free complexity/churn/marker heuristics), finding-card evidence, a Gate 0 impact bar, and honest coverage buckets (`confirmed` / `dismissed` / `manual-review` / `unreviewed`) — partial coverage is reported, never disguised as clean.
+- Security review applies Gate 0 before any Confirmed finding and checks A→B→C escalation chains before assigning severity.
 
 - Full review traces every changed domain concept from its authoritative source through all producers, consumers, public or derived representations, materially distinct variants, and positive and negative tests.
 - Family-wide behavior cannot be approved from one representative test unless equivalence is proved; canonical and derived representations must be reconciled for every material behavior partition.
@@ -129,6 +131,7 @@ The broker defaults to dry-run. Execution requires `--execute`, re-checks the PR
 | Research an issue on development tip                                      | `references/research-issue.md`                               |
 | Create a linked PR for an issue                                           | `references/create-pr-for-issue.md`                          |
 | Full bug, security, and standards review                                  | `references/full-review-pr.md`                               |
+| Bug review on a PR or branch (deep adversarial method)                    | `references/bug-review.md` + `references/bug-hunt-method.md` |
 | Spec and Standards review on a PR                                         | `references/spec-standards-review.md`                        |
 | Simplify, clean up, or deduplicate a PR without behavior changes          | `references/simplify-pr.md`                                  |
 | Full review plus optional approved simplification and mandatory re-review | `references/full-review-pr.md` + `references/simplify-pr.md` |

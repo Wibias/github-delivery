@@ -143,6 +143,42 @@ Severity (Critical/High/Medium/Low/Info) and confidence are independent. A High-
 
 Env vars, process config, build-time constants, operator-only admin config files — not request params/body/headers/URL/path, uploaded files, webhook payloads, or LLM/tool arguments from users.
 
+#### Gate 0 — impact bar before any Confirmed finding
+
+Every lead must pass all three before it can be Confirmed (else Needs
+verification / residual):
+
+1. **What can the attacker do right now?** Specific: "an unauthenticated user
+   can read any tenant's order" — not "could lead to...".
+2. **What does the victim lose?** Concrete, attributable: financial loss, data
+   exposure, privilege, service abuse.
+3. **Reproduce in 10 minutes from scratch?** Documented steps from a fresh
+   state that reach the impact end-to-end.
+
+#### Chain analysis — escalate before assigning severity
+
+After any Confirmed finding, check the A→B→C table before final severity:
+
+| Found A | Check B | Also C |
+| --- | --- | --- |
+| IDOR on one endpoint | Same IDOR on sibling verbs/paths | Old API versions / mobile API |
+| Auth bypass on one endpoint | Every sibling in the same controller | Old API version |
+| Stored XSS | Does an admin view it? (privilege escalation) | Email/export/PDF rendering |
+| SSRF (DNS-only) | Internal services / cloud metadata (169.254.169.254, 10.x) | SSRF via open redirect |
+| OAuth missing PKCE | CSRF on the OAuth flow (state param) | Auth-code replay |
+| Open redirect | OAuth `redirect_uri` code theft | Phishing chain |
+| Race on one primitive | Race on wallet/credits/rate limits | Same pattern in sibling flows |
+| Missing rate limit on OTP | OTP brute force | Password-reset token brute |
+| CSRF on sensitive action | XSS→CSRF escalation | Form autosubmit variants |
+| Leaked API key in JS | What can that key do? | Other keys in the same bundle |
+| Webhook no HMAC | Replay unmodified webhook | Fake success notification |
+
+Rules: confirm A is real first (exact request + response); B must be a
+**different** bug (different endpoint, mechanism, or impact); time-box B/C
+hunting (~20 min per candidate); if B is not confirmed, file A with its true
+severity and move on. Severity reflects the best **confirmed** chain, never a
+hypothetical one.
+
 ### 6. Pass gate (shipping decision)
 
 | Decision | Allowed only when |

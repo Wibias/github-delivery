@@ -18,6 +18,11 @@ Do **not** auto-launch Claude pr-review-toolkit / ultrareview fleets, Codex `adv
 
 When (and only when) the user asks (“deep bug review”, “run pr-review-toolkit”, “adversarial review”, etc.): run that kit, keep the same confidence gate, fold into chat.
 
+The in-session complementary pass (§2) already runs an adversarial
+Finder → Challenger → Arbiter structure from `references/bug-hunt-method.md`.
+That is the built-in method (parent or one helper subagent, sequential), not an
+external kit and not permission to launch one.
+
 ## Mandatory method (do not skip)
 
 ### 0. Scope script (required for PRs)
@@ -95,11 +100,36 @@ Bugbot.
 
 **One** structured pass (parent or one helper subagent) covering all of:
 
+Run it as the adversarial **Finder → Challenger → Arbiter** trio per
+`references/bug-hunt-method.md` §3, in isolated reasoning steps (each role sees
+only structured finding cards, never the other role's narrative). Use the
+finding-card schema (§4 there), result buckets `confirmed` / `dismissed` /
+`manual-review` / `unreviewed` (§5 there), and the coverage rule: **no clean
+claim while scannable files are unscanned**.
+
 #### Static analysis leads (run before the lenses)
 
 Run the repo's static gates on the changed paths when available —
 typecheck/compile (`tsc --noEmit`, project lint script, etc.) and analyzers
 (Semgrep, CodeQL) when the repo has them.
+
+**Manual static-lead heuristics (no tool required):**
+
+- Complexity bands: cyclomatic < 10 safe / 10–20 warning / > 20 danger;
+  cognitive < 15 / 15–30 / > 30. Functions in the diff beyond the warning
+  bands get focused review of error paths and boundary conditions.
+- Hotspots: changed files ranking in roughly the top 20% of both historical
+  churn **and** complexity are the highest-risk — prioritize them.
+- Markers: BUG/FIXME/HACK/SECURITY/TODO comments in changed code are leads;
+  defect markers (BUG/FIXME) first. **Newly added HACK/FIXME in the diff needs
+  justification.**
+- Change risk: large line additions, scattered changes (high entropy), many
+  files, or files with diffuse ownership get extra scrutiny.
+- Clones: duplicated code ≥ 6 lines at ≥ 80% similarity in the diff is a real
+  duplication lead — find every copy before confirming or fixing
+  (fix-one-forget-others).
+- Orphaned code: newly dead/unreachable code in the diff is a lead — dead code
+  hides bugs and misleads fixers.
 
 - Results are **leads only**: a green gate is not "no bugs"; a failing gate on a
   changed path must be confirmed manually before it becomes a finding.
@@ -132,6 +162,17 @@ If this session’s **security** pass already touched lock/CAS/auth-refresh/erro
 
 ### 3. Validate findings (confidence)
 
+Every card passes **Gate 0** before it can be Confirmed:
+
+1. **What can the actor do right now?** Concrete, specific impact ("an
+   unauthenticated user can place a $0 order"), not "could lead to...".
+2. **What does the victim lose?** Financial loss, data exposure, privilege,
+   or service abuse — attributable and concrete.
+3. **Reproduce in 10 minutes from scratch?** Documented steps from a fresh
+   state that hit the impact end-to-end.
+
+Vague impact = reject or `manual-review`. Then apply the confidence table:
+
 | Level      | Criteria                              | Action                                   |
 | ---------- | ------------------------------------- | ---------------------------------------- |
 | **HIGH**   | Concrete failure path + file evidence | **Confirmed** with severity              |
@@ -147,27 +188,47 @@ If this session’s **security** pass already touched lock/CAS/auth-refresh/erro
 
 Severity: Critical / High / Medium / Low / Info (same practical meaning as security-review for ship decisions).
 
+#### Pre-conclusion audit (before any final verdict)
+
+Before finalizing, state in chat:
+
+- every file reviewed, confirming each was read completely;
+- every checklist item walked with `issue` or `clean` — no skipped rows;
+- every area that could **not** be fully verified and why.
+
+Don't invent issues: if nothing significant is found, say so clearly — a clean
+report is a good result. Report-only unless the workflow authorized fixing.
+
 ### 4. Fix / ship guidance
 
 On **fix-pr-bots / full-review / create-PR**:
 
 - Fix Confirmed **High/Critical** in this PR when feasible; skip 0.1% nits.
 - Prefer a regression test for fixed High/Critical; if none, state why not.
+- Follow the **systematic fix protocol** in `references/bug-hunt-method.md` §6:
+  root cause investigation before any fix, failing test first, minimal single
+  fix, defense-in-depth at every layer, and **stop + question the architecture
+  after 3 failed fixes**. Record a test baseline before fixing; canary-first
+  rollout for fix batches; revert fixes that introduce new failures.
+- Coverage honesty: report `PARTIAL COVERAGE` + unscanned file list when
+  scannable files were not read; never claim "no bugs" on a partial pass.
 
 ## Steps (summary)
 
 1. Scope script → skip or deep.
 2. Platform adapter (Bugbot when Cursor).
 3. Static analysis leads (typecheck/lint/analyzers on changed paths; n/a if unavailable).
-4. Complementary lenses (if deep).
-5. Confidence gate → triage → fix on merge-ready paths.
-6. Chat: method used (Bugbot y/n/skip, static done/n-a, complementary done/skip), confirmed, needs verification, residual.
+4. Deep method (`references/bug-hunt-method.md`): input gathering + attack-surface map; Finder → Challenger → Arbiter (if deep).
+5. Complementary lenses (if deep).
+6. Gate 0 + confidence gate → triage → fix on merge-ready paths (systematic fix protocol).
+7. Chat: method used (Bugbot y/n/skip, static done/n-a, trio done/skip, complementary done/skip), confirmed, manual-review, unreviewed, residual.
 
 ## Done when
 
 - `bug-scope.mjs` run for PRs (JSON summarized)
 - If skipDeep: n/a recorded with why
 - Else: static analysis leads run (or n/a with why); complementary lenses completed; on Cursor Bugbot attempted (or unavailability stated)
+- Deep method run when not skipDeep: input gathered, attack-surface map built, trio verdicts in the four buckets, coverage stated honestly
 - No fake Bugbot on Claude/Codex
 - No deep multi-agent kit unless user asked
 - Confidence discipline applied; necessary High/Critical fixed or explicit residual on merge-ready paths
