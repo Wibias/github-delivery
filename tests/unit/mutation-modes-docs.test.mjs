@@ -33,3 +33,13 @@ test("gate helper invocation carries the active mutation mode", () => {
   assert.match(reference, /ship-gate\.mjs[\s\S]*--mutation-mode read-only/);
   assert.match(reference, /mutation-policy\.mjs/);
 });
+
+test("router authority and verdict verification are documented", () => {
+  const reference = read("references/mutation-modes.md");
+  const helpers = read("references/gate-helpers.md");
+  assert.match(reference, /## Router authority/);
+  assert.match(reference, /routed mutation mode plus `--workflow`/);
+  assert.match(reference, /self-selected mode is a workflow violation/i);
+  assert.match(helpers, /verify-verdict-published\.mjs/);
+  assert.match(helpers, /--workflow references\/full-review-pr\.md/);
+});

@@ -43,3 +43,15 @@ test("review mode cannot gain resolution authority through --explicit", () => {
   assert.equal(result.status, 2);
   assert.match(result.stderr, /mode_denied/);
 });
+
+test("read-only mode is rejected for the full-review workflow", () => {
+  const result = run([
+    "--workflow",
+    "references/full-review-pr.md",
+    "--mutation-mode",
+    "read-only",
+  ]);
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /mode_denied_by_workflow/);
+  assert.doesNotMatch(result.stderr, /ENOENT|spawn gh/i);
+});

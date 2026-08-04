@@ -53,6 +53,10 @@ Every full-review verdict comment MUST include:
 
 `<!-- github-delivery:full-review-verdict run:<full-review-run-id> head:<reviewed-head-sha> -->`
 
+Before `Publish final verdict` is marked complete, run
+`scripts/verify-verdict-published.mjs` with the run ID and reviewed head;
+`published: true` is the only normal completion proof (see the completion lock).
+
 Publication behavior:
 
 - no comment with the exact current run marker exists → post a new top-level PR
@@ -376,16 +380,21 @@ Before any stop, return, handoff, final response, or completion claim:
 4. obtain the authoritative `ship-gate.mjs` result for the reviewed head;
 5. publish one final `approve-comment`, `changes-requested`, `not-useful`, or
    `gated` verdict;
-6. mark `Publish final verdict` complete only after that verdict was delivered.
+6. mark `Publish final verdict` complete only after that verdict was delivered
+   and verified (`scripts/verify-verdict-published.mjs` → `published: true`).
 
 Pending CI, an unavailable reviewer, failed Bugbot execution, missing optional
 tooling, API failure, a hard blocker, or `Planning next moves` are not terminal
 full-review states. Record the limitation in the verdict and continue through
 verdict publication.
 
-If GitHub publication is unavailable, deliver the complete verdict in chat,
-including the reviewed head, findings, blockers, evidence limitations, and next
-action. That chat verdict satisfies the required plan item.
+If GitHub publication is genuinely unavailable (auth, network, or API failure),
+record the exact failure as a hard publication blocker, deliver the complete
+verdict in chat, including the reviewed head, findings, blockers, evidence
+limitations, and next action. That chat delivery satisfies the required plan
+item only with that recorded blocker. A self-selected stricter mutation mode
+(for example `--mutation-mode read-only` on a full review) is a workflow
+violation, not publication unavailability.
 
 Only explicit user cancellation permits ending a full-review run without a
 verdict.

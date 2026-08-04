@@ -151,3 +151,39 @@ test("ship-gate reports an explicitly selected mutation profile", () => {
     true,
   );
 });
+
+test("ship-gate rejects a self-selected read-only mode for the full-review workflow", () => {
+  const result = runShipGate(writeSnapshot(), [
+    "--mutation-mode",
+    "read-only",
+    "--workflow",
+    "references/full-review-pr.md",
+  ]);
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /mode_denied_by_workflow/);
+  assert.match(result.stderr, /allowed: review, maintainer/);
+});
+
+test("ship-gate accepts the routed review mode for the full-review workflow", () => {
+  const result = runShipGate(writeSnapshot(), [
+    "--mutation-mode",
+    "review",
+    "--workflow",
+    "references/full-review-pr.md",
+  ]);
+  assert.equal(result.status, 0, result.stderr);
+  const output = JSON.parse(result.stdout);
+  assert.equal(output.mutationMode, "review");
+  assert.equal(output.workflow, "references/full-review-pr.md");
+});
+
+test("ship-gate fails closed on an unknown workflow", () => {
+  const result = runShipGate(writeSnapshot(), [
+    "--mutation-mode",
+    "review",
+    "--workflow",
+    "references/unknown.md",
+  ]);
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /unknown_workflow/);
+});

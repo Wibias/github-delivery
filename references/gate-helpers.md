@@ -9,11 +9,22 @@ Resolve `<github-delivery>` to this skill’s install directory (repo root or `~
 Run exactly one authoritative decision first:
 
 ```bash
+# status / watch (read-only):
 node "<github-delivery>/scripts/ship-gate.mjs" OWNER/REPO N \
   --mutation-mode read-only
+
+# full review (review, or maintainer with fix/simplify):
+node "<github-delivery>/scripts/ship-gate.mjs" OWNER/REPO N \
+  --mutation-mode review \
+  --workflow references/full-review-pr.md
 ```
 
 The command captures one evidence snapshot and evaluates required checks, base health, review policy, unresolved threads, trusted feedback, merge state, and advisory CODEOWNERS against that same head SHA. Its output also includes the active mutation profile.
+
+Gate invocation contract: pass the router-derived mutation mode plus the
+matched `--workflow`. The gate rejects an incompatible combination, for example
+`--mutation-mode read-only --workflow references/full-review-pr.md`, because a
+stricter self-selected mode is a workflow violation, not a publication excuse.
 
 Decision contract:
 
@@ -22,6 +33,23 @@ Decision contract:
 - exit `2`, `decision: "unknown"`: evidence is stale, incomplete, mismatched, or unreadable; restore evidence and rerun
 
 Known blockers outrank unknown evidence. Unknown evidence outranks readiness. No individual helper may overrule the final decision.
+
+## Verdict publication check
+
+Full-review runs must verify the verdict landed before marking
+`Publish final verdict` complete:
+
+```bash
+node "<github-delivery>/scripts/verify-verdict-published.mjs" OWNER/REPO N \
+  --run-id fr-<PR>-<head-short-sha>-<UTC-start-time> \
+  --head <40-char-reviewed-head-sha> \
+  --mutation-mode review
+```
+
+Exit `0` / `published: true` is the only normal completion proof. Exit `1`
+means the verdict is not published; exit `2` means the check itself failed.
+Chat-only delivery never satisfies this check unless GitHub publication was
+genuinely unavailable and that hard blocker is recorded.
 
 ## Adaptive readiness settle
 

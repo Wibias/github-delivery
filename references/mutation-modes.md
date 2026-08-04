@@ -34,6 +34,20 @@ Examples:
 
 Do not ask users to run scripts. These mappings are agent behavior.
 
+## Router authority
+
+The router output is authoritative. A full review resolves to `review` (bare)
+or `maintainer` (when `fix` or `simplify` is explicitly requested); both
+profiles permit `post_comment`, so publishing the verdict is intrinsic to the
+workflow.
+
+Gate invocations must pass the routed mutation mode plus `--workflow`, and the
+gate rejects incompatible combinations (for example
+`--mutation-mode read-only --workflow references/full-review-pr.md`). A stricter
+self-selected mode is a workflow violation, never a publication excuse: a
+full-review run may complete with a chat-only verdict only when GitHub
+publication is genuinely unavailable and that hard blocker is recorded.
+
 ## Machine-readable policy
 
 Inspect a profile:

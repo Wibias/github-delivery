@@ -42,6 +42,9 @@ Before every attempted stop:
    - `not-useful`;
    - `gated`.
 7. Mark `Publish final verdict` complete only after delivery.
+8. Run `scripts/verify-verdict-published.mjs` with the run ID and reviewed head
+   and require `published: true`, unless a publication-unavailable hard blocker
+   was recorded (see below).
 
 A blocker is input to the final verdict, not permission to skip it.
 
@@ -57,9 +60,12 @@ The following are never terminal full-review states:
 - waiting for another continuation prompt;
 - completion of review work without publication of the verdict.
 
-If GitHub publication is unavailable, provide the complete verdict in chat,
-including the reviewed head, findings, blockers, evidence limitations, and next
-action. That chat verdict satisfies the required verdict item.
+If GitHub publication is unavailable for a genuine auth, network, or API
+reason, record the exact failure as a hard publication blocker, then provide
+the complete verdict in chat, including the reviewed head, findings, blockers,
+evidence limitations, and next action. That is the only chat-only completion
+path. Choosing a stricter mutation mode on your own is not publication
+unavailability and never satisfies this item.
 
 The only permitted exit without a verdict is explicit user cancellation.
 
@@ -165,6 +171,23 @@ Before publishing:
 6. Never select the newest generic `[GD] Verdict` comment without
    matching both run ID and reviewed head.
 
+The mutation mode for this workflow is derived by the router: `review` for a
+bare full review, `maintainer` when `fix` or `simplify` is explicitly requested.
+Run the authoritative gate with the routed mode plus
+`--workflow references/full-review-pr.md`; the gate rejects `read-only` for this
+workflow. A self-selected stricter mode is a workflow violation.
+
+After posting, verify publication before marking the plan item complete:
+
+```bash
+node scripts/verify-verdict-published.mjs OWNER/REPO PR_NUMBER \
+  --run-id <full-review-run-id> --head <reviewed-head-sha> \
+  --mutation-mode <routed-mode>
+```
+
+`published: true` is required, unless a publication-unavailable hard blocker
+was recorded as described above.
+
 Once `Publish final verdict` is marked complete, that comment becomes immutable
 historical review evidence.
 
@@ -249,4 +272,6 @@ For **every** targeted PR:
 - Foreign PRs: no base-sync push and no simplification edits; the verdict delivered the owner actions (update from latest base / apply the listed simplification candidates)
 - Thin settle completed before `approve-comment` / merge-ready (not for reject/gated labels)
 - Verdict posted with a **valid** label (see table)
+- Verdict verified published via `scripts/verify-verdict-published.mjs`
+  (`published: true`), or a recorded publication-unavailable hard blocker exists
 - No invented maintainer-ack / soft-security stop

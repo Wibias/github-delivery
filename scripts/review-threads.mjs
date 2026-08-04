@@ -17,9 +17,10 @@ import {
   parseSnapshotGateArgs,
   readValidatedSnapshot,
 } from "./lib/snapshot-input.mjs";
+import { validateWorkflowMutationMode } from "./lib/workflow-mode.mjs";
 
 const usage =
-  "Usage: node scripts/review-threads.mjs OWNER/REPO PR_NUMBER [--snapshot FILE] [--resolve PRRT_xxx] [--expected-head SHA] [--max-age-seconds N] [--mutation-mode MODE] [--explicit]";
+  "Usage: node scripts/review-threads.mjs OWNER/REPO PR_NUMBER [--snapshot FILE] [--resolve PRRT_xxx] [--expected-head SHA] [--max-age-seconds N] [--mutation-mode MODE] [--workflow WORKFLOW] [--explicit]";
 
 function resolveThread(threadId) {
   const mutation = `
@@ -55,6 +56,17 @@ try {
     usage,
     allowResolve: true,
   });
+  if (args.workflow) {
+    const compatibility = validateWorkflowMutationMode({
+      workflow: args.workflow,
+      mutationMode: mutationArgs.mode,
+    });
+    if (!compatibility.valid) {
+      throw new Error(
+        `Mutation mode "${compatibility.mutationMode}" is not compatible with workflow "${args.workflow}": ${compatibility.reason}${compatibility.allowedModes.length ? ` (allowed: ${compatibility.allowedModes.join(", ")})` : ""}`,
+      );
+    }
+  }
   if (args.resolveId) {
     const authorization = authorizeMutation({
       mode: mutationArgs.mode,
@@ -72,6 +84,7 @@ try {
           mutationMode: mutationArgs.mode,
           authorization,
           data: resolveThread(args.resolveId),
+          workflow: args.workflow,
         },
         null,
         2,
@@ -96,6 +109,7 @@ try {
     ...evaluateReviewThreadsSnapshot(snapshot),
     mutationMode: mutationArgs.mode,
     mutationProfile: mutationProfile(mutationArgs.mode),
+    workflow: args.workflow,
   };
   process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
   process.exitCode =

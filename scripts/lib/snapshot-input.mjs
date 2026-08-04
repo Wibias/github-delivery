@@ -21,9 +21,15 @@ export function parseSnapshotGateArgs(
   let expectedHead = null;
   let maxAgeSeconds = 300;
   let resolveId = null;
+  let workflow = null;
 
   for (let index = 0; index < argv.length; index++) {
     const value = argv[index];
+    if (value === "--workflow") {
+      workflow = argv[++index];
+      if (!workflow) throw new Error("--workflow requires a workflow reference");
+      continue;
+    }
     if (value === "--snapshot") {
       snapshotPath = argv[++index];
       if (!snapshotPath) throw new Error("--snapshot requires a file path");
@@ -72,6 +78,7 @@ export function parseSnapshotGateArgs(
     expectedHead,
     maxAgeSeconds,
     resolveId,
+    workflow,
   };
 }
 
