@@ -140,3 +140,46 @@ test("social writes require an idempotency key", () => {
     /idempotency_key_required/,
   );
 });
+
+test("delete_head_branch plans a ref delete for the actor-owned head", () => {
+  const plan = planMutationRequest({
+    schemaVersion: 1,
+    action: "delete_head_branch",
+    mutationMode: "maintainer",
+    explicitInstruction: true,
+    repo: "Wibias/opencodex",
+    pr: 1004,
+    headRefName: "feat/ri-02-request-history-index",
+    headOwnerLogin: "Wibias",
+    headRepo: "Wibias/opencodex",
+    baseRepo: "lidge-jun/opencodex",
+    actorLogin: "Wibias",
+    isMerged: true,
+    isCrossRepository: true,
+  });
+  assert.equal(plan.authorization.allowed, true);
+  assert.deepEqual(plan.command.slice(0, 4), ["gh", "api", "-X", "DELETE"]);
+  assert.match(plan.command[4], /repos\/Wibias\/opencodex\/git\/refs\/heads\/feat\/ri-02-request-history-index/);
+});
+
+test("delete_head_branch rejects another user's head", () => {
+  assert.throws(
+    () =>
+      planMutationRequest({
+        schemaVersion: 1,
+        action: "delete_head_branch",
+        mutationMode: "maintainer",
+        explicitInstruction: true,
+        repo: "Wibias/opencodex",
+        pr: 1004,
+        headRefName: "feat/ri-02-request-history-index",
+        headOwnerLogin: "Wibias",
+        headRepo: "Wibias/opencodex",
+        baseRepo: "lidge-jun/opencodex",
+        actorLogin: "other-user",
+        isMerged: true,
+        isCrossRepository: true,
+      }),
+    /branch kept: head owned by @Wibias/,
+  );
+});

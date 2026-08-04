@@ -100,7 +100,13 @@ Auto-close does not replace the required issue comment.
 
 - Confirm the PR is actually merged, not merely queued.
 - Confirm every required issue comment exists and complete issues are closed.
-- Delete the same-repository head branch only when safe and not shared.
+- Run **owner-scoped branch cleanup** (shared rules):
+  1. `gh api user -q .login` for the authenticated actor.
+  2. `gh pr view <N> --json state,mergedAt,headRefName,headRepositoryOwner,headRepository,baseRepository,isCrossRepository`.
+  3. Evaluate cleanup with `evaluateHeadBranchCleanup` from `scripts/lib/merge-branch-cleanup.mjs`.
+  4. When the decision is `delete`, run broker action `delete_head_branch` through `scripts/github-mutate.mjs`.
+  5. Report one explicit status line (`branch deleted: …`, `branch kept: head owned by @other`, `branch kept: protected shared branch`, or `branch kept: user requested keep`).
+- Delete only when the head owner matches the authenticated actor. This applies to **same-repo and fork PRs**; fork heads delete from the head fork repo.
 - Retarget stack children before deleting a stack parent branch.
 - Hand off versioning or worktree cleanup to the appropriate skill.
 
@@ -121,4 +127,4 @@ Auto-close does not replace the required issue comment.
 - every linked issue received its required comment;
 - complete linked issues are closed;
 - cleanup is done or explicitly deferred;
-- the final response reports PR, issue, branch, and mutation receipt states.
+- the final response reports PR, issue, branch cleanup status, and mutation receipt states.

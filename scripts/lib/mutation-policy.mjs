@@ -20,6 +20,7 @@ const ACTIONS = [
   "request_reviewers",
   "close_linked_issue",
   "merge_pr",
+  "delete_head_branch",
   "create_follow_up_issue",
   "post_resolution_record",
 ];
@@ -70,6 +71,7 @@ function buildProfile(mode) {
         "request_reviewers",
         "close_linked_issue",
         "merge_pr",
+        "delete_head_branch",
         "create_follow_up_issue",
       ],
       { explicit: true },
@@ -82,6 +84,7 @@ function buildProfile(mode) {
       "request_reviewers",
       "close_linked_issue",
       "merge_pr",
+      "delete_head_branch",
       "create_follow_up_issue",
     ]);
   }

@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 
 import { authorizeMutation } from "./mutation-policy.mjs";
+import { evaluateHeadBranchCleanup } from "./merge-branch-cleanup.mjs";
 
 const PR_ACTIONS = new Set([
   "post_review",
@@ -26,6 +27,8 @@ const SOCIAL_ACTIONS = new Set([
   "create_follow_up_issue",
   "post_resolution_record",
 ]);
+
+const CLEANUP_ACTIONS = new Set(["delete_head_branch"]);
 
 function sha256(value) {
   return createHash("sha256").update(String(value ?? ""), "utf8").digest("hex");
@@ -52,6 +55,13 @@ function repoParts(repo) {
     throw new Error("repo_invalid");
   }
   return { owner: parts[0], name: parts[1] };
+}
+
+function branchRefPath(branch) {
+  return String(branch)
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
 }
 
 function commandFor(request) {
@@ -204,6 +214,18 @@ function commandFor(request) {
         "--body",
         required(request.body, "body"),
       ];
+    case "delete_head_branch": {
+      const targetRepo = required(request.targetRepo || request.repo, "target_repo");
+      const { owner, name } = repoParts(targetRepo);
+      const branch = required(request.headRefName, "head_ref_name");
+      return [
+        "gh",
+        "api",
+        "-X",
+        "DELETE",
+        `repos/${owner}/${name}/git/refs/heads/${branchRefPath(branch)}`,
+      ];
+    }
     default:
       throw new Error(`unsupported_action:${request.action}`);
   }
@@ -245,6 +267,29 @@ function verifyHead({ request, runner }) {
   return output;
 }
 
+function verifyBranchDeleted({ request, runner }) {
+  if (request.action !== "delete_head_branch") return null;
+  const targetRepo = required(request.targetRepo || request.repo, "target_repo");
+  const { owner, name } = repoParts(targetRepo);
+  const branch = required(request.headRefName, "head_ref_name");
+  const result = runner(
+    "gh",
+    ["api", `repos/${owner}/${name}/git/ref/heads/${branchRefPath(branch)}`],
+    {
+      encoding: "utf8",
+      maxBuffer: 20 * 1024 * 1024,
+    },
+  );
+  if (result.status === 0) {
+    throw new Error("branch_still_exists");
+  }
+  const detail = String(result.stderr || result.stdout || "").toLowerCase();
+  if (!detail.includes("404") && result.status !== 1) {
+    throw new Error(`branch_delete_verification_failed:${result.status}`);
+  }
+  return "deleted";
+}
+
 function verificationCommand(request) {
   switch (request.action) {
     case "merge_pr":
@@ -280,9 +325,30 @@ function verificationCommand(request) {
         "--json",
         "isDraft,headRefOid",
       ];
+    case "delete_head_branch":
+      return null;
     default:
       return null;
   }
+}
+
+function assertDeleteHeadBranchAllowed(request) {
+  const decision = evaluateHeadBranchCleanup({
+    actorLogin: request.actorLogin,
+    headOwnerLogin: request.headOwnerLogin,
+    headRefName: request.headRefName,
+    isMerged:
+      request.isMerged === true ||
+      String(request.state || request.prState || "").toUpperCase() === "MERGED",
+    isCrossRepository: request.isCrossRepository === true,
+    headRepo: request.headRepo,
+    baseRepo: request.baseRepo || request.repo,
+    keepBranch: request.keepBranch === true,
+  });
+  if (decision.action !== "delete") {
+    throw new Error(`branch_cleanup_denied:${decision.reason}`);
+  }
+  return decision;
 }
 
 export function planMutationRequest(request = {}) {
@@ -303,6 +369,12 @@ export function planMutationRequest(request = {}) {
     positiveInteger(request.pr, "pr");
     required(request.expectedHead, "expected_head");
   }
+  if (CLEANUP_ACTIONS.has(request.action)) {
+    positiveInteger(request.pr, "pr");
+    required(request.headRefName, "head_ref_name");
+    required(request.actorLogin, "actor_login");
+    required(request.headOwnerLogin, "head_owner_login");
+  }
   if (SOCIAL_ACTIONS.has(request.action)) {
     required(request.idempotencyKey, "idempotency_key");
   }
@@ -313,6 +385,12 @@ export function planMutationRequest(request = {}) {
     }
   }
   const normalized = structuredClone(request);
+  if (normalized.action === "delete_head_branch") {
+    const decision = assertDeleteHeadBranchAllowed(normalized);
+    normalized.targetRepo = decision.targetRepo;
+    normalized.headRefName = decision.branch;
+    normalized.repo = decision.targetRepo;
+  }
   const command = commandFor(normalized);
   return {
     schemaVersion: 1,
@@ -341,8 +419,9 @@ export function executeMutationRequest({
 
   const observedHead = verifyHead({ request: plan.request, runner });
   const stdout = runOrThrow(runner, plan.command);
+  const branchDeletion = verifyBranchDeleted({ request: plan.request, runner });
   const verify = verificationCommand(plan.request);
-  const verification = verify ? runOrThrow(runner, verify) : null;
+  const verification = verify ? runOrThrow(runner, verify) : branchDeletion;
 
   return {
     ...plan,

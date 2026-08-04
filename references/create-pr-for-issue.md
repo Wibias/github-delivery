@@ -26,9 +26,18 @@ Run a **research preflight** (same checks as `research-issue`, can be lighter) a
 
 If preflight is unclear, say what’s missing; do not open a speculative PR.
 
+### A2. Issue conversation intake (required — before scoping or coding)
+
+Follow shared **Issue conversation intake** (`references/shared-rules.md`). The issue body alone is not enough.
+
+1. Read the full issue thread: body, **every comment** (paginate), labels, linked PRs, and timeline scope changes.
+2. Extract `## Agent Brief`, maintainer clarifications, `[GD]` research notes, repro updates, screenshots in follow-ups, acceptance criteria, and out-of-scope boundaries.
+3. If comments exist, do **not** implement from title/body alone.
+4. Carry the extracted contract into preflight, implementation, PR body, and Spec review.
+
 ### B. Screenshot gate
 
-1. Check the issue (and linked discussion) for author screenshots/images.
+1. Check the issue body **and comment thread** (and linked discussion) for author screenshots/images.
 2. **If there are screenshots:** review them (read the images). If you cannot review them, **stop — do not create a PR**.
 3. **If there are no screenshots:** continue.
 
@@ -42,6 +51,7 @@ Confirm this request is **one** issue (or an explicit batch). Otherwise pick/ask
 2. Base branch = that repo’s development/default as appropriate.
 3. Push the head branch (upstream if you can; else fork head is OK for the head ref).
 4. Load **`references/pr-description.md`**. Build the body from the issue and acceptance criteria, the actual current diff, and completed validation — not from the planned work or commit narration.
+   Include scope clarifications from the full comment thread when they change or narrow the ask.
 5. Create with UTF-8 **`--body-file`** (Windows-safe; shared encoding rules). The body must follow the PR-description policy and include same-repo `Fixes #N` on its own line:
 
    ```bash
@@ -95,4 +105,5 @@ Confirm this request is **one** issue (or an explicit batch). Otherwise pick/ask
 - `closingIssuesReferences` includes the issue; **issue** self-assigned when possible
 - Single complete opened-PR comment (no duplicates/cut-offs)
 - Screenshot gate passed (or N/A)
+- Full issue comment thread read when comments exist (shared **Issue conversation intake**)
 - Own bug + security + Spec/Standards done; reviews + required CI green on tip; merge-ready posted; **not** merged
