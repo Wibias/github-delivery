@@ -95,6 +95,18 @@ Bugbot.
 
 **One** structured pass (parent or one helper subagent) covering all of:
 
+#### Static analysis leads (run before the lenses)
+
+Run the repo's static gates on the changed paths when available —
+typecheck/compile (`tsc --noEmit`, project lint script, etc.) and analyzers
+(Semgrep, CodeQL) when the repo has them.
+
+- Results are **leads only**: a green gate is not "no bugs"; a failing gate on a
+  changed path must be confirmed manually before it becomes a finding.
+- Missing tool → `n/a (not installed)` — still do the manual lens pass below.
+- Fold confirmed hits into the lens rows below with the §3 confidence gate
+  (never auto-Confirm a tool hit).
+
 | Lens                | What to prove                                                                                                                                             |
 | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **silent_failures** | Empty/swallowed `catch`; ignored promises; missing error paths; fail-open that hides breakage; **error propagation** (below)                              |
@@ -146,15 +158,16 @@ On **fix-pr-bots / full-review / create-PR**:
 
 1. Scope script → skip or deep.
 2. Platform adapter (Bugbot when Cursor).
-3. Complementary lenses (if deep).
-4. Confidence gate → triage → fix on merge-ready paths.
-5. Chat: method used (Bugbot y/n/skip, complementary done/skip), confirmed, needs verification, residual.
+3. Static analysis leads (typecheck/lint/analyzers on changed paths; n/a if unavailable).
+4. Complementary lenses (if deep).
+5. Confidence gate → triage → fix on merge-ready paths.
+6. Chat: method used (Bugbot y/n/skip, static done/n-a, complementary done/skip), confirmed, needs verification, residual.
 
 ## Done when
 
 - `bug-scope.mjs` run for PRs (JSON summarized)
 - If skipDeep: n/a recorded with why
-- Else: complementary lenses completed; on Cursor Bugbot attempted (or unavailability stated)
+- Else: static analysis leads run (or n/a with why); complementary lenses completed; on Cursor Bugbot attempted (or unavailability stated)
 - No fake Bugbot on Claude/Codex
 - No deep multi-agent kit unless user asked
 - Confidence discipline applied; necessary High/Critical fixed or explicit residual on merge-ready paths

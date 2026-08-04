@@ -147,7 +147,7 @@ Full coverage matrix + abuse paths stay in **chat**. If too sensitive for a usef
 
 ### Bugs / correctness
 
-- Method: bug-review.md — Bugbot: yes/n/a-unavailable/skipDeep; complementary: done/skipDeep (`silent_failures`/`resource_leaks`/`edge_cases`)
+- Method: bug-review.md — Bugbot: yes/n/a-unavailable/skipDeep; static: run/n-a; complementary: done/skipDeep (`silent_failures`/`resource_leaks`/`edge_cases`)
 - Findings: none blocking / <list with `path` + why it matters + confidence>
 - Fixed this session: none / <sha + summary>
 
