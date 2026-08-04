@@ -155,6 +155,39 @@ verification / residual):
 3. **Reproduce in 10 minutes from scratch?** Documented steps from a fresh
    state that reach the impact end-to-end.
 
+#### Reachability and exploitability labels (every security finding)
+
+Required on every security finding, before severity:
+
+- **Reachability:** `EXTERNAL` (unauthenticated input), `AUTHENTICATED`
+  (valid session required), `INTERNAL` (internal/admin only), `UNREACHABLE`
+  (dead code — not a Confirmed finding).
+- **Exploitability:** `EASY` (standard technique, no special conditions),
+  `MEDIUM` (specific conditions, timing, or chaining required), `HARD`
+  (insider knowledge, rare conditions).
+- Confirmed **Critical/High** security findings also carry a **CVSS 3.1
+  vector + score** and a benign **PoC sketch** (payload / request / expected /
+  actual) in chat — never on the public comment.
+
+#### Layer-ordering trap (auth-bypass false positives)
+
+A validation-shaped error (`400 field X is required`) does **not** prove the
+request passed authentication — parsers/sanitizers often run before auth
+middleware. Probe auth with the **simplest well-formed body** the endpoint
+accepts (`{}`), not a malformed one. If the error names an input-shape or
+character-class problem, you are talking to a parser, not business logic. The
+same applies to WAF/CDN blocks: an edge block is not an origin response.
+
+#### Chain-required classes
+
+These are **not** Confirmed standalone — they need a proven end-to-end chain:
+open redirect alone, SSRF with DNS-only callback, host-header injection
+without password-reset poisoning, missing CSP/HSTS/security headers alone,
+missing `HttpOnly`/`Secure` cookie flags alone, clickjacking on non-sensitive
+pages, CORS wildcard without credential-exfiltration PoC, logout CSRF,
+self-XSS, rate limiting on non-critical forms. Chain first (§ Chain analysis),
+then file with the chain's severity.
+
 #### Chain analysis — escalate before assigning severity
 
 After any Confirmed finding, check the A→B→C table before final severity:
