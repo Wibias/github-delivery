@@ -211,7 +211,10 @@ test("full review cannot complete via chat after self-selecting read-only", () =
   );
 
   assert.match(sharedRules, /verify-verdict-published\.mjs/);
-  assert.match(sharedRules, /published: true` is the only normal completion proof/);
+  assert.match(
+    sharedRules,
+    /published: true` plus `format\.valid: true` is the only normal completion proof/,
+  );
   assert.match(sharedRules, /self-selected stricter mutation mode/i);
   assert.match(
     sharedRules,
@@ -219,7 +222,10 @@ test("full review cannot complete via chat after self-selecting read-only", () =
   );
 
   assert.match(fullReview, /--workflow references\/full-review-pr\.md/);
-  assert.match(fullReview, /`published: true` is required/);
+  assert.match(
+    fullReview,
+    /`published: true` \*\*and\*\* `format\.valid: true` are required/,
+  );
   assert.match(fullReview, /verify-verdict-published\.mjs/);
   assert.match(fullReview, /only chat-only completion\s+path/);
 

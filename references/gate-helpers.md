@@ -46,10 +46,13 @@ node "<github-delivery>/scripts/verify-verdict-published.mjs" OWNER/REPO N \
   --mutation-mode review
 ```
 
-Exit `0` / `published: true` is the only normal completion proof. Exit `1`
-means the verdict is not published; exit `2` means the check itself failed.
-Chat-only delivery never satisfies this check unless GitHub publication was
-genuinely unavailable and that hard blocker is recorded.
+Exit `0` requires `published: true` **and** `format.valid: true` — the only
+normal completion proof. Exit `1` means the verdict is not published or fails
+the verdict format gate (strict `[GD] Verdict:` label, `### TLDR` with every
+required bullet, full verdict inside a `<details>` dropdown after the TLDR);
+exit `2` means the check itself failed. Chat-only delivery never satisfies this
+check unless GitHub publication was genuinely unavailable and that hard blocker
+is recorded.
 
 ## Adaptive readiness settle
 

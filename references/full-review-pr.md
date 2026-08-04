@@ -43,8 +43,11 @@ Before every attempted stop:
    - `gated`.
 7. Mark `Publish final verdict` complete only after delivery.
 8. Run `scripts/verify-verdict-published.mjs` with the run ID and reviewed head
-   and require `published: true`, unless a publication-unavailable hard blocker
-   was recorded (see below).
+   and require `published: true` **and `format.valid: true`**, unless a
+   publication-unavailable hard blocker was recorded (see below). A verdict
+   that fails the format gate (missing strict label, `### TLDR`, or `<details>`
+   dropdown) is an incomplete publication: repair the current-run comment with
+   `edit_own_comment` and re-run the verifier until both fields pass.
 
 A blocker is input to the final verdict, not permission to skip it.
 
@@ -185,8 +188,13 @@ node scripts/verify-verdict-published.mjs OWNER/REPO PR_NUMBER \
   --mutation-mode <routed-mode>
 ```
 
-`published: true` is required, unless a publication-unavailable hard blocker
-was recorded as described above.
+`published: true` **and** `format.valid: true` are required, unless a
+publication-unavailable hard blocker was recorded as described above.
+`format.valid: false` lists the exact missing structure
+(`verdict_heading_missing` / `verdict_label_invalid`,
+`tldr_heading_missing`, `tldr_bullets_missing:<keys>`,
+`details_dropdown_missing`, `tldr_not_before_details`); repair the current-run
+comment and re-verify before marking the plan item complete.
 
 Once `Publish final verdict` is marked complete, that comment becomes immutable
 historical review evidence.
@@ -253,7 +261,7 @@ A normal full review does not simplify code merely because an opportunity is vis
    - There is **no recursive simplification** pass during the mandatory re-review.
 8. If concrete necessary issues remain: GitHub **changes requested** with those blockers only.
 9. Before `approve-comment` (or merge-ready notify): **thin settle** (shared rules) — ~3–5 min quiet + recheck; activity resets; two-window cap. Skip settle for `changes-requested` / `not-useful` / draft `gated`.
-10. Post a **detailed** verdict comment **only after** CI+comments are handled (and settle, when approving) or a real hard blocker / `not-useful` / draft `gated` applies. Use the **Full-review / re-review verdict** template in `references/comment-depth.md` — lead with the **TLDR** (decision, every axis outcome, blockers, owner actions, bottom line) and keep the complete verdict in a `<details>` dropdown. Fill Usefulness, Bugs, Security, Spec, Reviews, Base/CI, Gate, Bottom line with paths/SHAs/checks; the TLDR never drops a blocker, owner action, or required next step. Do not post a bullet stub of “bots: addressed / CI: green.” When simplification ran, include the approved candidates, rollback status, validation evidence, and exact post-simplification head. When the PR is not ours, also fill the **Base sync (for the PR owner)** line and **Simplification (for the PR owner)** section with the owner actions.
+10. Post a **detailed** verdict comment **only after** CI+comments are handled (and settle, when approving) or a real hard blocker / `not-useful` / draft `gated` applies. Use the **Full-review / re-review verdict** template in `references/comment-depth.md` — lead with the **TLDR** (decision, every axis outcome, blockers, owner actions, bottom line) and keep the complete verdict in a `<details>` dropdown. Fill Usefulness, Bugs, Security, Spec, Reviews, Base/CI, Gate, Bottom line with paths/SHAs/checks; the TLDR never drops a blocker, owner action, or required next step. Do not post a bullet stub of “bots: addressed / CI: green.” When simplification ran, include the approved candidates, rollback status, validation evidence, and exact post-simplification head. When the PR is not ours, also fill the **Base sync (for the PR owner)** line and **Simplification (for the PR owner)** section with the owner actions. The publication verifier rejects a verdict missing the TLDR or `<details>` structure — repair the current-run comment and re-verify; a format failure never counts as published.
 
 Approve via GitHub only if the user asked for approval; otherwise comment or request changes.
 
@@ -273,5 +281,5 @@ For **every** targeted PR:
 - Thin settle completed before `approve-comment` / merge-ready (not for reject/gated labels)
 - Verdict posted with a **valid** label (see table)
 - Verdict verified published via `scripts/verify-verdict-published.mjs`
-  (`published: true`), or a recorded publication-unavailable hard blocker exists
+  (`published: true` and `format.valid: true`), or a recorded publication-unavailable hard blocker exists
 - No invented maintainer-ack / soft-security stop

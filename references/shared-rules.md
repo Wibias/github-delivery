@@ -55,7 +55,11 @@ Every full-review verdict comment MUST include:
 
 Before `Publish final verdict` is marked complete, run
 `scripts/verify-verdict-published.mjs` with the run ID and reviewed head;
-`published: true` is the only normal completion proof (see the completion lock).
+`published: true` plus `format.valid: true` is the only normal completion proof
+(see the completion lock). The format gate enforces the strict
+`[GD] Verdict:` label, the `### TLDR` block with every required bullet, and the
+`<details>` dropdown; a comment that fails it must be repaired, not marked
+published.
 
 Publication behavior:
 
@@ -381,7 +385,8 @@ Before any stop, return, handoff, final response, or completion claim:
 5. publish one final `approve-comment`, `changes-requested`, `not-useful`, or
    `gated` verdict;
 6. mark `Publish final verdict` complete only after that verdict was delivered
-   and verified (`scripts/verify-verdict-published.mjs` → `published: true`).
+   and verified (`scripts/verify-verdict-published.mjs` → `published: true`
+   and `format.valid: true`).
 
 Pending CI, an unavailable reviewer, failed Bugbot execution, missing optional
 tooling, API failure, a hard blocker, or `Planning next moves` are not terminal

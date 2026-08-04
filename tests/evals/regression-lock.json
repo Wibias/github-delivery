@@ -178,5 +178,9 @@
   {
     "id": "R-full-review-no-self-read-only-2026-08-04",
     "sha256": "0d6ef3a749624e03a432bbff278686ee235c5667b58ab2bd09c98bd6cc0d9ec0"
+  },
+  {
+    "id": "R-verdict-format-gate-2026-08-04",
+    "sha256": "b96eccaeb797e9786daea54e9243a41102cd778d6d75a741c11b3a75482885ae"
   }
 ]

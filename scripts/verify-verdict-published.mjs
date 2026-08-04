@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 /**
  * Verify one full-review run's verdict is actually published on the PR.
+ * Exit 0 requires both a published verdict and a format-valid verdict body:
+ * strict `## [GD] Verdict: <label>` heading, `### TLDR` with the required
+ * bullets, and the full verdict inside a `<details>` dropdown.
  * Usage:
  *   node scripts/verify-verdict-published.mjs OWNER/REPO PR_NUMBER \
  *     --run-id fr-... --head SHA [--comments-file FILE] [--mutation-mode MODE]
@@ -14,6 +17,7 @@ import {
 import {
   fetchPrConversationComments,
   findVerdictPublication,
+  validateVerdictFormat,
 } from "./lib/verdict-publication.mjs";
 
 const usage =
@@ -67,10 +71,14 @@ try {
     runId: args.runId,
     head: args.head,
   });
+  const format = verdict
+    ? validateVerdictFormat({ body: verdict.body })
+    : null;
   const output = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     kind: "github-delivery/verdict-publication-check",
     published: Boolean(verdict),
+    format,
     repo: args.repo,
     pr: args.pr,
     runId: args.runId,
@@ -79,10 +87,14 @@ try {
     verdictCommentId: verdict?.id ?? null,
     url: verdict?.html_url ?? null,
     author: verdict?.user?.login ?? null,
-    reason: verdict ? null : "verdict_not_published",
+    reason: verdict
+      ? format?.valid
+        ? null
+        : "verdict_format_invalid"
+      : "verdict_not_published",
   };
   process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
-  process.exitCode = verdict ? 0 : 1;
+  process.exitCode = verdict && format?.valid ? 0 : 1;
 } catch (error) {
   console.error(String(error?.message || error));
   process.exit(2);

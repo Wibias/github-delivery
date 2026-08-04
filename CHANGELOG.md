@@ -2,6 +2,17 @@
 
 All notable changes to `github-delivery` are documented here.
 
+## [Unreleased]
+
+### Added
+
+- Verdict format gate: `scripts/verify-verdict-published.mjs` now requires
+  `published: true` **and** `format.valid: true`. The verifier enforces the
+  strict `## [GD] Verdict: <label>` heading, a `### TLDR` block with every
+  required bullet, and the full verdict inside a `<details>` dropdown after
+  the TLDR; a comment failing the gate must be repaired, never marked
+  published.
+
 ## [0.1.0] - 2026-08-01
 
 ### Added
