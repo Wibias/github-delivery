@@ -38,9 +38,6 @@ function resolveRepository(input) {
 }
 
 function withStatus(decision) {
-  if (!decision.branch) {
-    return decision;
-  }
   if (decision.action === "delete" && decision.targetRepository) {
     return {
       ...decision,
@@ -66,13 +63,13 @@ export function evaluateHeadBranchCleanup(input) {
   const protectedBranches = input.protectedBranches ?? DEFAULT_PROTECTED_BRANCHES;
 
   if (!isMerged(input)) {
-    return {
+    return withStatus({
       action: "skip",
       reason: "branch kept: pr not merged",
       targetRepository: null,
       targetRepo: null,
       branch: headRefName || null,
-    };
+    });
   }
 
   if (input.keepBranch) {
@@ -106,13 +103,13 @@ export function evaluateHeadBranchCleanup(input) {
   }
 
   if (headOwnerLogin !== actorLogin) {
-    return {
+    return withStatus({
       action: "skip",
       reason: `branch kept: head owned by @${input.headOwnerLogin}`,
       targetRepository: null,
       targetRepo: null,
       branch: headRefName,
-    };
+    });
   }
 
   if (protectedBranches.has(headRefName)) {

@@ -31,7 +31,6 @@ test("evaluateHeadBranchCleanup keeps another contributor's head", () => {
   });
 
   assert.equal(decision.action, "skip");
-  assert.equal(decision.reason, "head_not_owned_by_actor");
+  assert.equal(decision.reason, "branch kept: head owned by @other-contributor");
   assert.equal(decision.status, "branch kept: head owned by @other-contributor");
 });
-
