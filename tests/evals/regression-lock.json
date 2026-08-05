@@ -182,5 +182,9 @@
   {
     "id": "R-verdict-format-gate-2026-08-04",
     "sha256": "b96eccaeb797e9786daea54e9243a41102cd778d6d75a741c11b3a75482885ae"
+  },
+  {
+    "id": "R-bot-defer-fabric-2026-08-05",
+    "sha256": "ca458185d42bf1f7c259b8fde9dfccc21e10ac1a60eba6cba513c49ad5666c1b"
   }
 ]

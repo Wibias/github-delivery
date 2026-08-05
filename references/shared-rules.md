@@ -178,6 +178,23 @@ Rules:
 - Owner/maintainer requests are default-must-fix unless obsolete or contradictory.
 - **Watch / fix:** never idle on “waiting for CI” while unresolved owner/CODEOWNER/trusted-human feedback is open — on watch, **`scripts/watch-wake-gate.mjs` exit `1` is authoritative**; triage and fix (or surface) first; tip-update may share the same push. Merge-from-base alone does not clear the gate.
 
+### Bot-thread ownership (no false deferral)
+
+Applies to `fix-pr-bots`, `full-review-pr`, `re-review-pr`, and `create-pr-for-issue`.
+
+1. **Verify first.** For each open trusted-bot thread, read the path/line/symbol and check the finding against the **current PR head** code and tests. Do not trust the bot label (“nit”, “suggestion”, “outside diff”) without verification.
+2. **Fix here when in scope.** If the thread targets a path in this PR’s changed files, a symbol this PR introduced or modified, or behavior this PR is responsible for landing on the target branch, the fix belongs **in this PR**. Forbidden skip/defer rationales include:
+   - “inherited / copied / fabric file — fix in another PR”
+   - “rebase / stack / downstream branch will pick it up”
+   - “consumer lives elsewhere” when **this PR owns the file version on the target branch**
+   - “non-blocking” without a verified false positive or durable won’t-fix rationale
+3. **Fix-or-decline sequence (mandatory):**
+   - **Fix path:** patch → push → verify on current head → reply in-thread with path/SHA evidence → only then `resolve_thread` when the active mutation mode allows it.
+   - **Decline path:** verify the finding is wrong or genuinely out of scope → reply in-thread with concrete counterevidence → only then resolve when allowed.
+   - A `[GD]` reply that only says “deferred to other PR / fabric / rebase” is **not** a decline and does **not** clear the thread.
+4. **Mutation mode.** `review` may reply to bot threads but **must not** call `resolve_thread` (see `references/mutation-modes.md`). `maintainer` / `autonomous` may resolve only after step 3 is complete.
+5. **Readiness claims.** Do not post merge-ready, recommend merge, or publish `approve-comment` while useful bot threads remain open with only defer/skip replies and no verified fix or durable decline on-thread.
+
 ### Comment fetch hygiene
 
 - Filter resolved/outdated threads first.
