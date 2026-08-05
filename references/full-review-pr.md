@@ -153,26 +153,41 @@ The identifier remains unchanged throughout this same run, including:
 - head refreshes;
 - correction of a partial verdict publication.
 
-A later explicit full-review request MUST create a new `full-review-run-id`, even
-when it targets the same PR and the same head.
+A later explicit full-review request creates a new `full-review-run-id` for
+tracking, even when it targets the same PR and the same head. That does **not**
+automatically authorize a second top-level PR comment — see same-head reuse
+below.
 
 ### Final verdict publication
 
-Every completed full-review run MUST publish a new top-level PR conversation
-comment containing:
+Every completed full-review run MUST end with a published format-valid verdict
+for the reviewed head. Publication uses:
 
 `<!-- github-delivery:full-review-verdict run:<full-review-run-id> head:<reviewed-head-sha> -->`
 
-Before publishing:
+Before publishing, call `planVerdictPublication` from
+`scripts/lib/verdict-publication.mjs` (or apply the same rules manually) against
+the PR conversation comments and the draft verdict body:
 
-1. Search for the exact current `full-review-run-id`.
-2. If no exact current-run marker exists, use `post_comment`.
-3. If the exact marker exists only because this run’s publication is incomplete,
-   malformed, or truncated, use `edit_own_comment` to repair it.
-4. Never edit a completed verdict from an earlier full-review run.
-5. Never use another head’s verdict as the editable target.
-6. Never select the newest generic `[GD] Verdict` comment without
-   matching both run ID and reviewed head.
+1. Exact current `full-review-run-id` + head marker incomplete/malformed →
+   `edit_own_comment` to repair it.
+2. Exact current-run marker already complete → do not post again
+   (`already_published`).
+3. Completed same-head verdict exists and material delta is empty (same label +
+   same required TLDR bullet values after normalization) → **reuse** that
+   comment; do **not** `post_comment` again (`reuse_same_head`). Report
+   `reused same-head verdict comment`. This is the PR #1066 anti-noise rule.
+4. Completed same-head verdict exists and material delta is non-empty →
+   `post_comment` a **new** top-level verdict with the new run ID. Prior
+   same-head verdicts stay immutable historical evidence.
+5. No completed same-head verdict → `post_comment` a new verdict.
+6. Never edit another run's completed marker to attach this run's ID.
+7. Never select the newest generic `[GD] Verdict` comment without matching the
+   current run marker when repairing.
+
+Material delta = verdict label change **or** any required TLDR bullet value
+change. Wording-only churn in the details dropdown, or a second agent finishing
+the same tip with the same gate, is **not** material.
 
 The mutation mode for this workflow is derived by the router: `review` for a
 bare full review, `maintainer` when `fix` or `simplify` is explicitly requested.
@@ -180,7 +195,7 @@ Run the authoritative gate with the routed mode plus
 `--workflow references/full-review-pr.md`; the gate rejects `read-only` for this
 workflow. A self-selected stricter mode is a workflow violation.
 
-After posting, verify publication before marking the plan item complete:
+After posting or deciding to reuse, verify publication before marking the plan item complete. On `reuse_same_head`, verification is against the reused comment's run marker / format (already published), not a missing current-run marker:
 
 ```bash
 node scripts/verify-verdict-published.mjs OWNER/REPO PR_NUMBER \
@@ -201,12 +216,13 @@ historical review evidence.
 
 The final chat report must use:
 
-- `posted new verdict comment` when this run created its required verdict;
+- `posted new verdict comment` when this run created a new top-level verdict;
 - `repaired current-run verdict comment` only when this run repaired its own
-  incomplete publication.
+  incomplete publication;
+- `reused same-head verdict comment` when a completed same-head verdict was
+  reused because the material delta was empty (no second post).
 
-It must never describe a newly completed full review as `updated verdict
-comment`.
+It must never describe a non-material same-head re-run as a second publication.
 
 ## Goal
 

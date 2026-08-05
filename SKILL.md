@@ -124,17 +124,13 @@ Read `references/shared-rules.md` before acting. Non-negotiables:
 
     For `Addressed feedback`, the publication identity is **PR + exact current head SHA**, never the individual feedback ID. Publish at most one top-level `[GD] Addressed feedback` comment for that head. Aggregate every feedback key resolved by the same head into that comment, include `<!-- gd:addressed-feedback head:<40-char-head-sha> -->`, and edit the exact marker match when more keys are added. Never post one top-level comment per feedback item.
 
-    A new explicit `full-review-pr` invocation is always a new publication identity. At the start of each full-review run, create and retain a unique `full-review-run-id`. The final verdict for that run MUST be posted as a new top-level PR comment, even when an older full-review verdict already exists for the same PR or the same head.
-
-    Never use `edit_own_comment` on a verdict belonging to another `full-review-run-id` or another reviewed head. Earlier full-review verdicts are historical records and remain unchanged.
-
-    The current run may edit its own verdict comment only to correct formatting, complete a truncated publication, or repair an immediately failed/partial write before the run is marked complete. A later full review, re-execution after completed review, or review of a newer head posts a new verdict comment.
-
-    Include a hidden identity marker in every full-review verdict:
+    Each full-review run creates and retains a unique `full-review-run-id`. Include a hidden identity marker in every full-review verdict:
 
     `<!-- github-delivery:full-review-verdict run:<full-review-run-id> head:<reviewed-head-sha> -->`
 
-    Before editing, require an exact match on both the current `full-review-run-id` and reviewed head. Do not identify an editable verdict merely by finding the newest `[GD]` comment.
+    Before posting, plan with same-head anti-noise (PR #1066): if a completed format-valid `[GD] Verdict` already exists for the **exact same head SHA** and the new draft has no material delta (same verdict label + same required TLDR bullet values), **reuse** that comment — do not post a second top-level verdict. Only post a new top-level comment when there is no completed same-head verdict, the head changed, or the material delta is non-empty. Never rewrite another run's completed marker in place.
+
+    The current run may `edit_own_comment` only on a comment that already carries this run's exact marker, and only to correct formatting, complete a truncated publication, or repair an immediately failed/partial write. Do not identify an editable verdict merely by finding the newest `[GD]` comment.
 
     When mentioning a GitHub user, never wrap GitHub `@login` mentions in backticks; emit the mention as plain text so GitHub can notify the user.
 16. Merge-ready only when bots/humans are clear **and** own bug+security+spec reviews are done **and** the adaptive settle completed on the unchanged current heads; also post/edit one notify on each **linked issue** (not only on the PR). The final `ship-gate.mjs` result must be `ready`; unresolved GraphQL review threads remain blocking inside that decision.

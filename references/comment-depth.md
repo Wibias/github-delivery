@@ -12,7 +12,7 @@ Vague posts are a bug. Prefer **structured detail** over one-liners — still sc
 4. **Separate facts from judgment:** evidence → finding → action (fixed / declined / follow-up).
 5. **Per-axis completeness:** if a template has a section, fill it (use `none` / `n/a` with why when empty).
 6. **Security public posts stay redacted** (shared disclosure) — detail ≠ exploit steps.
-7. **Idempotent within one publication identity:** repair or complete the current run’s own comment instead of duplicating it. A new explicit full-review invocation is a new publication identity and MUST post a new verdict comment; never overwrite a completed verdict from an earlier full-review run.
+7. **Idempotent within one publication identity:** repair or complete the current run’s own comment instead of duplicating it. For full-review verdicts, also apply same-head anti-noise: a later run on the **exact same head** with no material TLDR/label delta reuses the completed same-head verdict instead of posting again; never overwrite another run's completed marker in place.
 8. **Chat can be fuller** than GitHub for security abuse paths and long dumps.
 9. **Full-review verdicts:** lead with a **TLDR** that carries the decision, every axis outcome, blockers, owner actions, and bottom line; put the complete verdict in a `<details>` dropdown. The TLDR never drops a blocker, owner action, or required next step. `scripts/verify-verdict-published.mjs` enforces this structure (strict `[GD] Verdict:` label, `### TLDR` with every bullet below, `<details>` dropdown after the TLDR); a verdict that fails the format gate is an incomplete publication and must be repaired before `Publish final verdict` completes.
 

@@ -6,6 +6,12 @@ All notable changes to `github-delivery` are documented here.
 
 ### Added
 
+- Same-head full-review verdict anti-noise (PR #1066): second full-review
+  runs on the exact same head reuse the completed format-valid verdict when
+  the label and required TLDR bullets are unchanged. Machine helper:
+  `planVerdictPublication` in `scripts/lib/verdict-publication.mjs`; verifier
+  supports `--allow-same-head-reuse` + `--body-file`.
+
 - Verdict format gate: `scripts/verify-verdict-published.mjs` now requires
   `published: true` **and** `format.valid: true`. The verifier enforces the
   strict `## [GD] Verdict: <label>` heading, a `### TLDR` block with every

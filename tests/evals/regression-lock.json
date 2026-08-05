@@ -230,5 +230,9 @@
   {
     "id": "R-ci-wait-no-long-sleep-2026-08-05",
     "sha256": "87b4c5677c07b9f228692cf48a374aff241a254f73ac5b2c5d91ced84006f621"
+  },
+  {
+    "id": "R-full-review-same-head-reuse-2026-08-05",
+    "sha256": "23ffd257c7a3c7cc8421a260f889264e0a1f18ae0f99211d1962ae7e67a7057b"
   }
 ]

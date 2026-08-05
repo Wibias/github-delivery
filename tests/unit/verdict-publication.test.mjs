@@ -7,13 +7,17 @@ import test from "node:test";
 
 import {
   findVerdictPublication,
+  materialVerdictDelta,
+  planVerdictPublication,
   validateVerdictFormat,
 } from "../../scripts/lib/verdict-publication.mjs";
 
 const ROOT = resolve(import.meta.dirname, "../..");
 const COMMAND = join(ROOT, "scripts", "verify-verdict-published.mjs");
 const RUN_ID = "fr-42-abc123-20260804";
+const RUN_ID_2 = "fr-42-abc123-20260804T203000Z";
 const HEAD = "0123456789abcdef0123456789abcdef01234567";
+const OTHER_HEAD = "ffffffffffffffffffffffffffffffffffffffff";
 
 function comment(body, id = 42) {
   return {
@@ -31,11 +35,24 @@ function writeComments(comments) {
   return path;
 }
 
-function verdictBody() {
+function writeBody(body) {
+  const directory = mkdtempSync(join(tmpdir(), "github-delivery-verdict-body-"));
+  const path = join(directory, "body.md");
+  writeFileSync(path, body, "utf8");
+  return path;
+}
+
+function verdictBody({
+  runId = RUN_ID,
+  head = HEAD,
+  label = "approve-comment",
+  decision = "useful and ready",
+  bottomLine = "ship it",
+} = {}) {
   const bullets = [
     "**PR:** `#42` — widget",
     "**Head:** `abc1234` on `dev`",
-    "**Decision:** useful and ready",
+    `**Decision:** ${decision}`,
     "**Usefulness:** fixes a real bug",
     "**Bugs:** none blocking",
     "**Security:** none",
@@ -44,13 +61,13 @@ function verdictBody() {
     "**Base / CI:** green",
     "**Gate:** none",
     "**Owner actions (foreign PR):** none",
-    "**Bottom line:** ship it",
+    `**Bottom line:** ${bottomLine}`,
   ]
     .map((line) => `- ${line}`)
     .join("\n");
   return [
-    "## [GD] Verdict: approve-comment",
-    `<!-- github-delivery:full-review-verdict run:${RUN_ID} head:${HEAD} -->`,
+    `## [GD] Verdict: ${label}`,
+    `<!-- github-delivery:full-review-verdict run:${runId} head:${head} -->`,
     "",
     "### TLDR",
     "",
@@ -92,13 +109,110 @@ test("ignores verdicts for another run or another head", () => {
       `<!-- github-delivery:full-review-verdict run:fr-other head:${HEAD} -->`,
     ),
     comment(
-      `<!-- github-delivery:full-review-verdict run:${RUN_ID} head:ffffffffffffffffffffffffffffffffffffffff -->`,
+      `<!-- github-delivery:full-review-verdict run:${RUN_ID} head:${OTHER_HEAD} -->`,
     ),
   ];
   assert.equal(
     findVerdictPublication({ comments, runId: RUN_ID, head: HEAD }),
     null,
   );
+});
+
+test("materialVerdictDelta is empty for wording-only details changes", () => {
+  const previous = verdictBody({ decision: "useful and ready" });
+  const next = previous.replace(
+    "full detail here",
+    "full detail here with extra wording that stays in details only",
+  );
+  const delta = materialVerdictDelta({ previousBody: previous, nextBody: next });
+  assert.equal(delta.material, false);
+  assert.deepEqual(delta.reasons, []);
+});
+
+test("materialVerdictDelta flags label or TLDR bullet changes", () => {
+  const previous = verdictBody({ label: "gated", decision: "blocked" });
+  const nextLabel = verdictBody({ label: "approve-comment", decision: "blocked" });
+  const nextDecision = verdictBody({ label: "gated", decision: "still blocked" });
+  assert.equal(
+    materialVerdictDelta({ previousBody: previous, nextBody: nextLabel }).material,
+    true,
+  );
+  assert.ok(
+    materialVerdictDelta({
+      previousBody: previous,
+      nextBody: nextLabel,
+    }).reasons.includes("verdict_label_changed"),
+  );
+  assert.ok(
+    materialVerdictDelta({
+      previousBody: previous,
+      nextBody: nextDecision,
+    }).reasons.includes("tldr_changed:decision"),
+  );
+});
+
+test("planVerdictPublication reuses completed same-head verdict without material delta", () => {
+  const existing = comment(verdictBody({ runId: RUN_ID, head: HEAD }), 100);
+  const draft = verdictBody({ runId: RUN_ID_2, head: HEAD });
+  const plan = planVerdictPublication({
+    comments: [existing],
+    runId: RUN_ID_2,
+    head: HEAD,
+    body: draft,
+  });
+  assert.equal(plan.action, "reuse_same_head");
+  assert.equal(plan.reason, "same_head_no_material_delta");
+  assert.equal(plan.targetComment.id, 100);
+  assert.equal(plan.reusedFromRunId, RUN_ID);
+});
+
+test("planVerdictPublication posts new when same-head material delta exists", () => {
+  const existing = comment(
+    verdictBody({ runId: RUN_ID, head: HEAD, label: "gated", decision: "blocked" }),
+    100,
+  );
+  const draft = verdictBody({
+    runId: RUN_ID_2,
+    head: HEAD,
+    label: "approve-comment",
+    decision: "ready after fixes",
+  });
+  const plan = planVerdictPublication({
+    comments: [existing],
+    runId: RUN_ID_2,
+    head: HEAD,
+    body: draft,
+  });
+  assert.equal(plan.action, "post_new");
+  assert.equal(plan.reason, "same_head_material_delta");
+});
+
+test("planVerdictPublication posts new for a different head", () => {
+  const existing = comment(verdictBody({ runId: RUN_ID, head: HEAD }), 100);
+  const draft = verdictBody({ runId: RUN_ID_2, head: OTHER_HEAD });
+  const plan = planVerdictPublication({
+    comments: [existing],
+    runId: RUN_ID_2,
+    head: OTHER_HEAD,
+    body: draft,
+  });
+  assert.equal(plan.action, "post_new");
+  assert.equal(plan.reason, "no_existing_verdict");
+});
+
+test("planVerdictPublication repairs incomplete current-run publication", () => {
+  const incomplete = comment(
+    `## [GD] Verdict: gated\n<!-- github-delivery:full-review-verdict run:${RUN_ID} head:${HEAD} -->\n### Verdict\nbroken`,
+    55,
+  );
+  const plan = planVerdictPublication({
+    comments: [incomplete],
+    runId: RUN_ID,
+    head: HEAD,
+    body: verdictBody(),
+  });
+  assert.equal(plan.action, "edit_current_run");
+  assert.equal(plan.targetComment.id, 55);
 });
 
 test("verify CLI reports published for a matching comment", () => {
@@ -120,12 +234,40 @@ test("verify CLI reports published for a matching comment", () => {
   assert.equal(result.status, 0, result.stderr);
   const output = JSON.parse(result.stdout);
   assert.equal(output.published, true);
+  assert.equal(output.reused, false);
   assert.equal(output.format.valid, true);
   assert.deepEqual(output.format.problems, []);
   assert.equal(output.reason, null);
   assert.equal(output.verdictCommentId, 123);
   assert.equal(output.author, "Wibias");
   assert.equal(output.mutationMode, "review");
+});
+
+test("verify CLI can accept same-head reuse when draft has no material delta", () => {
+  const existingBody = verdictBody({ runId: RUN_ID, head: HEAD });
+  const draftBody = verdictBody({ runId: RUN_ID_2, head: HEAD });
+  const commentsFile = writeComments([comment(existingBody, 777)]);
+  const bodyFile = writeBody(draftBody);
+  const result = run([
+    "acme/widget",
+    "42",
+    "--run-id",
+    RUN_ID_2,
+    "--head",
+    HEAD,
+    "--comments-file",
+    commentsFile,
+    "--allow-same-head-reuse",
+    "--body-file",
+    bodyFile,
+  ]);
+  assert.equal(result.status, 0, result.stderr + result.stdout);
+  const output = JSON.parse(result.stdout);
+  assert.equal(output.published, true);
+  assert.equal(output.reused, true);
+  assert.equal(output.reason, "reused_same_head_verdict");
+  assert.equal(output.verdictCommentId, 777);
+  assert.equal(output.reusedFromRunId, RUN_ID);
 });
 
 test("verify CLI fails a published verdict that lacks the TLDR structure", () => {
@@ -243,7 +385,7 @@ test("validateVerdictFormat accepts a template-compliant verdict", () => {
 test("verify CLI fails closed when the verdict is not published", () => {
   const file = writeComments([
     comment(
-      `<!-- github-delivery:full-review-verdict run:${RUN_ID} head:ffffffffffffffffffffffffffffffffffffffff -->`,
+      `<!-- github-delivery:full-review-verdict run:${RUN_ID} head:${OTHER_HEAD} -->`,
     ),
   ]);
   const result = run([

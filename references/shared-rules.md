@@ -62,22 +62,9 @@ Never use a top-level PR conversation comment as a substitute for an inline revi
 
 ### Full-review verdict publication identity
 
-General comment idempotency does not collapse separate full-review runs into one
-comment.
-
-Each new explicit `full-review-pr` invocation is a new publication identity and
-MUST publish a new top-level PR verdict comment. This remains true when:
-
-- the PR number is unchanged;
-- the reviewed head SHA is unchanged;
-- the verdict category is unchanged;
-- an earlier `[GD] Verdict` comment already exists.
-
-At the start of the full-review run, create one unique `full-review-run-id`. Keep
-that identifier unchanged while the same run waits for CI, retries tools,
-continues after compaction, or repairs an incomplete publication.
-
-Every full-review verdict comment MUST include:
+Each full-review run still creates a unique `full-review-run-id` and keeps that
+ID for the whole run (CI waits, retries, compaction, incomplete-publication
+repairs). The marker remains:
 
 `<!-- github-delivery:full-review-verdict run:<full-review-run-id> head:<reviewed-head-sha> -->`
 
@@ -89,22 +76,43 @@ Before `Publish final verdict` is marked complete, run
 `<details>` dropdown; a comment that fails it must be repaired, not marked
 published.
 
+**Same-head anti-noise rule (PR #1066):** a second full-review invocation on the
+**exact same head SHA** must not post another top-level verdict when the new
+verdict is not a material change from the latest completed same-head verdict.
+Material change means any of:
+
+- verdict label changed (`approve-comment` / `changes-requested` / `not-useful` /
+  `gated`);
+- any required TLDR bullet value changed (normalized text compare).
+
+Non-material rewrites (wording polish, re-run after compaction, second agent on
+the same tip with the same gate) **reuse** the existing completed same-head
+verdict: do not `post_comment` again; complete the run against that published
+comment and report `reused same-head verdict comment`. Use
+`scripts/lib/verdict-publication.mjs` → `planVerdictPublication` as the machine
+decision.
+
 Publication behavior:
 
-- no comment with the exact current run marker exists → post a new top-level PR
-  comment;
-- the exact current run marker exists and that publication is incomplete,
-  malformed, or truncated → edit that current-run comment;
-- only an older run marker exists → post a new comment;
-- only a verdict for another head exists → post a new comment;
-- a completed verdict from an earlier run is immutable historical evidence.
+- exact current run marker exists and publication is incomplete/malformed →
+  `edit_own_comment` on that current-run comment;
+- exact current run marker exists and is complete → already published for this
+  run (no second post);
+- completed same-head verdict exists and material delta is empty → **reuse**
+  that comment (no new top-level post; earlier run marker stays historical);
+- completed same-head verdict exists and material delta is non-empty → post a
+  **new** top-level comment with the new run ID (prior same-head verdict remains
+  immutable historical evidence);
+- only a verdict for another head exists, or none exists → post a new comment;
+- never choose an editable target merely because it is the newest `[GD]`
+  comment without matching the current run marker when repairing.
 
-Never choose an editable verdict merely because it is the newest
-`[GD]` comment. Both the `full-review-run-id` and reviewed head must
-match.
+Never rewrite another run's completed marker in place to attach a new
+`full-review-run-id`. Reuse means leave that comment alone and treat the run as
+published for completion purposes when the plan says reuse is valid.
 
-The idempotency boundary is the workflow run, not the PR number, verdict type,
-comment heading, or workflow name.
+The idempotency boundary is: **current run marker first**, then **same head +
+material TLDR/label delta**, not "every explicit invocation always posts".
 
 ## Compose with other skills (do not reinvent)
 

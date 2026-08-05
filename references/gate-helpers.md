@@ -54,6 +54,11 @@ exit `2` means the check itself failed. Chat-only delivery never satisfies this
 check unless GitHub publication was genuinely unavailable and that hard blocker
 is recorded.
 
+Same-head anti-noise (PR #1066): when `planVerdictPublication` returns
+`reuse_same_head`, re-verify with `--allow-same-head-reuse --body-file <draft>`
+so exit `0` can report `reused: true` against the existing completed same-head
+verdict instead of requiring a second post under the new run ID.
+
 ## Adaptive readiness settle
 
 Use this only after the authoritative decision is `ready`.

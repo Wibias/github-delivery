@@ -233,7 +233,7 @@ test("full review cannot complete via chat after self-selecting read-only", () =
   assert.match(mutationModes, /rejects incompatible combinations/);
 });
 
-test("new full-review runs publish new immutable verdict comments", () => {
+test("full-review verdict publication supports same-head anti-noise", () => {
   const skill = readFileSync(
     new URL("../../SKILL.md", import.meta.url),
     "utf8",
@@ -252,52 +252,32 @@ test("new full-review runs publish new immutable verdict comments", () => {
   );
 
   assert.match(skill, /full-review-run-id/);
-  assert.match(
-    skill,
-    /new explicit `full-review-pr` invocation is always a new publication identity/i,
-  );
-  assert.match(skill, /MUST be posted as a new top-level PR comment/i);
+  assert.match(skill, /same-head anti-noise/i);
+  assert.match(skill, /material delta/i);
+  assert.match(skill, /do not post a second top-level verdict/i);
 
   assert.match(sharedRules, /### Full-review verdict publication identity/);
+  assert.match(sharedRules, /Same-head anti-noise rule \(PR #1066\)/i);
+  assert.match(sharedRules, /planVerdictPublication/);
+  assert.match(sharedRules, /reuse_same_head|\*\*reuse\*\*/i);
   assert.match(
     sharedRules,
-    /Each new explicit `full-review-pr` invocation is a new publication identity/i,
+    /current run marker first.*same head \+\s*material TLDR\/label delta/is,
   );
-  assert.match(
-    sharedRules,
-    /no comment with the exact current run marker exists.*post a new top-level PR/is,
-  );
-  assert.match(
-    sharedRules,
-    /completed verdict from an earlier run is immutable historical evidence/i,
-  );
-  assert.match(sharedRules, /idempotency boundary is the workflow run/i);
 
   assert.match(fullReview, /### Full-review run and publication identity/);
   assert.match(fullReview, /### Final verdict publication/);
+  assert.match(fullReview, /planVerdictPublication/);
+  assert.match(fullReview, /reuse_same_head/);
+  assert.match(fullReview, /reused same-head verdict comment/);
+  assert.match(fullReview, /same_head_material_delta|material delta is non-empty/i);
   assert.match(
     fullReview,
-    /Every completed full-review run MUST publish a new top-level PR conversation\s+comment/i,
-  );
-  assert.match(
-    fullReview,
-    /If no exact current-run marker exists, use `post_comment`/i,
-  );
-  assert.match(
-    fullReview,
-    /Never edit a completed verdict from an earlier full-review run/i,
-  );
-  assert.match(fullReview, /posted new verdict comment/i);
-  assert.match(
-    fullReview,
-    /must never describe a newly completed full review as `updated verdict[\s\n]+comment`/i,
+    /Never edit another run's completed marker/i,
   );
 
   assert.match(commentDepth, /Idempotent within one publication identity/i);
-  assert.match(
-    commentDepth,
-    /new explicit full-review invocation.*MUST post a new verdict comment/is,
-  );
+  assert.match(commentDepth, /same-head anti-noise/i);
   assert.match(
     commentDepth,
     /github-delivery:full-review-verdict run:<full-review-run-id> head:<reviewed-head-sha>/,
