@@ -46,6 +46,16 @@ When the issue/PR lists explicit **non-goals** (e.g. dry-run only, no production
 - Cross-check resolution order, CLI examples, and operator docs against PR non-goals and references/shared-rules.md (Proactive contract verification).
 - Also cross-check **docs vs implemented behavior**: any documented config key, CLI flag, output metric, or scoring weight that the code does not consume/emit is a no-op or over-claim — either the code must consume it or the docs must label it future/non-goal. **Scoring/weight tables especially:** when a table lists weights or dimensions the evaluator does not score independently (because it folds normalized inputs into one composite or treats them as accepted-but-inactive), the docs must match the implemented behavior — document the fold, mark the entry reserved/future, or implement the dimension. An accepted-but-inactive weight documented as active is a Spec blocker.
 
+<!-- assertion-anchors -->
+<!-- assertion: accepted-but-inactive-weight-docs-overclaim -->
+<!-- assertion: docs-label-future-or-implement -->
+<!-- assertion: scoring-weight-table-matches-implementation -->
+<!-- /assertion-anchors -->
+
+
+
+
+
 
 
 ## 3. Find the standards sources

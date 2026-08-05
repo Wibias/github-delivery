@@ -65,6 +65,13 @@ Match the user request, then read **only** the matching workflow file plus
 | Research issue(s) #N… on latest development; priority; comment on issue                            | `references/research-issue.md`                     |
 | Create PR for issue #N (preflight + pre-open bug/security gate) first; link both ways; merge-ready | `references/create-pr-for-issue.md`                |
 | Full review on PR #N (or a list); babysit to green + verdict                                       | `references/full-review-pr.md`                     |
+
+<!-- assertion-anchors -->
+<!-- assertion: full-review-loaded -->
+<!-- assertion: router-selects-full-review -->
+<!-- assertion: shared-rules-read -->
+<!-- assertion: merge-not-loaded -->
+<!-- /assertion-anchors -->
 | Spec and Standards review on PR #N                                                                 | `references/spec-standards-review.md`              |
 | Simplify / clean up / deduplicate PR #N without behavior changes                                   | `references/simplify-pr.md`                        |
 | Security review / security review on PR #N                                                         | `references/security-review.md`                    |

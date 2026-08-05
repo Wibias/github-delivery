@@ -1,5 +1,7 @@
 const SECURITY_BASELINES = ["authn", "authz", "secrets_config", "injection"];
 const BUG_BASELINES = ["silent_failures", "resource_leaks", "edge_cases"];
+const BUG_PROBES = new Set(["api-cli-wiring", "input-shape-evidence-semantics", "determinism-clocks-budgets", "recursion-termination", "cli-payload-completeness", "hot-path-scale", "malformed-input-robustness", "lock-error-propagation"]);
+const SECURITY_PROBES = new Set(["credential-transport", "secrets-scan", "removed-controls"]);
 
 function packageManager(files) {
   const joined = files.join("\n");
@@ -53,6 +55,10 @@ export function projectSecurityScope(plan) {
     evidenceRequiredSurfaces: evidenceRequired.map((item) => item.id),
     baselineSurfaces: plan.securityReview.depth === "skip" ? [] : [...SECURITY_BASELINES],
     matched,
+    requiredProbes: (plan.requiredProbes || []).filter((id) => SECURITY_PROBES.has(id)),
+    probeEvidence: Object.fromEntries(
+      Object.entries(plan.probeEvidence || {}).filter(([id]) => SECURITY_PROBES.has(id)),
+    ),
     securityReviewDepth: plan.securityReview.depth,
     lockfilesChanged,
     manifestsChanged,
@@ -72,6 +78,7 @@ export function projectSecurityScope(plan) {
       "Prove removed controls and broadened workflow permissions preserve the original invariant.",
       "Load ai-agent-security for AI/agent/MCP surfaces and Agentic Skills Top 10 for skill or MCP installation changes.",
       "Run the package-manager audit when manifests or lockfiles changed.",
+      "Emit probe evidence for every requiredProbes id and verify it with `scripts/verify-probe-coverage.mjs` before claiming the security axis complete.",
     ],
   };
 }
@@ -124,6 +131,10 @@ export function projectBugScope(plan) {
     evidenceRequiredLenses: detailed.map((item) => item.id),
     baselineLenses: skip ? [] : [...BUG_BASELINES],
     lensEvidence,
+    requiredProbes: (plan.requiredProbes || []).filter((id) => BUG_PROBES.has(id)),
+    probeEvidence: Object.fromEntries(
+      Object.entries(plan.probeEvidence || {}).filter(([id]) => BUG_PROBES.has(id)),
+    ),
     requireBugbot: "when_available",
     deepMultiAgentDefault: false,
     uncertainty: plan.uncertainty,
@@ -135,6 +146,7 @@ export function projectBugScope(plan) {
       "Baseline means screen the umbrella lenses without pretending every detailed domain is touched.",
       "Bugbot is additive when available; a clean external result does not cancel required lenses.",
       "Never auto-launch adversarial or deep multi-agent review unless the user explicitly requested it.",
+      "Emit probe evidence for every requiredProbes id and verify it with `scripts/verify-probe-coverage.mjs` before claiming the bug axis complete.",
     ],
   };
 }

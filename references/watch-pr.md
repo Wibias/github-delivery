@@ -59,6 +59,20 @@ node "<github-delivery>/scripts/watch-wake-gate.mjs" OWNER/REPO N
 
 This exists because prose “reviews first” was ignored, and ACK-without-fix was gamed. **The exit code is the rule.**
 
+<!-- assertion-anchors -->
+<!-- assertion: wake-gate -->
+<!-- assertion: exit-1-no-wait -->
+<!-- assertion: addressed-owner-feedback-ack -->
+<!-- assertion: ack-not-enough -->
+<!-- assertion: dirty-blocks-wait -->
+<!-- assertion: must-rebase-leftovers -->
+<!-- assertion: watch-wake-gate-mjs -->
+<!-- /assertion-anchors -->
+
+
+
+
+
 ### Forbidden (instant fail)
 
 These progress lines are **illegal** while the wake-gate exits `1` (or while `mergeStateStatus` is DIRTY/CONFLICTING/BEHIND):
@@ -69,7 +83,21 @@ These progress lines are **illegal** while the wake-gate exits `1` (or while `me
 - “acknowledged owner feedback; leaving open; keeping an eye out” **without** a follow-up fix commit / conflict resolution
 - “DIRTY / conflicting — expected; still watching” — conflicts are work, not a spectator sport
 
-Owner “left open because leftover work remains” means **do the leftover work on tip** (or hard-block to the user with why you can’t), not acknowledge and poll.
+Owner “left open because leftover work remains”
+
+<!-- assertion-anchors -->
+<!-- assertion: illegal-wait-line -->
+<!-- assertion: owner-toplevel-required -->
+<!-- assertion: coderabbit-lower-priority -->
+<!-- assertion: not-only-merge-dev -->
+<!-- assertion: owners-first -->
+<!-- assertion: reviews-before-ci -->
+<!-- assertion: no-idle-on-ci -->
+<!-- /assertion-anchors -->
+
+
+
+ means **do the leftover work on tip** (or hard-block to the user with why you can’t), not acknowledge and poll.
 
 ### Wake gate checklist
 
@@ -93,7 +121,19 @@ On **every** poll / wake (including the first):
 6. **Then** if behind/conflicted **or** wake-gate reports `base_dirty_or_behind`: update from base, resolve or ask, push — only when the PR is ours (shared **PR ownership boundary**); on a foreign PR, tell the owner to update from the latest base and do not push the base sync. Verify compile-against-tip. Prefer combining with review fixes in the **same** push. **Never** enter the 1–2 min poll loop while `DIRTY`/`CONFLICTING`.
 7. **Then CI:** classify branch vs flake. Fix branch-related **and** pre-existing/“unrelated” required failures (minimal patch); rerun flakes (max 3 / SHA); stop on exhausted infra failures. After push: re-check stale-approval / last-push via `pr-policy-gate`.
 8. Security-offer / changelog nudge once if applicable.
-9. Only if green + mergeable + **useful threads/comments quiet** on **current** SHA **and** wake-gate exit `0`: report milestone **“CI/reviews quiet — still watching (not full merge-ready bar)”**. Do **not** post `[GD] Merge ready` from watch alone. Keep polling while open. If auto-merge **or merge-queue** queued: watch until **actually merged**.
+9. Only if green + mergeable + **useful threads/comments quiet** on **current** SHA **and** wake-gate exit `0`: report milestone **“CI/reviews quiet — still watching (not full merge-ready bar)”**. Do **not** post `[GD] Merge ready` from watch alone. Keep polling while open.
+
+<!-- assertion-anchors -->
+<!-- assertion: no-merge-ready-from-watch-alone -->
+<!-- assertion: watch-milestone-not-merge-ready -->
+<!-- assertion: keep-watching -->
+<!-- assertion: queued-not-merged -->
+<!-- assertion: merge-group-warn -->
+<!-- /assertion-anchors -->
+
+
+
+ If auto-merge **or merge-queue** queued: watch until **actually merged**.
 10. Stop only when:
    - PR **merged** or **closed**, or
    - Hard blocker (permissions, fork-head unwritable, dirty unrelated tree, push rejected, flake budget exhausted, product decision, human reply needs confirmation, stack needs `manage-stacked-prs` for trunk, merge-queue stuck with `merge_group` CI gap), or

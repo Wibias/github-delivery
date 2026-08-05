@@ -96,6 +96,16 @@ For every linked or fixed issue:
 
 Auto-close does not replace the required issue comment.
 
+<!-- assertion-anchors -->
+<!-- assertion: issue-thank-required -->
+<!-- assertion: auto-close-not-enough -->
+<!-- assertion: multi-pr-full-ceremony -->
+<!-- /assertion-anchors -->
+
+
+
+
+
 ### 4. Cleanup
 
 - Confirm the PR is actually merged, not merely queued.

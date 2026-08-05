@@ -80,6 +80,12 @@ Also verify:
 
 If authentication, repository identity, branch writability, or Git state is
 unclear, stop with the exact blocker. Do not claim stack state from partial
+
+<!-- assertion-anchors -->
+<!-- assertion: state-check-first -->
+<!-- /assertion-anchors -->
+
+
 evidence.
 
 ## 2. Inspect the complete stack
@@ -127,6 +133,17 @@ Depth: N
 
 Depth above three is not forbidden, but warn that review and restack risk rises.
 Recommend landing the lower portion first when that reduces risk.
+
+<!-- assertion-anchors -->
+<!-- assertion: gh-pr-list-used -->
+<!-- assertion: inspect-script-or-algorithm -->
+<!-- assertion: stack-tree-reported -->
+<!-- assertion: no-mutation -->
+<!-- /assertion-anchors -->
+
+
+
+
 
 ### Review view
 

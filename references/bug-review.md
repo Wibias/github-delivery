@@ -25,6 +25,13 @@ Finder → Challenger → Arbiter structure from `references/bug-hunt-method.md`
 That is the built-in method (parent or one helper subagent, sequential), not an
 external kit and not permission to launch one.
 
+<!-- assertion-anchors -->
+<!-- assertion: deep-only-if-user-asked -->
+<!-- assertion: never-auto-deep-bug-multiagent -->
+<!-- /assertion-anchors -->
+
+
+
 ## Mandatory method (do not skip)
 
 ### 0. Scope script (required for PRs)
@@ -35,11 +42,22 @@ node "<github-delivery>/scripts/bug-scope.mjs" OWNER/REPO N
 
 - If `skipDeepBugReview: true` → record **n/a** in chat (and comment templates); stop the bug axis for this PR. Do **not** invent Bugbot.
 - Else cover every `requiredLenses[]` in **one** complementary pass (below).
+- Every id in `requiredProbes[]` names a **Must-probe block below** — walk each one against the diff, not just the umbrella lenses.
 - `requireBugbot: "when_available"` → Cursor only (see adapter).
 - `deepMultiAgentDefault` is always `false`.
 - Follow `instructions[]` from the JSON.
 
 Issue-only / no PR: if reviewing local branch for create-PR, treat logic file changes like deep; docs-only like skip.
+
+<!-- assertion-anchors -->
+<!-- assertion: bug-scope-mjs -->
+<!-- assertion: no-bugbot-required-when-skip -->
+<!-- assertion: skip-deep-docs-only -->
+<!-- /assertion-anchors -->
+
+
+
+
 
 ### 1. Platform adapter
 
@@ -61,6 +79,10 @@ Checkout PR head first (shared **Subagent preflight**).
 4. On a missing-field, unsupported-`Diff`, or wrong-invocation validator error, retry **once** with the appropriate exact two-line prompt and nothing else.
 5. If Bugbot still cannot compute the requested diff after that retry, state that Bugbot is unavailable for this review and continue with the complementary pass. Do **not** invent another prompt shape or fake a Bugbot report.
 6. Then run **§2 Complementary** (additive, even if Bugbot found nothing).
+
+<!-- assertion-anchors -->
+<!-- assertion: bugbot-then-complementary -->
+<!-- /assertion-anchors -->
 
 ### Cursor Bugbot liveness rule
 
@@ -97,6 +119,15 @@ Bugbot.
 1. **Never** claim Cursor Bugbot ran.
 2. If Codex CLI `/review` (or equivalent read-only review) is available this session: run **once**, then **§2 Complementary**.
 3. Else: same as Claude (complementary only).
+
+<!-- assertion-anchors -->
+<!-- assertion: never-fake-bugbot-off-cursor -->
+<!-- assertion: complementary-required-on-claude -->
+<!-- /assertion-anchors -->
+
+
+
+
 
 ### 2. Complementary lenses (required when not skipDeep)
 
@@ -152,9 +183,20 @@ typecheck/compile (`tsc --noEmit`, project lint script, etc.) and analyzers
 | **malformed_input_robustness** | Parsers/validators must distinguish absent vs malformed, reject or skip invalid rows instead of 500 or fail-open; unguarded `JSON.parse` / `decodeURIComponent` on persisted or user input is a bug; fallback values must not defeat documented guards |
 | **budget_correctness** | Serialized/traced output must respect documented byte/string budgets: measure **bytes** not UTF-16 code units, cap strings/arrays to the stated limit, set `truncated` flags when capping, do not copy caller-supplied unknown nested fields verbatim, and the body-size limit the route enforces must match the budget the producer claims |
 
-On Cursor this is **additive to Bugbot** (Bugbot leans precision and can under-index leaks / silent fails / API contracts).
+On Cursor this is **additive to Bugbot**
+
+<!-- assertion-anchors -->
+<!-- assertion: complementary-additive -->
+<!-- assertion: lenses-silent-leak-edge -->
+<!-- /assertion-anchors -->
+
+
+
+ (Bugbot leans precision and can under-index leaks / silent fails / API contracts).
 
 #### Must probe — API/CLI wiring (CodeRabbit/Codex often catch these first)
+
+<!-- probe: api-cli-wiring -->
 
 When the diff adds or changes **user-facing surfaces** (CLI subcommands/flags, HTTP request/response fields, management DTOs, evaluator parameters, route-policy inputs), **explicitly** check:
 
@@ -166,7 +208,19 @@ When the diff adds or changes **user-facing surfaces** (CLI subcommands/flags, H
 
 Skip only when the diff clearly adds **no** new CLI/API/DTO/route surface (say so in chat).
 
+<!-- assertion-anchors -->
+<!-- assertion: wiring-trace-required -->
+<!-- assertion: operator-smoke-required -->
+<!-- assertion: green-tests-not-enough -->
+<!-- /assertion-anchors -->
+
+
+
+
+
 #### Must probe — input shape and evidence semantics (CodeRabbit/Codex often catch these first)
+
+<!-- probe: input-shape-evidence-semantics -->
 
 When the diff adds or changes parsers, scanners, evidence derivations, capability classifiers, or eligibility logic, **explicitly** check:
 
@@ -184,7 +238,32 @@ When the diff adds or changes parsers, scanners, evidence derivations, capabilit
 
 Skip only when the diff has no parser/scanner/classifier changes (say so in chat).
 
+<!-- assertion-anchors -->
+<!-- assertion: real-shape-required -->
+<!-- assertion: unknown-not-false -->
+<!-- assertion: nested-source-evidence -->
+<!-- assertion: unknown-scoring-neutral -->
+<!-- assertion: absent-config-unknown-not-false -->
+<!-- assertion: no-default-object-cast -->
+<!-- assertion: evidence-mirrors-router-backfill -->
+<!-- assertion: hard-requirement-normalized-value -->
+<!-- assertion: absent-vs-zero-vs-malformed -->
+<!-- assertion: raw-check-agrees-with-score -->
+<!-- assertion: hard-limit-from-policy -->
+<!-- assertion: caller-evidence-not-truth -->
+<!-- assertion: profile-limit-stamped-trace -->
+<!-- assertion: reject-misplaced-flag -->
+<!-- assertion: usage-on-dash-id -->
+<!-- assertion: both-show-and-dryrun -->
+<!-- /assertion-anchors -->
+
+
+
+
+
 #### Must probe — determinism, clocks, and budgets (CodeRabbit/Codex often catch these first)
+
+<!-- probe: determinism-clocks-budgets -->
 
 When the diff adds or changes scoring, aggregation, health/quota/cost evidence, or serialized traces, **explicitly** check:
 
@@ -196,7 +275,20 @@ When the diff adds or changes scoring, aggregation, health/quota/cost evidence, 
 
 Skip only when the diff has no scoring/aggregation/trace changes (say so in chat).
 
+<!-- assertion-anchors -->
+<!-- assertion: one-decision-one-clock -->
+<!-- assertion: filter-before-limit -->
+<!-- assertion: aggregate-union-required -->
+<!-- assertion: byte-budget-required -->
+<!-- /assertion-anchors -->
+
+
+
+
+
 #### Must probe — recursive and re-entrant lookups must terminate (CodeRabbit/Codex often catch these first)
+
+<!-- probe: recursion-termination -->
 
 When the diff adds or changes routing, alias, lookup, or resolver recursion, **explicitly** check:
 
@@ -206,7 +298,18 @@ When the diff adds or changes routing, alias, lookup, or resolver recursion, **e
 
 Skip only when the diff adds no routing/alias/lookup recursion (say so in chat).
 
+<!-- assertion-anchors -->
+<!-- assertion: recursion-termination-required -->
+<!-- assertion: alias-namespace-shadow -->
+<!-- /assertion-anchors -->
+
+
+
+
+
 #### Must probe — CLI/API payload completeness (CodeRabbit/Codex often catch these first)
+
+<!-- probe: cli-payload-completeness -->
 
 When the diff adds or changes a CLI command that calls a management API or evaluator, **explicitly** check:
 
@@ -215,7 +318,17 @@ When the diff adds or changes a CLI command that calls a management API or evalu
 
 Skip only when the diff adds no CLI→API/evaluator call path (say so in chat).
 
+<!-- assertion-anchors -->
+<!-- assertion: cli-payload-completeness -->
+<!-- /assertion-anchors -->
+
+
+
+
+
 #### Must probe — hot-path scale and determinism (CodeRabbit/Codex often catch these first)
+
+<!-- probe: hot-path-scale -->
 
 When the diff adds or changes request-path, ingest, indexing, or analytics code, **explicitly** check:
 
@@ -227,7 +340,17 @@ When the diff adds or changes request-path, ingest, indexing, or analytics code,
 
 Skip only when the diff has no request-path/ingest/analytics changes (say so in chat).
 
+<!-- assertion-anchors -->
+<!-- assertion: hot-path-scale-required -->
+<!-- /assertion-anchors -->
+
+
+
+
+
 #### Must probe — malformed-input robustness (CodeRabbit/Codex often catch these first)
+
+<!-- probe: malformed-input-robustness -->
 
 When the diff adds or changes parsers, persistence, or route/query validation, **explicitly** check:
 
@@ -239,7 +362,20 @@ When the diff adds or changes parsers, persistence, or route/query validation, *
 
 Skip only when the diff has no parser/persistence/validation changes (say so in chat).
 
+<!-- assertion-anchors -->
+<!-- assertion: malformed-input-robust -->
+<!-- assertion: db-result-cast-boundary -->
+<!-- assertion: non-finite-excluded -->
+<!-- assertion: null-not-number -->
+<!-- /assertion-anchors -->
+
+
+
+
+
 #### Must probe — Bugbot often misses these
+
+<!-- probe: lock-error-propagation -->
 
 When the diff touches locks, mutations, OAuth/refresh, detached/background tasks, `finally` cleanup, or HTTP/API error mapping, **explicitly** check:
 
@@ -250,7 +386,21 @@ When the diff touches locks, mutations, OAuth/refresh, detached/background tasks
 
 Skip this block only when the diff clearly has none of those surfaces (say so in chat).
 
+<!-- assertion-anchors -->
+<!-- assertion: complementary-must-probe -->
+<!-- assertion: typed-catch-detached -->
+<!-- assertion: finally-not-replace-error -->
+<!-- assertion: lock-contention-409-503 -->
+<!-- assertion: deterministic-lock-regressions -->
+<!-- /assertion-anchors -->
+
+
+
+
+
 #### Must probe — credential transport and OAuth baseUrl (CodeRabbit/Codex often catch these first)
+
+<!-- probe: credential-transport -->
 
 When the diff adds or changes an **OAuth / token / key provider flow** (new provider adapter, OAuth callback server, credential import, token refresh) or any outbound request that attaches `Authorization` / `Bearer` / API-key headers, **explicitly** check:
 
@@ -263,9 +413,63 @@ When the diff adds or changes an **OAuth / token / key provider flow** (new prov
 
 Skip only when the diff clearly adds no OAuth/token/key provider surface (say so in chat).
 
+<!-- assertion-anchors -->
+<!-- assertion: oauth-token-no-cleartext -->
+<!-- assertion: baseurl-https-only-credential-provider -->
+<!-- assertion: shared-http-validator-not-enough -->
+<!-- assertion: sibling-providers-same-rule -->
+<!-- /assertion-anchors -->
+
+
+
+
+
 #### Security → bug handoff
 
 If this session’s **security** pass already touched lock/CAS/auth-refresh/error-mapping, the bug complementary pass **still** must run the Must-probe checks above on those paths. Security Pass ≠ error-propagation covered.
+
+<!-- assertion-anchors -->
+<!-- assertion: security-pass-not-skip-bug-probe -->
+<!-- /assertion-anchors -->
+
+### 2b. Probe-application evidence (required when not skipDeep)
+
+The complementary pass is **not complete** until it emits machine-checkable
+probe-application evidence and a verifier accepts it. This is the model-behavior
+half of probe coverage: the deterministic scope engine fires `requiredProbes[]`,
+but only the review can prove each probe was **applied** to the diff.
+
+1. For every id in `bugScope.requiredProbes[]`, record one evidence entry:
+   `{ probeId, status, files?, reason? }`.
+2. `status` is one of:
+   - `"clean"` — the probe was applied to every trigger file and found nothing;
+   - `"findings"` — at least one concrete finding card; `files` must list the
+     reviewed paths (each must be a probe trigger file from the scope output);
+   - `"n-a"` — the probe was intentionally not applied; `reason` is **required**
+     and must be concrete (e.g. "no OAuth surface in the final diff").
+3. Save the evidence map and run the verifier:
+
+   ```bash
+   node "<github-delivery>/scripts/verify-probe-coverage.mjs" \
+     --scope-file <bugScope.json> --evidence-file <probe-evidence.json>
+   ```
+
+4. Exit `0` (`valid: true`) is the only normal completion proof for the probe
+   half of the bug axis. Exit `1` lists the missing/invalid probes — repair the
+   evidence and re-run. Exit `2` means the verifier itself failed.
+5. Chat and the pre-conclusion audit must include the verifier result and the
+   per-probe statuses. Do **not** claim the complementary pass is complete
+   while any required probe lacks accepted evidence.
+
+<!-- assertion-anchors -->
+<!-- assertion: probe-evidence-required -->
+<!-- assertion: verify-probe-coverage-before-done -->
+<!-- assertion: na-evidence-concrete-reason -->
+<!-- /assertion-anchors -->
+
+
+
+
 
 ### 3. Validate findings (confidence)
 
@@ -335,6 +539,7 @@ On **fix-pr-bots / full-review / create-PR**:
 - `bug-scope.mjs` run for PRs (JSON summarized)
 - If skipDeep: n/a recorded with why
 - Else: static analysis leads run (or n/a with why); complementary lenses completed; on Cursor Bugbot attempted (or unavailability stated)
+- **Probe-application evidence emitted for every `requiredProbes[]` id and accepted by `scripts/verify-probe-coverage.mjs` (exit 0)** — or skipDeep recorded
 - Deep method run when not skipDeep: input gathered, attack-surface map built, trio verdicts in the four buckets, coverage stated honestly
 - No fake Bugbot on Claude/Codex
 - No deep multi-agent kit unless user asked

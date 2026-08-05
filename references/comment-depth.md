@@ -8,6 +8,16 @@ Vague posts are a bug. Prefer **structured detail** over one-liners — still sc
 
 1. **Name concrete things** in backticks: files, symbols, checks, SHAs, PR/issue numbers, branches.
 2. **GitHub `@mentions` stay bare** — write `@user`, never `` `@user` ``. Backticks kill the mention (no notify, looks like code). Same for merge thanks / verdict / any public comment.
+
+<!-- assertion-anchors -->
+<!-- assertion: bare-at-mention -->
+<!-- assertion: never-backtick-at-login -->
+<!-- assertion: verdict-or-thanks -->
+<!-- /assertion-anchors -->
+
+
+
+
 3. **Say what you checked** (paths, tip SHA, tests/commands) and **what you concluded** — not “looks fine.”
 4. **Separate facts from judgment:** evidence → finding → action (fixed / declined / follow-up).
 5. **Per-axis completeness:** if a template has a section, fill it (use `none` / `n/a` with why when empty).

@@ -6,6 +6,41 @@ All notable changes to `github-delivery` are documented here.
 
 ### Added
 
+- Machine-checkable probe-application evidence. The bug and security axes are
+  no longer complete on assertion alone: the review must emit a
+  `{ probeId, status, files?, reason? }` record for every `requiredProbes[]`
+  id and `scripts/verify-probe-coverage.mjs` must exit `0`. Statuses are
+  enforced (`clean` / `findings` / `n-a`; n-a requires a concrete reason;
+  findings requires reviewed files that are the probe's trigger files; unknown
+  or non-required probes are rejected). Regression case
+  `R-probe-evidence-required-2026-08-05` pins the contract.
+
+- Deterministic diff-shape → probe routing. Every bug class is a named probe
+  declared in `scripts/lib/probe-registry.mjs` (axis, lens/surface, trigger
+  regexes, assertion markers). `planReviewScope` now emits `requiredProbes`
+  from the diff's added/removed lines and changed paths, and the reference
+  docs carry a `<!-- probe: … -->` tag on each Must-probe block. The offline
+  evals (`validate-evals.mjs`) execute `tests/evals/scope-cases.jsonl`
+  fixtures asserting the exact probe set each CodeRabbit/Codex diff-shape
+  class must route to, and verify every probe is tagged in a doc that also
+  carries its assertion markers. A trigger that stops firing, a dropped
+  probe tag, or an assertion moved off its probe's doc is now a CI break.
+
+- Regression-assertion → probe-anchor binding: `scripts/validate-evals.mjs`
+  now requires every `regression-cases.jsonl` assertion id to carry a
+  `<!-- assertion: <id> -->` marker inside one of the case's expected
+  resources. Deleting or renaming a Must-probe rule in `references/` /
+  `SKILL.md` without updating its regression case now fails the offline
+  evals (`assertion_not_bound` / `assertion_not_in_expected_resources` /
+  `assertion_marker_orphan`), so documented bot-finding classes can no
+  longer drift away from their regression cases silently. All 199 retained
+  regression assertions are anchored across `references/bug-review.md`,
+  `references/security-review.md`, `references/fix-pr-bots.md`,
+  `references/spec-standards-review.md`, `references/watch-pr.md`,
+  `references/shared-rules.md`, `references/full-review-pr.md`,
+  `references/comment-depth.md`, `references/stacked-prs.md`,
+  `references/merge-pr.md`, and `SKILL.md`.
+
 - Same-head full-review verdict anti-noise (PR #1066): second full-review
   runs on the exact same head reuse the completed format-valid verdict when
   the label and required TLDR bullets are unchanged. Machine helper:

@@ -242,5 +242,9 @@
   {
     "id": "R-pr1066-full-review-signal-2026-08-05",
     "sha256": "f4062cd6fa4dcbc79c63a6a81fdac7fa75348ae2504987bd672273b8345f7209"
+  },
+  {
+    "id": "R-probe-evidence-required-2026-08-05",
+    "sha256": "ca02ecdbc65f41a9cd8601dc22389eafd4eec8f7bfd5d79cef8bb76a062a4720"
   }
 ]

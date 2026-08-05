@@ -211,6 +211,25 @@ publication-unavailable hard blocker was recorded as described above.
 `details_dropdown_missing`, `tldr_not_before_details`); repair the current-run
 comment and re-verify before marking the plan item complete.
 
+<!-- assertion-anchors -->
+<!-- assertion: verdict-requires-tldr -->
+<!-- assertion: details-dropdown-required -->
+<!-- assertion: format-gate-blocks-completion -->
+<!-- assertion: verdict-tldr-first -->
+<!-- assertion: tldr-covers-all-axes -->
+<!-- assertion: full-verdict-in-details -->
+<!-- assertion: no-detail-dropped -->
+<!-- assertion: verdict-publication-intrinsic -->
+<!-- assertion: verdict-publication-verified -->
+<!-- assertion: full-review-verdict-authority -->
+<!-- assertion: read-only-not-default-for-full-review -->
+<!-- assertion: router-mode-authority -->
+<!-- assertion: no-self-read-only-for-full-review -->
+<!-- assertion: chat-only-requires-unavailable-blocker -->
+<!-- /assertion-anchors -->
+
+
+
 Once `Publish final verdict` is marked complete, that comment becomes immutable
 historical review evidence.
 
@@ -264,7 +283,18 @@ A normal full review does not simplify code merely because an opportunity is vis
 2. Usefulness pass: real bug / claimed value? If not → `not-useful` verdict and stop that PR only.
 3. Parallel where useful: **Bug** via **`references/bug-review.md`** (scope → Bugbot when Cursor → static analysis leads + complementary). On Cursor, use that file's literal `review-bugbot` prompt contract; do not construct or paraphrase a replacement prompt in this workflow. **Security** via **`references/security-review.md`** (never Cursor harness `security-review` / `review-security`). Run **Spec + Standards** through the bundled **`references/spec-standards-review.md`** method. It owns the fixed comparison, source discovery, two independent axes, and advisory `references/code-smells.md` baseline; do not depend on an optional external review skill.
 4. Triage open human + bot comments (shared rules — owners/maintainers first). Fix useful; decline nits with rationale. Inline replies in-thread only.
-5. Update from base and push the base sync **only when the PR is ours** (shared **PR ownership boundary**); on a foreign PR, record the owner actions (update from latest base / resolve conflicts) for the verdict and do not push the base sync. Push scoped fixes under the existing fork-head/push rules; **verify compile/tests against tip**; **wait and recheck** until useful threads quiet **and** required CI green on that tip SHA, or a hard blocker. Use **rate-limit backoff** (Composio → gh) on dense polls. **Doomed-run guard:** if a bot review (CodeRabbit/Codex) is still in progress or an actionable human thread is open, finish triage and patch/push **before** settling into the CI poll; if a bot review lands during the wait with findings on this diff, stop waiting, fix + push, and restart the CI wait on the new SHA.
+5. Update from base and push the base sync **only when the PR is ours** (shared **PR ownership boundary**); on a foreign PR, record the owner actions (update from latest base / resolve conflicts) for the verdict and do not push the base sync.
+
+<!-- assertion-anchors -->
+<!-- assertion: foreign-pr-no-base-push -->
+<!-- assertion: foreign-pr-no-simplify-edit -->
+<!-- assertion: verdict-tells-owner -->
+<!-- assertion: owner-updates-base -->
+<!-- /assertion-anchors -->
+
+
+
+ Push scoped fixes under the existing fork-head/push rules; **verify compile/tests against tip**; **wait and recheck** until useful threads quiet **and** required CI green on that tip SHA, or a hard blocker. Use **rate-limit backoff** (Composio → gh) on dense polls. **Doomed-run guard:** if a bot review (CodeRabbit/Codex) is still in progress or an actionable human thread is open, finish triage and patch/push **before** settling into the CI poll; if a bot review lands during the wait with findings on this diff, stop waiting, fix + push, and restart the CI wait on the new SHA.
 6. Changelog nudge if user-facing.
 7. **Optional simplify phase:** only when the user explicitly asks, run `references/simplify-pr.md` after the concrete bug, security, spec, review, base, and CI work above is clean but before posting the verdict.
    - **Foreign PRs (not ours):** run the candidate pass, then **do not edit or push**; include the complete bounded candidate list in the verdict for the PR owner and skip the approval-to-apply, validation, push, and re-review flow.

@@ -1,9 +1,61 @@
 import { spawnSync } from "node:child_process";
 
+import { PROBE_REGISTRY, validateProbeRegistry } from "./probe-registry.mjs";
+
 const CODE_RE = /\.(?:[cm]?[jt]sx?|mjs|cjs|py|go|rs|java|kt|rb|php|cs|swift|c|cc|cpp|h|hpp|vue|svelte)$/i;
 const DOC_RE = /\.(?:md|txt|rst|adoc)$/i;
 const LOCK_RE = /(^|\/)(?:package-lock\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb?|Cargo\.lock|go\.sum|Gemfile\.lock|composer\.lock)$/i;
 const MANIFEST_RE = /(^|\/)(?:package\.json|Cargo\.toml|go\.mod|pyproject\.toml|requirements[^/]*\.txt|Gemfile|composer\.json)$/i;
+
+// Exported so the eval validator can validate the probe registry against the
+// real lens/surface id universe without re-deriving it.
+export const KNOWN_LENS_IDS = [
+  // baseline/complementary umbrella lenses
+  "silent_failures",
+  "resource_leaks",
+  "edge_cases",
+  // detailed lenses from LENS_SPECS
+  "error_propagation",
+  "resource_lifecycle",
+  "concurrency_races",
+  "retry_idempotency",
+  "filesystem_atomicity",
+  "network_cancellation",
+  "parsing_serialization",
+  "time_clocks",
+  "state_consistency",
+  "ui_async_state",
+  "api_compatibility",
+  "boundary_conditions",
+  // complementary table lenses
+  "api_cli_wiring",
+  "input_shape",
+  "evidence_semantics",
+  "hot_path_scale",
+  "determinism_metrics",
+  "malformed_input_robustness",
+  "budget_correctness",
+];
+
+export const KNOWN_SECURITY_SURFACE_IDS = [
+  "authn",
+  "authz",
+  "injection",
+  "ssrf_outbound",
+  "secrets_config",
+  "uploads_files",
+  "webhooks_payments",
+  "ci_actions",
+  "supply_chain",
+  "logging_privacy",
+  "ai_agent_mcp",
+  "agentic_skills_supply_chain",
+  "crypto_session",
+  "business_logic",
+  "iac_docker",
+  "data_storage",
+  "api_compatibility",
+];
 
 const DOMAIN_SPECS = [
   ["authn", "security", /auth|session|login|oauth|jwt|passport|credential/i, /authenticate|login|logout|session|oauth|jwt|bearer|password|passkey|webauthn|cookie|token/i],
@@ -180,6 +232,29 @@ export function planReviewScope(input = {}) {
     required: entry.score >= 3,
   })).sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
 
+  // Probe routing: a probe fires when any trigger regex matches an added line
+  // or a changed path. This is the deterministic bridge from diff shape to the
+  // named Must-probe blocks in bug-review.md / security-review.md.
+  const probeHits = new Map();
+  for (const file of files) {
+    const paths = [file.path, file.previousPath].filter(Boolean);
+    const { added, removed } = patchLines(file.patch);
+    for (const probe of PROBE_REGISTRY) {
+      const mode = probe.mode || "added";
+      const matchedPath = paths.some((path) => probe.triggers.some((re) => re.test(path)));
+      const linePool = mode === "removed" ? removed : mode === "both" ? [...added, ...removed] : added;
+      const matchedLine = linePool.some((line) => probe.triggers.some((re) => re.test(line)));
+      if (matchedPath || matchedLine) {
+        if (!probeHits.has(probe.id)) probeHits.set(probe.id, []);
+        probeHits.get(probe.id).push(file.path);
+      }
+    }
+  }
+  const requiredProbes = [...probeHits.keys()].sort();
+  const probeEvidence = Object.fromEntries(
+    [...probeHits.entries()].map(([id, filesHit]) => [id, { files: [...new Set(filesHit)].sort() }]),
+  );
+
   const domains = finalize(evidence);
   const bugLenses = finalize(lensEvidence);
   const requiredSecurity = domains.filter((item) => item.category === "security" && item.required);
@@ -192,6 +267,16 @@ export function planReviewScope(input = {}) {
   const uncertainty = [];
   if (missingPatches.length) uncertainty.push({ code: "patch_missing", files: missingPatches, effect: "Do not downgrade path-only signals below baseline without manual inspection." });
   if (files.length >= 100) uncertainty.push({ code: "large_diff", fileCount: files.length, effect: "Partition review by domain and verify pagination completeness." });
+
+  // Registry integrity: a probe that references an unknown lens/surface or has
+  // no triggers/assertions must fail the plan rather than silently routing.
+  const registryErrors = validateProbeRegistry(
+    KNOWN_LENS_IDS,
+    KNOWN_SECURITY_SURFACE_IDS,
+  );
+  for (const error of registryErrors) {
+    uncertainty.push({ code: "probe_registry_invalid", ...error });
+  }
 
   return {
     schemaVersion: 2,
@@ -209,6 +294,8 @@ export function planReviewScope(input = {}) {
     bugLenses,
     securityReview: { depth: securityDepth, requiredDomains: requiredSecurity.map((item) => item.id) },
     bugReview: { depth: bugDepth, requiredLenses: requiredBug.map((item) => item.id) },
+    requiredProbes,
+    probeEvidence,
     baselineScreens: logicFiles.length ? ["authn", "authz", "secrets_config", "injection", "error_propagation", "boundary_conditions"] : [],
     uncertainty,
     complete: uncertainty.length === 0,
@@ -217,6 +304,7 @@ export function planReviewScope(input = {}) {
       "Removed controls and broadened workflow permissions require proof that the original invariant still holds.",
       "Use renamed source and destination paths when interpreting ownership and security boundaries.",
       "Do not skip a domain solely because another review tool reported clean results.",
+      "Every probe in `requiredProbes` names a Must-probe block in bug-review.md / security-review.md; walk each one against the diff.",
     ],
   };
 }

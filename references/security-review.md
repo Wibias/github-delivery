@@ -4,6 +4,16 @@
 
 **Adversarial / red-team second pass:** only when the user **explicitly** asks (e.g. “adversarial pass”, “red team”, “red-team”, “second security pass”, “run garak/promptfoo”). **Never** start it on your own — not after Pass, not because `ai-agent-security` mentions red-teaming, not because AST10 flagged.
 
+<!-- assertion-anchors -->
+<!-- assertion: never-auto-adversarial -->
+<!-- assertion: adversarial-only-if-user-asked -->
+<!-- assertion: adversarialPassDefault-false -->
+<!-- /assertion-anchors -->
+
+
+
+
+
 ## Goal
 
 Run a **hardened, evidence-based** security review on the named **PR(s) and/or issue area(s)**. Prefer finding real exploitable issues over a shallow “LGTM.” Fix what can/should be fixed when a PR branch is in scope. When reviewing **issues**, post a **redacted** review on each issue and give the **full** findings (including abuse paths) **only in chat**.
@@ -41,18 +51,47 @@ node "<github-delivery>/scripts/security-scope.mjs" OWNER/REPO N
 ```
 
 - Cover every `requiredSurfaces[]` row in the chat matrix.
+- Every id in `requiredProbes[]` names a **probe block below** (credential-transport / secrets-scan / removed-controls) — walk each one against the diff.
 - If `requireAiAgentSecurity: true` → **must** load skill **`ai-agent-security`** and review those paths (defensive app/agent review — **not** a red-team suite).
 - If `requireAgenticSkillsTop10: true` → **must** load **`references/agentic-skills-top10.md`** + **`ai-agent-security`** (MCP/tool refs) and cover AST01–AST10 for skill/MCP install paths.
 - If `requireDepsAudit: true` → run a package-manager audit as a **lead** (`bun audit` / `pnpm audit` / `npm audit` / `cargo audit` per `packageManager`). Do not invent CVEs; cite command output.
 - If `removedControlLeads` is non-empty → treat those deleted lines as **leads**; prove the control still exists elsewhere or file a finding.
+
+<!-- probe: removed-controls -->
 - `adversarialPassDefault` is always `false` — ignore any temptation to “also red-team.”
 - Follow `instructions[]` from the JSON.
+
+<!-- assertion-anchors -->
+<!-- assertion: security-scope-mjs -->
+<!-- assertion: required-surfaces -->
+<!-- assertion: ai-agent-when-flagged -->
+<!-- assertion: ast01-ast10-matrix -->
+<!-- assertion: load-agentic-skills-top10-md -->
+<!-- assertion: load-ai-agent-security -->
+<!-- assertion: require-agentic-skills-top10 -->
+<!-- assertion: confidence-in-instructions -->
+<!-- assertion: removed-controls-leads -->
+<!-- /assertion-anchors -->
+
+
+
+
 
 Issue-only (no PR): derive surfaces manually from implicated paths using the same categories; still apply AI/deps/IaC/crypto/AST10 rules when those paths match; still scan for removed controls in the tip/PR diff when available.
 
 ### 1. In-session security pass (required for PR diffs)
 
 **HARD RULE — never use the Cursor harness security agent.** Do **not** launch Task `subagent_type: "security-review"`, skill **`review-security`**, or any other built-in “Security Review” harness stub. Those are shallow and steal the prompt from this workflow. Security for github-delivery is **this file** only.
+
+<!-- assertion-anchors -->
+<!-- assertion: never-harness-security-review -->
+<!-- assertion: use-github-delivery-security-review-md -->
+<!-- assertion: bugbot-ok-security-not-harness -->
+<!-- /assertion-anchors -->
+
+
+
+
 
 1. Checkout PR head (shared **Subagent preflight** — checkout rules still apply; bugbot may use them separately).
 2. Review **branch changes vs PR base** in this session (parent), **or** one **general-purpose** subagent whose prompt says: follow `github-delivery` `references/security-review.md` + shared-rules for this PR — **never** `subagent_type: "security-review"`.
@@ -77,6 +116,8 @@ When (and only when) asked:
 If not asked: do not offer unprompted, do not “also run” after Pass, do not treat AST10 or `ai-agent-security` as permission to red-team.
 
 ### 2. Secrets scan (required when checkout exists)
+
+<!-- probe: secrets-scan -->
 
 - Run secrets scan on the repo / changed paths when possible (`python …/security-review/scripts/scan_secrets.py <path>` or equivalent).
 - Treat hits as **leads**; never print full secret values.
@@ -114,7 +155,23 @@ Fill every **scope-required** surface plus any you touched. Each row: `done` + e
 | **IaC / Docker** | Dockerfile/compose/K8s/Terraform: privileged containers, secrets in images, open ports, overly broad IAM/RBAC |
 | **Variant analysis** | After any confirmed bug, search for the same pattern nearby |
 
+<!-- probe: credential-transport -->
+
 **Cannot claim “no security issues”** unless every **required** row is `done` or honestly `n/a`. Residual risk must be listed.
+
+<!-- assertion-anchors -->
+<!-- assertion: coverage-matrix-required -->
+<!-- assertion: no-shallow-pass -->
+<!-- assertion: subagent-required -->
+<!-- assertion: provider-credential-destination -->
+<!-- assertion: secrets-scan -->
+<!-- assertion: iac-docker-surface -->
+<!-- assertion: crypto-session-when-flagged -->
+<!-- /assertion-anchors -->
+
+
+
+
 
 ### 5. Validate findings (confidence + Do-Not-Flag)
 
@@ -129,6 +186,16 @@ Research surrounding code before reporting. Diff-scoped report; codebase-deep ve
 | **LOW** | Theoretical, style, or defense-in-depth with no realistic path | Do **not** list as a finding; optional one-line residual |
 
 Severity (Critical/High/Medium/Low/Info) and confidence are independent. A High-severity *hypothesis* with MEDIUM confidence stays under Needs verification.
+
+<!-- assertion-anchors -->
+<!-- assertion: confidence-medium-needs-verification -->
+<!-- assertion: no-confirmed-without-high -->
+<!-- assertion: do-not-flag-low -->
+<!-- /assertion-anchors -->
+
+
+
+
 
 #### Do Not Flag
 
@@ -223,6 +290,16 @@ hypothetical one.
 
 Never output **Pass** while High/Critical items are only “noted,” MEDIUM-confidence, or Needs verification.
 
+<!-- assertion-anchors -->
+<!-- assertion: no-pass-with-open-high -->
+<!-- assertion: fix-or-user-accept -->
+<!-- assertion: pass-after-fixes-regression -->
+<!-- /assertion-anchors -->
+
+
+
+
+
 **Pre-open gate (create-PR):** when this review runs against a **branch** via `pre-open-gate.mjs` (before opening a PR), a **Do not ship yet** decision **blocks opening the PR**. `Pass after fixes` is allowed only after the Confirmed High/Critical fixes land on the branch and the review is re-run on the new head. Chat still gets the full findings + coverage matrix; nothing is posted to GitHub because no PR exists yet.
 
 **Adversarial pass** does **not** block Pass unless the user said the review is incomplete without it.
@@ -230,6 +307,40 @@ Never output **Pass** while High/Critical items are only “noted,” MEDIUM-con
 ### Bug handoff (lock / error-mapping diffs)
 
 If this review touched locks, CAS, auth-refresh, mutation `finally`, or HTTP mapping of contention/busy: say so in chat and ensure the **bug** axis (`references/bug-review.md` Must-probe) still covers error propagation (typed catch in detached tasks, `finally` not replacing the original error, retryable 409/503, deterministic lock/cleanup tests). Security Pass alone does **not** close that bug coverage.
+
+### 6b. Probe-application evidence (required for PR diffs)
+
+The security axis is **not complete** until it emits machine-checkable
+probe-application evidence for the deterministic probes the scope engine fired.
+
+1. For every id in `securityScope.requiredProbes[]` (credential-transport /
+   secrets-scan / removed-controls), record one evidence entry:
+   `{ probeId, status, files?, reason? }`.
+2. `status` is one of:
+   - `"clean"` — the probe was applied to every trigger file and found nothing;
+   - `"findings"` — at least one confirmed/needs-verification item; `files`
+     must list the reviewed paths (each a probe trigger file);
+   - `"n-a"` — the probe was intentionally not applied; `reason` is **required**
+     and concrete (e.g. "no credential-bearing outbound surface in the diff").
+3. Save the evidence map and run the verifier:
+
+   ```bash
+   node "<github-delivery>/scripts/verify-probe-coverage.mjs" \
+     --scope-file <securityScope.json> --evidence-file <probe-evidence.json>
+   ```
+
+4. Exit `0` (`valid: true`) is the only normal completion proof for the probe
+   half of the security axis. Exit `1` lists missing/invalid probes — repair
+   and re-run. Exit `2` means the verifier itself failed.
+5. Do **not** claim a security decision (Pass / Pass after fixes / Do not ship
+   yet) while any required probe lacks accepted evidence.
+
+<!-- assertion-anchors -->
+<!-- assertion: probe-evidence-required -->
+<!-- assertion: verify-probe-coverage-before-done -->
+<!-- assertion: na-evidence-concrete-reason -->
+<!-- /assertion-anchors -->
+
 
 ## Domain heuristics (common ship-loop misses)
 
@@ -263,6 +374,7 @@ If this review touched locks, CAS, auth-refresh, mutation `finally`, or HTTP map
 - Deps audit run when scope requires it (or `n/a` with tool missing)
 - Secrets scan attempted or `n/a` justified
 - Coverage matrix complete for all **required** surfaces (incl. crypto/session, business logic, removed controls, IaC/Docker, agentic skills when flagged)
+- **Probe-application evidence emitted for every `requiredProbes[]` id and accepted by `scripts/verify-probe-coverage.mjs` (exit 0)** for PR diffs
 - Confidence labels applied; Do-Not-Flag respected
 - Pass gate satisfied for the stated decision
 - User has full exploit/fix detail in chat

@@ -141,3 +141,56 @@ test("captures API compatibility changes", () => {
   assert.ok(domain(result, "api_compatibility"));
   assert.ok(lens(result, "api_compatibility"));
 });
+
+test("routes OAuth baseUrl cleartext diff to credential-transport probe", () => {
+  const result = plan([
+    file("src/providers/oauth.ts", "+const url = new URL(provider.baseUrl);\n+headers.set('Authorization', `Bearer ${token}`);\n+await fetch(url + '/alpha/generate');"),
+  ]);
+  assert.ok(result.requiredProbes.includes("credential-transport"));
+});
+
+test("routes CLI flag shift diff to api-cli-wiring probe", () => {
+  const result = plan([
+    file("cli/route-policy.ts", "+const args = process.argv.slice(2);\n+const id = args.shift();\n+if (id === '--json') { showUsage(); }\n+else dryRun(id);"),
+  ]);
+  assert.ok(result.requiredProbes.includes("api-cli-wiring"));
+});
+
+test("routes clock/LIMIT/budget diff to determinism-clocks-budgets probe", () => {
+  const result = plan([
+    file("src/router/evaluate.ts", "+const a = Date.now();\n+const b = Date.now();\n+rows = db.query('SELECT * FROM samples LIMIT 50');\n+trace = JSON.stringify(evidence);"),
+  ]);
+  assert.ok(result.requiredProbes.includes("determinism-clocks-budgets"));
+});
+
+test("routes SQLite NULL cast diff to malformed-input-robustness probe", () => {
+  const result = plan([
+    file("src/store/read.ts", "+const rows = db.prepare('SELECT duration_ms, status FROM samples').all() as HealthSample[];"),
+  ]);
+  assert.ok(result.requiredProbes.includes("malformed-input-robustness"));
+});
+
+test("routes alias self-recursion diff to recursion-termination probe", () => {
+  const result = plan([
+    file("src/router/resolve.ts", "+export function resolveAlias(alias: string): string {\n+  const target = routeModel(alias);\n+  return target === alias ? resolveAlias(target) : target;\n+}"),
+  ]);
+  assert.ok(result.requiredProbes.includes("recursion-termination"));
+});
+
+test("routes removed authz control to removed-controls probe (removed-line mode)", () => {
+  const result = plan([
+    file("src/api/admin.ts", "-if (!requireAdmin(user)) throw forbidden();\n+return destroyAccount();"),
+  ]);
+  assert.ok(result.requiredProbes.includes("removed-controls"));
+});
+
+test("docs-only diff routes no probes", () => {
+  const result = plan([file("docs/guide.md", "+Words only")]);
+  assert.deepEqual(result.requiredProbes, []);
+});
+
+test("probe registry validates against known lens and surface ids", () => {
+  const result = plan([file("src/math.ts", "+export function add(a, b) { return a + b; }")]);
+  // A clean registry means no probe_registry_invalid uncertainty
+  assert.ok(!result.uncertainty.some((u) => u.code === "probe_registry_invalid"));
+});

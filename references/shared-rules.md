@@ -21,6 +21,15 @@ When the user writes bare `#N` / a number list without saying “issue” or “
 4. Defaults when the verb is clear: research/create/assign → **issue**; fix/watch/status/merge/full-review/re-review → **PR**.
 5. Always pass `--repo OWNER/REPO` from the issue/PR URL or `gh repo view` — never assume cwd remote is correct when the user pasted a different repo.
 
+<!-- assertion-anchors -->
+<!-- assertion: disambiguate-issue-vs-pr -->
+<!-- assertion: ask-when-both-exist -->
+<!-- /assertion-anchors -->
+
+
+
+
+
 ## Issue conversation intake
 
 Applies to: `research-issue`, `create-pr-for-issue`, `issue-workflows` triage, and any workflow that implements from an issue.
@@ -111,7 +120,14 @@ Never rewrite another run's completed marker in place to attach a new
 `full-review-run-id`. Reuse means leave that comment alone and treat the run as
 published for completion purposes when the plan says reuse is valid.
 
-The idempotency boundary is: **current run marker first**, then **same head +
+The idempotency boundary is: **current run marker first**
+
+<!-- assertion-anchors -->
+<!-- assertion: same-head-anti-noise -->
+<!-- assertion: reuse-without-material-delta -->
+<!-- assertion: no-second-top-level-verdict -->
+<!-- assertion: plan-verdict-publication -->
+<!-- /assertion-anchors -->, then **same head +
 material TLDR/label delta**, not "every explicit invocation always posts".
 
 ## Compose with other skills (do not reinvent)
@@ -156,6 +172,16 @@ Report the gate and stop that step. Fix/review may continue, but say merge-ready
    - Then push and wait for **required CI on the new SHA**.
 4. If it no longer compiles or tests fail **because of base drift** (or any other required-check failure visible on this head): **fix in this PR** with a minimal patch — even when the broken code was introduced on base / elsewhere — or hard-block only for true infra / permissions / product decisions. Do **not** claim merge-ready / approve / merge while required CI stays red “because unrelated.”
 5. Never claim merge-ready or merge while conflicted, behind base, or failing compile/tests against current tip.
+
+<!-- assertion-anchors -->
+<!-- assertion: compile-against-tip -->
+<!-- assertion: update-base -->
+<!-- assertion: no-stale-ready -->
+<!-- /assertion-anchors -->
+
+
+
+
 
 Applies to: `fix-pr-bots`, `full-review-pr`, `create-pr-for-issue`, `re-review-pr`, `merge-pr`, and `watch-pr` when auto-fixing.
 
@@ -209,6 +235,10 @@ Applies to `fix-pr-bots`, `full-review-pr`, `re-review-pr`, and `create-pr-for-i
 - Read each comment’s **body + path/line/URL** only — do not dump entire JSON payloads into context.
 - Paginate review threads when there are many (GraphQL `pageInfo` / `endCursor`).
 - Prefer acting on **new or still-open** feedback; don’t re-litigate fully addressed threads.
+
+<!-- assertion-anchors -->
+<!-- assertion: no-unnecessary-loads -->
+<!-- /assertion-anchors -->
 
 ## GitHub social mutation policy
 
@@ -388,6 +418,16 @@ A blocker changes the verdict. It does not permit the workflow to omit the verdi
 
 Only explicit user cancellation may end a full-review run without a published verdict.
 
+<!-- assertion-anchors -->
+<!-- assertion: keep-fixing -->
+<!-- assertion: ci-red-not-done -->
+<!-- assertion: no-soft-gated -->
+<!-- /assertion-anchors -->
+
+
+
+
+
 #### Watch
 
 Applies to `watch-pr`.
@@ -527,6 +567,17 @@ Any wait for required CI, a rerun, a `merge_group` job, or a bot review must be 
 2. **Wake on every change** — after each chunk, re-run the wake gate / status check. A run that finished, failed, or restarted (new SHA) must be acted on immediately, not discovered after a long sleep.
 3. **Keep it visible** — state the reason and the next verification time before idling. Never expose a raw unexplained `sleep` / `Start-Sleep`.
 
+<!-- assertion-anchors -->
+<!-- assertion: no-single-blocking-sleep-over-30s -->
+<!-- assertion: poll-dont-park -->
+<!-- assertion: wake-on-every-change -->
+<!-- assertion: keep-wait-visible -->
+<!-- /assertion-anchors -->
+
+
+
+
+
 ## Adaptive settle window (before merge-ready / approve-comment)
 
 Do **not** post `[GD] Merge ready`, linked-issue merge-ready notify, or full-review `approve-comment` from a **single** green snapshot. Green means the automated gates are currently clear; it is not a final readiness claim until the stability window and final authoritative gate complete.
@@ -550,6 +601,21 @@ Do **not** post `[GD] Merge ready`, linked-issue merge-ready notify, or full-rev
    - **Docs-only:** a docs-only push that confirms green does **not** reset the clock to a longer window; it stays on the ~30–60s fast path.
 6. At the end, run one final authoritative gate and verify the recorded PR and immediate-base heads are unchanged. Only `decision: "ready"` on those heads permits a merge-ready / `approve-comment` claim.
 7. Do not hang forever waiting for hypothetical activity. A completed window plus the final unchanged-head gate is sufficient unless an observable in-progress signal or new event resets it.
+
+<!-- assertion-anchors -->
+<!-- assertion: adaptive-settle-default-60 -->
+<!-- assertion: extended-settle-after-material-change -->
+<!-- assertion: poll-authoritative-gate-20s -->
+<!-- assertion: final-unchanged-head-gate -->
+<!-- assertion: green-is-provisional -->
+<!-- assertion: show-reason-remaining-next-check -->
+<!-- assertion: reset-on-head-review-workflow-change -->
+<!-- assertion: no-silent-sleep-over-30s -->
+<!-- /assertion-anchors -->
+
+
+
+
 
 Watch mode already keeps polling after green; the adaptive settle is only for a readiness / approval claim. General watch polling still follows its own cadence.
 ## CI — branch fix vs flake
@@ -616,6 +682,23 @@ Do **not**:
 - **“Unrelated” ≠ skip:** if required CI fails on a path this PR did not author, still classify and harden/fix (or report true infra). Leaving the branch red so “someone else’s PR can fix it” is wrong while this PR is in a merge-ready / watch / full-review loop.
 - On true infra: **rerun the failed job only**; wrong-platform reruns (ubuntu/mac when Windows crashed) count as a botched retry — correct and rerun Windows, don’t burn the budget on greens.
 
+<!-- assertion-anchors -->
+<!-- assertion: harden-not-rerun -->
+<!-- assertion: same-failure-twice-fix -->
+<!-- assertion: api-timeout-not-infra -->
+<!-- assertion: rerun-failed-only -->
+<!-- assertion: verify-windows-restarted -->
+<!-- assertion: not-green-matrix-legs -->
+<!-- assertion: fix-unrelated-required-ci -->
+<!-- assertion: not-out-of-scope-excuse -->
+<!-- assertion: minimal-harden-in-pr -->
+<!-- assertion: base-update-first -->
+<!-- /assertion-anchors -->
+
+
+
+
+
 ## Merge policy extras
 
 Before merge / merge-ready claims, also watch for:
@@ -661,6 +744,16 @@ When the user targets **more than 3** existing PRs (or research issues) in one a
 5. **Concurrency / rate limits:** if >~6 targets or GraphQL remaining is low, chunk (e.g. waves of 4–6). Apply **Rate-limit backoff** between waves. Prefer one writer per PR (each subagent owns that PR’s GitHub comments).
 6. Create-PR **opening** many PRs is still only on explicit batch ask; when that batch is **>3** issues, fan out creation/merge-ready the same way.
 7. Stacked PRs that need restack/merge order → hand off to `manage-stacked-prs` instead of blind parallel merge-ready on mid-stack.
+
+<!-- assertion-anchors -->
+<!-- assertion: gt3-subagent-fanout -->
+<!-- assertion: one-pr-per-subagent -->
+<!-- assertion: no-serialize-parent -->
+<!-- /assertion-anchors -->
+
+
+
+
 
 ## Untrusted input
 
@@ -833,6 +926,16 @@ Before claiming merge-ready (or reporting a watch **CI/review milestone**), also
 
 “CI green” alone is **not** merge-ready. Green on a **stale** SHA while behind tip is **not** merge-ready. A rate-limited bot summary is **not** “bots clean.” Approvals on an **old** SHA are **not** approvals on tip when dismiss-stale / last-push rules apply. A single quiet snapshot without the adaptive settle and final unchanged-head gate is **not** merge-ready.
 
+<!-- assertion-anchors -->
+<!-- assertion: own-reviews-required -->
+<!-- assertion: refuse-false-merge-ready -->
+<!-- assertion: bots-not-clean -->
+<!-- /assertion-anchors -->
+
+
+
+
+
 **Watch milestones** may say only “CI/reviews quiet — still watching (not full merge-ready bar)” unless own bug+security+spec were already completed this session via fix-pr/full-review. Never post `[GD] Merge ready` from watch alone. If `isInMergeQueue`: report queue position/state and keep watching until merged/closed.
 
 When merge-ready **is** valid, also notify linked issues (see `fix-pr-bots`).
@@ -913,6 +1016,16 @@ query($o:String!,$r:String!,$n:Int!,$a:String){
 
 Reply in-thread (REST replies or `addPullRequestReviewThreadReply`). Resolve with `resolveReviewThread` / helper `--resolve PRRT_…` **only** when shared social policy allows.
 
+<!-- assertion-anchors -->
+<!-- assertion: graphql-review-threads -->
+<!-- assertion: paginate-unresolved -->
+<!-- assertion: block-if-open -->
+<!-- /assertion-anchors -->
+
+
+
+
+
 ## Merge queue
 
 When `isMergeQueueEnabled` / `isInMergeQueue` (from `pr-policy-gate.mjs` or GraphQL):
@@ -922,6 +1035,18 @@ When `isMergeQueueEnabled` / `isInMergeQueue` (from `pr-policy-gate.mjs` or Grap
 3. If queue is enabled but local `.github/workflows` never mention `merge_group`, **warn**: required checks that only run on `pull_request` often stall the queue. Do not “fix” by inventing workflow edits unless the user asked — report the gap.
 4. Auto-merge + merge queue: still wait for **merged** state, not merely “entry created.”
 
+<!-- assertion-anchors -->
+
+<!-- /assertion-anchors -->
+
+
+
+<!-- assertion-anchors -->
+<!-- assertion: queued-not-merged -->
+<!-- assertion: keep-watching -->
+<!-- assertion: merge-group-warn -->
+<!-- /assertion-anchors -->
+
 ## Stale approvals / last-push
 
 After **any** push that changes `headRefOid`:
@@ -929,6 +1054,15 @@ After **any** push that changes `headRefOid`:
 1. Run `scripts/pr-policy-gate.mjs`.
 2. If dismiss-stale or last-push-approval is enabled and there is no approval on the new SHA: merge-ready is blocked; say who needs to re-approve.
 3. Do not treat `reviewDecision: APPROVED` as tip-fresh without checking approval commits vs head when those rules are on.
+
+<!-- assertion-anchors -->
+<!-- assertion: approvals-on-head-sha -->
+<!-- assertion: recheck-after-push -->
+<!-- /assertion-anchors -->
+
+
+
+
 
 ## CODEOWNERS path automation
 
@@ -956,6 +1090,15 @@ Do not rely only on the Files-changed UI hover.
 4. Syntax errors in CODEOWNERS: report; do not pretend owners are complete.
 5. Always pair path mapping (`codeowners-for-pr.mjs`) with enforcement detection (`pr-policy-gate.mjs`).
 
+<!-- assertion-anchors -->
+<!-- assertion: enforcement-vs-suggestion -->
+<!-- assertion: use-pr-policy-gate -->
+<!-- /assertion-anchors -->
+
+
+
+
+
 ## Fork head / push permission
 
 When the PR head is on a **fork** (`isCrossRepository: true` / `headRepository` ≠ canonical):
@@ -965,6 +1108,14 @@ When the PR head is on a **fork** (`isCrossRepository: true` / `headRepository` 
 3. Do **not** open a parallel fork-only “fix” PR as the deliverable. Do **not** pretend merge-ready while required fixes cannot be pushed.
 4. Same-repo heads with rejected push (branch protection, missing rights): same hard stop — ask the user; never force-push.
 
+<!-- assertion-anchors -->
+<!-- assertion: fork-head-hard-stop -->
+<!-- /assertion-anchors -->
+
+
+
+
+
 ## Stacked PRs
 
 If the PR’s `baseRefName` is itself an open PR head (or the user says “stack” / “stacked”):
@@ -973,6 +1124,16 @@ If the PR’s `baseRefName` is itself an open PR head (or the user says “stack
 2. Stop mutating stack order/bases yourself unless the user asked for stack ops.
 3. **Hand off** to skill `manage-stacked-prs` (inspect → restack/retarget → merge bottom-up). Tell the user the stack order.
 4. Fix/review/status on a single stacked PR may continue (comments/CI on that PR), but label clearly: “ready relative to parent branch, **not** trunk” until the stack skill lands it.
+
+<!-- assertion-anchors -->
+<!-- assertion: detect-stack -->
+<!-- assertion: handoff-manage-stacked-prs -->
+<!-- assertion: no-mid-stack-trunk-merge -->
+<!-- /assertion-anchors -->
+
+
+
+
 
 Detect quickly:
 
@@ -1081,6 +1242,16 @@ gh pr comment N --repo OWNER/REPO --body-file body.md
 ```
 
 4. **Verify after every create/edit:** re-fetch the comment body. Reject and re-PATCH if you see mojibake like `�un …` (first letter eaten), text that starts mid-word, or a truncated body. Use the UTF-8 file method until the fetched body matches what you intended.
+
+<!-- assertion-anchors -->
+<!-- assertion: utf8-no-bom -->
+<!-- assertion: gh-input-file -->
+<!-- assertion: verify-refetch -->
+<!-- /assertion-anchors -->
+
+
+
+
 
 ## Comments
 
