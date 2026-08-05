@@ -91,7 +91,7 @@ Confirm this request is **one** issue (or an explicit batch). Otherwise pick/ask
 1. Keep branch up to date with base; resolve conflicts; **compile against tip**.
 2. Review wait-loop: owners/maintainers + humans + bots; push; keep going until stable or hard blocker.
 3. Fix CLI / project / **required CI** failures on this head (including pre-existing / “unrelated” required failures — shared rules); required CI green (`scripts/required-checks.mjs` when helpful).
-4. **Own reviews (required):** **bug** via **`references/bug-review.md`**; **security** via **`references/security-review.md`** (never Cursor harness `security-review` / `review-security`); **Spec + Standards** (`review` skill or short pass); **proactive contract verification** (shared rules: wiring trace, operator smoke, test-honesty, docs-vs-non-goals). Checkout preflight still applies.
+4. **Own reviews (required):** **bug** via **`references/bug-review.md`**; **security** via **`references/security-review.md`** (never Cursor harness `security-review` / `review-security`); **Spec + Standards** (`review` skill or short pass); **proactive contract verification** (shared rules: wiring trace, operator smoke, test-honesty, docs-vs-non-goals, input-shape/evidence semantics, hot-path scale/determinism, malformed-input robustness). Checkout preflight still applies.
 5. CODEOWNERS path check (`scripts/codeowners-for-pr.mjs` when helpful).
 6. Changelog nudge if user-facing → `git-workflow-and-versioning` for authoring.
 7. Final evidence sweep: reconcile the PR body with the final head using **`references/pr-description.md`**. Update stale scope, behavior, validation, review notes, or limitations and confirm the closing issue reference still resolves.

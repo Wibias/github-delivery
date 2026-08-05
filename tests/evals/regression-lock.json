@@ -190,5 +190,9 @@
   {
     "id": "R-cli-flag-noop-green-tests-2026-08-05",
     "sha256": "9c3a557ed6110897962928154587ed66bc63dd8b00c1c3b2886745183f4529d1"
+  },
+  {
+    "id": "R-pr1012-green-tests-nested-shape-2026-08-05",
+    "sha256": "d142dd589b34499b42daecf7a715e19b6e05889cc8d337622a64fba90c1c5043"
   }
 ]

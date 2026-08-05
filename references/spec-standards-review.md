@@ -44,6 +44,7 @@ When the issue/PR lists explicit **non-goals** (e.g. dry-run only, no production
 - User-facing docs added/changed in the PR must not imply behavior beyond those non-goals.
 - Flag doc drift as a **Spec** blocker on merge-ready paths (e.g. docs read like production routing is live when the PR says dry-run only).
 - Cross-check resolution order, CLI examples, and operator docs against PR non-goals and references/shared-rules.md (Proactive contract verification).
+- Also cross-check **docs vs implemented behavior**: any documented config key, CLI flag, or output metric that the code does not consume/emit is a no-op or over-claim — either the code must consume it or the docs must label it future/non-goal.
 
 
 

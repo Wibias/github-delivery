@@ -718,12 +718,40 @@ For each new/changed test **name or comment** that claims behavior (tie-break, d
 
 When the PR/issue states non-goals (e.g. “dry-run only, no production routing”), user-facing docs must not read like production is live. Doc drift is a spec blocker on merge-ready paths.
 
+Also cross-check **docs vs implemented behavior**: a documented config key, flag, or metric that the code does **not** consume is a no-op/over-claim — label it future/non-goal or remove it from the docs.
+
+### 5. Input shape and evidence semantics (mandatory when the diff adds parsers/scanners/classifiers)
+
+1. **Real request shapes** — scanners must handle the shapes the runtime accepts (e.g. nested image blocks under `input[].content[]` / `messages[].content[]`), not only the flat fixture used in tests. Depth-limited scans over nested content are bugs.
+2. **Unknown is not false** — classification/eligibility must record definitive negatives; once a classifier can determine a locality/support dimension, set both complementary fields, or `allow`/`penalize` unknown modes satisfy the wrong requirement.
+3. **No inference from adjacent fields** — `parallelToolCalls === true` does not prove tool support; confirm the field actually means what the classifier claims.
+4. **Accepted inputs must affect eligibility** — every dry-run/CLI/API evidence field consumed by the operator must be read by the evaluator or explicitly documented as ignored.
+
+### 6. Hot-path scale and determinism (mandatory when the diff adds ingest/indexing/analytics or request-path work)
+
+1. **No unbounded memory** — full-file reads of large append-only ledgers or full-collection allocations before streaming are bugs on user-sized inputs; ingest bounded chunks.
+2. **No per-candidate/per-request I/O or re-computation** — disk reads, catalog parses, and duplicate expensive computation inside loops are hot-path bugs.
+3. **Incremental paths stay incremental** — identity/change checks must not use volatile fields (`size`/`mtime`) as replacement keys or every append triggers a full rebuild.
+4. **Deterministic output** — truncation/aggregation needs a stable tie-break; grouping keys must include every distinguishing dimension (e.g. profile revision).
+5. **Metric names match semantics** — `totalRequests` must be a total, not a capped sample size; drop always-equal counters.
+
+### 7. Malformed-input robustness (mandatory when the diff adds parsing/persistence/validation)
+
+1. Malformed rows/inputs must not 500 the surface — unguarded `JSON.parse` / `decodeURIComponent` on persisted or user data is a bug; skip/reject or 400.
+2. Absent vs malformed are different states — `?limit=invalid` must 400, not silently disable filtering.
+3. Validate every NOT NULL/schema-required column before returning a row; parser-accepts-then-insert-fails is a bug.
+4. Fallbacks must not defeat documented guards — `?? raw` must not resurrect an object the normalizer just rejected.
+
 **Do not post merge-ready** while any of these hold:
 
 - A new/changed surface lacks wiring trace evidence
 - Operator smoke was skipped without a documented hard blocker
 - A known no-op flag or unused public parameter remains unfixed
 - Tests claim behavior the assertions do not prove (and code was not fixed)
+- A scanner/classifier does not handle the real request shapes or leaves complementary evidence unknown when determinable
+- Ingest/indexing/analytics code loads unbounded input into memory, re-reads/parses per candidate, or breaks an incremental path on every append
+- Aggregation/truncation is non-deterministic, grouping keys omit a distinguishing dimension, or a metric name over-promises
+- Malformed input can 500 the surface or silently disable validation, or a fallback defeats a documented guard
 
 ## Final evidence sweep
 
@@ -748,7 +776,7 @@ Before claiming merge-ready (or reporting a watch **CI/review milestone**), also
 - `CHANGES_REQUESTED` still in force from a trusted reviewer
 - Draft / WIP / do-not-merge gate
 - Own bug/security/**spec-standards** blockers unfixed (merge-ready / full-review / create-PR paths)
-- **Proactive contract verification incomplete** — new/changed CLI/API/config surface lacks wiring trace, operator smoke was skipped without a documented hard blocker, a known no-op flag or unused public parameter remains, tests claim behavior the assertions do not prove, or user-facing docs oversell beyond stated non-goals
+- **Proactive contract verification incomplete** — new/changed CLI/API/config surface lacks wiring trace, operator smoke was skipped without a documented hard blocker, a known no-op flag or unused public parameter remains, tests claim behavior the assertions do not prove, user-facing docs oversell beyond stated non-goals, a scanner/classifier misses real request shapes or leaves determinable evidence unknown, ingest/analytics code loads unbounded input or breaks incremental paths, aggregation/truncation is non-deterministic or mislabeled, or malformed input can 500/fail-open
 - PR is stacked on another open PR and user asked to merge into trunk (hand off — do not fake ready)
 - Adaptive settle not completed on the unchanged current heads (or reset by new activity) on a merge-ready / `approve-comment` path — one green snapshot is not enough
 

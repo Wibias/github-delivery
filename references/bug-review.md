@@ -143,6 +143,11 @@ typecheck/compile (`tsc --noEmit`, project lint script, etc.) and analyzers
 | **resource_leaks**  | Timers/listeners/handles/connections/streams not cleaned; missing `AbortSignal` / dispose on cancel                                                       |
 | **edge_cases**      | Null/empty/partial collections; off-by-one bounds; races/TOCTOU on shared state; partial failure mid-batch; **lock/contention → caller contract** (below) |
 | **api_cli_wiring**  | New/changed CLI flags, request fields, DTO columns, route params: trace to business effect; unused public params; downstream consumers assert every field they rely on; adversarial config (empty lists, zero weights, namespace collisions) |
+| **input_shape**     | Parsers/scanners/evidence-derivers validated against the **real request shapes** the runtime accepts (nested arrays, multiple adapters), not just the fixture shape used in tests; shallow depth-limited scans over nested content are bugs |
+| **evidence_semantics** | Boolean/evidence classification must return **definitive negatives** (unknown ≠ false); no fact inferred from an adjacent field (e.g. `parallelToolCalls === true` is not proof of tool support); each classification branch must set every complementary field it can determine |
+| **hot_path_scale**  | Request-path and rebuild code must not load unbounded input into memory (full-file reads, full-ledger allocations), must not do per-candidate disk I/O or repeated expensive computation; incremental paths must not regress to full rebuilds (identity keys on volatile fields like size/mtime) |
+| **determinism_metrics** | Aggregation/truncation must be deterministic (stable tie-break keys); grouping keys include every distinguishing dimension (e.g. profile revision); output metric names must not promise more than the value means |
+| **malformed_input_robustness** | Parsers/validators must distinguish absent vs malformed, reject or skip invalid rows instead of 500 or fail-open; unguarded `JSON.parse` / `decodeURIComponent` on persisted or user input is a bug; fallback values must not defeat documented guards |
 
 On Cursor this is **additive to Bugbot** (Bugbot leans precision and can under-index leaks / silent fails / API contracts).
 
@@ -157,6 +162,40 @@ When the diff adds or changes **user-facing surfaces** (CLI subcommands/flags, H
 5. **Adversarial config** — empty candidate lists, all-zero weights, alias namespace collisions, missing subcommands, and dry-run paths that omit required inputs.
 
 Skip only when the diff clearly adds **no** new CLI/API/DTO/route surface (say so in chat).
+
+#### Must probe — input shape and evidence semantics (CodeRabbit/Codex often catch these first)
+
+When the diff adds or changes parsers, scanners, evidence derivations, capability classifiers, or eligibility logic, **explicitly** check:
+
+1. **Real request shapes** — the scanner must handle the shapes the runtime actually accepts (e.g. image blocks nested under `input[].content[]` / `messages[].content[]`), not only the flat fixture used in tests. A depth-limited scan over nested content is a **Confirmed** bug when real requests nest it.
+2. **Unknown is not false** — eligibility/classification must record definitive negatives. If a classifier can determine `localOnly`/`remoteAllowed`, `supported`/`unsupported`, etc., it must set **both** complementary fields once classified; leaving the opposite unknown lets `allow`/`penalize` unknown-evidence modes satisfy the wrong requirement.
+3. **No inference from adjacent fields** — a boolean must not be derived from a field that documents something else (e.g. `parallelToolCalls === true` does not prove tool support). Confirm the field actually means what the classifier claims.
+4. **Every accepted input affects eligibility** — if the CLI/API accepts dry-run evidence (context window, structured output, service tier, encrypted task, cost), each accepted field must be consumed by the evaluator or documented as intentionally ignored. Accepted-but-ignored inputs are no-op bugs.
+
+Skip only when the diff has no parser/scanner/classifier changes (say so in chat).
+
+#### Must probe — hot-path scale and determinism (CodeRabbit/Codex often catch these first)
+
+When the diff adds or changes request-path, ingest, indexing, or analytics code, **explicitly** check:
+
+1. **No unbounded memory** — full-file reads (`.readFileSync` of a large append-only ledger) or full-collection allocations before streaming/splitting are **Confirmed** on user-sized inputs. Read and ingest bounded chunks.
+2. **No per-candidate / per-request I/O** — disk reads, catalog parses, or expensive re-computation inside a per-candidate/per-row loop are hot-path bugs; hoist or cache.
+3. **Incremental paths stay incremental** — an identity/change check that includes volatile fields (`size`, `mtime`) turns every append into a full rebuild; stable identity (path/dev/ino/birthtime) for replacement detection, volatile fields only for tail decisions.
+4. **Deterministic output** — truncation/aggregation needs a stable tie-break key (e.g. `timestamp DESC, request_id DESC`); identical calls must analyze the same rows. Grouping keys must include every distinguishing dimension (e.g. profile revision) or revisions are conflated.
+5. **Metric names match semantics** — an output named `totalRequests` must not actually be a capped sample size; drop or rename counters that are always equal.
+
+Skip only when the diff has no request-path/ingest/analytics changes (say so in chat).
+
+#### Must probe — malformed-input robustness (CodeRabbit/Codex often catch these first)
+
+When the diff adds or changes parsers, persistence, or route/query validation, **explicitly** check:
+
+1. **Malformed rows must not 500 the surface** — unguarded `JSON.parse` / `decodeURIComponent` on a damaged persisted row or user query is a **Confirmed** bug; skip or reject the row, return 400 for malformed input.
+2. **Absent vs malformed** — a missing query param and a malformed one are different states; `?limit=invalid` must 400, not silently disable validation/filtering.
+3. **Partial/structurally-incomplete rows** — validate every NOT NULL/schema-required column before returning a row; a row that passes the parser but fails the insert is a bug (skip it per documented intent, or reject explicitly).
+4. **Fallbacks must not defeat guards** — `?? raw` or similar fallbacks that resurrect an object the normalizer just rejected re-introduce the corruption the guard was documented to prevent.
+
+Skip only when the diff has no parser/persistence/validation changes (say so in chat).
 
 #### Must probe — Bugbot often misses these
 
