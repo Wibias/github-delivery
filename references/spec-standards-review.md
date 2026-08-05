@@ -37,6 +37,16 @@ Use this order:
 
 When no spec exists, report `no spec available` under `## Spec`. Do not invent requirements from taste, convention, or what the implementation happens to do.
 
+### Docs vs non-goals (feature PRs)
+
+When the issue/PR lists explicit **non-goals** (e.g. dry-run only, no production routing yet, no live enforcement):
+
+- User-facing docs added/changed in the PR must not imply behavior beyond those non-goals.
+- Flag doc drift as a **Spec** blocker on merge-ready paths (e.g. docs read like production routing is live when the PR says dry-run only).
+- Cross-check resolution order, CLI examples, and operator docs against PR non-goals and references/shared-rules.md (Proactive contract verification).
+
+
+
 ## 3. Find the standards sources
 
 Inspect applicable files such as:
@@ -78,8 +88,13 @@ Report:
 - behavior added without support in the spec or issue
 - requirements that appear implemented but whose behavior contradicts the source
 - acceptance criteria lacking credible verification
+- docs or user-facing help that overclaim current behavior (for example future-phase routing described as production-ready)
+- explicit non-goals or phase boundaries violated by docs, CLI help, or API contracts
+- new CLI/API surfaces whose docs omit required steps, flags, or limitations stated in the issue/PR non-goals
 
 Cite the relevant requirement or state that the source provides no such requirement.
+
+When the PR states non-goals (for example "dry-run only", "no production routing yet"), **read docs and help text against those non-goals**, not only against the happy-path implementation.
 
 ## 5. Aggregate without masking
 
@@ -106,4 +121,5 @@ The axis is complete only when:
 - the spec source or its absence is recorded
 - the standards sources are listed
 - all smell findings follow the repo-override and judgement-call rules
+- docs/help were checked against explicit non-goals when the PR defines phase boundaries
 - `## Standards` and `## Spec` results are available for the final verdict

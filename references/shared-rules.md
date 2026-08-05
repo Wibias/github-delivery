@@ -674,6 +674,57 @@ When the PR clearly changes **user-facing** behavior and lacks a changelog/relea
 
 For changelog **content**, semver bump choice, and release tagging, follow `git-workflow-and-versioning` — this skill only nudges that an entry may be missing.
 
+## Proactive contract verification (find bugs before bots)
+
+Applies to: `create-pr-for-issue`, `fix-pr-bots`, `full-review-pr`, and any merge-ready claim.
+
+Green unit tests and `tsc` are **necessary, not sufficient**. CodeRabbit/Codex often catch what we miss when we stop at “tests passed.” Before merge-ready / approve / create-PR handoff, run this **in addition to** bug + security + spec reviews:
+
+### 1. Wiring audit (mandatory when the diff adds or changes user-facing surfaces)
+
+A **surface** is any new or changed: CLI flag/subcommand, HTTP route/body field, config key, public function parameter, DTO/response field consumed downstream, or documented operator behavior.
+
+For **each** surface:
+
+1. Trace end-to-end: **input → validation → handler → business effect → output** (CLI stdout/JSON, API response, persisted state).
+2. **Unused public parameters are bugs** — e.g. a flag accepted in CLI/API but never read in the evaluator/handler. Do not ship; fix in-PR on merge-ready paths.
+3. **Downstream consumers must be covered** — if route/CLI code reads `row.model`, `candidates`, `requirements`, etc., tests or smoke evidence must show those fields exist and behave; testing only `id`/`revision` while the operator uses `model` is insufficient.
+4. **No-op flags are bugs** — if toggling a flag does not change observable output (given the same inputs), treat as Confirmed until proven intentional with docs + test.
+
+Record in chat (and PR validation notes when applicable): surfaces traced, evidence per surface, any unfixed wiring gaps (hard blocker for merge-ready).
+
+Skip only when the diff has **no** new/changed surfaces (state “wiring audit: n/a — no new surfaces”).
+
+### 2. Operator smoke (mandatory for new/changed CLI or HTTP operator paths)
+
+Run at least one **real** command or request the user/operator would run — not only `bun test` / `vitest` on an isolated file.
+
+Examples:
+
+- CLI: `ocx route policy dry-run … --tools` must change requirements/output vs the same command without `--tools` when that is the contract.
+- API: POST body field must appear in response or downstream behavior; empty-body dry-run must not silently make every candidate ineligible if docs promise evaluation.
+
+If smoke cannot run (missing binary, creds, env): report **hard blocker** or fix the PR to include a runnable smoke path; do not claim merge-ready on unit tests alone.
+
+### 3. Test honesty (mandatory when the diff adds or changes tests)
+
+For each new/changed test **name or comment** that claims behavior (tie-break, dry-run, flag effect, API contract):
+
+- The assertions must **prove** that behavior — not only happy-path shape checks.
+- Flag **test illusion**: name says X, assertions prove Y → fix test or fix code before merge-ready.
+- Adversarial config inputs (empty lists, all-zero weights, namespace collisions, missing subcommand) need at least one targeted test or explicit smoke when the product accepts free-form config.
+
+### 4. Docs vs non-goals (spec axis — see `references/spec-standards-review.md`)
+
+When the PR/issue states non-goals (e.g. “dry-run only, no production routing”), user-facing docs must not read like production is live. Doc drift is a spec blocker on merge-ready paths.
+
+**Do not post merge-ready** while any of these hold:
+
+- A new/changed surface lacks wiring trace evidence
+- Operator smoke was skipped without a documented hard blocker
+- A known no-op flag or unused public parameter remains unfixed
+- Tests claim behavior the assertions do not prove (and code was not fixed)
+
 ## Final evidence sweep
 
 Before claiming merge-ready (or reporting a watch **CI/review milestone**), also load `references/gate-helpers.md` when CI, CODEOWNERS, threads, or merge-queue policy may block.
@@ -697,6 +748,7 @@ Before claiming merge-ready (or reporting a watch **CI/review milestone**), also
 - `CHANGES_REQUESTED` still in force from a trusted reviewer
 - Draft / WIP / do-not-merge gate
 - Own bug/security/**spec-standards** blockers unfixed (merge-ready / full-review / create-PR paths)
+- **Proactive contract verification incomplete** — new/changed CLI/API/config surface lacks wiring trace, operator smoke was skipped without a documented hard blocker, a known no-op flag or unused public parameter remains, tests claim behavior the assertions do not prove, or user-facing docs oversell beyond stated non-goals
 - PR is stacked on another open PR and user asked to merge into trunk (hand off — do not fake ready)
 - Adaptive settle not completed on the unchanged current heads (or reset by new activity) on a merge-ready / `approve-comment` path — one green snapshot is not enough
 

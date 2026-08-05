@@ -142,8 +142,21 @@ typecheck/compile (`tsc --noEmit`, project lint script, etc.) and analyzers
 | **silent_failures** | Empty/swallowed `catch`; ignored promises; missing error paths; fail-open that hides breakage; **error propagation** (below)                              |
 | **resource_leaks**  | Timers/listeners/handles/connections/streams not cleaned; missing `AbortSignal` / dispose on cancel                                                       |
 | **edge_cases**      | Null/empty/partial collections; off-by-one bounds; races/TOCTOU on shared state; partial failure mid-batch; **lock/contention → caller contract** (below) |
+| **api_cli_wiring**  | New/changed CLI flags, request fields, DTO columns, route params: trace to business effect; unused public params; downstream consumers assert every field they rely on; adversarial config (empty lists, zero weights, namespace collisions) |
 
 On Cursor this is **additive to Bugbot** (Bugbot leans precision and can under-index leaks / silent fails / API contracts).
+
+#### Must probe — API/CLI wiring (CodeRabbit/Codex often catch these first)
+
+When the diff adds or changes **user-facing surfaces** (CLI subcommands/flags, HTTP request/response fields, management DTOs, evaluator parameters, route-policy inputs), **explicitly** check:
+
+1. **End-to-end trace** — each new/changed input must reach a business effect (not merely parsed, forwarded, or declared). A public parameter that is never read is a **Confirmed** bug unless documented as intentionally reserved.
+2. **Downstream contract** — every field a downstream module reads from an API/DB row must be produced by the upstream layer **and** asserted in at least one test when the PR introduces that dependency.
+3. **Operator smoke** — run at least one realistic command or API call per new surface (or document why impossible). Green unit tests alone do not prove flags work.
+4. **Test honesty** — test names and PR claims must match assertions (e.g. a “tie-break” test must force a tie; an API list test must assert fields the CLI consumes).
+5. **Adversarial config** — empty candidate lists, all-zero weights, alias namespace collisions, missing subcommands, and dry-run paths that omit required inputs.
+
+Skip only when the diff clearly adds **no** new CLI/API/DTO/route surface (say so in chat).
 
 #### Must probe — Bugbot often misses these
 

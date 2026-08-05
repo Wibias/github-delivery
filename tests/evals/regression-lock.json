@@ -186,5 +186,9 @@
   {
     "id": "R-bot-defer-fabric-2026-08-05",
     "sha256": "ca458185d42bf1f7c259b8fde9dfccc21e10ac1a60eba6cba513c49ad5666c1b"
+  },
+  {
+    "id": "R-cli-flag-noop-green-tests-2026-08-05",
+    "sha256": "9c3a557ed6110897962928154587ed66bc63dd8b00c1c3b2886745183f4529d1"
   }
 ]

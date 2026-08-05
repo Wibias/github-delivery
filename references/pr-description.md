@@ -90,6 +90,7 @@ Before opening the PR:
 2. inspect the actual diff and current head;
 3. collect the validation that has already completed;
 4. write the body from that evidence, describing the current result rather than the intended plan.
+5. for new CLI/API surfaces, include wiring trace + operator smoke + test-honesty evidence (shared **Proactive contract verification**); do not claim verified when only unit tests on happy paths passed.
 
 A good body explains the change at the behavioral level. It does not copy the issue, enumerate commits, or inflate routine implementation details into unsupported outcomes.
 
