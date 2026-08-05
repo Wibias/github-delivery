@@ -38,7 +38,7 @@ Read `references/mutation-modes.md` and `references/github-mutation-broker.md` b
 6. Confirm required CI, review policy, unresolved threads, feedback, base health, and merge queue state are clear.
 7. Confirm own bug, security, and spec/standards evidence exists this session, or obtain an explicit merge-anyway instruction after explaining the missing evidence.
 8. Confirm the branch was built and tested against the current base tip.
-9. Confirm valid adaptive-settle evidence exists for the unchanged PR and immediate-base heads. If it does not, run the adaptive settle from `references/shared-rules.md`: announce that green is provisional, choose 60 or 180 seconds from the observed activity, poll `ship-gate.mjs` every 20 seconds without a silent sleep longer than 30 seconds, reset on changes, and require the final gate to return `ready`.
+9. Confirm valid adaptive-settle evidence exists for the unchanged PR and immediate-base heads. If it does not, run the adaptive settle from `references/shared-rules.md`: announce that green is provisional, choose 60 or 180 seconds from the observed activity (**~30–60s for a docs/markdown-only head**), poll `ship-gate.mjs` every 20 seconds without a silent sleep longer than 30 seconds, reset on changes, and require the final gate to return `ready`.
 10. Immediately before the first mutation, rerun the authoritative gate and verify both recorded heads are unchanged.
 11. Resolve linked issues through both GitHub closing references and body keywords.
 12. Select the repository’s normal merge method. Do not silently squash when trailers or history matter.

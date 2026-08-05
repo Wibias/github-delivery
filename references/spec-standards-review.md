@@ -44,7 +44,7 @@ When the issue/PR lists explicit **non-goals** (e.g. dry-run only, no production
 - User-facing docs added/changed in the PR must not imply behavior beyond those non-goals.
 - Flag doc drift as a **Spec** blocker on merge-ready paths (e.g. docs read like production routing is live when the PR says dry-run only).
 - Cross-check resolution order, CLI examples, and operator docs against PR non-goals and references/shared-rules.md (Proactive contract verification).
-- Also cross-check **docs vs implemented behavior**: any documented config key, CLI flag, or output metric that the code does not consume/emit is a no-op or over-claim — either the code must consume it or the docs must label it future/non-goal.
+- Also cross-check **docs vs implemented behavior**: any documented config key, CLI flag, output metric, or scoring weight that the code does not consume/emit is a no-op or over-claim — either the code must consume it or the docs must label it future/non-goal. **Scoring/weight tables especially:** when a table lists weights or dimensions the evaluator does not score independently (because it folds normalized inputs into one composite or treats them as accepted-but-inactive), the docs must match the implemented behavior — document the fold, mark the entry reserved/future, or implement the dimension. An accepted-but-inactive weight documented as active is a Spec blocker.
 
 
 
