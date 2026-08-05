@@ -107,7 +107,7 @@ Fill every **scope-required** surface plus any you touched. Each row: `done` + e
 | **Logging / privacy** | PII/secrets in logs; error leakage |
 | **AI / agent / MCP** | Prompt injection, tool poisoning, excessive agency (`ai-agent-security`) — defensive |
 | **Agentic skills supply chain** | AST01–AST10 via `references/agentic-skills-top10.md` when skill/MCP install paths change |
-| **Credential destinations / providers** | Custom destinations preserved; routing authorization |
+| **Credential destinations / providers** | Custom destinations preserved; routing authorization; **credential-bearing outbound URLs must be HTTPS-only** — a provider config that accepts `http://` `baseUrl` while the adapter attaches OAuth/API-key `Authorization` headers leaks the token in cleartext (CWE-319); check the baseUrl validator and every adapter that builds requests from `provider.baseUrl` (shared validator must not be the lenient `http(s)` kind for token-bearing providers) |
 | **Crypto / session** | Hashing/JWT/`alg=none`/key handling; cookie `HttpOnly`/`Secure`/`SameSite`; TLS/cert footguns in touched code |
 | **Business logic** | Step skipping, TOCTOU/races, entitlement/workflow bypass, multi-tenant scoping across steps |
 | **Removed controls** | Diff deletions of auth/validation/sanitize/middleware — control still enforced or finding filed |
@@ -233,7 +233,7 @@ If this review touched locks, CAS, auth-refresh, mutation `finally`, or HTTP map
 
 ## Domain heuristics (common ship-loop misses)
 
-- **Provider / preset PRs:** `preserveCustomDestination` (or equivalent); same-name custom provider must not be canonicalized onto a new host; routing auth when catalogs bundle third-party models.
+- **Provider / preset PRs:** `preserveCustomDestination` (or equivalent); same-name custom provider must not be canonicalized onto a new host; routing auth when catalogs bundle third-party models. **OAuth / key provider PRs:** baseUrl validator must be HTTPS-only for every credential-bearing adapter (a shared `http(s)` validator is not enough); callback server must keep dual-stack bind + manual-paste fallback; controller callbacks inside the server-stop boundary; `ctrl.signal` abort re-checked after awaits; credential values absent from errors/parsed output.
 - **Management / dashboard APIs:** authz on `/api/*`; Origin/CORS vs TLS terminators; admin token file ACLs.
 - **Proxy / outbound:** private-network defaults vs SSRF; metadata/link-local deny.
 - **Windows service / process control:** PID identity verification; no trust of healthz alone.

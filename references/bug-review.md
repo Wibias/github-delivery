@@ -250,6 +250,19 @@ When the diff touches locks, mutations, OAuth/refresh, detached/background tasks
 
 Skip this block only when the diff clearly has none of those surfaces (say so in chat).
 
+#### Must probe — credential transport and OAuth baseUrl (CodeRabbit/Codex often catch these first)
+
+When the diff adds or changes an **OAuth / token / key provider flow** (new provider adapter, OAuth callback server, credential import, token refresh) or any outbound request that attaches `Authorization` / `Bearer` / API-key headers, **explicitly** check:
+
+1. **OAuth-derived credentials must never travel over cleartext** — if a provider config accepts `baseUrl` and the adapter attaches an OAuth-derived `Authorization: Bearer` header to `${baseUrl}/…`, a configured `http://` URL sends the token in cleartext (CWE-319). Find where `baseUrl` is validated (`providerBaseUrlConfigError` / `new URL(…).protocol` style checks) and confirm it rejects `http:` for credential-bearing providers — or that the adapter itself enforces `https://` before building the request. A shared validator that says "must be an http(s) URL" is **not** sufficient for a provider whose requests carry tokens.
+2. **Sibling providers share the same validator** — when one provider's baseUrl gets a HTTPS-only rule, search for every adapter that attaches credentials to `provider.baseUrl` and confirm each either shares the rule or has its own; a credential-bearing sibling left on the lenient `http(s)` validator is the same bug on a different host (fix-one-forget-others).
+3. **Callback server binding matches the shared infrastructure** — a new OAuth callback path must not regress to a single-stack bind (`127.0.0.1` only) or lose the manual-paste fallback (`onManualCodeInput`) that the shared `OAuthCallbackFlow` provides for headless/Windows/remote cases; loopback listeners that fail to bind must surface a usable error, not a silent hang.
+4. **Controller callbacks are inside the cleanup boundary** — `ctrl.onAuth` / `ctrl.onProgress` (or equivalent) must run inside the same `try`/`finally` that stops the callback servers, so a throwing controller callback cannot leak listener sockets that break the next login attempt.
+5. **Cancellation is honored end-to-end** — a `ctrl.signal` abort must be re-checked after any await (credential validation `whoami`, token refresh) and before reporting progress or returning credentials; a login that "completes" after abort is a correctness bug.
+6. **Credential values never appear in errors or parsed output** — callback parsers must not echo the secret into thrown error messages or the returned object; tests must assert the absence, not just the happy-path fields.
+
+Skip only when the diff clearly adds no OAuth/token/key provider surface (say so in chat).
+
 #### Security → bug handoff
 
 If this session’s **security** pass already touched lock/CAS/auth-refresh/error-mapping, the bug complementary pass **still** must run the Must-probe checks above on those paths. Security Pass ≠ error-propagation covered.

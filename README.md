@@ -71,6 +71,8 @@ routes through `references/full-review-pr.md`. The normal bug, security, standar
 - Optional reviewers such as Cursor Bugbot cannot suppress the final verdict; unavailable reviewer evidence is recorded and the complementary review continues.
 - The bug axis runs a built-in adversarial **Finder → Challenger → Arbiter** trio (`references/bug-hunt-method.md`) with static-analysis leads (typecheck/lint/Semgrep/CodeQL when installed plus tool-free complexity/churn/marker heuristics), finding-card evidence, a Gate 0 impact bar, and honest coverage buckets (`confirmed` / `dismissed` / `manual-review` / `unreviewed`) — partial coverage is reported, never disguised as clean.
 - Security review applies Gate 0 before any Confirmed finding and checks A→B→C escalation chains before assigning severity.
+- OAuth / token / key provider reviews enforce **HTTPS-only destinations for credential-bearing adapters**: a shared `http(s)` baseUrl validator is not enough when an adapter attaches OAuth/API-key `Authorization` headers to a configured `http://` URL (CWE-319) — the validator and every sibling adapter building requests from `provider.baseUrl` are checked.
+- Bot full-review signals are acted on immediately: when a bot (e.g. `@coderabbit review`) announces a **full review** instead of an incremental one, the own bug + security + spec re-review on the current head runs first instead of settling on `[GD] Fixed` replies for a stale head.
 - Creating a PR runs a **pre-open bug + security gate** (`scripts/pre-open-gate.mjs`) against the local branch diff: the PR is not opened until required bug lenses and security surfaces are reviewed and Confirmed High/Critical findings are fixed, and never opened from an incomplete diff.
 
 - Full review traces every changed domain concept from its authoritative source through all producers, consumers, public or derived representations, materially distinct variants, and positive and negative tests.
@@ -132,9 +134,10 @@ The broker defaults to dry-run. Execution requires `--execute`, re-checks the PR
 | Watch or babysit a PR                                                     | `references/watch-pr.md`                                     |
 | Re-review after commits or reviews                                        | `references/re-review-pr.md`                                 |
 | Research an issue on development tip                                      | `references/research-issue.md`                               |
-| Create a linked PR for an issue (pre-open bug/security gate first)       | `references/create-pr-for-issue.md`                          |
+| Create a linked PR for an issue (pre-open bug/security gate first)        | `references/create-pr-for-issue.md`                          |
 | Full bug, security, and standards review                                  | `references/full-review-pr.md`                               |
 | Bug review on a PR or branch (deep adversarial method)                    | `references/bug-review.md` + `references/bug-hunt-method.md` |
+| Credential-transport / OAuth-provider bug review                          | `references/bug-review.md` → probe: credential transport     |
 | Spec and Standards review on a PR                                         | `references/spec-standards-review.md`                        |
 | Simplify, clean up, or deduplicate a PR without behavior changes          | `references/simplify-pr.md`                                  |
 | Full review plus optional approved simplification and mandatory re-review | `references/full-review-pr.md` + `references/simplify-pr.md` |
@@ -203,7 +206,7 @@ Use the **Live Integration** workflow to exercise the real lifecycle. Scheduled 
 
 ## Current status
 
-The planned implementation roadmap is complete: evidence snapshots, authoritative ship decisions, base-health isolation, feedback resolution, guarded mutations, capability discovery, behavioral evaluations, deterministic packaging, provenance-backed releases, repository security controls, private vulnerability reporting, live GitHub integration fixtures, evidence-based review scoping, the issue lifecycle (PRDs, breakdowns, triage, QA intake, refactor plans, agent briefs, out-of-scope records), internal stacked-PR lifecycle with bottom-up merging, conflict resolution, adaptive settle verification, spec and standards review, explicit behavior-preserving simplification with mandatory post-change full review, and a pre-open bug + security gate for PR creation are implemented.
+The planned implementation roadmap is complete: evidence snapshots, authoritative ship decisions, base-health isolation, feedback resolution, guarded mutations, capability discovery, behavioral evaluations, deterministic packaging, provenance-backed releases, repository security controls, private vulnerability reporting, live GitHub integration fixtures, evidence-based review scoping, the issue lifecycle (PRDs, breakdowns, triage, QA intake, refactor plans, agent briefs, out-of-scope records), internal stacked-PR lifecycle with bottom-up merging, conflict resolution, adaptive settle verification, spec and standards review, explicit behavior-preserving simplification with mandatory post-change full review, a pre-open bug + security gate for PR creation, HTTPS-only credential-transport enforcement for OAuth/key provider reviews, and immediate own-review reaction to bot full-review signals are implemented.
 
 Remaining work is operational rather than architectural: maintain the documented live repository rules, keep available GitHub security features enabled, run release acceptance for new versions, and extend the regression corpus as GitHub and agent hosts evolve.
 

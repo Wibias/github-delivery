@@ -234,5 +234,13 @@
   {
     "id": "R-full-review-same-head-reuse-2026-08-05",
     "sha256": "23ffd257c7a3c7cc8421a260f889264e0a1f18ae0f99211d1962ae7e67a7057b"
+  },
+  {
+    "id": "R-pr1066-oauth-baseurl-https-2026-08-05",
+    "sha256": "e492b47dc0a20bbdf2853a29aee442d063aff9e1da98f5e0841a86b43d5ef004"
+  },
+  {
+    "id": "R-pr1066-full-review-signal-2026-08-05",
+    "sha256": "f4062cd6fa4dcbc79c63a6a81fdac7fa75348ae2504987bd672273b8345f7209"
   }
 ]
