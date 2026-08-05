@@ -93,6 +93,49 @@ test("fails closed when no GitHub read path is available", () => {
   assert.ok(result.degraded.includes("github_read_unavailable"));
 });
 
+test("reports unprobed (not unavailable) when gh is ready but no repo could be detected", () => {
+  const result = buildRuntimeCapabilities({
+    probes: {
+      node: true,
+      git: true,
+      gh: true,
+      ghAuthenticated: true,
+      repoReadableViaGh: false,
+      headWritableViaGh: false,
+    },
+    declarations: {},
+    repo: null,
+  });
+  assert.equal(result.github.repoReadable, false);
+  assert.equal(result.github.headWritable, false);
+  assert.equal(result.fallbacks.githubReads, "unprobed");
+  assert.equal(result.fallbacks.githubWrites, "unprobed");
+  assert.ok(result.degraded.includes("github_repo_not_detected"));
+  assert.ok(!result.degraded.includes("github_read_unavailable"));
+  assert.ok(!result.degraded.includes("github_write_permission_unavailable"));
+  assert.equal(result.readyForReadOnly, false);
+  assert.equal(result.readyForMutation, false);
+});
+
+test("still reports unavailable when a repo was detected but permission is missing", () => {
+  const result = buildRuntimeCapabilities({
+    probes: {
+      node: true,
+      git: true,
+      gh: true,
+      ghAuthenticated: true,
+      repoReadableViaGh: true,
+      headWritableViaGh: false,
+    },
+    declarations: {},
+    repo: "acme/widgets",
+  });
+  assert.equal(result.fallbacks.githubReads, "gh");
+  assert.equal(result.fallbacks.githubWrites, "unavailable");
+  assert.ok(result.degraded.includes("github_write_permission_unavailable"));
+  assert.ok(!result.degraded.includes("github_repo_not_detected"));
+});
+
 test("uses Bugbot only when both host and capability support it", () => {
   const cursor = buildRuntimeCapabilities({
     host: "cursor",

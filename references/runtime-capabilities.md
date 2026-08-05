@@ -10,6 +10,8 @@ Run internally at workflow start:
 node scripts/runtime-capabilities.mjs --repo OWNER/REPO
 ```
 
+`--repo` is optional when the probe runs inside the target checkout: it detects the repository from `gh repo view` (current-directory remote) or falls back to `git config --get remote.origin.url`. Pass `--repo` explicitly when the checkout is missing or the target differs from the local remote.
+
 The script probes facts available to the local process:
 
 - operating system
@@ -80,6 +82,7 @@ A Node process cannot discover a host connector that was never exposed to it. In
 - Connected GitHub reads are preferred when declared; authenticated `gh` is the fallback.
 - A connected write path is usable only when a broker adapter is declared. Otherwise authenticated writable `gh` is used through `github-mutate.mjs`.
 - The write fallback is reported as `connector-broker`, `gh-broker`, or `unavailable`.
+- When `gh` is authenticated but no repository could be detected, read/write fallbacks are reported as **`unprobed`** with `github_repo_not_detected` in `degraded` — that is a probe gap, not a permission denial. Do **not** treat `unprobed` as evidence that writes fail; re-run with `--repo OWNER/REPO` or rely on direct evidence (authenticated `gh`, successful broker execution) before claiming the write path is blocked.
 - Raw connector write permission without a broker adapter produces `github_write_not_brokered` and cannot make the workflow mutation-ready.
 - Composio rate-limit checks are preferred when declared; authenticated `gh` is the fallback.
 - Bugbot is used only on Cursor when both host and capability declarations permit it. Every other host uses complementary lenses.

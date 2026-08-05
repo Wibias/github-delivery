@@ -30,19 +30,42 @@ function ghJson(args) {
   }
 }
 
+function detectRepo(repo) {
+  if (repo) return repo;
+  const ghDetected = ghJson(["repo", "view", "--json", "nameWithOwner"]);
+  if (ghDetected?.nameWithOwner) return ghDetected.nameWithOwner;
+  const gitUrl = spawnSync(
+    "git",
+    ["config", "--get", "remote.origin.url"],
+    { encoding: "utf8" },
+  );
+  const url = String(gitUrl.stdout || "").trim();
+  const match = url.match(
+    /(?:https?:\/\/|git@)?(?:[^/\s]+@)?github\.com[/:]([^/\s]+)\/([^/\s]+?)(?:\.git)?$/i,
+  );
+  return match ? `${match[1]}/${match[2]}` : null;
+}
+
 function liveInput(repo) {
   const gh = commandAvailable("gh");
   const ghAuthenticated =
     gh && spawnSync("gh", ["auth", "status"], { encoding: "utf8" }).status === 0;
+  const resolvedRepo = ghAuthenticated ? detectRepo(repo) : repo || null;
   const repoData =
-    repo && ghAuthenticated
-      ? ghJson(["repo", "view", repo, "--json", "nameWithOwner,viewerPermission"])
+    resolvedRepo && ghAuthenticated
+      ? ghJson([
+          "repo",
+          "view",
+          resolvedRepo,
+          "--json",
+          "nameWithOwner,viewerPermission",
+        ])
       : null;
   const permission = String(repoData?.viewerPermission || "").toUpperCase();
   return {
     host: process.env.SHIPPING_GITHUB_HOST || "unknown",
     os: process.platform,
-    repo,
+    repo: resolvedRepo,
     probes: {
       node: true,
       git: commandAvailable("git"),

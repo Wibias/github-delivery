@@ -34,6 +34,11 @@ export function buildRuntimeCapabilities({
     tools.gh && tools.ghAuthenticated && boolean(probes.repoReadableViaGh);
   const ghWritable =
     tools.gh && tools.ghAuthenticated && boolean(probes.headWritableViaGh);
+  const ghAvailable = tools.gh && tools.ghAuthenticated;
+  const repoDetected =
+    Boolean(repo) ||
+    boolean(probes.repoReadableViaGh) ||
+    boolean(probes.headWritableViaGh);
   const repoReadable = optional.connectorRead || ghReadable;
   const headWritable = optional.connectorWrite || ghWritable;
   const brokerWriteAvailable = optional.brokeredConnectorWrite || ghWritable;
@@ -55,12 +60,16 @@ export function buildRuntimeCapabilities({
       ? "connector"
       : ghReadable
         ? "gh"
-        : "unavailable",
+        : ghAvailable && !repoDetected
+          ? "unprobed"
+          : "unavailable",
     githubWrites: optional.brokeredConnectorWrite
       ? "connector-broker"
       : ghWritable
         ? "gh-broker"
-        : "unavailable",
+        : ghAvailable && !repoDetected
+          ? "unprobed"
+          : "unavailable",
     rateLimits: optional.composio
       ? "composio"
       : tools.gh && tools.ghAuthenticated
@@ -77,8 +86,13 @@ export function buildRuntimeCapabilities({
   const degraded = unique([
     !tools.node && "node_unavailable",
     !tools.git && "git_unavailable",
-    !github.repoReadable && "github_read_unavailable",
-    !github.headWritable && "github_write_permission_unavailable",
+    !github.repoReadable &&
+      !(ghAvailable && !repoDetected) &&
+      "github_read_unavailable",
+    !github.headWritable &&
+      !(ghAvailable && !repoDetected) &&
+      "github_write_permission_unavailable",
+    ghAvailable && !repoDetected && "github_repo_not_detected",
     github.headWritable &&
       !github.brokerWriteAvailable &&
       "github_write_not_brokered",
