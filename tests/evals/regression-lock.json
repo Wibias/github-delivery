@@ -198,5 +198,9 @@
   {
     "id": "R-pr1014-alias-recursion-2026-08-05",
     "sha256": "4f044947e02d46a65c07fa54337fba649ff408e610a62653652af7f43a44e0bc"
+  },
+  {
+    "id": "R-pr1013-clock-limit-budget-2026-08-05",
+    "sha256": "9afa827ed473c39a015085b3cc20855ab9a4e74a436f8d5263628d9e58058ec1"
   }
 ]

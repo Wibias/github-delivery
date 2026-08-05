@@ -727,6 +727,8 @@ Also cross-check **docs vs implemented behavior**: a documented config key, flag
 3. **No inference from adjacent fields** — `parallelToolCalls === true` does not prove tool support; confirm the field actually means what the classifier claims. Conversely, **absence of a positive flag is not proof of absence** — single tool calls work without `parallelToolCalls`, so it must not report tools as unknown and exclude valid candidates.
 4. **Accepted inputs must affect eligibility** — every dry-run/CLI/API evidence field consumed by the operator must be read by the evaluator or explicitly documented as ignored.
 5. **Aggregate all contributing source records** — evidence from persisted history must include nested contributing records (combo/failover `entry.attempts`), not only the top-level outcome row; otherwise hidden upstream failures poison health/eligibility.
+6. **Unknown must not outrank measured** — when scoring blends evidence, an unknown value must get a neutral score, not the raw priority score; otherwise unknown health/eligibility beats measured-but-imperfect evidence.
+7. **Hardcoded capability sets must match reality** — adapter/capability allowlists must be typed against the real value universe (shared literal union), or invalid ids drift silently.
 
 ### 6. Recursive/re-entrant lookups must terminate (mandatory when the diff adds routing/alias/lookup recursion)
 
@@ -746,6 +748,9 @@ Also cross-check **docs vs implemented behavior**: a documented config key, flag
 3. **Incremental paths stay incremental** — identity/change checks must not use volatile fields (`size`/`mtime`) as replacement keys or every append triggers a full rebuild.
 4. **Deterministic output** — truncation/aggregation needs a stable tie-break; grouping keys must include every distinguishing dimension (e.g. profile revision).
 5. **Metric names match semantics** — `totalRequests` must be a total, not a capped sample size; drop always-equal counters.
+6. **One decision, one clock** — a single evaluation must read `Date.now()`/`now` once and thread it; multiple clock reads in one call graph are a race (a cooldown expiring between reads produces a candidate that carries `cooldownUntilMs` but is not excluded).
+7. **Filter before LIMIT** — applying `LIMIT`/`maxRows` before the candidate/category filter loses samples non-deterministically (membership depends on unrelated traffic); filter first, then truncate.
+8. **Aggregate semantics match the doc** — a comment saying "every X or Y" must implement that union, not "all X or all Y"; mixed distributions (some in A, some in B) must still aggregate.
 
 ### 9. Malformed-input robustness (mandatory when the diff adds parsing/persistence/validation)
 
@@ -754,6 +759,13 @@ Also cross-check **docs vs implemented behavior**: a documented config key, flag
 3. Validate every NOT NULL/schema-required column before returning a row; parser-accepts-then-insert-fails is a bug.
 4. Fallbacks must not defeat documented guards — `?? raw` must not resurrect an object the normalizer just rejected.
 
+### 10. Serialization and trace budgets (mandatory when the diff adds or changes serialized traces/persisted rows)
+
+1. **Byte budgets measure bytes** — `JSON.stringify(x).length` is UTF-16 code units; a documented "≤ 16 KiB" trace must measure encoded bytes.
+2. **Cap strings/arrays to the stated limit and set `truncated` flags when capping** — silent truncation that does not flag itself hides data loss.
+3. **Do not copy caller-supplied unknown nested fields verbatim** — persist only whitelisted fields so a large or malicious nested value cannot bypass the budget.
+4. **Route body limit must match the producer budget** — a trace that fits its own budget must not exceed the management route body limit after normalization.
+
 **Do not post merge-ready** while any of these hold:
 
 - A new/changed surface lacks wiring trace evidence
@@ -761,10 +773,13 @@ Also cross-check **docs vs implemented behavior**: a documented config key, flag
 - A known no-op flag or unused public parameter remains unfixed
 - Tests claim behavior the assertions do not prove (and code was not fixed)
 - A scanner/classifier does not handle the real request shapes or leaves complementary evidence unknown when determinable
+- Unknown evidence outranks measured evidence in scoring, or a hardcoded capability/allowlist set no longer matches the actual value universe
 - A recursive/re-entrant lookup can route a resolved target back through itself (stack overflow) or an alias shadows a configured provider namespace
 - A CLI/API call path sends an empty/incomplete payload the evaluator turns into silent all-candidate rejection, or evidence aggregates only top-level rows while nested contributing records exist
 - Ingest/indexing/analytics code loads unbounded input into memory, re-reads/parses per candidate, or breaks an incremental path on every append
 - Aggregation/truncation is non-deterministic, grouping keys omit a distinguishing dimension, or a metric name over-promises
+- A single decision reads the clock multiple times (race), LIMIT is applied before the filter, or aggregate semantics do not match the documented union
+- Serialized output violates its documented byte/string budget, truncates without a flag, copies unknown nested fields verbatim, or exceeds the route body limit
 - Malformed input can 500 the surface or silently disable validation, or a fallback defeats a documented guard
 
 ## Final evidence sweep
