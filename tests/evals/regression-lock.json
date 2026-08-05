@@ -194,5 +194,9 @@
   {
     "id": "R-pr1012-green-tests-nested-shape-2026-08-05",
     "sha256": "d142dd589b34499b42daecf7a715e19b6e05889cc8d337622a64fba90c1c5043"
+  },
+  {
+    "id": "R-pr1014-alias-recursion-2026-08-05",
+    "sha256": "4f044947e02d46a65c07fa54337fba649ff408e610a62653652af7f43a44e0bc"
   }
 ]

@@ -20,9 +20,14 @@ test('shared rules require proactive contract verification before ready claims',
   assert.match(s, /Input shape and evidence semantics/);
   assert.match(s, /Hot-path scale and determinism/);
   assert.match(s, /Malformed-input robustness/);
+  assert.match(s, /Recursive\/re-entrant lookups must terminate/);
+  assert.match(s, /CLI\/API payload completeness/);
   assert.match(s, /Unknown is not false/);
   assert.match(s, /No unbounded memory/);
   assert.match(s, /Absent vs malformed/);
+  assert.match(s, /absence of a positive flag is not proof of absence/);
+  assert.match(s, /Aggregate all contributing source records/);
+  assert.match(s, /No self-recursion on a resolved target/);
   assert.match(s, /Proactive contract verification incomplete/);
 });
 
@@ -40,6 +45,10 @@ test('bug-review adds api_cli_wiring must-probe block', () => {
   assert.match(b, /malformed_input_robustness/);
   assert.match(b, /Real request shapes/);
   assert.match(b, /Unknown is not false/);
+  assert.match(b, /recursive and re-entrant lookups must terminate/i);
+  assert.match(b, /CLI\/API payload completeness/);
+  assert.match(b, /aggregate all contributing source records/i);
+  assert.match(b, /No self-recursion on a resolved target/);
   assert.match(b, /Incremental paths stay incremental/);
   assert.match(b, /Absent vs malformed/);
 });

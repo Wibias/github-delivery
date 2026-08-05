@@ -141,10 +141,10 @@ typecheck/compile (`tsc --noEmit`, project lint script, etc.) and analyzers
 | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **silent_failures** | Empty/swallowed `catch`; ignored promises; missing error paths; fail-open that hides breakage; **error propagation** (below)                              |
 | **resource_leaks**  | Timers/listeners/handles/connections/streams not cleaned; missing `AbortSignal` / dispose on cancel                                                       |
-| **edge_cases**      | Null/empty/partial collections; off-by-one bounds; races/TOCTOU on shared state; partial failure mid-batch; **lock/contention → caller contract** (below) |
+| **edge_cases**      | Null/empty/partial collections; off-by-one bounds; races/TOCTOU on shared state; partial failure mid-batch; **recursive/re-entrant lookup must terminate** (self-recursion on a resolved target = stack overflow); **lock/contention → caller contract** (below) |
 | **api_cli_wiring**  | New/changed CLI flags, request fields, DTO columns, route params: trace to business effect; unused public params; downstream consumers assert every field they rely on; adversarial config (empty lists, zero weights, namespace collisions) |
 | **input_shape**     | Parsers/scanners/evidence-derivers validated against the **real request shapes** the runtime accepts (nested arrays, multiple adapters), not just the fixture shape used in tests; shallow depth-limited scans over nested content are bugs |
-| **evidence_semantics** | Boolean/evidence classification must return **definitive negatives** (unknown ≠ false); no fact inferred from an adjacent field (e.g. `parallelToolCalls === true` is not proof of tool support); each classification branch must set every complementary field it can determine |
+| **evidence_semantics** | Boolean/evidence classification must return **definitive negatives** (unknown ≠ false); no fact inferred from an adjacent field (e.g. `parallelToolCalls === true` is not proof of tool support); **absence of a positive flag is not proof of absence** (single tool calls work without `parallelToolCalls`); **evidence must aggregate all contributing source records** (nested attempts/retries), not only top-level rows |
 | **hot_path_scale**  | Request-path and rebuild code must not load unbounded input into memory (full-file reads, full-ledger allocations), must not do per-candidate disk I/O or repeated expensive computation; incremental paths must not regress to full rebuilds (identity keys on volatile fields like size/mtime) |
 | **determinism_metrics** | Aggregation/truncation must be deterministic (stable tie-break keys); grouping keys include every distinguishing dimension (e.g. profile revision); output metric names must not promise more than the value means |
 | **malformed_input_robustness** | Parsers/validators must distinguish absent vs malformed, reject or skip invalid rows instead of 500 or fail-open; unguarded `JSON.parse` / `decodeURIComponent` on persisted or user input is a bug; fallback values must not defeat documented guards |
@@ -169,10 +169,30 @@ When the diff adds or changes parsers, scanners, evidence derivations, capabilit
 
 1. **Real request shapes** — the scanner must handle the shapes the runtime actually accepts (e.g. image blocks nested under `input[].content[]` / `messages[].content[]`), not only the flat fixture used in tests. A depth-limited scan over nested content is a **Confirmed** bug when real requests nest it.
 2. **Unknown is not false** — eligibility/classification must record definitive negatives. If a classifier can determine `localOnly`/`remoteAllowed`, `supported`/`unsupported`, etc., it must set **both** complementary fields once classified; leaving the opposite unknown lets `allow`/`penalize` unknown-evidence modes satisfy the wrong requirement.
-3. **No inference from adjacent fields** — a boolean must not be derived from a field that documents something else (e.g. `parallelToolCalls === true` does not prove tool support). Confirm the field actually means what the classifier claims.
+3. **No inference from adjacent fields** — a boolean must not be derived from a field that documents something else (e.g. `parallelToolCalls === true` does not prove tool support). Confirm the field actually means what the classifier claims. Conversely, **absence of a positive flag is not proof of absence** — a provider that runs single tool calls without `parallelToolCalls` must not report tools as unknown and exclude valid candidates.
 4. **Every accepted input affects eligibility** — if the CLI/API accepts dry-run evidence (context window, structured output, service tier, encrypted task, cost), each accepted field must be consumed by the evaluator or documented as intentionally ignored. Accepted-but-ignored inputs are no-op bugs.
+5. **Aggregate all contributing source records** — evidence derived from persisted history must include nested contributing records (e.g. combo/failover `entry.attempts`), not only the top-level outcome row; otherwise hidden upstream failures poison health/eligibility.
 
 Skip only when the diff has no parser/scanner/classifier changes (say so in chat).
+
+#### Must probe — recursive and re-entrant lookups must terminate (CodeRabbit/Codex often catch these first)
+
+When the diff adds or changes routing, alias, lookup, or resolver recursion, **explicitly** check:
+
+1. **No self-recursion on a resolved target** — after a lookup resolves a concrete target (e.g. a policy alias → winning `provider/model`), the resolved value must not be routed back through the same resolver; that recurses until stack overflow when the alias equals its own output.
+2. **Aliases must not shadow the resolver's own namespace** — if a profile alias is an explicit `provider/model` slug and aliases resolve before provider namespaces, the alias takes over the concrete route; reject aliases under configured provider namespaces or resolve concrete targets with policy lookup disabled.
+3. **Termination guard** — any resolver that calls itself (directly or via a chain) needs an exit condition that cannot be re-entered by its own output; review the guard when the output shape equals the input shape.
+
+Skip only when the diff adds no routing/alias/lookup recursion (say so in chat).
+
+#### Must probe — CLI/API payload completeness (CodeRabbit/Codex often catch these first)
+
+When the diff adds or changes a CLI command that calls a management API or evaluator, **explicitly** check:
+
+1. **The CLI sends the same payload the API/evaluator consumes** — if the evaluator needs candidate evidence for a dry-run, the CLI must populate it from config, not post only request evidence so the route converts it to an empty list (unknown-everything → `exclude` rejects valid candidates).
+2. **Empty-list semantics** — when a CLI/API converts missing input to an empty list, confirm what the evaluator does with that list; an empty candidate list combined with `unknownEvidence.capability: "exclude"` making every candidate ineligible is a wiring bug, not a dry-run success.
+
+Skip only when the diff adds no CLI→API/evaluator call path (say so in chat).
 
 #### Must probe — hot-path scale and determinism (CodeRabbit/Codex often catch these first)
 

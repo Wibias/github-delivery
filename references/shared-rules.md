@@ -724,10 +724,22 @@ Also cross-check **docs vs implemented behavior**: a documented config key, flag
 
 1. **Real request shapes** — scanners must handle the shapes the runtime accepts (e.g. nested image blocks under `input[].content[]` / `messages[].content[]`), not only the flat fixture used in tests. Depth-limited scans over nested content are bugs.
 2. **Unknown is not false** — classification/eligibility must record definitive negatives; once a classifier can determine a locality/support dimension, set both complementary fields, or `allow`/`penalize` unknown modes satisfy the wrong requirement.
-3. **No inference from adjacent fields** — `parallelToolCalls === true` does not prove tool support; confirm the field actually means what the classifier claims.
+3. **No inference from adjacent fields** — `parallelToolCalls === true` does not prove tool support; confirm the field actually means what the classifier claims. Conversely, **absence of a positive flag is not proof of absence** — single tool calls work without `parallelToolCalls`, so it must not report tools as unknown and exclude valid candidates.
 4. **Accepted inputs must affect eligibility** — every dry-run/CLI/API evidence field consumed by the operator must be read by the evaluator or explicitly documented as ignored.
+5. **Aggregate all contributing source records** — evidence from persisted history must include nested contributing records (combo/failover `entry.attempts`), not only the top-level outcome row; otherwise hidden upstream failures poison health/eligibility.
 
-### 6. Hot-path scale and determinism (mandatory when the diff adds ingest/indexing/analytics or request-path work)
+### 6. Recursive/re-entrant lookups must terminate (mandatory when the diff adds routing/alias/lookup recursion)
+
+1. **No self-recursion on a resolved target** — after a lookup resolves a concrete target (policy alias → winning `provider/model`), the resolved value must not be routed back through the same resolver; when the alias equals its own output this recurses to stack overflow.
+2. **Aliases must not shadow the resolver's namespace** — a profile alias that is an explicit `provider/model` slug takes over the concrete route when aliases resolve before provider namespaces; reject aliases under configured provider namespaces or resolve concrete targets with policy lookup disabled.
+3. **Termination guard** — any resolver that calls itself (directly or via a chain) needs an exit condition that cannot be re-entered by its own output.
+
+### 7. CLI/API payload completeness (mandatory when the diff adds a CLI → API/evaluator call path)
+
+1. **The CLI must send what the API/evaluator consumes** — a dry-run CLI that posts only request evidence while the evaluator needs candidate evidence yields an empty candidate list; with `unknownEvidence.capability: "exclude"` every candidate becomes ineligible and the dry-run silently reports failure.
+2. **Empty-list semantics must be deliberate** — converting missing input to an empty list is only correct if the evaluator treats it as intended; otherwise it is a wiring bug, not a dry-run success.
+
+### 8. Hot-path scale and determinism (mandatory when the diff adds ingest/indexing/analytics or request-path work)
 
 1. **No unbounded memory** — full-file reads of large append-only ledgers or full-collection allocations before streaming are bugs on user-sized inputs; ingest bounded chunks.
 2. **No per-candidate/per-request I/O or re-computation** — disk reads, catalog parses, and duplicate expensive computation inside loops are hot-path bugs.
@@ -735,7 +747,7 @@ Also cross-check **docs vs implemented behavior**: a documented config key, flag
 4. **Deterministic output** — truncation/aggregation needs a stable tie-break; grouping keys must include every distinguishing dimension (e.g. profile revision).
 5. **Metric names match semantics** — `totalRequests` must be a total, not a capped sample size; drop always-equal counters.
 
-### 7. Malformed-input robustness (mandatory when the diff adds parsing/persistence/validation)
+### 9. Malformed-input robustness (mandatory when the diff adds parsing/persistence/validation)
 
 1. Malformed rows/inputs must not 500 the surface — unguarded `JSON.parse` / `decodeURIComponent` on persisted or user data is a bug; skip/reject or 400.
 2. Absent vs malformed are different states — `?limit=invalid` must 400, not silently disable filtering.
@@ -749,6 +761,8 @@ Also cross-check **docs vs implemented behavior**: a documented config key, flag
 - A known no-op flag or unused public parameter remains unfixed
 - Tests claim behavior the assertions do not prove (and code was not fixed)
 - A scanner/classifier does not handle the real request shapes or leaves complementary evidence unknown when determinable
+- A recursive/re-entrant lookup can route a resolved target back through itself (stack overflow) or an alias shadows a configured provider namespace
+- A CLI/API call path sends an empty/incomplete payload the evaluator turns into silent all-candidate rejection, or evidence aggregates only top-level rows while nested contributing records exist
 - Ingest/indexing/analytics code loads unbounded input into memory, re-reads/parses per candidate, or breaks an incremental path on every append
 - Aggregation/truncation is non-deterministic, grouping keys omit a distinguishing dimension, or a metric name over-promises
 - Malformed input can 500 the surface or silently disable validation, or a fallback defeats a documented guard
