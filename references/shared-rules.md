@@ -511,6 +511,14 @@ Waiting for required CI is **poll until green (or hard blocker)** — not a fixe
 
 Adaptive settle (**normally 60 seconds after green; 180 seconds after material activity**) is separate — that is for late workflows, reviews, and GitHub state propagation, not for Windows runtime.
 
+#### Must probe — no single blocking sleep over 30s while CI is pending
+
+Any wait for required CI, a rerun, a `merge_group` job, or a bot review must be **polling**: re-check the authoritative state (check runs, `ship-gate.mjs`, rerun status) on a cadence, not one long blocking sleep. A single `sleep` / `Start-Sleep` (or a sleep loop whose chunks exceed **30 seconds**) that spans the whole remaining CI wait is a **Confirmed** bug even if it “will finish around the same time” — the run can finish early, flip to failed, or restart on a new SHA, and the agent must notice in between. Concretely:
+
+1. **Poll, don’t park** — waiting on CI/rerun/bot means re-checking status every **~1 minute** (shorter for a fast rerun), never one 4+ minute sleep. If the current wake-gate is clear, a ≤30s chunk followed by a state check is fine; a single longer block is not.
+2. **Wake on every change** — after each chunk, re-run the wake gate / status check. A run that finished, failed, or restarted (new SHA) must be acted on immediately, not discovered after a long sleep.
+3. **Keep it visible** — state the reason and the next verification time before idling. Never expose a raw unexplained `sleep` / `Start-Sleep`.
+
 ## Adaptive settle window (before merge-ready / approve-comment)
 
 Do **not** post `[GD] Merge ready`, linked-issue merge-ready notify, or full-review `approve-comment` from a **single** green snapshot. Green means the automated gates are currently clear; it is not a final readiness claim until the stability window and final authoritative gate complete.

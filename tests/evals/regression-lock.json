@@ -226,5 +226,9 @@
   {
     "id": "R-pr1015-misplaced-cli-flag-2026-08-05",
     "sha256": "5d6a6c96d0c403d55bbff5c5fe96206ce19ebcf9dd0795e4f885abd0bfde7919"
+  },
+  {
+    "id": "R-ci-wait-no-long-sleep-2026-08-05",
+    "sha256": "87b4c5677c07b9f228692cf48a374aff241a254f73ac5b2c5d91ced84006f621"
   }
 ]

@@ -64,6 +64,7 @@ routes through `references/full-review-pr.md`. The normal bug, security, standar
 - Stacked PR topology is discovered from GitHub PR bases and managed inside the skill through `references/stacked-prs.md`; stacks restack bottom-up and merge bottom-up with revalidation after every parent lands.
 - Issue lifecycle workflows cover PRDs, issue breakdown, triage, QA intake, refactor plans, `ready-for-agent` briefs, and persistent out-of-scope records.
 - Merge-ready and full-review claims require an adaptive visible-polling settle on unchanged heads: 60 seconds by default, 180 seconds after a push, rebase, restack, force-with-lease, or review/thread change, with the authoritative gate re-polled every 20 seconds.
+- Waiting on required CI or a rerun is **polling, never a single long blocking sleep**: re-check the run every ~1 minute and act the moment it finishes, fails, or restarts; a blocking `sleep`/`Start-Sleep` longer than 30 seconds is forbidden.
 - Active Git conflicts while updating or shipping a PR are resolved through `references/resolve-conflicts.md` from the intent and evidence of both sides, never from markers alone.
 - Review depth is derived from changed paths, patches, symbols, removed controls, dependencies, workflow permissions, and uncertainty rather than filenames alone.
 - Full-review execution plans end with a mandatory `Publish final verdict` item and cannot terminate while that item or any required prerequisite remains `pending` or `in_progress`.

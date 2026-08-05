@@ -109,7 +109,7 @@ On **every** poll / wake (including the first):
 - **Docs-only pushes:** when the current head is docs/markdown-only, required CI that would not exercise it adds no signal — confirm the head’s checks are green once and do not hold the poll open for legs that cannot run on it.
 - Before dense multi-PR / watch polls: check Composio `GITHUB_GET_GRAPHQL_RATE_LIMIT` (or `gh api rate_limit` / GraphQL `rateLimit`).
 - CI green, PR still open: report `automated gates currently green — still watching`, then keep polling (~1–2 minutes) for new reviews/conflicts. Do not present green as a terminal readiness claim.
-- Waiting must remain visible: state the reason and next verification time before idling; never expose a raw unexplained `sleep` / `Start-Sleep`; split any shell wait into chunks no longer than 30 seconds while preserving the API polling cadence.
+- Waiting must remain visible: state the reason and next verification time before idling; never expose a raw unexplained `sleep` / `Start-Sleep`; split any shell wait into chunks no longer than 30 seconds while preserving the API polling cadence. **Must-probe (see `shared-rules.md` “CI wait expectations”):** a single blocking sleep that spans the whole remaining CI wait (e.g. one 240s block) is forbidden even when the run “should finish by then” — poll every ~1 minute and re-check the run after each chunk.
 - On any change (new SHA, check flip, **new comment**): reset to wake gate; **re-run reviews-first**.
 - Heartbeat only when wake gate is clear **and** status changed — never a wait line that skips owner triage. Countdown output during an explicitly announced stability check is allowed.
 
