@@ -202,5 +202,29 @@
   {
     "id": "R-pr1013-clock-limit-budget-2026-08-05",
     "sha256": "9afa827ed473c39a015085b3cc20855ab9a4e74a436f8d5263628d9e58058ec1"
+  },
+  {
+    "id": "R-pr1014-normalized-requirement-2026-08-05",
+    "sha256": "6c95c43856b015ebf17c0d9f4a6ae9920f1b1f4bbf8d06759d638881e5e440f3"
+  },
+  {
+    "id": "R-pr1014-inactive-scoring-weight-docs-2026-08-05",
+    "sha256": "910cc712cbbf6bec5a19570b1f62e05e4ff1f629a4e796852ab906cf44f1214d"
+  },
+  {
+    "id": "R-pr1015-db-cast-null-score-2026-08-05",
+    "sha256": "9985683c174455c932715a3b58a4c5eac1d87d58b971adfa215b1d248c8a34b6"
+  },
+  {
+    "id": "R-pr1015-policy-limit-source-2026-08-05",
+    "sha256": "315ae0d707446eb7671add60c3dd9db56ef9f35d17b20e89834fb52038f7ccd8"
+  },
+  {
+    "id": "R-pr1015-absent-provider-false-2026-08-05",
+    "sha256": "99bd50791679ae22f961b55cc49cd6c3fa422546e10b128514d95a810fbea617"
+  },
+  {
+    "id": "R-pr1015-misplaced-cli-flag-2026-08-05",
+    "sha256": "5d6a6c96d0c403d55bbff5c5fe96206ce19ebcf9dd0795e4f885abd0bfde7919"
   }
 ]
