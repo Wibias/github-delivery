@@ -232,3 +232,44 @@ export function collectPrReviewInput(repo, pr) {
   const pages = JSON.parse(gh(["api", `repos/${repo}/pulls/${pr}/files?per_page=100`, "--method", "GET", "--paginate", "--slurp"]));
   return { repo, pr, ...meta, files: pages.flat() };
 }
+
+function git(args) {
+  const result = spawnSync("git", args, { encoding: "utf8", maxBuffer: 50 * 1024 * 1024 });
+  if (result.status !== 0) throw new Error(String(result.stderr || result.stdout || "git failed").trim());
+  return String(result.stdout || "").trim();
+}
+
+function gitMaybe(args) {
+  const result = spawnSync("git", args, { encoding: "utf8", maxBuffer: 50 * 1024 * 1024 });
+  if (result.status !== 0) return null;
+  return String(result.stdout || "").trim();
+}
+
+function resolveRepoForBranch() {
+  try {
+    const name = JSON.parse(gh(["repo", "view", "--json", "nameWithOwner"])).nameWithOwner;
+    if (typeof name === "string" && name.includes("/")) return name;
+  } catch {
+    // fall through to git remote
+  }
+  const remote = gitMaybe(["remote", "get-url", "origin"]);
+  if (!remote) return null;
+  const match = String(remote).match(/(?:[:/])([^/:]+)\/([^/]+?)(?:\.git)?$/);
+  return match ? `${match[1]}/${match[2]}` : null;
+}
+
+export function collectBranchReviewInput(baseRef, headRef) {
+  const nameStatus = git(["diff", "--name-status", `${baseRef}...${headRef}`]);
+  const paths = nameStatus.split(/\r?\n/).filter(Boolean).map((line) => {
+    const [status, ...rest] = line.split(/\s+/);
+    return { status, path: rest.join(" ").replace(/^"|"$/g, "") };
+  });
+  const files = paths.map(({ status, path }) => {
+    const patch = git(["diff", "--no-ext-diff", "--unified=3", `${baseRef}...${headRef}`, "--", path]);
+    const added = patch.split(/\r?\n/).filter((line) => line.startsWith("+") && !line.startsWith("+++")).length;
+    const deleted = patch.split(/\r?\n/).filter((line) => line.startsWith("-") && !line.startsWith("---")).length;
+    return { path, status, patch, additions: added, deletions: deleted };
+  });
+  const headRefOid = gitMaybe(["rev-parse", "--verify", headRef]) || null;
+  return { repo: resolveRepoForBranch(), pr: null, headRefOid, files };
+}

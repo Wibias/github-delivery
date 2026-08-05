@@ -2,6 +2,8 @@
 
 **Trigger:** own-bug axis on merge-ready / full-review / create-PR; or explicit “bug review on pr #N”.
 
+**Branch target (create-PR pre-open gate):** when invoked from **`scripts/pre-open-gate.mjs`** before opening a PR, review the **local branch diff** (base → head) instead of a PR base. The scope comes from the gate output (`bugScope.requiredLenses`); there is no PR head to checkout. Bugbot (Cursor) already supports `Diff: branch changes` for local branches.
+
 ## Goal
 
 Find **real** correctness bugs, silent failures, resource leaks, and edge cases on the PR (or branch) diff. Prefer high-confidence findings over checklist theater. Fix Confirmed High/Critical in-PR on merge-ready paths.

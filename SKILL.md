@@ -49,32 +49,32 @@ Prefer **this skill** and the personal redirects under `overrides/babysit` and
 Match the user request, then read **only** the matching workflow file plus
 `references/shared-rules.md` first:
 
-| Request shape                                                           | Workflow                                           |
-| ----------------------------------------------------------------------- | -------------------------------------------------- |
-| Create a PRD from conversation, repository context, or an idea          | `references/issue-workflows.md` → PRD Workflow     |
-| Break a PRD, plan, spec, or issue into implementation issues            | `references/issue-workflows.md` → Issue Breakdown  |
-| Create GitHub issue(s) from a clear request or verified finding         | `references/issue-workflows.md` → Issue Breakdown  |
-| Triage issue(s), labels, state, readiness, or rejection                 | `references/issue-workflows.md` → Triage Workflow  |
-| Run QA intake or file reproducible conversational bug reports           | `references/issue-workflows.md` → QA Intake        |
-| Create a refactor request, RFC, or verified tiny-commit plan            | `references/issue-workflows.md` → Refactor Plan     |
-| Write or update a `ready-for-agent` issue contract                      | `references/agent-brief.md`                        |
-| Record, match, reconsider, or remove a rejected enhancement decision    | `references/out-of-scope.md`                       |
-| Fix humans/bots on PR #N; own bug+security+spec; merge-ready            | `references/fix-pr-bots.md`                        |
-| Watch / monitor PR #N (CI + new reviews until merged/closed/blocker)    | `references/watch-pr.md`                           |
-| Re-review PR #N from human review + commits + new rabbit/Codex          | `references/re-review-pr.md`                       |
-| Research issue(s) #N… on latest development; priority; comment on issue | `references/research-issue.md`                     |
-| Create PR for issue #N (preflight first); link both ways; merge-ready   | `references/create-pr-for-issue.md`                |
-| Full review on PR #N (or a list); babysit to green + verdict            | `references/full-review-pr.md`                     |
-| Spec and Standards review on PR #N                                     | `references/spec-standards-review.md`              |
-| Simplify / clean up / deduplicate PR #N without behavior changes        | `references/simplify-pr.md`                        |
-| Security review / security review on PR #N                              | `references/security-review.md`                    |
-| Status / what’s left / is PR #N merge ready? (read-only; same bar)      | `references/status.md`                             |
-| Merge PR #N; why-good + thanks; issue thank + close                     | `references/merge-pr.md`                           |
-| Active Git conflict while updating or shipping a PR                    | `references/resolve-conflicts.md`, then resume     |
-| Inspect / restack / retarget / recover / merge existing stacked PRs    | `references/stacked-prs.md`                        |
-| Split oversized change into reviewable PRs                              | Hand off to skill `split-to-prs`                   |
-| Finish branch / worktree cleanup after ship                             | Hand off to skill `finishing-a-development-branch` |
-| Commit / semver / changelog authoring / release tag                     | Hand off to skill `git-workflow-and-versioning`    |
+| Request shape                                                                                      | Workflow                                           |
+| ---------------------------------------------------------------------------------------------------| ---------------------------------------------------|
+| Create a PRD from conversation, repository context, or an idea                                     | `references/issue-workflows.md` → PRD Workflow     |
+| Break a PRD, plan, spec, or issue into implementation issues                                       | `references/issue-workflows.md` → Issue Breakdown  |
+| Create GitHub issue(s) from a clear request or verified finding                                    | `references/issue-workflows.md` → Issue Breakdown  |
+| Triage issue(s), labels, state, readiness, or rejection                                            | `references/issue-workflows.md` → Triage Workflow  |
+| Run QA intake or file reproducible conversational bug reports                                      | `references/issue-workflows.md` → QA Intake        |
+| Create a refactor request, RFC, or verified tiny-commit plan                                       | `references/issue-workflows.md` → Refactor Plan    |
+| Write or update a `ready-for-agent` issue contract                                                 | `references/agent-brief.md`                        |
+| Record, match, reconsider, or remove a rejected enhancement decision                               | `references/out-of-scope.md`                       |
+| Fix humans/bots on PR #N; own bug+security+spec; merge-ready                                       | `references/fix-pr-bots.md`                        |
+| Watch / monitor PR #N (CI + new reviews until merged/closed/blocker)                               | `references/watch-pr.md`                           |
+| Re-review PR #N from human review + commits + new rabbit/Codex                                     | `references/re-review-pr.md`                       |
+| Research issue(s) #N… on latest development; priority; comment on issue                            | `references/research-issue.md`                     |
+| Create PR for issue #N (preflight + pre-open bug/security gate) first; link both ways; merge-ready | `references/create-pr-for-issue.md`                |
+| Full review on PR #N (or a list); babysit to green + verdict                                       | `references/full-review-pr.md`                     |
+| Spec and Standards review on PR #N                                                                 | `references/spec-standards-review.md`              |
+| Simplify / clean up / deduplicate PR #N without behavior changes                                   | `references/simplify-pr.md`                        |
+| Security review / security review on PR #N                                                         | `references/security-review.md`                    |
+| Status / what’s left / is PR #N merge ready? (read-only; same bar)                                 | `references/status.md`                             |
+| Merge PR #N; why-good + thanks; issue thank + close                                                | `references/merge-pr.md`                           |
+| Active Git conflict while updating or shipping a PR                                                | `references/resolve-conflicts.md`, then resume     |
+| Inspect / restack / retarget / recover / merge existing stacked PRs                                | `references/stacked-prs.md`                        |
+| Split oversized change into reviewable PRs                                                         | Hand off to skill `split-to-prs`                   |
+| Finish branch / worktree cleanup after ship                                                        | Hand off to skill `finishing-a-development-branch` |
+| Commit / semver / changelog authoring / release tag                                                | Hand off to skill `git-workflow-and-versioning`    |
 
 If the request spans multiple rows, run them in lifecycle order and keep
 loading only the current workflow file. Within `references/issue-workflows.md`,
@@ -113,7 +113,7 @@ Read `references/shared-rules.md` before acting. Non-negotiables:
 7. Behind base + **compile against tip** — for a standalone PR, update from its base; for a stack, update the bottom PR against trunk and each child against its immediate parent, bottom → top. Then verify build/tests on the resulting tip before merge-ready / full-review approve / merge. After every push or rewritten head, re-check **stale approvals / last-push** policy.
 8. Draft/WIP/do-not-merge — never merge or claim ready while gated.
 9. Prefer in-PR fixes; merge only on merge workflow (thank PR + **issue authors**, no self-thanks; auto-close issues when fixed). **Never** `gh pr merge` without the issue-thank step when `closingIssuesReferences` / `Fixes #N` exist. Stacked PRs remain inside this skill via `references/stacked-prs.md`: never merge a middle or top PR as if it targeted trunk; merge bottom-up and revalidate every surviving child after each parent lands.
-10. Create-PR: need-to-fix preflight; **one PR** unless explicit batch; **canonical repo only** (never fork-only deliverable); verify `Fixes #N` link; **assign @me** on the issue; **one** idempotent issue comment (edit if incomplete — never a second cut-off comment).
+10. Create-PR: need-to-fix preflight; **pre-open bug + security gate** via **`scripts/pre-open-gate.mjs`** — run the bug + security reviews on the branch diff **before** opening; do **not** open while the gate is `blocked` (required lenses/surfaces unreviewed or Confirmed High/Critical unfixed) or `unknown` (incomplete diff); **one PR** unless explicit batch; **canonical repo only** (never fork-only deliverable); verify `Fixes #N` link; **assign @me** on the issue; **one** idempotent issue comment (edit if incomplete — never a second cut-off comment).
 
 11. **Issue lifecycle.** For PRDs, issue creation/breakdown, triage, QA intake, and refactor plans, load the selected section of `references/issue-workflows.md`. Research current repository behavior before publishing; do not over-interview when the conversation already resolves the important decisions. Search for obvious duplicates before creating issues. Break implementation work into independently verifiable vertical slices, mark each `AFK` or `HITL`, preserve dependency order, and present the breakdown before publishing unless the user explicitly requested direct creation. Every `ready-for-agent` issue requires `references/agent-brief.md`. Reject and close an enhancement as `wontfix`, or write/update `.out-of-scope/`, only after explicit maintainer confirmation using `references/out-of-scope.md`. After every issue write, read back the result and report its URL.
 12. Research posts findings + priority + security relevance; ask to run + **post** security review when possible/likely (exploit details chat-only; public posts redacted).

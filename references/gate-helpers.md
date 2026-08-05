@@ -171,3 +171,13 @@ These classify review work; they are not substitutes for the authoritative ship 
 node "<github-delivery>/scripts/security-scope.mjs" OWNER/REPO N
 node "<github-delivery>/scripts/bug-scope.mjs" OWNER/REPO N
 ```
+
+### Pre-open gate (create-PR)
+
+For an **unopened** branch, run the pre-open gate instead of `bug-scope.mjs`/`security-scope.mjs` (those require an existing PR number):
+
+```bash
+node "<github-delivery>/scripts/pre-open-gate.mjs" OWNER/REPO BASE_REF HEAD_REF
+```
+
+Exit `0` (`decision: "ready"`) means the branch diff has no required bug/security scope. Exit `1` (`decision: "blocked"`) lists the required bug lenses and security surfaces that must be reviewed (and Confirmed High/Critical findings fixed) before opening. Exit `2` (`decision: "unknown"`) means the branch diff could not be collected completely — never open a PR on unknown. See `references/create-pr-for-issue.md` step C2.

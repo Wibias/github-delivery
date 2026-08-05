@@ -18,6 +18,7 @@ Do **not** merge unless asked.
 |---|---|
 | PR #N / current branch | Checkout PR head (shared subagent preflight); review **branch changes vs PR base** |
 | Issue(s) #N… (from research ask) | Review implicated code on latest development tip (+ open covering PR if any). Post on **each** issue when posting was requested |
+| Open a PR for issue #N / pre-open branch | Review the **local branch diff** (base → head) via **`scripts/pre-open-gate.mjs`**; same mandatory method (scope → matrix → pass gate), but **no `gh pr` calls and no PR-head checkout** — the diff comes from the local git working tree |
 
 ## Public vs chat (mandatory)
 
@@ -221,6 +222,8 @@ hypothetical one.
 | **Do not ship yet** | Any Critical/High Confirmed still open without explicit user accept, or required matrix incomplete, or `requireAiAgentSecurity` / `requireAgenticSkillsTop10` / `requireDepsAudit` / required IaC/crypto/removed-controls rows skipped |
 
 Never output **Pass** while High/Critical items are only “noted,” MEDIUM-confidence, or Needs verification.
+
+**Pre-open gate (create-PR):** when this review runs against a **branch** via `pre-open-gate.mjs` (before opening a PR), a **Do not ship yet** decision **blocks opening the PR**. `Pass after fixes` is allowed only after the Confirmed High/Critical fixes land on the branch and the review is re-run on the new head. Chat still gets the full findings + coverage matrix; nothing is posted to GitHub because no PR exists yet.
 
 **Adversarial pass** does **not** block Pass unless the user said the review is incomplete without it.
 

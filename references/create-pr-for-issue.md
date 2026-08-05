@@ -4,7 +4,7 @@
 
 ## Goal
 
-Open **one** PR on the **canonical** (issue’s) repository that fixes issue `#N`, with verified bidirectional linking, self-assignment, review/CI cleanup, merge-ready. Do **not** merge. Do **not** batch other issues’ PRs unless the user explicitly demanded a batch.
+Open **one** PR on the **canonical** (issue’s) repository that fixes issue `#N`, with verified bidirectional linking, self-assignment, review/CI cleanup, merge-ready. **Run the pre-open bug + security gate before opening** and only open when the gate permits. Do **not** merge. Do **not** batch other issues’ PRs unless the user explicitly demanded a batch.
 
 ## Workflow (single sequence)
 
@@ -44,6 +44,22 @@ Follow shared **Issue conversation intake** (`references/shared-rules.md`). The 
 ### C. Confirm scope
 
 Confirm this request is **one** issue (or an explicit batch). Otherwise pick/ask — do not open extra PRs. If implementation scope explodes → hand off to `split-to-prs`. Explicit create batch of **>3** issues → **subagent fan-out** (shared rules).
+
+### C2. Pre-open bug + security gate (required — before coding or opening)
+
+Run the **bug-finding** and **security review** passes on the code that will go into this PR **before opening it**. Do **not** open a PR while the gate is blocked or unknown.
+
+1. Run the gate on the branch diff (base → head):
+   ```bash
+   node "<github-delivery>/scripts/pre-open-gate.mjs" OWNER/REPO <base> <head>
+   ```
+2. If `decision: "ready"` → no required bug/security scope (docs-only or clean); proceed to **D**.
+3. If `decision: "blocked"` → the diff has required bug lenses and/or security surfaces. Run the **bug axis** via **`references/bug-review.md`** and the **security axis** via **`references/security-review.md`** on the **branch diff** (not a PR head). Fix Confirmed High/Critical findings (and useful Mediums) **before** opening. Only proceed when:
+   - every required lens/surface is `done` or honestly `n/a (why)`, and
+   - no Confirmed High/Critical remains open.
+   Rerun the gate after fixes and confirm it is no longer blocked for the reasons you addressed.
+4. If `decision: "unknown"` → **stop**. Restore complete branch evidence (fetch base, checkout head, resolve missing patches) and rerun. **Never open a PR from an incomplete diff.**
+5. Record the gate result (decision + blockers cleared) in chat and carry it into the PR body validation notes.
 
 ### D. Implement + open canonical PR
 
@@ -106,4 +122,5 @@ Confirm this request is **one** issue (or an explicit batch). Otherwise pick/ask
 - Single complete opened-PR comment (no duplicates/cut-offs)
 - Screenshot gate passed (or N/A)
 - Full issue comment thread read when comments exist (shared **Issue conversation intake**)
+- **Pre-open bug + security gate** passed (decision `ready`, or `blocked` fully reviewed + Confirmed High/Critical fixed before opening)
 - Own bug + security + Spec/Standards done; reviews + required CI green on tip; merge-ready posted; **not** merged
