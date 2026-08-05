@@ -95,7 +95,7 @@ Confirm this request is **one** issue (or an explicit batch). Otherwise pick/ask
 5. CODEOWNERS path check (`scripts/codeowners-for-pr.mjs` when helpful).
 6. Changelog nudge if user-facing → `git-workflow-and-versioning` for authoring.
 7. Final evidence sweep: reconcile the PR body with the final head using **`references/pr-description.md`**. Update stale scope, behavior, validation, review notes, or limitations and confirm the closing issue reference still resolves.
-8. **Thin settle** (~3–5 min quiet + recheck; shared rules); then post merge-ready PR + linked-issue notify (idempotent). Do **not** merge.
+8. **Thin settle** (~3–5 min quiet + recheck; shared rules); then post merge-ready PR + linked-issue notify (idempotent). Do **not** merge. For a docs/markdown-only head, use the shared-rules **~30–60s** fast-path settle; if a bot review lands during the settle with findings on this diff, fix + push and re-enter the settle on the new head instead of burning the old window.
 
 ## Done when
 

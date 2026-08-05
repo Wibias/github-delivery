@@ -321,6 +321,7 @@ When research (or the user) finds **fixed on development tip but not on release/
 
 1. Commit and push scoped fixes (when the workflow implies fix work / user authorized pushes).
 2. Wait for new review rounds and CI — backoff polling, not a busy loop. See **CI wait expectations** below.
+   - **Doomed-run guard:** before settling into the CI poll, make sure no in-progress bot review (CodeRabbit/Codex) or actionable human thread can still invalidate this SHA. If one is pending, finish triage and patch/push first. If a bot review lands **during** the wait with findings on this diff, stop waiting, fix + push, and restart the CI wait on the new SHA — the run you were watching is already wasted.
 3. Re-triage; repeat until the mode’s **done** condition or a **hard blocker**.
 
 ### Mode completion rules
@@ -505,6 +506,8 @@ Waiting for required CI is **poll until green (or hard blocker)** — not a fixe
 | Do **not**                 | Sleep a blanket **20 minutes** (or similar) after CI started “to be safe”                                               |
 | Past ~15 min still pending | Re-check the job (queued/stuck/cancelled/waiting for runner). Investigate — don’t assume you must wait longer by policy |
 | Ubuntu/mac legs            | Usually faster; still poll ~1 min; don’t gate the whole wait on an invented 20 min wall                                 |
+| **Never idle a doomed run**| **Do not** sit out a CI wait when an in-progress bot review (CodeRabbit/Codex) or an actionable human thread can still invalidate the current SHA. Finish bot triage and patch/push **first**, then wait for CI on the resulting head — otherwise the CI run you are waiting on is wasted and restarts from zero after the fix push. If a bot review lands **during** a CI wait and raises findings on this diff: stop waiting, fix + push, and start the CI wait over on the new SHA. |
+| Docs-only pushes          | When the current head’s change is **docs/markdown only** (no logic/CI/test paths), CI legs that would not exercise it (build/test/compile jobs) add no signal; confirm the head’s required checks are green once and keep the settle short — **~30–60s** — instead of the default window. Do not skip the final gate. |
 
 Adaptive settle (**normally 60 seconds after green; 180 seconds after material activity**) is separate — that is for late workflows, reviews, and GitHub state propagation, not for Windows runtime.
 
@@ -522,10 +525,13 @@ Do **not** post `[GD] Merge ready`, linked-issue merge-ready notify, or full-rev
 2. Choose the quiet duration:
    - **60 seconds default** when the current heads and review/workflow evidence were already stable and no material event occurred after the gate became ready.
    - **180 seconds** after a push, rebase, restack, force-with-lease, base-head movement, approval change, review-thread change, draft/ready transition, or newly discovered workflow.
+   - **Docs-only fast path:** when the current head’s change is **docs/markdown only** (no logic/CI/test paths), use **~30–60 seconds** instead of the default, regardless of the reason for the window. CI legs that would not exercise the docs change add no signal; confirm required checks are green once on the head. Do not skip the final gate.
    - A visible bot “review in progress” signal may extend one window to **300 seconds**. Never extend for a hypothetical bot with no observable signal.
 3. Announce the provisional state before waiting. Use wording such as: `Automated gates are currently green; stability verification is in progress for 60 seconds.` Include both heads, the reason for the selected duration, and the next verification time. Do **not** say only `All green`.
 4. Poll the authoritative `ship-gate.mjs` every **20 seconds**. Between polls, never perform or expose one blocking `sleep`, `Start-Sleep`, or equivalent longer than **30 seconds**. Show remaining time and the next verification instead of surfacing an unexplained long-running sleep command.
 5. Any material change resets the window and recalculates its duration. Exit `1` means act on the reported blockers immediately. Exit `2` means restore missing or stale evidence; readiness remains forbidden.
+   - **Doomed-run abort:** if a bot review lands **during** the settle and raises findings on this diff — or an actionable human thread appears — stop the settle clock, fix + push, and re-enter the settle (with the new head’s duration). Do **not** keep burning the old window; the CI run it was protecting is already invalidated by the next push.
+   - **Docs-only:** a docs-only push that confirms green does **not** reset the clock to a longer window; it stays on the ~30–60s fast path.
 6. At the end, run one final authoritative gate and verify the recorded PR and immediate-base heads are unchanged. Only `decision: "ready"` on those heads permits a merge-ready / `approve-comment` claim.
 7. Do not hang forever waiting for hypothetical activity. A completed window plus the final unchanged-head gate is sufficient unless an observable in-progress signal or new event resets it.
 
