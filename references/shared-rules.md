@@ -934,7 +934,7 @@ For `[GD] Addressed feedback`, the identity key is `PR + exact current head SHA`
 2. Search your existing PR conversation comments for the exact marker `<!-- gd:addressed-feedback head:<40-char-head-sha> -->`.
 3. If an exact marker match exists, edit that comment and merge the full deduplicated feedback-key set into it. If none exists, create exactly one comment.
 4. Never create separate top-level comments for multiple feedback items resolved by the same head or commit.
-5. Use this canonical body:
+5. Use this canonical body. **5 or fewer** feedback keys stay inline:
 
 ```markdown
 [GD] Addressed feedback
@@ -947,6 +947,30 @@ commit: abc1234
 
 <!-- gd:addressed-feedback head:<40-char-head-sha> -->
 ```
+
+6. **More than 5** feedback keys collapse into a `<details>` block under `commit:`, same pattern as the TLDR:
+
+```markdown
+[GD] Addressed feedback
+
+commit: abc1234
+
+<details>
+<summary>feedbacks:</summary>
+
+- issue_comment:123
+- review_comment:456
+- review_comment:789
+- issue_comment:111
+- review_comment:222
+- review_comment:333
+
+</details>
+
+<!-- gd:addressed-feedback head:<40-char-head-sha> -->
+```
+
+The parser reads feedback keys from both layouts (inline list and `<details>` list), so either form clears the same items.
 
 Legacy long-form resolution records remain readable as migration evidence, but every new publication uses `[GD]` and the head marker.
 

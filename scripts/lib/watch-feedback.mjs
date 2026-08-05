@@ -32,6 +32,18 @@ const MERGE_COMMIT_RE =
 const FEEDBACK_KEY_RE =
   /^(issue_comment|review_comment|review_submission):[A-Za-z0-9_-]+$/;
 const COMMIT_REF_RE = /^[0-9a-f]{7,40}$/i;
+const COMMIT_MARKDOWN_RE = /^\[([0-9a-f]{7,40})\]\(/i;
+const DETAILS_OPEN_RE = /^<details(?:\s[^>]*)?>$/i;
+const DETAILS_CLOSE_RE = /^<\/details>$/i;
+const FEEDBACKS_SUMMARY_RE = /^<summary>\s*feedbacks:\s*<\/summary>$/i;
+
+function normalizeCommitRef(value) {
+  const trimmed = String(value || "").trim();
+  const markdown = COMMIT_MARKDOWN_RE.exec(trimmed);
+  if (markdown) return markdown[1].toLowerCase();
+  if (COMMIT_REF_RE.test(trimmed)) return trimmed.toLowerCase();
+  return trimmed;
+}
 
 export function normalizeFeedback(raw, kind) {
   return {
@@ -102,13 +114,23 @@ export function parseFeedbackResolution(comment) {
       inFeedbackList = false;
       continue;
     }
-    if (/^feedbacks:\s*$/i.test(line)) {
+    if (DETAILS_OPEN_RE.test(line)) {
+      continue;
+    }
+    if (DETAILS_CLOSE_RE.test(line)) {
+      inFeedbackList = false;
+      continue;
+    }
+    if (FEEDBACKS_SUMMARY_RE.test(line) || /^feedbacks:\s*$/i.test(line)) {
       inFeedbackList = true;
       continue;
     }
-    if (inFeedbackList && /^-\s+/.test(line)) {
-      addFeedbackKey(line.replace(/^-\s+/, "").trim());
-      continue;
+    if (inFeedbackList) {
+      const keyLine = line.replace(/^-\s+/, "").trim();
+      if (FEEDBACK_KEY_RE.test(keyLine)) {
+        addFeedbackKey(keyLine);
+        continue;
+      }
     }
     inFeedbackList = false;
 
@@ -119,7 +141,7 @@ export function parseFeedbackResolution(comment) {
     if (name === "feedback") addFeedbackKey(value);
     if (name === "commit") {
       if (commitRef !== null) errors.push("duplicate_commit");
-      commitRef = value;
+      commitRef = normalizeCommitRef(value);
     }
   }
 

@@ -50,7 +50,7 @@ node "<github-delivery>/scripts/watch-wake-gate.mjs" OWNER/REPO N
     <!-- gd:addressed-feedback head:<40-char-current-head-sha> -->
     ```
 
-    Collect all items fixed by the same head first. Search for the exact head marker and edit that one comment; never publish one top-level comment per feedback ID.
+    Collect all items fixed by the same head first. Search for the exact head marker and edit that one comment; never publish one top-level comment per feedback ID. When the feedback-key list is **more than 5** entries, collapse it into a `<details><summary>feedbacks:</summary>…</details>` block right below `commit:` (same pattern as the TLDR) so the top-level body stays short.
 
   - **ACK-only does not clear the gate** (script requires a later non-merge commit).
 

@@ -13,6 +13,7 @@ import {
   evaluateFeedbackResolutions,
   normalizeFeedback,
 } from "./watch-feedback.mjs";
+import { formatAddressedFeedbackComment } from "./addressed-feedback-comment.mjs";
 
 const DIRTY_STATES = new Set(["DIRTY", "CONFLICTING", "BEHIND"]);
 
@@ -395,16 +396,11 @@ export function evaluateWakeSnapshot(snapshot) {
     });
   }
   const addressedFeedbackComment = unaddressed.length
-    ? [
-        "[GD] Addressed feedback",
-        "",
-        "feedbacks:",
-        ...unaddressed.map((comment) => "- " + comment.key),
-        "",
-        "commit: <7-40 character PR commit SHA>",
-        "",
-        "<!-- gd:addressed-feedback head:" + snapshot.headOid + " -->",
-      ].join("\n")
+    ? formatAddressedFeedbackComment({
+        feedbackKeys: unaddressed.map((comment) => comment.key),
+        commitRef: "<7-40 character PR commit SHA>",
+        headOid: snapshot.headOid,
+      })
     : null;
   for (const comment of unaddressed) {
     blockers.push({

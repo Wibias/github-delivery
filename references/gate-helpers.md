@@ -153,6 +153,8 @@ commit: abc1234
 
 Aggregate all feedback resolved by the same current head into this single comment. Before creating it, search for the exact head marker and edit that comment when present. An unrelated later commit does not clear feedback.
 
+**Long lists:** when the feedback-key list has **more than 5** entries, put only the `commit:` line in the top-level body and move `feedbacks:` plus the keys into a `<details><summary>feedbacks:</summary>…</details>` block directly below `commit:`. The wake parser reads both layouts.
+
 ### Merge queue and review policy
 
 ```bash
