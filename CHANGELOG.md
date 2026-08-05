@@ -6,6 +6,16 @@ All notable changes to `github-delivery` are documented here.
 
 ### Added
 
+- gh-stack-derived stack operational practices in `references/stacked-prs.md`:
+  restack work enables `git rerere` (conflict memory across cascading
+  rebases); the push remote is resolved via `remote.pushDefault` instead of a
+  hardcoded `origin` (multi-remote safety); review/readiness/merge are gated
+  on a parent-ancestor `needsRebase` preflight; edits are made only on the
+  layer that owns the path; and a merge-queue base may enqueue the contiguous
+  lower stack all-or-nothing (per-PR readiness still required before
+  enqueue). Regression case `R-stack-restack-preflight-2026-08-05` pins the
+  contract.
+
 - Machine-checkable probe-application evidence. The bug and security axes are
   no longer complete on assertion alone: the review must emit a
   `{ probeId, status, files?, reason? }` record for every `requiredProbes[]`

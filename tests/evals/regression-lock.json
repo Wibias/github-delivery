@@ -246,5 +246,9 @@
   {
     "id": "R-probe-evidence-required-2026-08-05",
     "sha256": "ca02ecdbc65f41a9cd8601dc22389eafd4eec8f7bfd5d79cef8bb76a062a4720"
+  },
+  {
+    "id": "R-stack-restack-preflight-2026-08-05",
+    "sha256": "a09a0bc057d1e8b9eba86aed0b59794ec8ab0713fd322d02617eb4f280ad6f54"
   }
 ]

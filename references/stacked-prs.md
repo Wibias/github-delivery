@@ -78,14 +78,50 @@ Also verify:
 - every branch that may be rewritten is local or can be created safely from its
   expected remote tip.
 
-If authentication, repository identity, branch writability, or Git state is
-unclear, stop with the exact blocker. Do not claim stack state from partial
+**Conflict memory (rerere):** before any restack work, enable
+`git config rerere.enabled true` (and prefer `rerere.autoUpdate false` so you
+review each replay). Rebase conflicts are then remembered across cascading
+restacks, so a conflict resolved on one child does not need re-resolving on
+every branch above it.
+
+**Remote resolution (multi-remote safety):** never hardcode `origin`. Resolve
+the push remote once:
+
+```powershell
+$PushRemote = git config --get remote.pushDefault
+if (-not $PushRemote) {
+  $Remotes = git remote
+  if (($Remotes -split "\s+").Count -ne 1) {
+    throw "Multiple remotes and no remote.pushDefault; set it or pass --remote explicitly."
+  }
+  $PushRemote = $Remotes
+}
+```
+
+Use `$PushRemote` everywhere a push/fetch target is needed (restack push, branch
+cleanup, backport). On a single-remote repo this is `origin`; on multi-remote
+repos it refuses to guess.
+
+**needsRebase preflight (before review / readiness / merge):** for each child,
+the parent's current remote tip must be an **ancestor** of the child:
+
+```powershell
+git merge-base --is-ancestor "origin/$Parent" "refs/heads/$Child"
+if ($LASTEXITCODE -ne 0) { throw "Child $Child is behind its parent; restack first." }
+```
+
+A child whose parent tip is not an ancestor shows a stale diff (parent commits
+missing) — never review, declare ready, or merge it in that state.
 
 <!-- assertion-anchors -->
 <!-- assertion: state-check-first -->
+<!-- assertion: rerere-conflict-memory -->
+<!-- assertion: remote-pushdefault-resolution -->
+<!-- assertion: needs-rebase-ancestor-preflight -->
 <!-- /assertion-anchors -->
 
-
+If authentication, repository identity, branch writability, or Git state is
+unclear, stop with the exact blocker. Do not claim stack state from partial
 evidence.
 
 ## 2. Inspect the complete stack
@@ -157,6 +193,23 @@ For each PR in the stack:
   own diff;
 - do not declare a child merge-ready while its required parent state is
   unknown, blocked, or changing.
+
+### Layer-ownership editing
+
+Each change belongs to the **layer that owns the path**. Before editing:
+
+1. Check out the branch whose PR should carry the change — run
+   `gh stack view` / inspect `git log --all -- <path>` when ownership is
+   unclear.
+2. Never commit a lower layer's concern on the current top branch; the diff
+   would be attributed to the wrong PR layer.
+3. After editing the owner, rebase every branch above it (bottom → top) so the
+   upstack diffs still contain only their own delta, then return to the
+   previous branch.
+
+<!-- assertion-anchors -->
+<!-- assertion: layer-ownership-edit -->
+<!-- /assertion-anchors -->
 
 ## 3. Choose the stack action
 
@@ -332,6 +385,29 @@ For every level:
     bar.
 
 Never reuse a parent's readiness result for its child.
+
+### Merge queue: all-or-nothing lower-stack merge
+
+When the base branch uses a **merge queue**, merging the contiguous lower
+portion of the stack as one all-or-nothing queue entry is a valid alternative
+to strict one-at-a-time bottom-up merging:
+
+- Check queue policy first (`scripts/pr-policy-gate.mjs` / `merge_group`
+  coverage). If the queue is enforced, enqueue the lower PRs together; the
+  queue processes them in order and each `merge_group` run revalidates the
+  combined head.
+- The merge-ready bar still applies **per PR before enqueue**: each PR in the
+  lower set needs its own current-head `ship-gate.mjs` `ready`, own reviews,
+  and clean threads — queuing does not waive readiness.
+- After the queue lands the set, re-inspect the remaining stack, restack the
+  next child onto the surviving base, and rerun its gates (same as bottom-up).
+- Never enqueue a child whose parent is not yet in the same queue entry unless
+  the queue's merge order provably keeps the parent ahead (the child would
+  otherwise evaluate against an unlanded base).
+
+<!-- assertion-anchors -->
+<!-- assertion: queue-all-or-nothing-lower-stack -->
+<!-- /assertion-anchors -->
 
 ### Empty child after parent lands
 
