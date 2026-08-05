@@ -34,3 +34,34 @@ test("evaluateHeadBranchCleanup keeps another contributor's head", () => {
   assert.equal(decision.reason, "branch kept: head owned by @other-contributor");
   assert.equal(decision.status, "branch kept: head owned by @other-contributor");
 });
+
+test("evaluateHeadBranchCleanup prefers the gh pr view headRepository field for fork heads", () => {
+  const decision = evaluateHeadBranchCleanup({
+    actorLogin: "Wibias",
+    headOwnerLogin: "Wibias",
+    headRefName: "feat/ri-04-policy-profile-core",
+    isMerged: true,
+    isCrossRepository: true,
+    headRepository: "Wibias/opencodex",
+    baseRepository: "lidge-jun/opencodex",
+  });
+
+  assert.equal(decision.action, "delete");
+  assert.equal(decision.targetRepo, "Wibias/opencodex");
+});
+
+test("evaluateHeadBranchCleanup lets an explicit targetRepo win over head and base", () => {
+  const decision = evaluateHeadBranchCleanup({
+    actorLogin: "Wibias",
+    headOwnerLogin: "Wibias",
+    headRefName: "feat/ri-04-policy-profile-core",
+    isMerged: true,
+    isCrossRepository: true,
+    targetRepo: "Wibias/opencodex",
+    headRepository: "fork-owner/opencodex",
+    baseRepository: "lidge-jun/opencodex",
+  });
+
+  assert.equal(decision.action, "delete");
+  assert.equal(decision.targetRepo, "Wibias/opencodex");
+});

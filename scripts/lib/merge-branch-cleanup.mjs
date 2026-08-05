@@ -29,6 +29,8 @@ function isMerged(input) {
 
 function resolveRepository(input) {
   return (
+    input.targetRepository?.trim() ||
+    input.targetRepo?.trim() ||
     input.headRepository?.trim() ||
     input.headRepo?.trim() ||
     input.baseRepository?.trim() ||

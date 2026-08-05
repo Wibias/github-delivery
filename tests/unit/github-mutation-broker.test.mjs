@@ -162,6 +162,47 @@ test("delete_head_branch plans a ref delete for the actor-owned head", () => {
   assert.match(plan.command[4], /repos\/Wibias\/opencodex\/git\/refs\/heads\/feat\/ri-02-request-history-index/);
 });
 
+test("delete_head_branch honors headRepository for a fork PR when headRepo is absent", () => {
+  const plan = planMutationRequest({
+    schemaVersion: 1,
+    action: "delete_head_branch",
+    mutationMode: "maintainer",
+    explicitInstruction: true,
+    repo: "lidge-jun/opencodex",
+    pr: 1011,
+    headRefName: "feat/ri-04-policy-profile-core",
+    headOwnerLogin: "Wibias",
+    headRepository: "Wibias/opencodex",
+    baseRepository: "lidge-jun/opencodex",
+    actorLogin: "Wibias",
+    isMerged: true,
+    isCrossRepository: true,
+  });
+  assert.equal(plan.authorization.allowed, true);
+  assert.equal(plan.request.targetRepo, "Wibias/opencodex");
+  assert.match(plan.command[4], /repos\/Wibias\/opencodex\/git\/refs\/heads\/feat\/ri-04-policy-profile-core/);
+  assert.ok(!/repos\/lidge-jun\/opencodex\/git/.test(plan.command[4]));
+});
+
+test("delete_head_branch lets an explicit targetRepo win over the base repo", () => {
+  const plan = planMutationRequest({
+    schemaVersion: 1,
+    action: "delete_head_branch",
+    mutationMode: "maintainer",
+    explicitInstruction: true,
+    repo: "lidge-jun/opencodex",
+    pr: 1011,
+    headRefName: "feat/ri-04-policy-profile-core",
+    headOwnerLogin: "Wibias",
+    targetRepo: "Wibias/opencodex",
+    actorLogin: "Wibias",
+    isMerged: true,
+    isCrossRepository: true,
+  });
+  assert.equal(plan.request.targetRepo, "Wibias/opencodex");
+  assert.match(plan.command[4], /repos\/Wibias\/opencodex\/git\/refs\/heads\/feat\/ri-04-policy-profile-core/);
+});
+
 test("delete_head_branch rejects another user's head", () => {
   assert.throws(
     () =>

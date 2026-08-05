@@ -341,7 +341,10 @@ function assertDeleteHeadBranchAllowed(request) {
       request.isMerged === true ||
       String(request.state || request.prState || "").toUpperCase() === "MERGED",
     isCrossRepository: request.isCrossRepository === true,
+    targetRepo: request.targetRepo,
+    headRepository: request.headRepository,
     headRepo: request.headRepo,
+    baseRepository: request.baseRepository,
     baseRepo: request.baseRepo || request.repo,
     keepBranch: request.keepBranch === true,
   });
