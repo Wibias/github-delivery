@@ -109,8 +109,31 @@ export function evaluateBaseHealthSnapshot(snapshot) {
   const sharedFailures = [];
   const prOnlyFailures = [];
   const unknownFailures = [];
+  const perCheckOrigins = [];
   for (const failure of headFailures) {
     const baseRow = baseByKey.get(failure.key);
+    const origin = !baseSourcesComplete
+      ? "failure_origin_unknown"
+      : baseRow?.gate === "fail"
+        ? "base_preexisting"
+        : baseRow && ["pending", "unknown"].includes(baseRow.gate)
+          ? "failure_origin_unknown"
+          : "pr_only";
+    perCheckOrigins.push({
+      key: failure.key,
+      name: failure.context || failure.key,
+      gate: failure.gate,
+      origin,
+      baseGate: baseRow?.gate || null,
+      baseSourcesComplete,
+      reason: !baseSourcesComplete
+        ? "base evidence incomplete — cannot classify"
+        : baseRow?.gate === "fail"
+          ? "same check fails on base tip"
+          : baseRow && ["pending", "unknown"].includes(baseRow.gate)
+            ? "base check is not conclusive (pending/unknown)"
+            : "base check passes — PR-introduced or infra (see ci-forensics)",
+    });
     if (!baseSourcesComplete) {
       unknownFailures.push(publicCheck(failure));
     } else if (baseRow?.gate === "fail") {
@@ -162,6 +185,7 @@ export function evaluateBaseHealthSnapshot(snapshot) {
     sharedFailures,
     prOnlyFailures,
     unknownFailures,
+    perCheckOrigins,
     baseOnlyFailures,
     scopeRecommendation: prOnlyFailures.length
       ? "fix_in_pr"

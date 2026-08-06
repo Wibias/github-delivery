@@ -8,6 +8,7 @@
  *   node scripts/verify-pr-head.mjs OWNER/REPO PR_NUMBER
  *     [--worktree-root D:\codex-worktrees]
  *     [--install-cmd "bun install"] [--typecheck-cmd "bun run typecheck"]
+ *     [--gui-typecheck-cmd "cd gui && bun x tsc --noEmit -p tsconfig.app.json"]
  *     [--test-cmd "bun run test"] [--test-filter "claude-messages"]
  *     [--lint-cmd "bun run lint:gui"] [--privacy-cmd "bun run privacy:scan"]
  *     [--keep-worktree] [--timeout-ms N] [--json]
@@ -18,7 +19,7 @@ import { pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 
 const USAGE =
-  "Usage: node scripts/verify-pr-head.mjs OWNER/REPO PR_NUMBER [--worktree-root DIR] [--install-cmd CMD] [--typecheck-cmd CMD] [--test-cmd CMD] [--test-filter TEXT] [--lint-cmd CMD] [--privacy-cmd CMD] [--keep-worktree] [--timeout-ms N] [--json]";
+  "Usage: node scripts/verify-pr-head.mjs OWNER/REPO PR_NUMBER [--worktree-root DIR] [--install-cmd CMD] [--typecheck-cmd CMD] [--gui-typecheck-cmd CMD] [--test-cmd CMD] [--test-filter TEXT] [--lint-cmd CMD] [--privacy-cmd CMD] [--keep-worktree] [--timeout-ms N] [--json]";
 
 export function parseArgs(argv) {
   const positional = [];
@@ -26,6 +27,7 @@ export function parseArgs(argv) {
     worktreeRoot: null,
     installCmd: "bun install",
     typecheckCmd: "bun run typecheck",
+    guiTypecheckCmd: null,
     testCmd: "bun run test",
     testFilter: null,
     lintCmd: "bun run lint:gui",
@@ -43,6 +45,10 @@ export function parseArgs(argv) {
       options.installCmd = argv[++index];
     } else if (value === "--typecheck-cmd") {
       options.typecheckCmd = argv[++index];
+      if (!options.typecheckCmd) throw new Error("--typecheck-cmd requires a value");
+    } else if (value === "--gui-typecheck-cmd") {
+      options.guiTypecheckCmd = argv[++index];
+      if (!options.guiTypecheckCmd) throw new Error("--gui-typecheck-cmd requires a value");
     } else if (value === "--test-cmd") {
       options.testCmd = argv[++index];
     } else if (value === "--test-filter") {
@@ -82,6 +88,22 @@ function run(cmd, { cwd, timeoutMs }) {
     elapsedMs: Date.now() - started,
     tail: String(result.stdout || result.stderr || "").trim().split(/\r?\n/).slice(-8).join("\n"),
   };
+}
+
+function findGuiTsconfig(cwd) {
+  const candidates = ["tsconfig.app.json", "tsconfig.json", "tsconfig.web.json"];
+  for (const candidate of candidates) {
+    const probe = run(`test -f "gui/${candidate}" && echo found`, { cwd, timeoutMs: 10_000 });
+    if (probe.ok && probe.tail.includes("found")) return candidate;
+  }
+  return null;
+}
+
+function guiTypecheckCommand(config) {
+  // cd gui then run tsc against the GUI tsconfig, so the GUI's own type rules
+  // (which the root tsconfig often excludes) are checked. This catches the
+  // "local typecheck green, CI GUI typecheck red" class (PR #1108).
+  return `cd gui && bun x tsc --noEmit -p ${config}`;
 }
 
 async function main() {
@@ -136,6 +158,14 @@ async function main() {
   try {
     results.install = run(args.installCmd, { cwd: worktreePath, timeoutMs: args.timeoutMs });
     results.typecheck = run(args.typecheckCmd, { cwd: worktreePath, timeoutMs: args.timeoutMs });
+    if (args.guiTypecheckCmd) {
+      results.guiTypecheck = run(args.guiTypecheckCmd, { cwd: worktreePath, timeoutMs: args.timeoutMs });
+    } else {
+      const guiConfig = findGuiTsconfig(worktreePath);
+      if (guiConfig) {
+        results.guiTypecheck = run(guiTypecheckCommand(guiConfig), { cwd: worktreePath, timeoutMs: args.timeoutMs });
+      }
+    }
     if (args.testCmd) {
       const testCmd = args.testFilter
         ? args.testCmd.replace(/^bun run test/, `bun run test --filter "${args.testFilter}"`)

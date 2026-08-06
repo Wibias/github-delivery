@@ -85,3 +85,21 @@ test("reports base-only failures without blocking a passing head", () => {
   assert.equal(result.decision, "ready");
   assert.equal(result.baseOnlyFailures.length, 1);
 });
+
+test("per-check origins explain why each head failure is classified", () => {
+  const result = evaluateBaseHealthSnapshot(
+    snapshot({
+      head: [run("shared", "failure"), run("pr-only", "failure")],
+      base: [run("shared", "failure"), run("pr-only", "success")],
+    }),
+  );
+  assert.equal(result.perCheckOrigins.length, 2);
+  const shared = result.perCheckOrigins.find((row) => row.name === "shared");
+  const prOnly = result.perCheckOrigins.find((row) => row.name === "pr-only");
+  assert.equal(shared.origin, "base_preexisting");
+  assert.equal(shared.baseGate, "fail");
+  assert.match(shared.reason, /same check fails on base tip/);
+  assert.equal(prOnly.origin, "pr_only");
+  assert.equal(prOnly.baseGate, "pass");
+  assert.match(prOnly.reason, /base check passes/);
+});

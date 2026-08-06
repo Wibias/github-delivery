@@ -24,6 +24,8 @@ test("verify-pr-head accepts command overrides", () => {
     "npm ci",
     "--typecheck-cmd",
     "npm run typecheck",
+    "--gui-typecheck-cmd",
+    "cd gui && npm run typecheck",
     "--test-cmd",
     "npm test",
     "--test-filter",
@@ -37,6 +39,7 @@ test("verify-pr-head accepts command overrides", () => {
   ]);
   assert.equal(args.worktreeRoot, "D:/codex-worktrees");
   assert.equal(args.installCmd, "npm ci");
+  assert.equal(args.guiTypecheckCmd, "cd gui && npm run typecheck");
   assert.equal(args.testFilter, "claude-messages");
   assert.equal(args.keepWorktree, true);
   assert.equal(args.json, true);

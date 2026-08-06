@@ -56,13 +56,35 @@ each gate:
 
 ```bash
 node "<github-delivery>/scripts/verify-pr-head.mjs" OWNER/REPO N \
-  --test-filter "<changed-subsystem>" --worktree-root "D:\codex-worktrees"
+  --test-filter "<changed-subsystem>" --worktree-root "D:\codex-worktrees" \
+  --keep-worktree
 ```
 
 It checks out the exact PR head in a temp worktree, runs install/typecheck/
-focused tests/lint/privacy, prints one PASS/FAIL table, and removes the
-worktree. If CI is already green on the head and the changed subsystems pass,
-you do **not** need to re-run the full local suite.
+**GUI typecheck included** (auto-detected from `gui/tsconfig*.json` — the root
+tsconfig often excludes `gui/`, which is how the PR #1108 union-type bug slipped
+past a green local typecheck), focused tests/lint/privacy, prints one PASS/FAIL
+table. `--keep-worktree` leaves the worktree in place and reports its path, so
+you can push fixes into it and re-run — use it for any PR you will edit. Without
+`--keep-worktree` it removes the worktree. If CI is already green on the head
+and the changed subsystems pass, you do **not** need to re-run the full local
+suite.
+
+### CI forensics (don't re-derive failure origin by hand)
+
+When required checks are red, run `scripts/ci-forensics.mjs` instead of
+manually fetching logs, annotations, base SHAs, and comparing workflow files:
+
+```bash
+node "<github-delivery>/scripts/ci-forensics.mjs" OWNER/REPO N
+```
+
+For each failing required check it prints: the conclusion, whether the base SHA
+also fails that check (`base_preexisting` vs `pr_only_or_unknown`), the
+check-run annotations, and the log tail. `ship-gate.mjs`'s base-health component
+also emits `perCheckOrigins` (per-check origin + the reason why) so you never
+re-derive "is this mine?" by hand. The final infra-vs-PR call is still yours —
+the script gives the evidence.
 
 ### Reference read-once rule
 
