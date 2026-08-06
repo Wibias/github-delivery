@@ -121,6 +121,16 @@ Before every attempted stop:
    that fails the format gate (missing strict label, `### TLDR`, or `<details>`
    dropdown) is an incomplete publication: repair the current-run comment with
    `edit_own_comment` and re-run the verifier until both fields pass.
+9. **Freshness gate before publishing** (PR #1108 lesson): re-check the review
+   threads on the exact reviewed head immediately before posting. If any
+   unresolved, non-outdated **bot-authored** thread is present (or landed after
+   your evidence was gathered), do **not** publish the verdict yet — address or
+   rebut those findings on the head first, then re-verify. Use
+   `assessVerdictFreshness` from `scripts/lib/verdict-publication.mjs` (or run
+   `scripts/review-threads.mjs --resolve-bot` to clear bot threads you already
+   verified). A verdict published while a fresh bot review is actionable on the
+   same head is stale and will be rejected by the human reviewer (see Ingwannu
+   on #1108).
 
 A blocker is input to the final verdict, not permission to skip it.
 

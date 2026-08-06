@@ -370,3 +370,74 @@ export function fetchPrConversationComments({ repo, pr }) {
     page += 1;
   }
 }
+
+const BOT_LOGIN_RE = /\[bot\]$/i;
+
+function isBotLogin(login) {
+  if (!login) return false;
+  return BOT_LOGIN_RE.test(login) || /^coderabbitai|^chatgpt-codex-connector/.test(login);
+}
+
+/**
+ * Assess whether a verdict is stale: new actionable bot threads landed on the
+ * reviewed head after the review evidence was gathered.
+ *
+ * Ingwannu's PR #1108 complaint: the verdict was posted against a head while
+ * a CodeRabbit review with actionable items landed on that same head after
+ * the self-review evidence. This check makes that impossible by refusing a
+ * verdict publication when unresolved, non-outdated bot threads exist on the
+ * reviewed head.
+ *
+ * @param {object} options
+ * @param {Array<object>} [options.threads] raw reviewThreads nodes
+ * @param {string} [options.headOid] current PR head SHA
+ * @param {string} [options.reviewedHead] head the verdict claims to review
+ * @param {string} [options.evidenceCutoff] ISO timestamp; threads newer than
+ *   this count as landed-after-evidence
+ * @returns {{ stale: boolean, reason: string | null, actionable: Array<object> }}
+ */
+export function assessVerdictFreshness({
+  threads = [],
+  headOid = null,
+  reviewedHead = null,
+  evidenceCutoff = null,
+} = {}) {
+  const reviewed = String(reviewedHead || headOid || "").toLowerCase();
+  const cutoff = evidenceCutoff ? Date.parse(evidenceCutoff) : null;
+  if (!reviewed) {
+    return { stale: true, reason: "reviewed_head_missing", actionable: [] };
+  }
+
+  const actionable = [];
+  for (const thread of threads || []) {
+    if (thread?.isResolved === true) continue;
+    if (thread?.isOutdated === true) continue;
+    const comments = thread?.comments?.nodes || [];
+    const first = comments[0];
+    const author = first?.author?.login || null;
+    if (!isBotLogin(author)) continue;
+    // A bot thread is actionable for freshness if it has a comment newer than
+    // the evidence cutoff, or (when no cutoff given) any unresolved bot thread.
+    const newest = comments.map((c) => Date.parse(c?.createdAt || "")).filter(Number.isFinite);
+    const newestAt = newest.length ? Math.max(...newest) : null;
+    if (cutoff === null || (newestAt !== null && newestAt > cutoff)) {
+      actionable.push({
+        threadId: thread?.id || null,
+        path: thread?.path || null,
+        line: thread?.line ?? null,
+        author,
+        newestAt: newestAt ? new Date(newestAt).toISOString() : null,
+        preview: String(first?.body || "").slice(0, 160),
+      });
+    }
+  }
+
+  if (actionable.length) {
+    return {
+      stale: true,
+      reason: "new_actionable_bot_threads_on_head",
+      actionable,
+    };
+  }
+  return { stale: false, reason: null, actionable: [] };
+}

@@ -421,6 +421,29 @@ Skip only when the diff has no test-file changes (say so in chat).
 
 
 
+#### Must probe — UI accessibility (duplicate / missing / unlabeled controls)
+
+<!-- probe: ui-accessibility -->
+
+When the diff adds or changes **UI component files** (`.tsx` / `.jsx` / `.vue` / `.svelte`) with interactive controls, **explicitly** check:
+
+1. **Accessible names are unique per group** — repeated controls (e.g. a remove/delete button per list row, a select per candidate) must not all share the same accessible name. Give each an `aria-label` containing the row/candidate identity, or place each in a labelled group, so a screen-reader user can tell which item a control affects.
+2. **Keyboard operable** — buttons/links/dialogs reachable and dismissible by keyboard (`onKeyDown`/Enter/Escape as appropriate); nothing that requires a mouse only.
+3. **Focus is managed** — opening/closing a dialog or modal moves focus into it and returns it on close; `tabIndex`/focus traps don't strand the user.
+4. **Labels are bound** — form controls have a real `<label htmlFor>`/`aria-labelledby`/`aria-label`; a control with no accessible name is a **Confirmed** a11y gap.
+
+Skip only when the diff has no UI component changes (say so in chat).
+
+<!-- assertion-anchors -->
+<!-- assertion: accessible-names-unique -->
+<!-- assertion: keyboard-operable -->
+<!-- assertion: focus-managed -->
+<!-- assertion: labels-bound -->
+<!-- /assertion-anchors -->
+
+
+
+
 #### Must probe — credential transport and OAuth baseUrl (CodeRabbit/Codex often catch these first)
 
 <!-- probe: credential-transport -->

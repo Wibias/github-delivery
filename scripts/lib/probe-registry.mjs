@@ -147,6 +147,21 @@ export const PROBE_REGISTRY = [
       "order-asserted-not-membership",
     ],
   },
+  {
+    id: "ui-accessibility",
+    axis: "bug",
+    lens: "ui_accessibility",
+    triggers: [
+      /\.tsx$|\.jsx$|\.vue$|\.svelte$/i, // UI component files
+      /\baria-|\brole=|\balt=|\btabIndex|\bonKeyDown|\bhtmlFor/i,
+    ],
+    assertions: [
+      "accessible-names-unique",
+      "keyboard-operable",
+      "focus-managed",
+      "labels-bound",
+    ],
+  },
   // --- security axis ---
   {
     id: "credential-transport",

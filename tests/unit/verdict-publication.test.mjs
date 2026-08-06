@@ -6,6 +6,7 @@ import { join, resolve } from "node:path";
 import test from "node:test";
 
 import {
+  assessVerdictFreshness,
   findVerdictPublication,
   materialVerdictDelta,
   planVerdictPublication,
@@ -408,4 +409,85 @@ test("verify CLI rejects missing required arguments", () => {
   const result = run(["acme/widget", "42"]);
   assert.equal(result.status, 2);
   assert.match(result.stderr, /Usage:/);
+});
+
+function botThread({ id, author = "coderabbitai[bot]", createdAt = "2026-08-06T10:00:00Z", resolved = false, outdated = false }) {
+  return {
+    id,
+    isResolved: resolved,
+    isOutdated: outdated,
+    path: "gui/src/pages/RoutingProfiles.tsx",
+    line: 416,
+    comments: {
+      nodes: [
+        {
+          id: `${id}-c1`,
+          author: { login: author },
+          body: "Actionable bot finding.",
+          createdAt,
+        },
+      ],
+    },
+  };
+}
+
+test("freshness flags unresolved non-outdated bot threads on the reviewed head", () => {
+  const result = assessVerdictFreshness({
+    threads: [botThread({ id: "T1" })],
+    headOid: HEAD,
+    reviewedHead: HEAD,
+  });
+  assert.equal(result.stale, true);
+  assert.equal(result.reason, "new_actionable_bot_threads_on_head");
+  assert.equal(result.actionable.length, 1);
+  assert.equal(result.actionable[0].author, "coderabbitai[bot]");
+});
+
+test("freshness ignores resolved and outdated threads", () => {
+  const result = assessVerdictFreshness({
+    threads: [
+      botThread({ id: "T1", resolved: true }),
+      botThread({ id: "T2", outdated: true }),
+    ],
+    headOid: HEAD,
+    reviewedHead: HEAD,
+  });
+  assert.equal(result.stale, false);
+  assert.equal(result.actionable.length, 0);
+});
+
+test("freshness ignores human-authored threads", () => {
+  const result = assessVerdictFreshness({
+    threads: [botThread({ id: "T1", author: "Ingwannu" })],
+    headOid: HEAD,
+    reviewedHead: HEAD,
+  });
+  assert.equal(result.stale, false);
+  assert.equal(result.actionable.length, 0);
+});
+
+test("freshness honors an evidence cutoff (threads newer than evidence are stale)", () => {
+  const result = assessVerdictFreshness({
+    threads: [botThread({ id: "T1", createdAt: "2026-08-06T12:00:00Z" })],
+    headOid: HEAD,
+    reviewedHead: HEAD,
+    evidenceCutoff: "2026-08-06T11:00:00Z",
+  });
+  assert.equal(result.stale, true);
+});
+
+test("freshness passes when bot threads predate the evidence cutoff", () => {
+  const result = assessVerdictFreshness({
+    threads: [botThread({ id: "T1", createdAt: "2026-08-06T10:00:00Z" })],
+    headOid: HEAD,
+    reviewedHead: HEAD,
+    evidenceCutoff: "2026-08-06T11:00:00Z",
+  });
+  assert.equal(result.stale, false);
+});
+
+test("freshness refuses when the reviewed head is missing", () => {
+  const result = assessVerdictFreshness({ threads: [], headOid: null, reviewedHead: null });
+  assert.equal(result.stale, true);
+  assert.equal(result.reason, "reviewed_head_missing");
 });

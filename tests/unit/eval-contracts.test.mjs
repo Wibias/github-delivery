@@ -114,6 +114,7 @@ function makeFixtureRoot() {
     ["malformed-input-robustness", ["malformed-input-robustness", "db-result-cast-boundary"]],
     ["lock-error-propagation", ["complementary-must-probe", "typed-catch-detached"]],
     ["test-honesty", ["non-vacuous-assertions", "no-fixed-sleeps", "exact-selector-required", "order-asserted-not-membership"]],
+    ["ui-accessibility", ["accessible-names-unique", "keyboard-operable", "focus-managed", "labels-bound"]],
     ["credential-transport", ["oauth-token-no-cleartext", "baseurl-https-only-credential-provider"]],
     ["secrets-scan", ["secrets-scan"]],
     ["removed-controls", ["removed-controls-leads"]],

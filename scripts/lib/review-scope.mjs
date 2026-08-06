@@ -25,6 +25,7 @@ export const KNOWN_LENS_IDS = [
   "time_clocks",
   "state_consistency",
   "ui_async_state",
+  "ui_accessibility",
   "api_compatibility",
   "boundary_conditions",
   // complementary table lenses
@@ -88,6 +89,7 @@ const LENS_SPECS = [
   ["time_clocks", /Date\.|new Date|clock|timer|timeout|timezone|UTC|duration|expires|ttl/i],
   ["state_consistency", /transaction|state|cache|persist|commit|rollback|compare-and-swap|version/i],
   ["ui_async_state", /useEffect|useState|setState|watch\(|onMounted|componentWill|loading|pending/i],
+  ["ui_accessibility", /aria-|role=|button|label|tooltip|focus|tabIndex|dialog|modal|screen-?reader|keyboard|onKeyDown|alt=|htmlFor/i],
   ["api_compatibility", /export\s|public\s|endpoint|route|response|schema|version|deprecated/i],
   ["boundary_conditions", /length|size|limit|empty|null|undefined|overflow|underflow|slice|index/i],
 ];
