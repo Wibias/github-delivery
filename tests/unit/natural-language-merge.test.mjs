@@ -18,10 +18,12 @@ test("merge PR natural language routes to the merge workflow", () => {
   assert.match(merge, /The user speaks naturally/);
 });
 
-test("the merge workflow uses the mutation broker instead of a bare merge", () => {
+test("the merge workflow uses the driver + mutation broker instead of a bare merge", () => {
   const merge = read("references/merge-pr.md");
+  assert.match(merge, /scripts\/merge-pr-driver\.mjs/);
   assert.match(merge, /scripts\/github-mutate\.mjs/);
-  assert.match(merge, /action": "merge_pr"/);
+  assert.match(merge, /merge_pr/);
+  assert.match(merge, /--match-head-commit/);
   assert.doesNotMatch(merge, /^\s*gh pr merge\b/m);
 });
 

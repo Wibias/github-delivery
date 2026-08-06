@@ -45,45 +45,25 @@ Read `references/mutation-modes.md` and `references/github-mutation-broker.md` b
 
 ## Internal mutation sequence
 
-Create a temporary audit file for this PR, for example `github-delivery-pr-32-mutations.jsonl`. Every request is first planned without `--execute`, inspected, and then executed.
-
-### 1. Pre-merge PR comment
-
-Prepare an idempotent `post_comment` request containing:
-
-
-- `mutationMode: "maintainer"`
-- the exact repository, PR number, and current `expectedHead`
-- a stable `idempotencyKey`, such as `merge-thanks-pr-32`
-- a concrete 2–3 sentence why-it-helps comment
-- thanks to the PR author only when they are not the authenticated user
-- use the **Merge thanks** shape from `references/comment-depth.md`; keep GitHub `@mentions` bare and never backticked
-
-Run it through:
+Run the **merge driver** — it chains the gate, settle, broker requests, and cleanup decision into one call so the agent reviews one plan and confirms execution instead of hand-rolling each write:
 
 ```bash
-node scripts/github-mutate.mjs --request request.json
-node scripts/github-mutate.mjs --request request.json --execute --audit mutations.jsonl
+node "<github-delivery>/scripts/merge-pr-driver.mjs" OWNER/REPO N --mode maintainer --settle
 ```
 
-### 2. Merge
+The dry-run (no `--execute`) prints the ship-gate decision, the exact `post_comment` and `merge_pr` commands (with `--match-head-commit` head pinning), and the merge method. The agent **writes only the thanks-comment prose** (via `--thank-comment` or by editing the default) — every other step is scripted. Only when the plan is correct and the user's merge request is explicit, run:
 
-Prepare a `merge_pr` request:
-
-```json
-{
-  "schemaVersion": 1,
-  "action": "merge_pr",
-  "mutationMode": "maintainer",
-  "explicitInstruction": true,
-  "repo": "OWNER/REPO",
-  "pr": 32,
-  "expectedHead": "reviewed-head-sha",
-  "mergeMethod": "merge"
-}
+```bash
+node "<github-delivery>/scripts/merge-pr-driver.mjs" OWNER/REPO N --mode maintainer --settle --thank-comment "<why-it-helps prose>" --execute --audit github-delivery-pr-N-mutations.jsonl
 ```
 
-The broker must re-read the head before mutation and pin the merge using `--match-head-commit`. A moved head is a hard stop requiring a fresh gate run.
+`--execute` performs the writes through the broker only after the gate is `ready` on the pinned head, and appends every receipt to the audit file. A blocked gate, moved head, draft, or already-merged PR is a hard stop with a structured reason — never bypass.
+
+The driver covers:
+
+- **Pre-merge PR comment** — idempotent `post_comment` (`idempotencyKey: merge-thanks-pr-N`) with the thanks/why-it-helps body; thanks the author only when they are not the authenticated user; use the **Merge thanks** shape from `references/comment-depth.md`; keep GitHub `@mentions` bare and never backticked.
+- **Merge** — `merge_pr` with `--match-head-commit` head pinning (a moved head is a hard stop requiring a fresh gate run); the driver re-reads the head before mutation and verifies the merge receipt.
+- **Linked issue comments and closure** — still a judgment step the agent performs after the driver (see below).
 
 ### 3. Linked issue comments and closure
 
@@ -108,14 +88,9 @@ Auto-close does not replace the required issue comment.
 
 ### 4. Cleanup
 
-- Confirm the PR is actually merged, not merely queued.
-- Confirm every required issue comment exists and complete issues are closed.
-- Run **owner-scoped branch cleanup** (shared rules):
-  1. `gh api user -q .login` for the authenticated actor.
-  2. `gh pr view <N> --json state,mergedAt,headRefName,headRepositoryOwner,headRepository,baseRepository,isCrossRepository`.
-  3. Evaluate cleanup with `evaluateHeadBranchCleanup` from `scripts/lib/merge-branch-cleanup.mjs`.
-  4. When the decision is `delete`, run broker action `delete_head_branch` through `scripts/github-mutate.mjs`.
-  5. Report one explicit status line (`branch deleted: …`, `branch kept: head owned by @other`, `branch kept: protected shared branch`, or `branch kept: user requested keep`).
+- Confirm the PR is actually merged, not merely queued (the driver verifies the merge receipt; also confirm every required issue comment exists and complete issues are closed).
+- The driver reports the owner-scoped branch-cleanup decision via `evaluateHeadBranchCleanup`. When the decision is `delete`, run broker action `delete_head_branch` through `scripts/github-mutate.mjs` (or let the driver's cleanup plan drive it in a later iteration).
+- Report one explicit status line (`branch deleted: …`, `branch kept: head owned by @other`, `branch kept: protected shared branch`, or `branch kept: user requested keep`).
 - Delete only when the head owner matches the authenticated actor. This applies to **same-repo and fork PRs**; fork heads delete from the head fork repo.
 - Retarget stack children before deleting a stack parent branch.
 - Hand off versioning or worktree cleanup to the appropriate skill.

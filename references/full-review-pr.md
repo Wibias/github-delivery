@@ -29,6 +29,53 @@ The run **MUST NOT stop, return, hand off, emit a final response, or report
 completion** while `Publish final verdict` or any required prerequisite is
 `pending` or `in_progress`.
 
+## Token-efficient review flow (start here)
+
+Run the **review brief** first — it digests the scope plan, required lenses and
+surfaces, required probes, dependency changes, and the diff hunks into one
+compact read. This replaces re-reading the PR files and re-deriving scope by
+hand:
+
+```bash
+node "<github-delivery>/scripts/review-brief.mjs" OWNER/REPO N
+```
+
+The brief names every required bug lens, security surface, and probe the run
+must cover, plus the exact changed-file hunks. Open a source file **only when a
+lens actually needs more than the hunk** — do not read whole files preemptively.
+The brief also appends the **required probe blocks** extracted from the review
+references (`<!-- probe: <id> -->` sections), so the agent applies exactly the
+probe instructions the diff triggers instead of reading the whole references.
+
+For a foreign PR (not ours), verify the head mechanically instead of narrating
+each gate:
+
+```bash
+node "<github-delivery>/scripts/verify-pr-head.mjs" OWNER/REPO N \
+  --test-filter "<changed-subsystem>" --worktree-root "D:\codex-worktrees"
+```
+
+It checks out the exact PR head in a temp worktree, runs install/typecheck/
+focused tests/lint/privacy, prints one PASS/FAIL table, and removes the
+worktree. If CI is already green on the head and the changed subsystems pass,
+you do **not** need to re-run the full local suite.
+
+### Reference read-once rule
+
+Load each review reference (`bug-review.md`, `security-review.md`,
+`spec-standards-review.md`, `semantic-propagation-review.md`, `code-smells.md`,
+the required security skill) **once per session**, not once per PR. After the
+first read, reuse the in-session summary; only re-open the section a required
+lens/probe actually names. Reading all six in full for every PR is the largest
+token sink in this workflow.
+
+### Narration discipline
+
+Between tool calls, do **not** narrate intent (“Now let me check…”, “Let me
+verify…”, “The plan is correct”). Work through the lenses silently and report
+only findings, blockers, and evidence — the chat report is the verdict
+summary, not a step log.
+
 Before every attempted stop:
 
 1. Inspect the current execution plan.
