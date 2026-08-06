@@ -1,21 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import { planReviewScope } from "../../scripts/lib/review-scope.mjs";
-import { projectBugScope, projectSecurityScope } from "../../scripts/lib/review-scope-compat.mjs";
+import { evaluate } from "../../scripts/pre-open-gate.mjs";
+import { validatePreOpenEvidence, evidenceClears } from "../../scripts/lib/pre-open-evidence.mjs";
 
 function file(path, patch = "", extra = {}) {
   return { path, patch, additions: 1, deletions: 1, status: "modified", ...extra };
 }
 
 function gateDecision(plan) {
-  const bugScope = projectBugScope(plan);
-  const securityScope = projectSecurityScope(plan);
-  const blockers = [
-    ...bugScope.requiredLenses.map((id) => `bug:requiredLenses:${id}`),
-    ...securityScope.requiredSurfaces.map((id) => `security:requiredSurfaces:${id}`),
-  ];
-  const complete = plan.complete && bugScope.complete && securityScope.complete;
-  return { decision: !complete ? "unknown" : blockers.length ? "blocked" : "ready", blockers };
+  const { decision, blockers } = evaluate(plan);
+  return { decision, blockers };
 }
 
 test("pre-open gate: docs-only branch is ready", () => {
@@ -44,4 +40,72 @@ test("pre-open gate: missing patch makes the decision unknown (never open)", () 
   const plan = planReviewScope({ repo: "acme/widget", pr: null, headRefOid: "abc", files: [file("src/auth/login.ts", "")] });
   const { decision } = gateDecision(plan);
   assert.equal(decision, "unknown");
+});
+
+test("pre-open gate: evidence covering every required lens/surface clears blocked to ready", () => {
+  const plan = planReviewScope({ repo: "acme/widget", pr: null, headRefOid: "abc", files: [file("src/worker.ts", "+const worker = new Worker(url);\n+worker.terminate();")] });
+  const evidence = {
+    schemaVersion: 1,
+    lenses: {
+      silent_failures: "done",
+      resource_leaks: "done",
+      edge_cases: "done",
+      concurrency_races: "done",
+      resource_lifecycle: "done",
+    },
+    surfaces: {
+      authn: "n/a no auth boundary touched",
+      authz: "n/a no authorization boundary touched",
+      secrets_config: "n/a no secrets or config touched",
+      injection: "n/a no untrusted input or shell execution",
+    },
+  };
+  const { decision, blockers, clearedByEvidence, evidenceApplied } = evaluate(plan, evidence);
+  assert.equal(evidenceApplied, true);
+  assert.equal(decision, "ready");
+  assert.deepEqual(blockers, []);
+  assert.equal(clearedByEvidence.length, 9);
+});
+
+test("pre-open gate: partial evidence stays blocked and lists the remaining blockers", () => {
+  const plan = planReviewScope({ repo: "acme/widget", pr: null, headRefOid: "abc", files: [file("src/worker.ts", "+const worker = new Worker(url);\n+worker.terminate();")] });
+  const evidence = {
+    schemaVersion: 1,
+    lenses: { silent_failures: "done" },
+    surfaces: {},
+  };
+  const { decision, blockers } = evaluate(plan, evidence);
+  assert.equal(decision, "blocked");
+  assert.ok(blockers.includes("bug:requiredLenses:resource_leaks"));
+  assert.ok(blockers.includes("security:requiredSurfaces:authn"));
+  assert.ok(!blockers.includes("bug:requiredLenses:silent_failures"));
+});
+
+test("pre-open gate: evidence does not change the unknown decision", () => {
+  const plan = planReviewScope({ repo: "acme/widget", pr: null, headRefOid: "abc", files: [file("src/auth/login.ts", "")] });
+  const evidence = { schemaVersion: 1, lenses: {}, surfaces: {} };
+  const { decision } = evaluate(plan, evidence);
+  assert.equal(decision, "unknown");
+});
+
+test("pre-open gate: invalid evidence is rejected by validation", () => {
+  const invalid = validatePreOpenEvidence({ lenses: { silent_failures: "maybe" }, surfaces: {} });
+  assert.equal(invalid.ok, false);
+  assert.ok(invalid.errors.some((error) => error.includes("invalid status")));
+});
+
+test("pre-open gate: n/a evidence requires a reason", () => {
+  const bare = validatePreOpenEvidence({ lenses: { silent_failures: "n/a" }, surfaces: {} });
+  assert.equal(bare.ok, false);
+  assert.ok(bare.errors.some((error) => error.includes("requires a reason")));
+  const withReason = validatePreOpenEvidence({ lenses: { silent_failures: "n/a boundary untouched" }, surfaces: {} });
+  assert.equal(withReason.ok, true);
+});
+
+test("pre-open gate: evidenceClears accepts done and n/a-with-reason only", () => {
+  assert.equal(evidenceClears({ silent_failures: "done" }, "silent_failures"), true);
+  assert.equal(evidenceClears({ silent_failures: "n/a boundary untouched" }, "silent_failures"), true);
+  assert.equal(evidenceClears({ silent_failures: "n/a" }, "silent_failures"), false);
+  assert.equal(evidenceClears({ silent_failures: "maybe" }, "silent_failures"), false);
+  assert.equal(evidenceClears({}, "silent_failures"), false);
 });

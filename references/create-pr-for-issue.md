@@ -57,7 +57,7 @@ Run the **bug-finding** and **security review** passes on the code that will go 
 3. If `decision: "blocked"` → the diff has required bug lenses and/or security surfaces. Run the **bug axis** via **`references/bug-review.md`** and the **security axis** via **`references/security-review.md`** on the **branch diff** (not a PR head). Fix Confirmed High/Critical findings (and useful Mediums) **before** opening. Only proceed when:
    - every required lens/surface is `done` or honestly `n/a (why)`, and
    - no Confirmed High/Critical remains open.
-   Rerun the gate after fixes and confirm it is no longer blocked for the reasons you addressed.
+   Rerun the gate after fixes to confirm the diff shape is what you reviewed; the exit code stays `blocked` for any logic-bearing diff unless you pass `--evidence-file` recording the completed lens/surface statuses. Clearance is the recorded `done`/`n/a` evidence you produce in the passes above — carry that evidence (not the bare exit code) forward as proof the blockers were addressed.
 4. If `decision: "unknown"` → **stop**. Restore complete branch evidence (fetch base, checkout head, resolve missing patches) and rerun. **Never open a PR from an incomplete diff.**
 5. Record the gate result (decision + blockers cleared) in chat and carry it into the PR body validation notes.
 
