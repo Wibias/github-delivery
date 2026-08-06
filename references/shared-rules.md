@@ -223,10 +223,10 @@ Applies to `fix-pr-bots`, `full-review-pr`, `re-review-pr`, and `create-pr-for-i
    - “consumer lives elsewhere” when **this PR owns the file version on the target branch**
    - “non-blocking” without a verified false positive or durable won’t-fix rationale
 3. **Fix-or-decline sequence (mandatory):**
-   - **Fix path:** patch → push → verify on current head → reply in-thread with path/SHA evidence → only then `resolve_thread` when the active mutation mode allows it.
+   - **Fix path:** patch → push → verify on current head → reply in-thread with path/SHA evidence → only then resolve when the active mutation mode allows it.
    - **Decline path:** verify the finding is wrong or genuinely out of scope → reply in-thread with concrete counterevidence → only then resolve when allowed.
    - A `[GD]` reply that only says “deferred to other PR / fabric / rebase” is **not** a decline and does **not** clear the thread.
-4. **Mutation mode.** `review` may reply to bot threads but **must not** call `resolve_thread` (see `references/mutation-modes.md`). `maintainer` / `autonomous` may resolve only after step 3 is complete.
+4. **Mutation mode.** `review` may reply to bot threads and **may resolve bot-authored threads** the run verified addressed, via `scripts/review-threads.mjs --resolve-bot` (the `resolve_bot_thread` action; it refuses when any unresolved human-authored thread remains). `review` must **not** resolve human threads or use `--resolve` — those require `maintainer`/`autonomous` with explicit instruction. `maintainer` / `autonomous` may resolve any thread only after step 3 is complete.
 5. **Readiness claims.** Do not post merge-ready, recommend merge, or publish `approve-comment` while useful bot threads remain open with only defer/skip replies and no verified fix or durable decline on-thread.
 
 ### Comment fetch hygiene
@@ -250,7 +250,7 @@ Visible GitHub actions must not impersonate the user.
 | Reply on **bot** threads          | Allowed when declining/skipping or noting a fix; prefix with `[GD]`                                                                                                                                              |
 | Reply on **human** threads        | **Forbidden** unless the user confirms the **exact** reply text first                                                                                                                                                         |
 | Inline review-thread replies      | Prefer **in-thread** replies (below), never a top-level PR comment that duplicates the thread                                                                                                                                 |
-| Resolve review threads            | Only after the fix is verified, and only for: (a) threads from the user who requested this run, or (b) trusted bot threads you addressed. Do **not** resolve other humans’ threads that others participated in without asking |
+| Resolve review threads            | Only after the fix is verified. **Bot-authored threads** you addressed may be resolved via `--resolve-bot` (allowed in `review` + higher). **Human threads** require `maintainer`/`autonomous` + explicit instruction, only for (a) threads from the user who requested this run, or (b) after asking when others participated. Do **not** resolve other humans’ threads without asking |
 | Approve / request changes         | Only per the active review workflow; never approve unless asked                                                                                                                                                               |
 | Draft / ready / close / reopen PR | Never convert draft→ready or ready→draft unless the user explicitly asks (see **Draft → ready**). Merge workflow may close **issues** after merge                                                                             |
 

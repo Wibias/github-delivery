@@ -11,6 +11,7 @@ const PR_ACTIONS = new Set([
   "reply_bot_thread",
   "reply_human_thread",
   "resolve_thread",
+  "resolve_bot_thread",
   "change_draft_state",
   "request_reviewers",
   "merge_pr",
@@ -147,6 +148,7 @@ function commandFor(request) {
       ];
     }
     case "resolve_thread":
+    case "resolve_bot_thread":
       return [
         "gh",
         "api",

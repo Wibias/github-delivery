@@ -16,6 +16,7 @@ const ACTIONS = [
   "reply_human_thread",
   "push_code",
   "resolve_thread",
+  "resolve_bot_thread",
   "change_draft_state",
   "request_reviewers",
   "close_linked_issue",
@@ -56,6 +57,7 @@ function buildProfile(mode) {
       "post_issue_comment",
       "edit_own_comment",
       "reply_bot_thread",
+      "resolve_bot_thread",
     ]);
     allow(profile, ["reply_human_thread"], { exactText: true });
   }

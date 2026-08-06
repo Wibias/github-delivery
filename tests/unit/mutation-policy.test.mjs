@@ -13,10 +13,11 @@ test("read-only permits evidence reads but denies GitHub writes", () => {
   assert.equal(profile.actions.post_comment.allowed, false);
 });
 
-test("review can publish reviews but cannot resolve threads", () => {
+test("review can publish reviews and resolve bot threads but not human threads", () => {
   const profile = mutationProfile("review");
   assert.equal(profile.actions.post_review.allowed, true);
   assert.equal(profile.actions.resolve_thread.allowed, false);
+  assert.equal(profile.actions.resolve_bot_thread.allowed, true);
 });
 
 test("maintainer mutations require explicit instruction", () => {

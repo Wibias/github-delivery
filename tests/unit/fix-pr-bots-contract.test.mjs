@@ -18,7 +18,9 @@ test("shared rules forbid deferring in-scope bot fixes to another PR", () => {
   assert.match(sharedRules, /consumer lives elsewhere/);
   assert.match(sharedRules, /non-blocking/);
   assert.match(sharedRules, /Fix-or-decline sequence/);
-  assert.match(sharedRules, /`review` may reply to bot threads but \*\*must not\*\* call `resolve_thread`/);
+  assert.match(sharedRules, /`review` may reply to bot threads and \*\*may resolve bot-authored threads\*\*/);
+  assert.match(sharedRules, /--resolve-bot/);
+  assert.match(sharedRules, /must \*\*not\*\* resolve human threads/);
 });
 
 test("fix-pr-bots requires verify-fix-resolve and blocks defer-only merge-ready", () => {

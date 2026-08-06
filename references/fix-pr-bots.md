@@ -35,7 +35,7 @@ Necessary/useful **human** (esp. owners/maintainers) + CodeRabbit/Codex comments
  "inherited/fabric file — fix in another PR", "rebase will pick it up later", "non-blocking nit — reply and resolve", or "consumer lives elsewhere" without proving the current PR does not own the file.
    - **Fix order:** fix → push → verify (tests/CI as appropriate) → in-thread reply with commit/SHA + path evidence → only then `resolve_thread` when mutation mode allows it.
    - `[GD]` skip notes are only for verified false positives, durable won't-fix with reason, or true out-of-scope. They do **not** replace a fix for in-scope bot findings.
-   - In `review` mutation mode: reply allowed; **do not** `resolve_thread`.
+   - In `review` mutation mode: reply allowed; **bot-authored** threads you verified addressed may be resolved via `scripts/review-threads.mjs --resolve-bot`; human threads stay out of scope (need `maintainer` + explicit).
 6. Triage and fix necessary/useful items (trusted humans first; verify bots). For human declines needing a written reply: confirm exact text in chat first (shared social policy). Bot skip notes may use `[GD]` prefix.
 7. Push fixes (git safety: no force-push; stop if rejected / dirty unrelated tree / **fork-head unwritable**
 

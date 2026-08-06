@@ -14,13 +14,14 @@ function positiveNumber(value, option) {
 
 export function parseSnapshotGateArgs(
   argv,
-  { usage, allowResolve = false } = {},
+  { usage, allowResolve = false, allowResolveBot = false } = {},
 ) {
   const positionals = [];
   let snapshotPath = null;
   let expectedHead = null;
   let maxAgeSeconds = 300;
   let resolveId = null;
+  let resolveBot = false;
   let workflow = null;
 
   for (let index = 0; index < argv.length; index++) {
@@ -53,6 +54,10 @@ export function parseSnapshotGateArgs(
       if (!resolveId) throw new Error("--resolve requires a review thread ID");
       continue;
     }
+    if (value === "--resolve-bot" && allowResolveBot) {
+      resolveBot = true;
+      continue;
+    }
     if (value.startsWith("--")) throw new Error(`Unknown option: ${value}`);
     positionals.push(value);
   }
@@ -78,6 +83,7 @@ export function parseSnapshotGateArgs(
     expectedHead,
     maxAgeSeconds,
     resolveId,
+    resolveBot,
     workflow,
   };
 }

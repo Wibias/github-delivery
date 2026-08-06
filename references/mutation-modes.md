@@ -14,7 +14,8 @@ The user never needs to choose CLI flags. The agent derives the narrowest approp
 | Reply to a human thread | no | exact text required | exact text required | exact text required |
 | Push scoped code | no | no | yes | yes |
 | Post feedback-resolution records | no | no | yes | yes |
-| Resolve threads | no | no | explicit instruction | yes, subject to social policy |
+| Resolve bot-authored threads (`--resolve-bot`) | no | yes, after verification | yes | yes |
+| Resolve human threads | no | no | explicit instruction | yes, subject to social policy |
 | Change draft state / request reviewers | no | no | explicit instruction | yes |
 | Merge PR / close linked issue | no | no | explicit instruction | yes, only inside the governing workflow |
 | Create a follow-up issue | no | no | explicit instruction | yes |
