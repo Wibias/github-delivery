@@ -398,6 +398,29 @@ Skip this block only when the diff clearly has none of those surfaces (say so in
 
 
 
+#### Must probe — test honesty (vacuous / flaky / order-blind coverage)
+
+<!-- probe: test-honesty -->
+
+When the diff adds or changes **test files** (`*.test.*` / `*.spec.*`), every new or modified assertion must actually prove the claimed behavior. **Explicitly** check:
+
+1. **Non-vacuous assertions** — an assertion must fail if the code under test changes. A test whose setup makes the assertion trivially true (empty slice windows, inverted ranges, a fixture that can never trigger the branch, an assertion on data the test itself constructed) is a **Confirmed** gap: it reports green for the wrong reason. For each new/modified assertion, state what code change would flip it.
+2. **Exact selectors, not matching nothing** — a query/selector that matches no element (wrong class, wrong label, stale DOM id) passes vacuously. Assert the element exists or use the same selectors as the sibling tests that actually exercise the surface.
+3. **No fixed sleeps** — `setTimeout` / `sleep(20)` / fixed delays inside `act` or async tests are flaky-by-design and can pass without the async state ever settling. Use deterministic flush/wait patterns (await the promise, poll a condition, use the framework's act/flush helper).
+4. **Order asserted, not just membership** — a loop that proves only "all items present" does not prove "items written in this order". When ordering/sequence is the claimed behavior, assert the actual order (index-based or sequence compare).
+
+Skip only when the diff has no test-file changes (say so in chat).
+
+<!-- assertion-anchors -->
+<!-- assertion: non-vacuous-assertions -->
+<!-- assertion: no-fixed-sleeps -->
+<!-- assertion: exact-selector-required -->
+<!-- assertion: order-asserted-not-membership -->
+<!-- /assertion-anchors -->
+
+
+
+
 #### Must probe — credential transport and OAuth baseUrl (CodeRabbit/Codex often catch these first)
 
 <!-- probe: credential-transport -->

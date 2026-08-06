@@ -131,6 +131,22 @@ export const PROBE_REGISTRY = [
       "deterministic-lock-regressions",
     ],
   },
+  {
+    id: "test-honesty",
+    axis: "bug",
+    lens: "evidence_semantics",
+    triggers: [
+      /\.(?:test|spec)\.[cm]?[jt]sx?$/i, // changed test file
+      /setTimeout\(|setInterval\(|await\s+sleep\(|new Promise\(resolve\s*=>\s*setTimeout/i, // fixed sleeps
+      /expect\([^)]*\)\.(?:toHaveLength|toContain|toEqual|toMatchObject|toHaveClass|querySelector|getBy)/i, // vacuity-prone assertions
+    ],
+    assertions: [
+      "non-vacuous-assertions",
+      "no-fixed-sleeps",
+      "exact-selector-required",
+      "order-asserted-not-membership",
+    ],
+  },
   // --- security axis ---
   {
     id: "credential-transport",

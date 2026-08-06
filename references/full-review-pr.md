@@ -46,6 +46,10 @@ lens actually needs more than the hunk** — do not read whole files preemptivel
 The brief also appends the **required probe blocks** extracted from the review
 references (`<!-- probe: <id> -->` sections), so the agent applies exactly the
 probe instructions the diff triggers instead of reading the whole references.
+When the diff changes test files, the brief carries the **`test-honesty`**
+probe block: verify every new/modified assertion is non-vacuous (would fail if
+the code changed), uses exact selectors, avoids fixed sleeps, and asserts order
+where order is claimed — CodeRabbit catches these on most non-trivial PRs.
 
 For a foreign PR (not ours), verify the head mechanically instead of narrating
 each gate:

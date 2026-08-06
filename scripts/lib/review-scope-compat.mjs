@@ -1,6 +1,6 @@
 const SECURITY_BASELINES = ["authn", "authz", "secrets_config", "injection"];
 const BUG_BASELINES = ["silent_failures", "resource_leaks", "edge_cases"];
-const BUG_PROBES = new Set(["api-cli-wiring", "input-shape-evidence-semantics", "determinism-clocks-budgets", "recursion-termination", "cli-payload-completeness", "hot-path-scale", "malformed-input-robustness", "lock-error-propagation"]);
+const BUG_PROBES = new Set(["api-cli-wiring", "input-shape-evidence-semantics", "determinism-clocks-budgets", "recursion-termination", "cli-payload-completeness", "hot-path-scale", "malformed-input-robustness", "lock-error-propagation", "test-honesty"]);
 const SECURITY_PROBES = new Set(["credential-transport", "secrets-scan", "removed-controls"]);
 
 function packageManager(files) {
