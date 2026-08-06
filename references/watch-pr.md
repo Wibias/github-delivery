@@ -35,8 +35,9 @@ node "<github-delivery>/scripts/watch-wake-gate.mjs" OWNER/REPO N
 
 - **Exit `1` / `canWait: false`:** you are **forbidden** to say you are waiting on CI, `windows-latest`, CodeRabbit, or Codex. Act on `blockers[]`:
   - `trusted_human_comment_needs_code` — owner/member said something actionable (including “half landed elsewhere, keep the rest”): **rebase onto tip, drop duplicated work, keep leftovers, fix conflicts, push**. Do **not** only post an ACK comment.
+    **After pushing the fix, the `[GD] Addressed feedback` resolution record is REQUIRED to clear this blocker** — the gate only credits a human comment as addressed when a record references its exact comment key plus a commit that postdates it. A bare push leaves the comment `unaddressed` and the gate re-flags it on every wake (the PR #1068 loop). Post the record (via `addressedFeedbackPlan` / `scripts/lib/addressed-feedback-dedup.mjs`) with the feedback keys and the fix commit:
   - `base_dirty_or_behind` — `DIRTY` / `CONFLICTING` / `BEHIND`: update from base and resolve **now** — only when the PR is ours (shared **PR ownership boundary**); on a foreign PR, surface the required owner action instead of pushing. Polling while conflicted is forbidden.
-  - Optional paper trail **after** the fix commit:
+    Mandatory record format (one cumulative comment per PR):
 
     ```markdown
     [GD] Addressed feedback

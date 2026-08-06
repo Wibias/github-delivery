@@ -20,7 +20,7 @@ The required plan must include, at minimum:
 4. Complete bug review.
 5. Complete security review.
 6. Complete Spec and Standards review.
-7. Triage human and bot feedback.
+7. Triage human and bot feedback. **After pushing fixes for a human (owner/maintainer) comment, post the `[GD] Addressed feedback` resolution record** referencing that comment's exact key plus the fix commit — the wake gate only credits a human comment as addressed via such a record, and a bare push leaves it `unaddressed` so the gate re-flags it on every run (the PR #1068 loop). Use `addressedFeedbackPlan` from `watch-wake-gate.mjs` (or `scripts/lib/addressed-feedback-dedup.mjs`) for the edit-vs-post decision, and `--resolve-bot` for bot threads.
 8. Validate the current head and required CI.
 9. Refresh the authoritative ship gate.
 10. Publish final verdict.
