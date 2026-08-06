@@ -463,7 +463,7 @@ If the user named **several** existing PRs (“full review these”, “babysit 
 
 **Batch tip race:** before each PR’s merge-ready / approve claim, re-check behind-base + compile-against-tip on **that** PR — base may have moved while you fixed an earlier one.
 
-**Single writer:** do not run watch + fix-pr concurrently on the same PR in a way that double-posts. One workflow owns the `[GD] Merge ready` comment, and one exact PR head owns one `[GD] Addressed feedback` comment.
+**Single writer:** do not run watch + fix-pr concurrently on the same PR in a way that double-posts. One workflow owns the `[GD] Merge ready` comment, and one cumulative `[GD] Addressed feedback` comment exists per PR — new heads edit it, never add a second.
 
 ### Full-review verdict completion lock
 
@@ -1168,12 +1168,15 @@ For any `[GD]` comment intent on an issue or PR (opened-PR notice, research revi
 
 ### Addressed-feedback identity (one comment per head)
 
-For `[GD] Addressed feedback`, the identity key is `PR + exact current head SHA`; an individual feedback ID is **not** a publication identity.
+For `[GD] Addressed feedback`, the identity key is **one cumulative comment per PR**; an individual feedback ID is **not** a publication identity, and a head SHA is a version of that single thread, not a new identity. A new head never creates a second comment.
 
 1. Collect every trusted feedback item resolved by the current head before publishing.
-2. Search your existing PR conversation comments for the exact marker `<!-- gd:addressed-feedback head:<40-char-head-sha> -->`.
-3. If an exact marker match exists, edit that comment and merge the full deduplicated feedback-key set into it. If none exists, create exactly one comment.
-4. Never create separate top-level comments for multiple feedback items resolved by the same head or commit.
+2. Read `addressedFeedbackPlan` from `watch-wake-gate.mjs` (or run the dedup decision directly via `scripts/lib/addressed-feedback-dedup.mjs`). It returns the mechanical publication decision:
+   - `{ action: "edit", commentId, reason: "exact_head_marker_exists" }` — the current head already has a marker; edit that comment and merge the full deduplicated feedback-key set.
+   - `{ action: "edit", commentId, reason: "older_head_marker_exists" | "legacy_or_unmarked_comment_exists" }` — an older-head or legacy `[shipping-github]`/`[github-delivery]` comment exists; edit the most recent one, update its head marker to the current head, and merge keys. Do **not** post a second comment.
+   - `{ action: "post" }` — no authored addressed-feedback comment exists; create exactly one.
+3. If the plan says `edit`, use `edit_own_comment` on the returned `commentId`. If it says `post`, create exactly one comment.
+4. Never create separate top-level comments for multiple feedback items resolved by the same head or commit, and never create a second comment for a new head when an addressed-feedback comment already exists on the PR.
 5. Use this canonical body. **5 or fewer** feedback keys stay inline:
 
 ```markdown

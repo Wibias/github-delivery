@@ -50,7 +50,7 @@ node "<github-delivery>/scripts/watch-wake-gate.mjs" OWNER/REPO N
     <!-- gd:addressed-feedback head:<40-char-current-head-sha> -->
     ```
 
-    Collect all items fixed by the same head first. Search for the exact head marker and edit that one comment; never publish one top-level comment per feedback ID. When the feedback-key list is **more than 5** entries, collapse it into a `<details><summary>feedbacks:</summary>…</details>` block right below `commit:` (same pattern as the TLDR) so the top-level body stays short.
+    Collect all items fixed by the same head first. Read `addressedFeedbackPlan` from this script's output (or `scripts/lib/addressed-feedback-dedup.mjs`): when it returns `edit` with a `commentId`, edit that one comment (it already carries the current head marker, or is the older-head/legacy comment to supersede); when it returns `post`, create exactly one. Never publish one top-level comment per feedback ID and never a second comment for a new head. When the feedback-key list is **more than 5** entries, collapse it into a `<details><summary>feedbacks:</summary>…</details>` block right below `commit:` (same pattern as the TLDR) so the top-level body stays short.
 
   - **ACK-only does not clear the gate** (script requires a later non-merge commit).
 

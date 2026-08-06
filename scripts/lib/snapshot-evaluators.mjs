@@ -14,6 +14,7 @@ import {
   normalizeFeedback,
 } from "./watch-feedback.mjs";
 import { formatAddressedFeedbackComment } from "./addressed-feedback-comment.mjs";
+import { planAddressedFeedbackPublication } from "./addressed-feedback-dedup.mjs";
 
 const DIRTY_STATES = new Set(["DIRTY", "CONFLICTING", "BEHIND"]);
 
@@ -402,6 +403,11 @@ export function evaluateWakeSnapshot(snapshot) {
         headOid: snapshot.headOid,
       })
     : null;
+  const addressedFeedbackPlan = planAddressedFeedbackPublication({
+    comments: feedbackEvidence.issueComments || [],
+    myLogin,
+    headOid: snapshot.headOid,
+  });
   for (const comment of unaddressed) {
     blockers.push({
       key: comment.key,
@@ -449,5 +455,6 @@ export function evaluateWakeSnapshot(snapshot) {
     resolutionRecords: resolution.validRecords,
     resolutionDiagnostics: resolution.diagnostics,
     addressedFeedbackComment,
+    addressedFeedbackPlan,
   };
 }
