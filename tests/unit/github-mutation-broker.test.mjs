@@ -301,3 +301,133 @@ test("delete_head_branch rejects another user's head", () => {
     /branch kept: head owned by @Wibias/,
   );
 });
+
+function editOwnCommentRequest(overrides = {}) {
+  return {
+    schemaVersion: 1,
+    action: "edit_own_comment",
+    mutationMode: "review",
+    repo: "acme/widgets",
+    pr: 32,
+    expectedHead: "abcdef1234567890",
+    commentId: 77,
+    body: "[GD] corrected verdict",
+    idempotencyKey: "edit-verdict-77",
+    ...overrides,
+  };
+}
+
+test("edit_own_comment rejects a comment owned by another GitHub actor before PATCH", () => {
+  const calls = [];
+  assert.throws(
+    () =>
+      executeMutationRequest({
+        request: editOwnCommentRequest(),
+        execute: true,
+        runner(command, args) {
+          calls.push([command, ...args]);
+          if (args[0] === "pr" && args[1] === "view") {
+            return { status: 0, stdout: "abcdef1234567890\n", stderr: "" };
+          }
+          if (args[0] === "api" && args[1] === "user") {
+            return {
+              status: 0,
+              stdout: JSON.stringify({ login: "github-delivery-agent" }),
+              stderr: "",
+            };
+          }
+          if (args[0] === "api" && args[1].endsWith("/issues/comments/77")) {
+            return {
+              status: 0,
+              stdout: JSON.stringify({
+                user: { login: "maintainer" },
+                issue_url: "https://api.github.com/repos/acme/widgets/issues/32",
+              }),
+              stderr: "",
+            };
+          }
+          return { status: 0, stdout: "", stderr: "" };
+        },
+      }),
+    /comment_not_owned_by_actor/,
+  );
+  assert.equal(calls.some((call) => call.includes("PATCH")), false);
+});
+
+test("edit_own_comment rejects an owned comment attached to a different PR", () => {
+  const calls = [];
+  assert.throws(
+    () =>
+      executeMutationRequest({
+        request: editOwnCommentRequest(),
+        execute: true,
+        runner(command, args) {
+          calls.push([command, ...args]);
+          if (args[0] === "pr" && args[1] === "view") {
+            return { status: 0, stdout: "abcdef1234567890\n", stderr: "" };
+          }
+          if (args[0] === "api" && args[1] === "user") {
+            return {
+              status: 0,
+              stdout: JSON.stringify({ login: "github-delivery-agent" }),
+              stderr: "",
+            };
+          }
+          if (args[0] === "api" && args[1].endsWith("/issues/comments/77")) {
+            return {
+              status: 0,
+              stdout: JSON.stringify({
+                user: { login: "github-delivery-agent" },
+                issue_url: "https://api.github.com/repos/acme/widgets/issues/99",
+              }),
+              stderr: "",
+            };
+          }
+          return { status: 0, stdout: "", stderr: "" };
+        },
+      }),
+    /comment_target_mismatch/,
+  );
+  assert.equal(calls.some((call) => call.includes("PATCH")), false);
+});
+
+test("edit_own_comment allows the authenticated actor to edit its comment on the expected PR", () => {
+  const calls = [];
+  const result = executeMutationRequest({
+    request: editOwnCommentRequest(),
+    execute: true,
+    runner(command, args) {
+      calls.push([command, ...args]);
+      if (args[0] === "pr" && args[1] === "view") {
+        return { status: 0, stdout: "abcdef1234567890\n", stderr: "" };
+      }
+      if (args[0] === "api" && args[1] === "user") {
+        return {
+          status: 0,
+          stdout: JSON.stringify({ login: "github-delivery-agent" }),
+          stderr: "",
+        };
+      }
+      if (
+        args[0] === "api" &&
+        args[1].endsWith("/issues/comments/77") &&
+        !args.includes("PATCH")
+      ) {
+        return {
+          status: 0,
+          stdout: JSON.stringify({
+            user: { login: "github-delivery-agent" },
+            issue_url: "https://api.github.com/repos/acme/widgets/issues/32",
+          }),
+          stderr: "",
+        };
+      }
+      if (args.includes("PATCH")) {
+        return { status: 0, stdout: JSON.stringify({ id: 77 }), stderr: "" };
+      }
+      return { status: 0, stdout: "", stderr: "" };
+    },
+  });
+  assert.equal(result.status, "succeeded");
+  assert.equal(calls.filter((call) => call.includes("PATCH")).length, 1);
+});
