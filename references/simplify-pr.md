@@ -1,3 +1,13 @@
+<!-- policy-modules:start -->
+Policy modules:
+- policy-kernel
+- mutation
+- evidence
+- git
+- reviews
+- stacks (when stack topology is detected)
+<!-- policy-modules:end -->
+
 # Simplify PR
 
 **Trigger:** An explicit request to simplify, clean up, deduplicate, or reduce unnecessary complexity in PR #N without changing behavior. This workflow is **explicit-only**. Do not activate it for an ordinary full review, a generic merge-ready request, or because the reviewer happens to notice code that could be shorter.
