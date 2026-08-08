@@ -106,6 +106,7 @@ function parseRoutedWorkflowPaths(skill) {
   const routeSection = nextHeading >= 0 ? afterRoute.slice(0, nextHeading) : afterRoute;
   const paths = new Set();
   for (const match of routeSection.matchAll(/`(references\/[a-z0-9-]+\.md)`/gi)) {
+    if (match[1] === "references/shared-rules.md") continue;
     paths.add(match[1]);
   }
   return [...paths].sort();
