@@ -140,7 +140,7 @@ internal sealed class AuthorityService
         var parts = token.Split('.');
         if (parts.Length != 3 || parts[0] != "gd1") throw new AuthorityException("token_format_invalid");
         var value = parts[1].Replace('-', '+').Replace('_', '/');
-        value += value.Length % 4 switch { 2 => "==", 3 => "=", 0 => "", _ => throw new AuthorityException("token_encoding_invalid") };
+        value += (value.Length % 4) switch { 2 => "==", 3 => "=", 0 => "", _ => throw new AuthorityException("token_encoding_invalid") };
         try
         {
             using var document = JsonDocument.Parse(Convert.FromBase64String(value));
