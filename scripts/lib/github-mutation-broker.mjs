@@ -278,6 +278,18 @@ function runOrThrow(runner, command) {
   return String(result.stdout || "").trim();
 }
 
+function parseJson(output, errorCode) {
+  try {
+    const value = JSON.parse(output);
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      throw new Error("not_object");
+    }
+    return value;
+  } catch {
+    throw new Error(errorCode);
+  }
+}
+
 function verifyHead({ request, runner }) {
   if (!PR_ACTIONS.has(request.action)) return null;
   const expectedHead = required(request.expectedHead, "expected_head");
@@ -299,6 +311,40 @@ function verifyHead({ request, runner }) {
     );
   }
   return output;
+}
+
+function verifyOwnCommentTarget({ request, runner }) {
+  if (request.action !== "edit_own_comment") return null;
+  const repo = required(request.repo, "repo");
+  const { owner, name } = repoParts(repo);
+  const pr = positiveInteger(request.pr, "pr");
+  const commentId = positiveInteger(request.commentId, "comment_id");
+
+  const viewer = parseJson(
+    runOrThrow(runner, ["gh", "api", "user"]),
+    "viewer_evidence_invalid",
+  );
+  const actorLogin = required(viewer.login, "viewer_login");
+  const comment = parseJson(
+    runOrThrow(runner, [
+      "gh",
+      "api",
+      `repos/${owner}/${name}/issues/comments/${commentId}`,
+    ]),
+    "comment_evidence_invalid",
+  );
+  const commentLogin = required(comment.user?.login, "comment_author_login");
+  if (String(commentLogin).toLowerCase() !== String(actorLogin).toLowerCase()) {
+    throw new Error("comment_not_owned_by_actor");
+  }
+
+  const issueUrl = required(comment.issue_url, "comment_issue_url");
+  const expectedSuffix = `/repos/${owner}/${name}/issues/${pr}`.toLowerCase();
+  if (!String(issueUrl).toLowerCase().endsWith(expectedSuffix)) {
+    throw new Error("comment_target_mismatch");
+  }
+
+  return { actorLogin, commentId, issueUrl };
 }
 
 function verifyBranchDeleted({ request, runner }) {
@@ -467,6 +513,7 @@ export function executeMutationRequest({
   }
 
   const observedHead = verifyHead({ request: plan.request, runner });
+  const commentEditTarget = verifyOwnCommentTarget({ request: plan.request, runner });
   const stdout = runOrThrow(runner, plan.command);
   const branchDeletion = verifyBranchDeleted({ request: plan.request, runner });
   const verify = verificationCommand(plan.request);
@@ -477,6 +524,7 @@ export function executeMutationRequest({
     executed: true,
     status: "succeeded",
     observedHead,
+    commentEditTarget,
     stdout,
     verification,
   };
