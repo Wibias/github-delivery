@@ -31,7 +31,13 @@ function parseArgs(argv) {
 try {
   const args = parseArgs(process.argv.slice(2));
   const request = JSON.parse(readFileSync(args.requestPath, "utf8"));
-  const receipt = executeMutationRequest({ request, execute: args.execute });
+  const receipt = executeMutationRequest({
+    request,
+    execute: args.execute,
+    authorityPublicKey: process.env.GITHUB_DELIVERY_AUTHORITY_PUBLIC_KEY || null,
+    requireTrustedAuthority:
+      process.env.GITHUB_DELIVERY_REQUIRE_TRUSTED_AUTHORITY === "1",
+  });
   if (args.auditPath) {
     appendFileSync(args.auditPath, `${JSON.stringify(receipt)}\n`, "utf8");
   }
