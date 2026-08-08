@@ -96,23 +96,29 @@ text moved into focused policy modules.
 
 Canonical: `GD-REVIEW-002` and `GD-REVIEW-003`.
 
-For an in-diff valid bot finding, phrases such as “inherited / copied / fabric
-file — fix in another PR”, “rebase / stack / downstream branch will pick it
-up”, “consumer lives elsewhere”, or “non-blocking” are not sufficient reasons
-to defer and resolve. Follow the **Fix-or-decline sequence**. `review` may reply
-to bot threads and **may resolve bot-authored threads** through `--resolve-bot`,
+For an in-diff valid bot finding, phrases such as “inherited / copied / fabric file — fix in another PR”, “rebase / stack / downstream branch will pick it up”,
+“consumer lives elsewhere”, or “non-blocking” are not sufficient reasons to
+defer and resolve. Follow the **Fix-or-decline sequence**. `review` may reply to bot threads and **may resolve bot-authored threads** through `--resolve-bot`,
 but it must **not** resolve human threads under bot-thread authority.
+
+### PR ownership boundary
+
+Canonical: `GD-GIT-004`.
+
+Resolve the authenticated viewer login before deciding whether the PR branch is
+owned by the current operator. For a foreign PR, never update the branch from base
+and never apply simplification changes; provide owner-directed instructions
+instead. Applies to: `fix-pr-bots`, `full-review-pr`, `simplify-pr`.
 
 ### Proactive contract verification
 
 Canonical: `GD-REVIEW-008`.
 
-Merge-ready review must **find bugs before bots**; bots/checks are necessary,
-not sufficient. The canonical rule retains Wiring audit, Operator smoke, Test
+Merge-ready review must **find bugs before bots**; bots/checks are necessary, not sufficient. The canonical rule retains Wiring audit, Operator smoke, Test
 honesty, Docs vs non-goals, Input shape and evidence semantics, Hot-path scale
 and determinism, Malformed-input robustness, Serialization and trace budgets,
-Recursive/re-entrant lookup termination, CLI/API payload completeness, Unknown
-is not false, Unknown must not outrank measured, One decision, one clock,
+Recursive/re-entrant lookups must terminate, CLI/API payload completeness,
+Unknown is not false, Unknown must not outrank measured, One decision, one clock,
 Filter before LIMIT, Aggregate semantics match the doc, Byte budgets measure
 bytes, No unbounded memory, Absent vs malformed, absence of a positive flag is
 not proof of absence, Aggregate all contributing source records, No
@@ -142,8 +148,7 @@ not itself authorize merge.
 
 Canonical: `GD-PUB-002`, `GD-PUB-003`, and `GD-PUB-004`.
 
-The full-review run uses `full-review-run-id`; the **Same-head anti-noise rule
-(PR #1066)** uses `planVerdictPublication`. Repair the current run marker first,
+The full-review run uses `full-review-run-id`; the **Same-head anti-noise rule (PR #1066)** uses `planVerdictPublication`. Repair the current run marker first,
 then **reuse** a completed same-head verdict when the strict label/TLDR material
 delta is empty. The idempotency boundary is **current run marker first**, then
 **same head + material TLDR/label delta**.
@@ -153,19 +158,16 @@ delta is empty. The idempotency boundary is **current run marker first**, then
 Canonical: `GD-PUB-004`.
 
 `Publish final verdict` remaining pending or in_progress is never a completed
-state. `verify-verdict-published.mjs` must show `published: true` plus
-`format.valid: true` as the only normal completion proof. A blocker changes the
-verdict. It does not permit the workflow to omit the verdict. A self-selected
-stricter mutation mode is not publication unavailability. Only explicit user
-cancellation may end the required publication workflow without the verdict.
+state. `verify-verdict-published.mjs` must show `published: true` plus `format.valid: true` is the only normal completion proof. A blocker changes the verdict. It does not permit the workflow to omit the verdict.
+A self-selected stricter mutation mode is not publication unavailability. Only explicit user cancellation may end the required publication workflow without the verdict.
 
 ## Full-review semantic completeness
 
 Workflow-specific method: `references/semantic-propagation-review.md`, composed
 by `references/full-review-pr.md` under `GD-REVIEW-004` and `GD-REVIEW-008`.
 Running every named review axis is not sufficient when the changed abstraction
-has untraced variants. Trace canonical and derived representations where they
-coexist. Coverage is not representative of the changed abstraction when one
+has untraced variants. When canonical and derived representations coexist,
+trace both wherever they coexist. Coverage is not representative of the changed abstraction when one
 representative is used without proving equivalence.
 
 ## Historical links
