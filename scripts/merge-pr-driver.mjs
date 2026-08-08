@@ -13,6 +13,7 @@
  * --execute performs the writes through the broker only after the gate is
  * ready on the pinned head. Never merges when blocked or head-mismatched.
  */
+import { spawnSync } from "node:child_process";
 import { appendFileSync, realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -129,8 +130,49 @@ export function buildMergeRequest({ repo, pr, expectedHead, mergeMethod }) {
   };
 }
 
-export function detectMergeMethod() {
-  return "merge";
+function booleanCapability(capabilities, camel, snake) {
+  if (capabilities?.[camel] === true || capabilities?.[snake] === true) return true;
+  if (capabilities?.[camel] === false || capabilities?.[snake] === false) return false;
+  return null;
+}
+
+export function detectMergeMethod(capabilities = null) {
+  if (!capabilities) return "merge";
+  const candidates = [
+    ["merge", booleanCapability(capabilities, "mergeCommitAllowed", "allow_merge_commit")],
+    ["squash", booleanCapability(capabilities, "squashMergeAllowed", "allow_squash_merge")],
+    ["rebase", booleanCapability(capabilities, "rebaseMergeAllowed", "allow_rebase_merge")],
+  ];
+  const enabled = candidates.filter(([, allowed]) => allowed === true).map(([method]) => method);
+  if (!enabled.length) {
+    throw new Error("repository_has_no_enabled_merge_method");
+  }
+  return enabled[0];
+}
+
+export function readRepositoryMergeCapabilities(
+  repo,
+  runner = (command, args, options) => spawnSync(command, args, options),
+) {
+  const result = runner("gh", ["api", `repos/${repo}`], {
+    encoding: "utf8",
+    maxBuffer: 20 * 1024 * 1024,
+  });
+  if (result.status !== 0) {
+    const detail = String(result.stderr || result.stdout || "").trim();
+    throw new Error(detail || `repository_capabilities_failed:${result.status}`);
+  }
+  let payload;
+  try {
+    payload = JSON.parse(String(result.stdout || ""));
+  } catch {
+    throw new Error("repository_capabilities_invalid_json");
+  }
+  return {
+    mergeCommitAllowed: payload.allow_merge_commit === true,
+    squashMergeAllowed: payload.allow_squash_merge === true,
+    rebaseMergeAllowed: payload.allow_rebase_merge === true,
+  };
 }
 
 async function settle({ repo, pr, mode, snapshot, totalMs = 60_000, pollMs = 20_000 }) {
@@ -188,7 +230,8 @@ async function main() {
   }
 
   const expectedHead = snapshot.headOid;
-  const mergeMethod = args.mergeMethod || detectMergeMethod();
+  const mergeMethod =
+    args.mergeMethod || detectMergeMethod(readRepositoryMergeCapabilities(args.repo));
   const authorLogin = pr.author?.login || null;
   const thankBody =
     args.thankComment ||
