@@ -1,3 +1,15 @@
+<!-- policy-modules:start -->
+Policy modules:
+- policy-kernel
+- mutation
+- evidence
+- git
+- ci
+- reviews
+- publication
+- stacks (when stack topology is detected)
+<!-- policy-modules:end -->
+
 # Full review PR
 
 **Trigger:** “full review on pr #N…”, “bug + security review + rabbit/codex + verdict”, “is this PR useful?”, a list of existing PRs to full-review, or an explicit “full review + simplify” request.
@@ -311,8 +323,6 @@ comment and re-verify before marking the plan item complete.
 <!-- assertion: chat-only-requires-unavailable-blocker -->
 <!-- /assertion-anchors -->
 
-
-
 Once `Publish final verdict` is marked complete, that comment becomes immutable
 historical review evidence.
 
@@ -348,7 +358,7 @@ A normal full review does not simplify code merely because an opportunity is vis
 | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `approve-comment`   | Useful; bots/humans clear; own reviews + spec/standards clean; up to date with base; **compiles against tip**; **required CI green**; protection/`reviewDecision`/CODEOWNERS clear; not mid-stack-for-trunk; no draft/WIP gate; **thin settle** done |
 | `changes-requested` | Concrete necessary blockers remain that you cannot/should not silently fix                                                                                                                                                                           |
-| `not-useful`        | Usefulness pass failed — stop expanding work on that PR                                                                                                                                                                                              |
+| `not-useful`        | Usefulness pass failed — stop expanding work on that PR only                                                                                                                                                                                              |
 | `gated`             | **Only** GitHub draft / WIP / do-not-merge (shared draft gates). **Not** “wants maintainer ack”, “security feels sensitive”, or “Windows looks flaky”                                                                                                |
 
 `changes-requested` also covers owner actions on a foreign PR: update from the latest base and apply the listed simplification candidates.
@@ -374,8 +384,6 @@ A normal full review does not simplify code merely because an opportunity is vis
 <!-- assertion: verdict-tells-owner -->
 <!-- assertion: owner-updates-base -->
 <!-- /assertion-anchors -->
-
-
 
  Push scoped fixes under the existing fork-head/push rules; **verify compile/tests against tip**; **wait and recheck** until useful threads quiet **and** required CI green on that tip SHA, or a hard blocker. Use **rate-limit backoff** (Composio → gh) on dense polls. **Doomed-run guard:** if a bot review (CodeRabbit/Codex) is still in progress or an actionable human thread is open, finish triage and patch/push **before** settling into the CI poll; if a bot review lands during the wait with findings on this diff, stop waiting, fix + push, and restart the CI wait on the new SHA.
 6. Changelog nudge if user-facing.
