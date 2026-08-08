@@ -33,3 +33,11 @@ Network-visible GitHub writes owned by this skill go through `scripts/github-mut
 ### GD-AUTH-008 — Bind PR mutations to the expected head
 
 Every PR mutation that can become stale must carry the expected PR head and re-read it immediately before execution. Merge requests must retain expected-head pinning through GitHub's merge API/CLI boundary.
+
+### GD-AUTH-009 — Trusted grants bind the exact mutation effect
+
+Algorithm-agile trusted grants must bind a deterministic `scopeSha256` to every semantically relevant mutation input, including repository, action, mutation mode, PR head, merge method, concrete targets, stable idempotency keys, and SHA-256 hashes of human-visible text. Batch approvals are ordered and finite; they do not confer wildcard or session authority.
+
+### GD-AUTH-010 — Redemption-required grants are one-time
+
+When a trusted grant declares `redemption: required`, the mutation path must redeem its nonce with the trusted issuer after fresh-head/target/idempotency preflight and immediately before spawning the exact planned GitHub write. A consumed nonce is never automatically reopened after a crash or downstream failure.
