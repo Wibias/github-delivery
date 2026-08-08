@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  executeMutationRequest,
+  idempotencyMarker,
+  planMutationRequest,
+} from "../../scripts/lib/github-mutation-broker.mjs";
+import {
   authorizeMutation,
   extractMutationModeArgs,
   mutationProfile,
@@ -82,4 +87,99 @@ test("extracts mutation flags without leaking them to another parser", () => {
     explicitInstruction: true,
     exactTextConfirmed: false,
   });
+});
+
+test("social mutation plans embed a stable remote idempotency marker", () => {
+  const request = {
+    schemaVersion: 1,
+    action: "post_comment",
+    mutationMode: "review",
+    repo: "acme/widgets",
+    pr: 32,
+    expectedHead: "abcdef1234567890",
+    idempotencyKey: "status-pr-32-head-abcdef",
+    body: "[GD] Status update",
+  };
+  const first = planMutationRequest(request);
+  const second = planMutationRequest(request);
+  const marker = idempotencyMarker(request.idempotencyKey);
+  assert.equal(first.request.idempotencyMarker, marker);
+  assert.equal(second.request.idempotencyMarker, marker);
+  assert.match(first.request.body, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+});
+
+test("a retry reuses an existing GitHub social mutation instead of posting a duplicate", () => {
+  const key = "status-pr-32-head-abcdef";
+  const marker = idempotencyMarker(key);
+  let writes = 0;
+  const result = executeMutationRequest({
+    request: {
+      schemaVersion: 1,
+      action: "post_comment",
+      mutationMode: "review",
+      repo: "acme/widgets",
+      pr: 32,
+      expectedHead: "abcdef1234567890",
+      idempotencyKey: key,
+      body: "[GD] Status update",
+    },
+    execute: true,
+    runner(command, args) {
+      if (args[0] === "pr" && args[1] === "view") {
+        return { status: 0, stdout: "abcdef1234567890\n", stderr: "" };
+      }
+      if (args[0] === "api" && String(args[1]).includes("/issues/32/comments")) {
+        return {
+          status: 0,
+          stdout: JSON.stringify([[{
+            id: 321,
+            html_url: "https://github.com/acme/widgets/pull/32#issuecomment-321",
+            body: `[GD] Status update\n\n${marker}`,
+          }]]),
+          stderr: "",
+        };
+      }
+      if (args[0] === "pr" && args[1] === "comment") {
+        writes += 1;
+        return { status: 0, stdout: "posted", stderr: "" };
+      }
+      return { status: 0, stdout: "", stderr: "" };
+    },
+  });
+  assert.equal(result.status, "already_applied");
+  assert.equal(result.executed, false);
+  assert.equal(result.existingMutation.id, 321);
+  assert.equal(writes, 0);
+});
+
+test("idempotency lookup failure fails closed before a social write", () => {
+  let writes = 0;
+  assert.throws(
+    () =>
+      executeMutationRequest({
+        request: {
+          schemaVersion: 1,
+          action: "post_comment",
+          mutationMode: "review",
+          repo: "acme/widgets",
+          pr: 32,
+          expectedHead: "abcdef1234567890",
+          idempotencyKey: "status-pr-32-head-abcdef",
+          body: "[GD] Status update",
+        },
+        execute: true,
+        runner(command, args) {
+          if (args[0] === "pr" && args[1] === "view") {
+            return { status: 0, stdout: "abcdef1234567890\n", stderr: "" };
+          }
+          if (args[0] === "api" && String(args[1]).includes("/issues/32/comments")) {
+            return { status: 1, stdout: "", stderr: "HTTP 429: rate limit" };
+          }
+          if (args[0] === "pr" && args[1] === "comment") writes += 1;
+          return { status: 0, stdout: "", stderr: "" };
+        },
+      }),
+    /HTTP 429|idempotency_lookup_failed/,
+  );
+  assert.equal(writes, 0);
 });
