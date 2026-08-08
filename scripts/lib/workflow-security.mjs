@@ -92,3 +92,108 @@ export function validateRepositoryPolicy(policy) {
   if (!Array.isArray(policy?.requiredChecks) || policy.requiredChecks.length < 3) add("required_checks_incomplete", "At least CI, Dependency Review, and CodeQL must be required");
   return errors;
 }
+
+function requiredCheckContexts(activeRules) {
+  const contexts = new Set();
+  for (const rule of activeRules || []) {
+    if (rule?.type !== "required_status_checks") continue;
+    const checks = rule?.parameters?.required_status_checks || rule?.parameters?.checks || [];
+    for (const check of checks) {
+      const context = typeof check === "string" ? check : check?.context;
+      if (context) contexts.add(String(context));
+    }
+  }
+  return contexts;
+}
+
+function requiredReviewerCount(environment) {
+  let count = 0;
+  for (const rule of environment?.protection_rules || []) {
+    if (rule?.type !== "required_reviewers") continue;
+    const reviewers = rule?.reviewers || rule?.parameters?.reviewers || [];
+    if (Array.isArray(reviewers)) count += reviewers.length;
+  }
+  return count;
+}
+
+export function evaluateLiveRepositoryPolicy({ policy, live } = {}) {
+  const errors = [];
+  const add = (code, detail) => errors.push({ code, detail });
+  const declaredErrors = validateRepositoryPolicy(policy);
+  if (declaredErrors.length) {
+    add("declared_policy_invalid", "The checked-in repository policy is invalid.");
+  }
+
+  const expectedBranch = policy?.defaultBranch;
+  const observedBranch = live?.repository?.default_branch;
+  if (!observedBranch || observedBranch !== expectedBranch) {
+    add(
+      "default_branch_mismatch",
+      `Expected default branch ${expectedBranch || "missing"}, observed ${observedBranch || "missing"}.`,
+    );
+  }
+  if (live?.branch?.protected !== true) {
+    add("default_branch_unprotected", `Default branch ${expectedBranch || "missing"} is not protected.`);
+  }
+
+  const activeRules = Array.isArray(live?.activeRules) ? live.activeRules : [];
+  if (!activeRules.length) {
+    add("active_rules_missing", `No active GitHub rules apply to ${expectedBranch || "the default branch"}.`);
+  }
+  if (policy?.pullRequests?.required === true && !activeRules.some((rule) => rule?.type === "pull_request")) {
+    add("pull_request_rule_missing", "No active pull-request rule enforces the declared PR requirement.");
+  }
+  if (
+    policy?.pullRequests?.conversationResolution === true &&
+    !activeRules.some((rule) =>
+      ["required_conversation_resolution", "required_review_thread_resolution"].includes(rule?.type),
+    )
+  ) {
+    add(
+      "conversation_resolution_rule_missing",
+      "No active conversation/review-thread resolution rule enforces the declared policy.",
+    );
+  }
+
+  const observedChecks = requiredCheckContexts(activeRules);
+  const missingRequiredChecks = (policy?.requiredChecks || [])
+    .filter((context) => !observedChecks.has(context))
+    .sort();
+  if (missingRequiredChecks.length) {
+    add(
+      "required_checks_missing_live",
+      `Live GitHub rules are missing required checks: ${missingRequiredChecks.join(", ")}`,
+    );
+  }
+
+  const expectedEnvironment = policy?.release?.environment;
+  const observedEnvironment = live?.releaseEnvironment?.name;
+  if (!observedEnvironment || observedEnvironment !== expectedEnvironment) {
+    add(
+      "release_environment_missing",
+      `Expected release environment ${expectedEnvironment || "missing"}, observed ${observedEnvironment || "missing"}.`,
+    );
+  }
+  const expectedReviewers = policy?.release?.requiredReviewers || 0;
+  const observedReviewers = requiredReviewerCount(live?.releaseEnvironment);
+  if (observedReviewers < expectedReviewers) {
+    add(
+      "release_reviewer_missing",
+      `Release environment requires ${expectedReviewers} reviewer(s), but GitHub exposes ${observedReviewers}.`,
+    );
+  }
+
+  return {
+    schemaVersion: 1,
+    kind: "github-delivery/live-repository-policy-report",
+    valid: errors.length === 0,
+    defaultBranch: observedBranch || null,
+    protected: live?.branch?.protected === true,
+    activeRuleTypes: activeRules.map((rule) => rule?.type).filter(Boolean),
+    observedRequiredChecks: [...observedChecks].sort(),
+    missingRequiredChecks,
+    releaseEnvironment: observedEnvironment || null,
+    observedRequiredReviewers: observedReviewers,
+    errors,
+  };
+}
