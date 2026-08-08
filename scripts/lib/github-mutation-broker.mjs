@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 
+import { classifyAuthority } from "./authority-grant.mjs";
 import { authorizeMutation } from "./mutation-policy.mjs";
 import { evaluateHeadBranchCleanup } from "./merge-branch-cleanup.mjs";
 
@@ -521,15 +522,48 @@ function assertDeleteHeadBranchAllowed(request) {
   return decision;
 }
 
-export function planMutationRequest(request = {}) {
+function publicAuthorityReceipt(authority) {
+  return authority.verified
+    ? {
+        provenance: authority.provenance,
+        verified: true,
+        reason: null,
+        claims: structuredClone(authority.claims),
+      }
+    : {
+        provenance: authority.provenance,
+        verified: false,
+        reason: authority.reason,
+      };
+}
+
+export function planMutationRequest(
+  request = {},
+  {
+    authorityPublicKey = null,
+    requireTrustedAuthority = false,
+    authorityNow,
+    authorityMaxTtlSeconds,
+    authorityClockSkewSeconds,
+  } = {},
+) {
   if (request.schemaVersion !== 1) {
     throw new Error("unsupported_request_schema");
   }
+
+  const authorityDecision = classifyAuthority({
+    request,
+    publicKey: authorityPublicKey,
+    requireTrusted: requireTrustedAuthority,
+    now: authorityNow,
+    maxTtlSeconds: authorityMaxTtlSeconds,
+    clockSkewSeconds: authorityClockSkewSeconds,
+  });
   const authorization = authorizeMutation({
-    mode: request.mutationMode,
+    mode: authorityDecision.effective.mutationMode,
     action: request.action,
-    explicitInstruction: request.explicitInstruction === true,
-    exactTextConfirmed: request.exactTextConfirmed === true,
+    explicitInstruction: authorityDecision.effective.explicitInstruction,
+    exactTextConfirmed: authorityDecision.effective.exactTextConfirmed,
   });
   if (!authorization.allowed) {
     throw new Error(`mutation_denied:${authorization.reason}`);
@@ -555,6 +589,7 @@ export function planMutationRequest(request = {}) {
     }
   }
   const normalized = structuredClone(request);
+  delete normalized.authorityGrant;
   if (REMOTE_IDEMPOTENT_CREATE_ACTIONS.has(normalized.action)) {
     const marker = idempotencyMarker(normalized.idempotencyKey);
     normalized.idempotencyMarker = marker;
@@ -578,6 +613,7 @@ export function planMutationRequest(request = {}) {
     expectedHead: normalized.expectedHead ?? null,
     idempotencyKey: normalized.idempotencyKey ?? null,
     idempotencyMarker: normalized.idempotencyMarker ?? null,
+    authority: publicAuthorityReceipt(authorityDecision),
     authorization,
     command,
   };
@@ -587,8 +623,19 @@ export function executeMutationRequest({
   request,
   execute = false,
   runner = (command, args, options) => spawnSync(command, args, options),
+  authorityPublicKey = null,
+  requireTrustedAuthority = false,
+  authorityNow,
+  authorityMaxTtlSeconds,
+  authorityClockSkewSeconds,
 } = {}) {
-  const plan = planMutationRequest(request);
+  const plan = planMutationRequest(request, {
+    authorityPublicKey,
+    requireTrustedAuthority,
+    authorityNow,
+    authorityMaxTtlSeconds,
+    authorityClockSkewSeconds,
+  });
   if (!execute) {
     return { ...plan, executed: false, status: "dry_run" };
   }
