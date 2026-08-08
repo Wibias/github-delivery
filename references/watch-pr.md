@@ -1,3 +1,15 @@
+<!-- policy-modules:start -->
+Policy modules:
+- policy-kernel
+- mutation
+- evidence
+- git
+- ci
+- reviews
+- publication
+- stacks (when stack topology is detected)
+<!-- policy-modules:end -->
+
 # Watch / babysit PR
 
 **Trigger:** “babysit pr #N”, “watch pr #N”, “monitor CI and reviews on #N”, “keep an eye on this PR”.
@@ -70,10 +82,6 @@ This exists because prose “reviews first” was ignored, and ACK-without-fix w
 <!-- assertion: watch-wake-gate-mjs -->
 <!-- /assertion-anchors -->
 
-
-
-
-
 ### Forbidden (instant fail)
 
 These progress lines are **illegal** while the wake-gate exits `1` (or while `mergeStateStatus` is DIRTY/CONFLICTING/BEHIND):
@@ -95,8 +103,6 @@ Owner “left open because leftover work remains”
 <!-- assertion: reviews-before-ci -->
 <!-- assertion: no-idle-on-ci -->
 <!-- /assertion-anchors -->
-
-
 
  means **do the leftover work on tip** (or hard-block to the user with why you can’t), not acknowledge and poll.
 
@@ -131,8 +137,6 @@ On **every** poll / wake (including the first):
 <!-- assertion: queued-not-merged -->
 <!-- assertion: merge-group-warn -->
 <!-- /assertion-anchors -->
-
-
 
  If auto-merge **or merge-queue** queued: watch until **actually merged**.
 10. Stop only when:
