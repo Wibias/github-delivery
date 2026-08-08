@@ -80,6 +80,8 @@ revalidate, then enter the merge workflow. For **research issue + create PR**,
 complete research before creation. Triage may compose `agent-brief`; confirmed
 rejection may compose `out-of-scope`.
 
+Simplification is explicit-only; line count is never a goal or success metric.
+
 If a PR is stacked, load the `stacks` conditional module and
 `references/stacked-prs.md` before mutation/readiness/merge decisions. Stack
 policy remains authoritative for topology; the selected workflow owns the
@@ -105,18 +107,18 @@ GitHub write, and require final evidence for final claims.
 
 - **Default mutation mode is read-only.** Available profiles are `read-only`,
   `review`, `maintainer`, and `autonomous`; the profile is an upper bound.
-  **Human replies always require exact-text confirmation.** Detailed rules:
-  `references/policy/mutation.md` and `references/mutation-modes.md`.
+  **Human replies always require exact-text confirmation.** Public GitHub text
+  must keep notifying mentions bare: never wrap GitHub `@login` mentions in backticks.
+  Detailed rules: `references/policy/mutation.md` and `references/mutation-modes.md`.
 - **Authoritative gate: `scripts/ship-gate.mjs`.** Watch MUST run
-  scripts/ship-gate.mjs every wake. Before merge-ready or merge, the final
-  `ship-gate.mjs` result must be `ready` on unchanged heads. Component helpers
-  diagnose; they never overrule that decision.
+  scripts/ship-gate.mjs every wake. Before merge-ready or merge, the final `ship-gate.mjs` result must be `ready` on unchanged heads.
+  Component helpers diagnose; they never overrule that decision.
 - Red required checks use the `baseHealth` component: `fix_in_pr`,
-  `separate_follow_up`, or `investigate`; unknown origin is a hard evidence
-  stop. See `references/policy/ci.md` and `references/base-health.md`.
+  `separate_follow_up`, or `investigate`; unknown origin is a hard evidence stop.
+  See `references/policy/ci.md` and `references/base-health.md`.
 - **Bot threads on paths in this PR diff must be fixed here** or explicitly
-  declined with verified rationale; never defer with `[GD]` + resolve to another
-  PR/rebase. **Never resolve a bot thread with only a defer/skip reply.** See
+  declined with verified rationale; never defer with `[GD]` + resolve to another PR/rebase.
+  **Never resolve a bot thread with only a defer/skip reply.** See
   `references/policy/reviews.md`.
 - Merge-ready paths run their required Bug + Security + Spec + Standards review
   and **proactive contract verification**; passing bots/checks alone is not
@@ -133,24 +135,19 @@ GitHub write, and require final evidence for final claims.
 
 ## Full-review contracts that remain entrypoint-visible
 
-A full review is not complete merely because analysis stopped. **Full-review
-completion lock:** the plan item **Publish final verdict** remains pending or
+A full review is not complete merely because analysis stopped. **Full-review completion lock:** the plan item **Publish final verdict** remains pending or
 in_progress until the required verdict is actually published and verified. A
-blocker changes the verdict; it does not remove the verdict requirement. **Only
-explicit user cancellation** permits ending the required publication workflow
+blocker changes the verdict; it does not remove the verdict requirement. **Only explicit user cancellation** permits ending the required publication workflow
 without it. Verify normal publication using `scripts/verify-verdict-published.mjs`.
 A self-selected stricter mutation mode is not publication unavailability.
 
 Each full-review run has a `full-review-run-id`. Apply the **same-head anti-noise**
-rule: compare the strict label/TLDR **material delta** and do not post a second
-top-level verdict when there is no material change. `planVerdictPublication`
+rule: compare the strict label/TLDR **material delta** and do not post a second top-level verdict when there is no material change. `planVerdictPublication`
 remains the machine decision.
 
-Full review also performs a **Semantic propagation audit**: search the repository
-beyond the changed files, trace canonical/derived representations and material
+Full review also performs a **Semantic propagation audit**: Search the repository beyond the changed files, trace canonical/derived representations and material
 variant families, prove parity or test every relevant partition, including
-expected absences and rejected values. One representative member is insufficient
-unless equivalence is proved. Method:
+expected absences and rejected values. One representative member is insufficient unless equivalence is proved. Method:
 `references/semantic-propagation-review.md`.
 
 ## Safety precedence
