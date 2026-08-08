@@ -1,3 +1,11 @@
+<!-- policy-modules:start -->
+Policy modules:
+- policy-kernel
+- evidence
+- reviews
+- publication
+<!-- policy-modules:end -->
+
 # Security review
 
 **Trigger:** “security review”, “security review on pr #N”, “security review on these issues”, “/review-security”, or **yes** after a research security ask.
@@ -9,10 +17,6 @@
 <!-- assertion: adversarial-only-if-user-asked -->
 <!-- assertion: adversarialPassDefault-false -->
 <!-- /assertion-anchors -->
-
-
-
-
 
 ## Goal
 
@@ -73,10 +77,6 @@ node "<github-delivery>/scripts/security-scope.mjs" OWNER/REPO N
 <!-- assertion: removed-controls-leads -->
 <!-- /assertion-anchors -->
 
-
-
-
-
 Issue-only (no PR): derive surfaces manually from implicated paths using the same categories; still apply AI/deps/IaC/crypto/AST10 rules when those paths match; still scan for removed controls in the tip/PR diff when available.
 
 ### 1. In-session security pass (required for PR diffs)
@@ -88,10 +88,6 @@ Issue-only (no PR): derive surfaces manually from implicated paths using the sam
 <!-- assertion: use-github-delivery-security-review-md -->
 <!-- assertion: bugbot-ok-security-not-harness -->
 <!-- /assertion-anchors -->
-
-
-
-
 
 1. Checkout PR head (shared **Subagent preflight** — checkout rules still apply; bugbot may use them separately).
 2. Review **branch changes vs PR base** in this session (parent), **or** one **general-purpose** subagent whose prompt says: follow `github-delivery` `references/security-review.md` + shared-rules for this PR — **never** `subagent_type: "security-review"`.
@@ -169,10 +165,6 @@ Fill every **scope-required** surface plus any you touched. Each row: `done` + e
 <!-- assertion: crypto-session-when-flagged -->
 <!-- /assertion-anchors -->
 
-
-
-
-
 ### 5. Validate findings (confidence + Do-Not-Flag)
 
 Research surrounding code before reporting. Diff-scoped report; codebase-deep verification.
@@ -192,10 +184,6 @@ Severity (Critical/High/Medium/Low/Info) and confidence are independent. A High-
 <!-- assertion: no-confirmed-without-high -->
 <!-- assertion: do-not-flag-low -->
 <!-- /assertion-anchors -->
-
-
-
-
 
 #### Do Not Flag
 
@@ -296,10 +284,6 @@ Never output **Pass** while High/Critical items are only “noted,” MEDIUM-con
 <!-- assertion: pass-after-fixes-regression -->
 <!-- /assertion-anchors -->
 
-
-
-
-
 **Pre-open gate (create-PR):** when this review runs against a **branch** via `pre-open-gate.mjs` (before opening a PR), a **Do not ship yet** decision **blocks opening the PR**. `Pass after fixes` is allowed only after the Confirmed High/Critical fixes land on the branch and the review is re-run on the new head. Chat still gets the full findings + coverage matrix; nothing is posted to GitHub because no PR exists yet.
 
 **Adversarial pass** does **not** block Pass unless the user said the review is incomplete without it.
@@ -340,7 +324,6 @@ probe-application evidence for the deterministic probes the scope engine fired.
 <!-- assertion: verify-probe-coverage-before-done -->
 <!-- assertion: na-evidence-concrete-reason -->
 <!-- /assertion-anchors -->
-
 
 ## Domain heuristics (common ship-loop misses)
 

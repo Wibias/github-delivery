@@ -1,3 +1,10 @@
+<!-- policy-modules:start -->
+Policy modules:
+- policy-kernel
+- evidence
+- reviews
+<!-- policy-modules:end -->
+
 # Spec and standards review
 
 **Trigger:** required Spec + Standards axis for full-review, make-merge-ready, and create-PR workflows.
@@ -51,12 +58,6 @@ When the issue/PR lists explicit **non-goals** (e.g. dry-run only, no production
 <!-- assertion: docs-label-future-or-implement -->
 <!-- assertion: scoring-weight-table-matches-implementation -->
 <!-- /assertion-anchors -->
-
-
-
-
-
-
 
 ## 3. Find the standards sources
 

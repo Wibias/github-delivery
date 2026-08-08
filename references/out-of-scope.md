@@ -1,3 +1,11 @@
+<!-- policy-modules:start -->
+Policy modules:
+- policy-kernel
+- mutation
+- issues
+- publication
+<!-- policy-modules:end -->
+
 # Out-of-Scope Knowledge Base
 
 The `.out-of-scope/` directory in a repo stores persistent records of rejected feature requests. It serves two purposes:

@@ -1,3 +1,11 @@
+<!-- policy-modules:start -->
+Policy modules:
+- policy-kernel
+- mutation
+- issues
+- evidence
+<!-- policy-modules:end -->
+
 # Issue Workflow Procedures
 
 Detailed procedures for each workflow type. Read the relevant section when executing that workflow.

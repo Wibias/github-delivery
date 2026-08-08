@@ -1,3 +1,12 @@
+<!-- policy-modules:start -->
+Policy modules:
+- policy-kernel
+- evidence
+- git
+- ci
+- stacks (when stack topology is detected)
+<!-- policy-modules:end -->
+
 # Resolve Conflicts During a GitHub PR Workflow
 
 Use this reference only when the active `github-delivery` workflow encounters

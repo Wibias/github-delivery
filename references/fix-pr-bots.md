@@ -1,3 +1,15 @@
+<!-- policy-modules:start -->
+Policy modules:
+- policy-kernel
+- mutation
+- evidence
+- git
+- ci
+- reviews
+- publication
+- stacks (when stack topology is detected)
+<!-- policy-modules:end -->
+
 # Fix PR bots → merge-ready
 
 **Trigger:** “review my pr #N - fix coderabbit/codex…”, “make PR #N merge ready”, “babysit these PRs until merge ready”, bot-fix loops aimed at merge-ready (not watch-until-merged).
@@ -30,8 +42,6 @@ Necessary/useful **human** (esp. owners/maintainers) + CodeRabbit/Codex comments
 <!-- assertion: resolve-after-verified-fix -->
 <!-- /assertion-anchors -->
 
-
-
  "inherited/fabric file — fix in another PR", "rebase will pick it up later", "non-blocking nit — reply and resolve", or "consumer lives elsewhere" without proving the current PR does not own the file.
    - **Fix order:** fix → push → verify (tests/CI as appropriate) → in-thread reply with commit/SHA + path evidence → only then `resolve_thread` when mutation mode allows it.
    - `[GD]` skip notes are only for verified false positives, durable won't-fix with reason, or true out-of-scope. They do **not** replace a fix for in-scope bot findings.
@@ -51,9 +61,6 @@ Necessary/useful **human** (esp. owners/maintainers) + CodeRabbit/Codex comments
 <!-- assertion: own-findings-before-bot-output -->
 <!-- /assertion-anchors -->
 
-
-
-
 9. Fix CLI / project / **required CI** failures on this head — including ones introduced elsewhere or outside this PR’s feature files (shared rules scope lock + CI classify). Classify CI: branch fix vs flake (shared rules; flake reruns still max 3 / SHA). Apply **Required checks + review gate** + policy gate (code-owner enforcement, merge queue).
 10. **Own reviews (required — not optional):**
    - Subagent **preflight** (checkout PR head; stash only with user OK) — shared rules.
@@ -72,9 +79,6 @@ Necessary/useful **human** (esp. owners/maintainers) + CodeRabbit/Codex comments
 <!-- assertion: quiet-then-recheck -->
 <!-- assertion: no-single-snapshot -->
 <!-- /assertion-anchors -->
-
-
-
 
 15. If truly ready after settle, post on the **PR** (idempotent
 

@@ -1,3 +1,15 @@
+<!-- policy-modules:start -->
+Policy modules:
+- policy-kernel
+- mutation
+- evidence
+- git
+- ci
+- reviews
+- publication
+- stacks (when stack topology is detected)
+<!-- policy-modules:end -->
+
 # Maintainer overtake of a pull request
 
 **Trigger:** “overtake PR #N”, “maintainer overtake #N”, “take over PR #N”,
@@ -94,4 +106,3 @@ open unless the closing decision explicitly resolves them.
 - Required CI green on the current head (or a recorded hard blocker)
 - Merge-ready posted (when the bar is met) or a close-with-reference completed
 - Every visible write went through the broker with verified receipts
-

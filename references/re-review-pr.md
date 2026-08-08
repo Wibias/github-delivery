@@ -1,3 +1,14 @@
+<!-- policy-modules:start -->
+Policy modules:
+- policy-kernel
+- mutation
+- evidence
+- ci
+- reviews
+- publication
+- stacks (when stack topology is detected)
+<!-- policy-modules:end -->
+
 # Re-review PR
 
 **Trigger:** “re-review pr #N based on my review comment + his commits + new rabbit & Codex…”

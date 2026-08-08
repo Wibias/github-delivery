@@ -104,8 +104,8 @@ function runtimeReferences(markdown) {
   const found = new Set();
   const pattern = /(?<![A-Za-z0-9_<>/-])(?:<github-delivery>\/)?((?:references|scripts|overrides|tests\/evals)\/[A-Za-z0-9_.@<>/-]+)/g;
   for (const match of markdown.matchAll(pattern)) {
-    const cleaned = match[1].replace(/[),.;:`'"\]}]+$/g, "");
-    if (!cleaned.includes("<") && !cleaned.includes("*")) found.add(cleaned);
+    const cleaned = match[1].replace(/[),.;:`'"\]}]+$/g, "").replace(/\/+$/, "");
+    if (!cleaned.includes("<") && !cleaned.includes("*") && cleaned) found.add(cleaned);
   }
   return [...found].sort();
 }

@@ -193,6 +193,11 @@ function walkMarkdown(root, directory) {
   return files;
 }
 
+function addMarker(markers, id, file) {
+  if (!markers.has(id)) markers.set(id, new Set());
+  markers.get(id).add(file);
+}
+
 function collectAssertionMarkers(root) {
   const files = ["SKILL.md"];
   for (const directory of ["references", "overrides"]) {
@@ -206,10 +211,7 @@ function collectAssertionMarkers(root) {
     if (!existsSync(join(root, file))) continue;
     const source = readFileSync(join(root, file), "utf8");
     for (const match of source.matchAll(/<!--\s*assertion:\s*([A-Za-z0-9][A-Za-z0-9-]*)\s*-->/g)) {
-      const assertion = match[1];
-      if (!markers.has(assertion)) {
-        markers.set(assertion, file);
-      }
+      addMarker(markers, match[1], file);
     }
   }
   return { markers };
@@ -221,6 +223,11 @@ function resolveExpectedResourcePaths(item, root) {
     if (resource.endsWith(".md")) return resource;
     return null;
   }).filter((resource) => resource !== null);
+}
+
+function markerMatchesExpectedResource(file, expected) {
+  const allowed = [file, `references/${basename(file)}`];
+  return expected.some((resource) => allowed.includes(resource));
 }
 
 function validateAssertionBinding(allRows, root, errors, { regressionOnly = false } = {}) {
@@ -241,15 +248,15 @@ function validateAssertionBinding(allRows, root, errors, { regressionOnly = fals
     for (const assertion of item.assertion_ids) {
       usedAssertions.add(assertion);
       if (markers.has(assertion)) {
-        const file = markers.get(assertion);
+        const markerFiles = [...markers.get(assertion)].sort();
         const expected = resolveExpectedResourcePaths(item, root);
-        const allowed = [file, `references/${basename(file)}`];
-        if (!expected.some((resource) => allowed.includes(resource))) {
+        if (!markerFiles.some((file) => markerMatchesExpectedResource(file, expected))) {
           errors.push({
             code: "assertion_not_in_expected_resources",
             id: item.id,
             assertion,
-            markerFile: file,
+            markerFile: markerFiles[0],
+            markerFiles,
             expectedResources: expected,
           });
         }
@@ -327,7 +334,7 @@ function validateScopeCases(scopeRows, root, errors) {
 function validateProbeDocBinding(root, errors) {
   // Every probe in the registry must have a `<!-- probe: <id> -->` tag in one
   // of the reference docs, and every assertion the probe declares must be
-  // bound to a marker in a doc that also carries that probe's tag.
+  // bound to a marker in at least one doc that also carries that probe's tag.
   const files = ["SKILL.md"];
   for (const directory of ["references", "overrides"]) {
     const full = join(root, directory);
@@ -341,14 +348,14 @@ function validateProbeDocBinding(root, errors) {
     if (!existsSync(full)) continue;
     docContents.set(file, readFileSync(full, "utf8"));
   }
-  const probeTags = new Map(); // probe id -> doc
-  const assertionMarkers = new Map(); // assertion id -> doc
+  const probeTags = new Map(); // probe id -> Set<doc>
+  const assertionMarkers = new Map(); // assertion id -> Set<doc>
   for (const [file, source] of docContents) {
     for (const match of source.matchAll(/<!--\s*probe:\s*([A-Za-z0-9][A-Za-z0-9-]*)\s*-->/g)) {
-      if (!probeTags.has(match[1])) probeTags.set(match[1], file);
+      addMarker(probeTags, match[1], file);
     }
     for (const match of source.matchAll(/<!--\s*assertion:\s*([A-Za-z0-9][A-Za-z0-9-]*)\s*-->/g)) {
-      if (!assertionMarkers.has(match[1])) assertionMarkers.set(match[1], file);
+      addMarker(assertionMarkers, match[1], file);
     }
   }
   for (const probe of PROBE_REGISTRY) {
@@ -356,20 +363,22 @@ function validateProbeDocBinding(root, errors) {
       errors.push({ code: "probe_not_tagged_in_docs", probe: probe.id });
       continue;
     }
-    const probeDoc = probeTags.get(probe.id);
+    const probeDocs = [...probeTags.get(probe.id)].sort();
     for (const assertion of probe.assertions) {
       if (!assertionMarkers.has(assertion)) {
         errors.push({ code: "probe_assertion_not_bound", probe: probe.id, assertion });
         continue;
       }
-      const assertionDoc = assertionMarkers.get(assertion);
-      if (assertionDoc !== probeDoc) {
+      const assertionDocs = [...assertionMarkers.get(assertion)].sort();
+      if (!probeDocs.some((probeDoc) => assertionMarkers.get(assertion).has(probeDoc))) {
         errors.push({
           code: "probe_assertion_wrong_doc",
           probe: probe.id,
           assertion,
-          probeDoc,
-          assertionDoc,
+          probeDoc: probeDocs[0],
+          assertionDoc: assertionDocs[0],
+          probeDocs,
+          assertionDocs,
         });
       }
     }
