@@ -181,7 +181,10 @@ internal static partial class ScopeCanonicalizer
             .OrderBy(value => value, StringComparer.Ordinal)
             .ToArray();
         if (values.Length == 0) throw new AuthorityException("authority_scope_reviewers_required");
-        return new JsonArray(values.Select(JsonValue.Create).ToArray());
+
+        var array = new JsonArray();
+        foreach (var reviewer in values) array.Add(reviewer);
+        return array;
     }
 
     private static string NormalizeMergeMethod(string? value)
