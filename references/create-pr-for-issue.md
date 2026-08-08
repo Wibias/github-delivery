@@ -1,3 +1,16 @@
+<!-- policy-modules:start -->
+Policy modules:
+- policy-kernel
+- mutation
+- evidence
+- git
+- ci
+- reviews
+- issues
+- publication
+- stacks (when stack topology is detected)
+<!-- policy-modules:end -->
+
 # Create PR for issue → merge-ready
 
 **Trigger:** “Create a pr for issue #N … merge ready, don’t merge”.
