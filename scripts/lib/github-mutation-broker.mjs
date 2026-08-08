@@ -438,7 +438,8 @@ function verifyBranchDeleted({ request, runner }) {
     throw new Error("branch_still_exists");
   }
   const detail = String(result.stderr || result.stdout || "").toLowerCase();
-  if (!detail.includes("404") && result.status !== 1) {
+  const confirmedNotFound = detail.includes("404") || detail.includes("not found");
+  if (!confirmedNotFound) {
     throw new Error(`branch_delete_verification_failed:${result.status}`);
   }
   return "deleted";

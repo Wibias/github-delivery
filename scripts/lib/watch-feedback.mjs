@@ -268,14 +268,14 @@ export function evaluateFeedbackResolutions({
       const feedbackTime = Date.parse(target.createdAt || "");
       if (!Number.isFinite(feedbackTime)) {
         diagnostics.push(
-          diagnostic(recor, "timestamp_invalid", { feedbackKey }),
+          diagnostic(record, "timestamp_invalid", { feedbackKey }),
         );
         continue;
       }
       if (fixedTime <= feedbackTime) {
         diagnostics.push(
           diagnostic(record, "commit_not_after_feedback", { feedbackKey }),
-       );
+        );
         continue;
       }
       addressed.add(target.key);

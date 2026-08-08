@@ -431,3 +431,60 @@ test("edit_own_comment allows the authenticated actor to edit its comment on the
   assert.equal(result.status, "succeeded");
   assert.equal(calls.filter((call) => call.includes("PATCH")).length, 1);
 });
+
+function deleteHeadRequest() {
+  return {
+    schemaVersion: 1,
+    action: "delete_head_branch",
+    mutationMode: "maintainer",
+    explicitInstruction: true,
+    repo: "Wibias/opencodex",
+    pr: 1004,
+    headRefName: "feat/ri-02-request-history-index",
+    headOwnerLogin: "Wibias",
+    headRepo: "Wibias/opencodex",
+    baseRepo: "lidge-jun/opencodex",
+    actorLogin: "Wibias",
+    isMerged: true,
+    isCrossRepository: true,
+  };
+}
+
+test("delete_head_branch treats a 403 verification response as unknown instead of deleted", () => {
+  assert.throws(
+    () =>
+      executeMutationRequest({
+        request: deleteHeadRequest(),
+        execute: true,
+        runner(command, args) {
+          if (args.includes("DELETE")) {
+            return { status: 0, stdout: "", stderr: "" };
+          }
+          return {
+            status: 1,
+            stdout: "",
+            stderr: "HTTP 403: Resource not accessible by integration",
+          };
+        },
+      }),
+    /branch_delete_verification_failed/,
+  );
+});
+
+test("delete_head_branch accepts only an explicit not-found verification as deleted", () => {
+  const result = executeMutationRequest({
+    request: deleteHeadRequest(),
+    execute: true,
+    runner(command, args) {
+      if (args.includes("DELETE")) {
+        return { status: 0, stdout: "", stderr: "" };
+      }
+      return {
+        status: 1,
+        stdout: "",
+        stderr: "HTTP 404: Not Found",
+      };
+    },
+  });
+  assert.equal(result.verification, "deleted");
+});
