@@ -6,14 +6,15 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   validatePolicyArchitecture,
 } from "../../scripts/lib/policy-bundle.mjs";
 
-const repoRoot = resolve(new URL("../..", import.meta.url).pathname);
+const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 
 function write(root, path, content) {
   const full = join(root, ...path.split("/"));
