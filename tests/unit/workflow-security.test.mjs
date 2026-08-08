@@ -5,6 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 import {
+  evaluateLiveRepositoryPolicy,
   validateRepositoryPolicy,
   validateWorkflowFile,
   validateWorkflowTree,
@@ -15,6 +16,34 @@ function workflowRoot(source) {
   mkdirSync(join(root, ".github", "workflows"), { recursive: true });
   writeFileSync(join(root, ".github", "workflows", "fixture.yml"), source);
   return root;
+}
+
+function desiredPolicy() {
+  return {
+    schemaVersion: 1,
+    defaultBranch: "main",
+    pullRequests: {
+      required: true,
+      conversationResolution: true,
+      dismissStaleApprovals: true,
+    },
+    branch: {
+      allowForcePushes: false,
+      allowDeletions: false,
+      requireLinearHistory: false,
+    },
+    merge: { methods: ["merge"], updateBranch: true, autoMerge: true },
+    release: {
+      environment: "release",
+      protectedTagPattern: "v*",
+      requiredReviewers: 1,
+    },
+    requiredChecks: [
+      "Node 22 / ubuntu-latest",
+      "Dependency Review",
+      "CodeQL / Analyze (javascript-typescript)",
+    ],
+  };
 }
 
 test("repository workflows satisfy the security policy", () => {
@@ -43,16 +72,86 @@ test("rejects write permissions outside approved workflows", () => {
 });
 
 test("desired repository policy is fail-closed", () => {
-  const policy = {
-    schemaVersion: 1,
-    defaultBranch: "main",
-    pullRequests: { required: true, conversationResolution: true, dismissStaleApprovals: true },
-    branch: { allowForcePushes: false, allowDeletions: false, requireLinearHistory: false },
-    merge: { methods: ["merge"], updateBranch: true, autoMerge: true },
-    release: { environment: "release", protectedTagPattern: "v*", requiredReviewers: 1 },
-    requiredChecks: ["Node 20 / ubuntu-latest", "Dependency Review", "CodeQL"],
-  };
+  const policy = desiredPolicy();
   assert.deepEqual(validateRepositoryPolicy(policy), []);
   policy.merge.methods = ["merge", "squash"];
   assert.match(validateRepositoryPolicy(policy)[0].code, /merge_method/);
+});
+
+test("live policy drift detects an unprotected default branch and missing release reviewer", () => {
+  const report = evaluateLiveRepositoryPolicy({
+    policy: desiredPolicy(),
+    live: {
+      repository: { default_branch: "main" },
+      branch: { name: "main", protected: false },
+      activeRules: [],
+      releaseEnvironment: { name: "release", protection_rules: [] },
+    },
+  });
+  assert.equal(report.valid, false);
+  assert.ok(report.errors.some((error) => error.code === "default_branch_unprotected"));
+  assert.ok(report.errors.some((error) => error.code === "active_rules_missing"));
+  assert.ok(report.errors.some((error) => error.code === "release_reviewer_missing"));
+});
+
+test("live policy drift reports missing required check contexts", () => {
+  const report = evaluateLiveRepositoryPolicy({
+    policy: desiredPolicy(),
+    live: {
+      repository: { default_branch: "main" },
+      branch: { name: "main", protected: true },
+      activeRules: [
+        { type: "pull_request" },
+        {
+          type: "required_status_checks",
+          parameters: {
+            required_status_checks: [
+              { context: "Node 22 / ubuntu-latest" },
+              { context: "Dependency Review" },
+            ],
+          },
+        },
+      ],
+      releaseEnvironment: {
+        name: "release",
+        protection_rules: [
+          { type: "required_reviewers", reviewers: [{ reviewer: { login: "maintainer" } }] },
+        ],
+      },
+    },
+  });
+  assert.equal(report.valid, false);
+  assert.deepEqual(report.missingRequiredChecks, [
+    "CodeQL / Analyze (javascript-typescript)",
+  ]);
+  assert.ok(report.errors.some((error) => error.code === "required_checks_missing_live"));
+});
+
+test("live policy verifier accepts matching branch, rule and release evidence", () => {
+  const policy = desiredPolicy();
+  const report = evaluateLiveRepositoryPolicy({
+    policy,
+    live: {
+      repository: { default_branch: "main" },
+      branch: { name: "main", protected: true },
+      activeRules: [
+        { type: "pull_request" },
+        { type: "required_conversation_resolution" },
+        {
+          type: "required_status_checks",
+          parameters: {
+            required_status_checks: policy.requiredChecks.map((context) => ({ context })),
+          },
+        },
+      ],
+      releaseEnvironment: {
+        name: "release",
+        protection_rules: [
+          { type: "required_reviewers", reviewers: [{ reviewer: { login: "maintainer" } }] },
+        ],
+      },
+    },
+  });
+  assert.equal(report.valid, true, JSON.stringify(report.errors, null, 2));
+  assert.deepEqual(report.missingRequiredChecks, []);
 });
