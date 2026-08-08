@@ -73,7 +73,7 @@ internal static class GrantCodec
     private static byte[] Base64UrlDecode(string value)
     {
         var padded = value.Replace('-', '+').Replace('_', '/');
-        padded += padded.Length % 4 switch { 2 => "==", 3 => "=", 0 => "", _ => throw new FormatException() };
+        padded += (padded.Length % 4) switch { 2 => "==", 3 => "=", 0 => "", _ => throw new FormatException() };
         return Convert.FromBase64String(padded);
     }
 
