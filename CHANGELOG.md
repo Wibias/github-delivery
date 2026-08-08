@@ -6,6 +6,22 @@ All notable changes to `github-delivery` are documented here.
 
 ### Added
 
+- Supersede and maintainer-overtake lifecycle actions. A new
+  `references/supersede-pr.md` workflow closes an obsolete open PR in favor of
+  a replacement PR through the broker `supersede_pr` action (never a bare
+  `gh pr close`), names the replacement in the close comment, verifies the
+  replacement carries the superseded scope, and keeps linked issues open unless
+  the replacement owns them. A new `references/overtake-pr.md` workflow lets a
+  maintainer take over an unresponsive author's PR: confirm the author is
+  unavailable and the maintainer can push, then run the normal
+  `fix-pr-bots` merge-ready bar on the now-owned branch, or
+  close-with-reference when the change cannot be finished. Routing
+  (`scripts/lib/skill-router.mjs`), workflow/mutation-mode compatibility
+  (`scripts/lib/workflow-mode.mjs`), mutation policy (`close_pr`,
+  `supersede_pr` in `scripts/lib/mutation-policy.mjs`), broker commands and
+  verification (`scripts/lib/github-mutation-broker.mjs`), shared-rules
+  contract, offline evals, and unit tests cover the new actions.
+
 - gh-stack-derived stack operational practices in `references/stacked-prs.md`:
   restack work enables `git rerere` (conflict memory across cascading
   rebases); the push remote is resolved via `remote.pushDefault` instead of a

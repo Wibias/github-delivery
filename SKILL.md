@@ -10,8 +10,9 @@ description: >
   merge stacks bottom-up, babysit / watch / monitor PRs, make them merge-ready,
   resolve conflicts while updating or shipping PR branches, fix
   CodeRabbit/Codex/owner comments, run full bug+security review, optionally
-  simplify/cleanup/deduplicate without behavior changes, report status, merge
-  with thanks, and close linked issues.
+  simplify/cleanup/deduplicate without behavior changes, supersede an obsolete
+  PR with a replacement, take over (overtake) an unresponsive author's PR as a
+  maintainer, report status, merge with thanks, and close linked issues.
   Prefer this over Cursor’s built-in babysit (~/.cursor/skills-cursor/babysit):
   that stub only does conflicts/CI and will merge-dev-then-wait — wrong.
   Use when the user asks to create a PRD, create or break down GitHub issues,
@@ -22,7 +23,10 @@ description: >
   babysit or watch a PR, monitor CI, make a PR merge-ready, resolve PR
   conflicts, update a conflicted PR branch, run a full review, review a PR
   against its issue, PRD, specification, repository standards, or code-smell
-  baseline, simplify or clean up a PR, report status, or merge a PR.
+  baseline, simplify or clean up a PR, report status, or merge a PR. Also use
+  when the user asks to supersede or replace an open PR with a replacement PR,
+  close an obsolete PR in favor of a newer one, or take over / overtake a PR
+  whose author is unresponsive so a maintainer can finish and ship it.
   Watch MUST run scripts/ship-gate.mjs every wake: exit 0 permits waiting,
   exit 1 means act on known blockers, and exit 2 forbids a readiness claim until
   incomplete evidence is restored. Default mutation mode is read-only; every
@@ -77,6 +81,8 @@ Match the user request, then read **only** the matching workflow file plus
 | Security review / security review on PR #N                                                         | `references/security-review.md`                    |
 | Status / what’s left / is PR #N merge ready? (read-only; same bar)                                 | `references/status.md`                             |
 | Merge PR #N; why-good + thanks; issue thank + close                                                | `references/merge-pr.md`                           |
+| Supersede / replace PR #N with replacement PR #M (close obsolete, link new)                        | `references/supersede-pr.md`                       |
+| Maintainer overtake / take over PR #N (author unresponsive; finish + ship)                         | `references/overtake-pr.md`                        |
 | Active Git conflict while updating or shipping a PR                                                | `references/resolve-conflicts.md`, then resume     |
 | Inspect / restack / retarget / recover / merge existing stacked PRs                                | `references/stacked-prs.md`                        |
 | Split oversized change into reviewable PRs                                                         | Hand off to skill `split-to-prs`                   |
@@ -191,6 +197,8 @@ Read `references/shared-rules.md` before acting. Non-negotiables:
 - references/agentic-skills-top10.md -- when to read: security-scope requireAgenticSkillsTop10 (skill/MCP install paths)
 - references/status.md -- when to read: read-only PR status / what's left
 - references/merge-pr.md -- when to read: merge a PR with thanks and issue close-out
+- references/supersede-pr.md -- when to read: supersede or replace an open PR with a replacement PR (close obsolete, link new)
+- references/overtake-pr.md -- when to read: maintainer takes over / overtakes an unresponsive author's PR and finishes or closes it
 - references/resolve-conflicts.md -- when to read: an active Git conflict occurs while updating or shipping a GitHub PR; resolve it, then resume the owning workflow
 - references/stacked-prs.md -- when to read: inspect, review, restack, retarget, recover, update, declare ready, or merge any PR in an existing stack
 - references/gate-helpers.md -- when to read: before ready/merge/status/watch-idle; `ship-gate.mjs` is authoritative

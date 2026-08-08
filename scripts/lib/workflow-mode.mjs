@@ -7,11 +7,13 @@ const WORKFLOW_MUTATION_MODES = Object.freeze({
   "references/fix-pr-bots.md": ["maintainer"],
   "references/full-review-pr.md": ["review", "maintainer"],
   "references/merge-pr.md": ["maintainer"],
+  "references/overtake-pr.md": ["maintainer"],
   "references/re-review-pr.md": ["review"],
   "references/research-issue.md": ["review"],
   "references/security-review.md": ["review"],
   "references/simplify-pr.md": ["maintainer"],
   "references/status.md": ["read-only"],
+  "references/supersede-pr.md": ["maintainer"],
   "references/watch-pr.md": ["read-only", "autonomous"],
 });
 

@@ -14,6 +14,8 @@ const PR_ACTIONS = new Set([
   "resolve_bot_thread",
   "change_draft_state",
   "request_reviewers",
+  "close_pr",
+  "supersede_pr",
   "merge_pr",
   "post_resolution_record",
 ]);
@@ -25,6 +27,7 @@ const SOCIAL_ACTIONS = new Set([
   "edit_own_comment",
   "reply_bot_thread",
   "reply_human_thread",
+  "supersede_pr",
   "create_follow_up_issue",
   "post_resolution_record",
 ]);
@@ -195,6 +198,35 @@ function commandFor(request) {
       }
       return command;
     }
+    case "close_pr":
+      return [
+        "gh",
+        "pr",
+        "close",
+        String(positiveInteger(request.pr, "pr")),
+        "--repo",
+        repo,
+      ];
+    case "supersede_pr": {
+      const command = [
+        "gh",
+        "pr",
+        "close",
+        String(positiveInteger(request.pr, "pr")),
+        "--repo",
+        repo,
+      ];
+      let body;
+      if (request.body) {
+        body = required(request.body, "body");
+      } else if (request.supersedingPr) {
+        body = `Superseded by PR #${positiveInteger(request.supersedingPr, "superseding_pr")}.`;
+      } else {
+        throw new Error("body_or_superseding_pr_required");
+      }
+      command.push("--comment", body);
+      return command;
+    }
     case "close_linked_issue":
       return [
         "gh",
@@ -304,6 +336,18 @@ function verificationCommand(request) {
         request.repo,
         "--json",
         "state,mergedAt,headRefOid",
+      ];
+    case "close_pr":
+    case "supersede_pr":
+      return [
+        "gh",
+        "pr",
+        "view",
+        String(request.pr),
+        "--repo",
+        request.repo,
+        "--json",
+        "state,closedAt",
       ];
     case "close_linked_issue":
       return [

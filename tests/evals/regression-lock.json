@@ -250,5 +250,13 @@
   {
     "id": "R-stack-restack-preflight-2026-08-05",
     "sha256": "a09a0bc057d1e8b9eba86aed0b59794ec8ab0713fd322d02617eb4f280ad6f54"
+  },
+  {
+    "id": "R-supersede-no-merge-2026-08-08",
+    "sha256": "01af91095d3fb966dab8b7ac0980d9ad8dee6cb2e5046007feff4108306a1f4c"
+  },
+  {
+    "id": "R-overtake-unavailable-2026-08-08",
+    "sha256": "e81c22d5d6f5a768431acc50ddd54d97ab61f44d92edca62fa36f11f63e6f610"
   }
 ]

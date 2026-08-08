@@ -38,6 +38,25 @@ test("routes fix-and-merge-ready to the maintainer workflow", () => {
   assert.equal(route.mutationMode, "maintainer");
 });
 
+test("routes a supersede request to the supersede workflow", () => {
+  const route = routeShippingGithubPrompt(
+    "supersede PR #12 with PR #45 — close the old one and point everyone at the new one",
+  );
+  assert.equal(route.workflow, "references/supersede-pr.md");
+  assert.equal(route.mutationMode, "maintainer");
+  assert.ok(route.explicitActions.includes("supersede_pr"));
+});
+
+test("routes a maintainer overtake request to the overtake workflow", () => {
+  const route = routeShippingGithubPrompt(
+    "the author is unresponsive; I'm a maintainer and I will overtake PR #32 and finish it",
+  );
+  assert.equal(route.workflow, "references/overtake-pr.md");
+  assert.equal(route.mutationMode, "maintainer");
+  assert.ok(route.explicitActions.includes("push_code"));
+  assert.ok(route.explicitActions.includes("close_pr"));
+});
+
 test("does not trigger for local pre-PR debugging", () => {
   assert.equal(
     routeShippingGithubPrompt("help me fix a flaky local Vitest unit test"),

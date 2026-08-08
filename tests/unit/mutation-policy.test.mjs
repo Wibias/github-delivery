@@ -31,6 +31,27 @@ test("maintainer mutations require explicit instruction", () => {
   assert.equal(allowed.allowed, true);
 });
 
+test("supersede_pr and close_pr require explicit maintainer instruction", () => {
+  for (const action of ["supersede_pr", "close_pr"]) {
+    const denied = authorizeMutation({ mode: "maintainer", action });
+    const allowed = authorizeMutation({
+      mode: "maintainer",
+      action,
+      explicitInstruction: true,
+    });
+    assert.equal(denied.reason, "explicit_instruction_required");
+    assert.equal(allowed.allowed, true);
+  }
+});
+
+test("read-only and review never allow closing or superseding a PR", () => {
+  for (const mode of ["read-only", "review"]) {
+    const profile = mutationProfile(mode);
+    assert.equal(profile.actions.close_pr.allowed, false);
+    assert.equal(profile.actions.supersede_pr.allowed, false);
+  }
+});
+
 test("autonomous mode still requires exact text for human replies", () => {
   const denied = authorizeMutation({
     mode: "autonomous",

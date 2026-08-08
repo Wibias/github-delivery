@@ -16,6 +16,8 @@ research issue #90 on the latest development branch
 full review PR #42
 simplify PR #42 without changing behavior
 full review PR #42 and simplify it safely
+supersede PR #12 with PR #45 (close the obsolete PR)
+the author is unresponsive — maintainer overtake PR #32 and finish it
 ```
 
 You do **not** need to invoke Node scripts yourself. They are the skill’s internal safety and evidence machinery.
@@ -148,6 +150,8 @@ The broker defaults to dry-run. Execution requires `--execute`, re-checks the PR
 | Security review                                                           | `references/security-review.md`                              |
 | Status or merge-readiness                                                 | `references/status.md`                                       |
 | Merge with linked-issue close-out                                         | `references/merge-pr.md`                                     |
+| Supersede an obsolete PR with a replacement PR (close old, link new)      | `references/supersede-pr.md`                                 |
+| Maintainer overtake of an unresponsive author's PR                        | `references/overtake-pr.md`                                  |
 | Resolve an active Git conflict while updating or shipping a PR            | `references/resolve-conflicts.md`, then resume the workflow  |
 | Inspect, restack, retarget, recover, or merge stacked PRs                 | `references/stacked-prs.md`                                  |
 

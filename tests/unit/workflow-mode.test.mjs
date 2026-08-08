@@ -74,6 +74,28 @@ test("watch accepts only its declared read-only and autonomous modes", () => {
   );
 });
 
+test("supersede and overtake require maintainer mode", () => {
+  for (const workflow of [
+    "references/supersede-pr.md",
+    "references/overtake-pr.md",
+  ]) {
+    assert.deepEqual(allowedMutationModes(workflow), ["maintainer"]);
+    assert.equal(
+      validateWorkflowMutationMode({
+        workflow,
+        mutationMode: "maintainer",
+      }).valid,
+      true,
+    );
+    const denied = validateWorkflowMutationMode({
+      workflow,
+      mutationMode: "review",
+    });
+    assert.equal(denied.valid, false);
+    assert.equal(denied.reason, "mode_denied_by_workflow");
+  }
+});
+
 test("unknown workflows fail closed", () => {
   const result = validateWorkflowMutationMode({
     workflow: "references/typo.md",

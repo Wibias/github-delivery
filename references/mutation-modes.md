@@ -17,6 +17,7 @@ The user never needs to choose CLI flags. The agent derives the narrowest approp
 | Resolve bot-authored threads (`--resolve-bot`) | no | yes, after verification | yes | yes |
 | Resolve human threads | no | no | explicit instruction | yes, subject to social policy |
 | Change draft state / request reviewers | no | no | explicit instruction | yes |
+| Close an obsolete PR (supersede / overtake-close) | no | no | explicit instruction | yes |
 | Merge PR / close linked issue | no | no | explicit instruction | yes, only inside the governing workflow |
 | Create a follow-up issue | no | no | explicit instruction | yes |
 
@@ -31,6 +32,8 @@ Examples:
 - `review PR #32 and post the findings` → `review`
 - `fix PR #32 and make it merge ready` → `maintainer`
 - `merge PR #32` → `maintainer` with explicit authority for the merge workflow
+- `supersede PR #12 with #45` → `maintainer` with explicit authority for the `supersede_pr` action
+- `maintainer overtake PR #32` → `maintainer` with explicit authority for the push/close/comment actions the overtake workflow needs
 - `watch and autonomously fix/merge PR #32` → `autonomous` only when the wording truly grants that scope
 
 Do not ask users to run scripts. These mappings are agent behavior.

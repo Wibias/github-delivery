@@ -194,7 +194,66 @@ A PR is **ours** only when the PR author login equals the authenticated viewer l
 - Do not claim merge-ready, `approve-comment`, or a green status for a foreign PR whose head is behind base, conflicted, or awaiting owner-side simplification. The verdict/status must record the owner action as required.
 - The fork-head unwritable hard stop still applies to our own PRs; ownership never waives Git safety.
 
-Applies to: `fix-pr-bots`, `full-review-pr`, `simplify-pr`, `re-review-pr`, and `watch-pr`.
+Applies to: `fix-pr-bots`, `full-review-pr`, `simplify-pr`, `re-review-pr`,
+`watch-pr`, `supersede-pr`, and `overtake-pr`.
+
+## Supersede and maintainer overtake
+
+Two explicit maintainer-grade lifecycle actions are distinct from ordinary
+foreign-PR fix work:
+
+### Supersede a PR
+
+Closing an obsolete open PR (`#N`) because a replacement PR (`#M`) carries the
+work is **not** a merge and **not** a close-without-reference. Rules:
+
+1. The obsolete PR must be open and not merged; the replacement PR must exist
+   (or be opened first via `references/create-pr-for-issue.md`).
+2. The replacement must actually carry the obsolete PR’s scope. If it covers
+   only part, **stop and report** the leftover scope — do not close the
+   obsolete PR until the user decides.
+3. Close through the broker `supersede_pr` action (never bare `gh pr close`)
+   with a comment naming the replacement PR.
+4. The obsolete PR’s linked issues stay open unless the replacement PR owns
+   and fixes them; verify the replacement carries the `Fixes #N` linkage.
+5. Stacked PRs: never close a stack parent while open children depend on it
+   unless the children were retargeted first (`references/stacked-prs.md`).
+6. Re-read both PRs after closing and report the close receipt + replacement
+   linkage state.
+
+<!-- assertion-anchors -->
+<!-- assertion: supersede-close-not-merge -->
+<!-- assertion: supersede-requires-replacement -->
+<!-- assertion: supersede-scope-covered -->
+<!-- assertion: supersede-linked-issues-stay-open -->
+<!-- /assertion-anchors -->
+
+### Maintainer overtake
+
+Taking over an unresponsive author’s PR is the explicit maintainer-authorized
+handover of the PR itself, not just fix instructions for the owner. Rules:
+
+1. Confirm the author is genuinely unavailable (no response in a reasonable
+   window, repo overtake policy exists, or the user explicitly says they are
+   taking it over). An active, responsive author is **not** an overtake target.
+2. Confirm the user is a maintainer with push rights to the target branch or a
+   fork head they control. The fork-head unwritable hard stop applies when they
+   cannot push.
+3. Once taken over, the branch is effectively ours: base updates, pushes, and
+   simplification may proceed under the normal merge-ready bar
+   (`references/fix-pr-bots.md`).
+4. When the overtaken PR cannot be finished, close-with-reference through the
+   broker (`close_pr` / `supersede_pr`) instead of abandoning it; linked issues
+   stay open unless the closing decision explicitly resolves them.
+5. Overtake never authorizes merging by itself — merging still requires the
+   merge workflow (`references/merge-pr.md`) and an explicit merge ask.
+
+<!-- assertion-anchors -->
+<!-- assertion: overtake-author-unavailable -->
+<!-- assertion: overtake-maintainer-push-rights -->
+<!-- assertion: overtake-owns-branch-after-handover -->
+<!-- assertion: overtake-close-with-reference -->
+<!-- /assertion-anchors -->
 
 ## Review triage (humans + bots)
 

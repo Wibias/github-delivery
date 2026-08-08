@@ -141,6 +141,83 @@ test("social writes require an idempotency key", () => {
   );
 });
 
+test("supersede_pr plans a close with a replacement-naming comment", () => {
+  const plan = planMutationRequest({
+    schemaVersion: 1,
+    action: "supersede_pr",
+    mutationMode: "maintainer",
+    explicitInstruction: true,
+    repo: "acme/widgets",
+    pr: 12,
+    expectedHead: "abcdef1234567890",
+    supersedingPr: 45,
+    idempotencyKey: "supersede-pr-12-by-45",
+  });
+  assert.equal(plan.authorization.allowed, true);
+  assert.deepEqual(plan.command.slice(0, 5), [
+    "gh",
+    "pr",
+    "close",
+    "12",
+    "--repo",
+  ]);
+  assert.match(plan.command.join(" "), /Superseded by PR #45/);
+});
+
+test("supersede_pr requires an idempotency key and a body or superseding PR", () => {
+  assert.throws(
+    () =>
+      planMutationRequest({
+        schemaVersion: 1,
+        action: "supersede_pr",
+        mutationMode: "maintainer",
+        explicitInstruction: true,
+        repo: "acme/widgets",
+        pr: 12,
+        expectedHead: "abcdef1234567890",
+      }),
+    /idempotency_key_required|body_or_superseding_pr_required/,
+  );
+});
+
+test("close_pr plans a close and verifies the closed state", () => {
+  let calls = 0;
+  const result = executeMutationRequest({
+    request: {
+      schemaVersion: 1,
+      action: "close_pr",
+      mutationMode: "maintainer",
+      explicitInstruction: true,
+      repo: "acme/widgets",
+      pr: 12,
+      expectedHead: "abcdef1234567890",
+    },
+    execute: true,
+    runner(command, args) {
+      calls += 1;
+      if (args[0] === "pr" && args[1] === "view") {
+        if (args.includes("headRefOid")) {
+          return { status: 0, stdout: "abcdef1234567890\n", stderr: "" };
+        }
+        return {
+          status: 0,
+          stdout: JSON.stringify({ state: "CLOSED", closedAt: "2026-08-08T00:00:00Z" }),
+          stderr: "",
+        };
+      }
+      if (args[0] === "pr" && args[1] === "close") {
+        return { status: 0, stdout: "closed\n", stderr: "" };
+      }
+      return { status: 0, stdout: "", stderr: "" };
+    },
+  });
+  assert.equal(result.executed, true);
+  assert.equal(result.status, "succeeded");
+  assert.ok(calls >= 3);
+  const verification = JSON.parse(result.verification);
+  assert.equal(verification.state, "CLOSED");
+});
+
 test("delete_head_branch plans a ref delete for the actor-owned head", () => {
   const plan = planMutationRequest({
     schemaVersion: 1,

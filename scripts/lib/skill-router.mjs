@@ -40,6 +40,29 @@ export function routeShippingGithubPrompt(prompt) {
     ]);
   }
 
+  if (
+    /\b(supersede|supersedes|replace|replaces|in favor of|in favour of)\b[\s\S]*\bpr\b/.test(
+      text,
+    )
+  ) {
+    return result("references/supersede-pr.md", "maintainer", [
+      "supersede_pr",
+      "post_comment",
+    ]);
+  }
+
+  if (
+    /\b(overtake|take over|maintainer overtake|take it over)\b[\s\S]*\bpr\b/.test(
+      text,
+    )
+  ) {
+    return result("references/overtake-pr.md", "maintainer", [
+      "push_code",
+      "post_comment",
+      "close_pr",
+    ]);
+  }
+
   if (/\b(full review|review .* for real bugs|usefulness verdict)\b/.test(text)) {
     const simplifyRequested = SIMPLIFY_REQUEST.test(text);
     return result(

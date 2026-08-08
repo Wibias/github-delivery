@@ -88,7 +88,7 @@ function inferredWorkflow(item) {
   if (item.expected_workflow !== undefined) return item.expected_workflow;
   if (!["must-trigger", "routing"].includes(item.category)) return undefined;
   const workflows = (item.expected_resources || []).filter((resource) =>
-    /^references\/(fix-pr-bots|watch-pr|re-review-pr|research-issue|create-pr-for-issue|full-review-pr|security-review|status|merge-pr)\.md$/.test(
+    /^references\/(fix-pr-bots|watch-pr|re-review-pr|research-issue|create-pr-for-issue|full-review-pr|security-review|status|merge-pr|supersede-pr|overtake-pr)\.md$/.test(
       resource,
     ),
   );
