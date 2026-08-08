@@ -195,3 +195,40 @@ test("scope-case probe mismatch is reported when a trigger drifts", () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("duplicate assertion markers bind to any expected document and keep probe locality", () => {
+  const dir = makeFixtureRoot();
+  try {
+    const mergePath = join(dir, "references", "merge-pr.md");
+    writeFileSync(
+      mergePath,
+      `${readFileSync(mergePath, "utf8")}\n<!-- assertion: keeps-rule -->\n`,
+      "utf8",
+    );
+    const skillPath = join(dir, "SKILL.md");
+    writeFileSync(
+      skillPath,
+      `${readFileSync(skillPath, "utf8")}\n<!-- assertion: wiring-trace-required -->\n`,
+      "utf8",
+    );
+
+    const report = validateEvalRepository({ root: dir });
+    const wrongExpectedBinding = report.errors.find(
+      (error) =>
+        error.code === "assertion_not_in_expected_resources" &&
+        error.id === "R-fixture-wrong-file" &&
+        error.assertion === "keeps-rule",
+    );
+    assert.equal(wrongExpectedBinding, undefined, JSON.stringify(report.errors, null, 2));
+
+    const wrongProbeBinding = report.errors.find(
+      (error) =>
+        error.code === "probe_assertion_wrong_doc" &&
+        error.probe === "api-cli-wiring" &&
+        error.assertion === "wiring-trace-required",
+    );
+    assert.equal(wrongProbeBinding, undefined, JSON.stringify(report.errors, null, 2));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

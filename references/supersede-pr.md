@@ -1,3 +1,14 @@
+<!-- policy-modules:start -->
+Policy modules:
+- policy-kernel
+- mutation
+- evidence
+- git
+- issues
+- publication
+- stacks (when stack topology is detected)
+<!-- policy-modules:end -->
+
 # Supersede a pull request
 
 **Trigger:** “supersede PR #N with #M”, “replace PR #N with #M”, “close #N in
@@ -109,4 +120,3 @@ generated from `supersedingPr` unless you supply an exact approved `body`
 - The replacement PR is open, exists, and carries the superseded scope
 - Linked issues remain open unless the replacement owns and fixes them
 - The close and any comments went through the broker with verified receipts
-

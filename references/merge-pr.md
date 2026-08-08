@@ -1,3 +1,16 @@
+<!-- policy-modules:start -->
+Policy modules:
+- policy-kernel
+- mutation
+- evidence
+- git
+- ci
+- publication
+- releases
+- issues
+- stacks (when stack topology is detected)
+<!-- policy-modules:end -->
+
 # Merge PR
 
 **Trigger:** “merge pr #N”, “merge pr #A and #B”, “merge it”, “ship pr #N”.
@@ -82,10 +95,6 @@ Auto-close does not replace the required issue comment.
 <!-- assertion: multi-pr-full-ceremony -->
 <!-- /assertion-anchors -->
 
-
-
-
-
 ### 4. Cleanup
 
 - Confirm the PR is actually merged, not merely queued (the driver verifies the merge receipt; also confirm every required issue comment exists and complete issues are closed).
@@ -102,7 +111,6 @@ Auto-close does not replace the required issue comment.
 - Partial ceremony: continue only the missing idempotent step; do not duplicate completed comments.
 - Mutation command failure: include the action, receipt or plan hash, and error; never claim success.
 - Verification mismatch: treat the mutation as unresolved until repository state confirms it.
-
 
 ## Done when
 

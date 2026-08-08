@@ -1,3 +1,12 @@
+<!-- policy-modules:start -->
+Policy modules:
+- policy-kernel
+- evidence
+- ci
+- reviews
+- stacks (when stack topology is detected)
+<!-- policy-modules:end -->
+
 # Status / what’s left
 
 **Trigger:** “status on pr #N”, “what’s left on pr #N”, “is it merge ready?”, read-only check.

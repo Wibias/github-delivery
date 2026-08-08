@@ -1,3 +1,17 @@
+<!-- policy-modules:start -->
+Policy modules:
+- policy-kernel
+- mutation
+- evidence
+- git
+- ci
+- reviews
+- publication
+- releases
+- issues
+- stacks (when stack topology is detected)
+<!-- policy-modules:end -->
+
 # Prepare and merge a PR
 
 Use this workflow only when the user explicitly combines a merge request with work that must happen before the merge, such as full review, addressing review feedback, or safe simplification.

@@ -65,6 +65,19 @@ test("accepts references to bundled runtime directories", () => {
   assert.doesNotThrow(() => buildDistribution({ root, out: join(root, "out"), sourceCommit: "d".repeat(40) }));
 });
 
+test("accepts trailing-slash references to bundled runtime directories", () => {
+  const root = fixtureRoot();
+  mkdirSync(join(root, "references", "policy"), { recursive: true });
+  writeFileSync(join(root, "references", "policy", "mutation.md"), "# Mutation\n");
+  writeFileSync(
+    join(root, "SKILL.md"),
+    "---\nname: github-delivery\ndescription: Merge PRs.\n---\n\nLoad policy modules from `references/policy/`.\n",
+  );
+  assert.doesNotThrow(() =>
+    buildDistribution({ root, out: join(root, "out"), sourceCommit: "f".repeat(40) }),
+  );
+});
+
 test("ignores references owned by another named skill", () => {
   const root = fixtureRoot();
   writeFileSync(join(root, "references", "shared-rules.md"), "Read `<ai-agent-security>/references/mcp-tool-security.md`.\n");
