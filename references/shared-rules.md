@@ -170,7 +170,7 @@ delta is empty. The idempotency boundary is **current run marker first**, then
 
 Canonical: `GD-PUB-004`.
 
-`Publish final verdict` remaining pending or in_progress is never a completed state. `verify-verdict-published.mjs` must show `published: true` plus `format.valid: true` as the only normal completion proof. A blocker changes the verdict. It does not permit the workflow to omit the verdict.
+`Publish final verdict` remaining pending or in_progress is never a completed state. `verify-verdict-published.mjs` must show `published: true` plus `format.valid: true` is the only normal completion proof. A blocker changes the verdict. It does not permit the workflow to omit the verdict.
 A self-selected stricter mutation mode is not publication unavailability. Only explicit user cancellation may end the required publication workflow without the verdict.
 
 ## Full-review semantic completeness
