@@ -266,3 +266,28 @@ test("snapshot wake evaluation exposes valid resolution evidence", () => {
   assert.deepEqual(result.addressedFeedbackKeys, ["review_comment:77"]);
   assert.equal(result.resolutionRecords[0].resolvedCommitOid, fixCommit.oid);
 });
+
+test("an invalid feedback timestamp becomes a diagnostic instead of throwing", () => {
+  const malformedTimestampTarget = comment({
+    id: 79,
+    kind: "review_comment",
+    createdAt: "not-a-timestamp",
+    body: "Please fix this too.",
+  });
+  const result = evaluateFeedbackResolutions({
+    feedback: [
+      malformedTimestampTarget,
+      resolution({ feedbackKey: "review_comment:79" }),
+    ],
+    commits: [fixCommit],
+    myLogin: "Wibias",
+  });
+  assert.deepEqual(result.addressedKeys, []);
+  assert.ok(
+    result.diagnostics.some(
+      (item) =>
+        item.code === "timestamp_invalid" &&
+        item.feedbackKey === "review_comment:79",
+    ),
+  );
+});
