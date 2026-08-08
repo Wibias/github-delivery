@@ -114,16 +114,29 @@ instead. Applies to: `fix-pr-bots`, `full-review-pr`, `simplify-pr`.
 
 Canonical: `GD-REVIEW-008`.
 
-Merge-ready review must **find bugs before bots**; bots/checks are necessary, not sufficient. The canonical rule retains Wiring audit, Operator smoke, Test
-honesty, Docs vs non-goals, Input shape and evidence semantics, Hot-path scale
-and determinism, Malformed-input robustness, Serialization and trace budgets,
-Recursive/re-entrant lookups must terminate, CLI/API payload completeness,
-Unknown is not false, Unknown must not outrank measured, One decision, one clock,
-Filter before LIMIT, Aggregate semantics match the doc, Byte budgets measure
-bytes, No unbounded memory, Absent vs malformed, absence of a positive flag is
-not proof of absence, Aggregate all contributing source records, No
-self-recursion on a resolved target, and the rule that **Proactive contract
-verification incomplete** blocks a positive result.
+Merge-ready review must **find bugs before bots**; bots/checks are necessary, not sufficient. The canonical rule retains:
+- Wiring audit
+- Operator smoke
+- Test honesty
+- Docs vs non-goals
+- Input shape and evidence semantics
+- Hot-path scale and determinism
+- Malformed-input robustness
+- Serialization and trace budgets
+- Recursive/re-entrant lookups must terminate
+- CLI/API payload completeness
+- Unknown is not false
+- Unknown must not outrank measured
+- One decision, one clock
+- Filter before LIMIT
+- Aggregate semantics match the doc
+- Byte budgets measure bytes
+- No unbounded memory
+- Absent vs malformed
+- absence of a positive flag is not proof of absence
+- Aggregate all contributing source records
+- No self-recursion on a resolved target
+- **Proactive contract verification incomplete** blocks a positive result.
 
 ## Supersede and maintainer overtake
 
@@ -157,8 +170,7 @@ delta is empty. The idempotency boundary is **current run marker first**, then
 
 Canonical: `GD-PUB-004`.
 
-`Publish final verdict` remaining pending or in_progress is never a completed
-state. `verify-verdict-published.mjs` must show `published: true` plus `format.valid: true` is the only normal completion proof. A blocker changes the verdict. It does not permit the workflow to omit the verdict.
+`Publish final verdict` remaining pending or in_progress is never a completed state. `verify-verdict-published.mjs` must show `published: true` plus `format.valid: true` as the only normal completion proof. A blocker changes the verdict. It does not permit the workflow to omit the verdict.
 A self-selected stricter mutation mode is not publication unavailability. Only explicit user cancellation may end the required publication workflow without the verdict.
 
 ## Full-review semantic completeness
