@@ -25,7 +25,72 @@ Use `node scripts/policy-bundle.mjs <workflow>` to inspect the exact bundle and
 ## Compatibility assertions
 
 These summaries preserve old documentation anchors while pointing to their
-single canonical rule definition.
+single canonical rule definition. The anchor registry below is non-normative:
+it preserves locked regression-to-document traceability after the normative
+text moved into focused policy modules.
+
+<!-- legacy-assertion-anchor-registry:start -->
+<!-- assertion: no-unnecessary-loads -->
+<!-- assertion: refuse-false-merge-ready -->
+<!-- assertion: bots-not-clean -->
+<!-- assertion: own-reviews-required -->
+<!-- assertion: no-soft-gated -->
+<!-- assertion: ci-red-not-done -->
+<!-- assertion: keep-fixing -->
+<!-- assertion: update-base -->
+<!-- assertion: compile-against-tip -->
+<!-- assertion: no-stale-ready -->
+<!-- assertion: disambiguate-issue-vs-pr -->
+<!-- assertion: ask-when-both-exist -->
+<!-- assertion: detect-stack -->
+<!-- assertion: handoff-manage-stacked-prs -->
+<!-- assertion: no-mid-stack-trunk-merge -->
+<!-- assertion: utf8-no-bom -->
+<!-- assertion: gh-input-file -->
+<!-- assertion: verify-refetch -->
+<!-- assertion: fork-head-hard-stop -->
+<!-- assertion: graphql-review-threads -->
+<!-- assertion: paginate-unresolved -->
+<!-- assertion: block-if-open -->
+<!-- assertion: enforcement-vs-suggestion -->
+<!-- assertion: use-pr-policy-gate -->
+<!-- assertion: recheck-after-push -->
+<!-- assertion: approvals-on-head-sha -->
+<!-- assertion: gt3-subagent-fanout -->
+<!-- assertion: one-pr-per-subagent -->
+<!-- assertion: no-serialize-parent -->
+<!-- assertion: harden-not-rerun -->
+<!-- assertion: same-failure-twice-fix -->
+<!-- assertion: api-timeout-not-infra -->
+<!-- assertion: rerun-failed-only -->
+<!-- assertion: verify-windows-restarted -->
+<!-- assertion: not-green-matrix-legs -->
+<!-- assertion: fix-unrelated-required-ci -->
+<!-- assertion: not-out-of-scope-excuse -->
+<!-- assertion: minimal-harden-in-pr -->
+<!-- assertion: base-update-first -->
+<!-- assertion: green-is-provisional -->
+<!-- assertion: adaptive-settle-default-60 -->
+<!-- assertion: extended-settle-after-material-change -->
+<!-- assertion: poll-authoritative-gate-20s -->
+<!-- assertion: no-silent-sleep-over-30s -->
+<!-- assertion: show-reason-remaining-next-check -->
+<!-- assertion: reset-on-head-review-workflow-change -->
+<!-- assertion: final-unchanged-head-gate -->
+<!-- assertion: poll-dont-park -->
+<!-- assertion: wake-on-every-change -->
+<!-- assertion: keep-wait-visible -->
+<!-- assertion: no-single-blocking-sleep-over-30s -->
+<!-- assertion: same-head-anti-noise -->
+<!-- assertion: reuse-without-material-delta -->
+<!-- assertion: no-second-top-level-verdict -->
+<!-- assertion: plan-verdict-publication -->
+<!-- assertion: supersede-requires-replacement -->
+<!-- assertion: supersede-scope-covered -->
+<!-- assertion: supersede-linked-issues-stay-open -->
+<!-- assertion: overtake-owns-branch-after-handover -->
+<!-- assertion: overtake-close-with-reference -->
+<!-- legacy-assertion-anchor-registry:end -->
 
 ### Bot-thread ownership (no false deferral)
 
