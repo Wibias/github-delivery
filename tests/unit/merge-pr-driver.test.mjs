@@ -123,3 +123,37 @@ test("merge driver defaults to merge commits and builds a thanks body", () => {
   assert.match(body, /@alice/);
   assert.match(body, /merging/);
 });
+
+test("merge method detection follows squash-only repository capabilities", () => {
+  assert.equal(
+    detectMergeMethod({
+      mergeCommitAllowed: false,
+      squashMergeAllowed: true,
+      rebaseMergeAllowed: false,
+    }),
+    "squash",
+  );
+});
+
+test("merge method detection follows rebase-only repository capabilities", () => {
+  assert.equal(
+    detectMergeMethod({
+      mergeCommitAllowed: false,
+      squashMergeAllowed: false,
+      rebaseMergeAllowed: true,
+    }),
+    "rebase",
+  );
+});
+
+test("merge method detection fails closed when the repository exposes no merge method", () => {
+  assert.throws(
+    () =>
+      detectMergeMethod({
+        mergeCommitAllowed: false,
+        squashMergeAllowed: false,
+        rebaseMergeAllowed: false,
+      }),
+    /repository_has_no_enabled_merge_method/,
+  );
+});
