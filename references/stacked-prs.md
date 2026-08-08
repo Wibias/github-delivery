@@ -1,3 +1,15 @@
+<!-- policy-modules:start -->
+Policy modules:
+- policy-kernel
+- mutation
+- evidence
+- git
+- ci
+- reviews
+- publication
+- stacks
+<!-- policy-modules:end -->
+
 # Stacked Pull Requests
 
 Use this workflow for an **existing GitHub PR stack**: inspect its topology,
@@ -176,10 +188,6 @@ Recommend landing the lower portion first when that reduces risk.
 <!-- assertion: stack-tree-reported -->
 <!-- assertion: no-mutation -->
 <!-- /assertion-anchors -->
-
-
-
-
 
 ### Review view
 
