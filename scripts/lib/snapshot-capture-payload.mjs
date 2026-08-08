@@ -8,6 +8,66 @@ function collectionSource(collection, required = true) {
   };
 }
 
+function isExplicitNotFound(error) {
+  return /(?:HTTP\s+404|\b404\b|Not Found)/i.test(String(error || ""));
+}
+
+export function classifyBranchProtectionResponse(response = {}) {
+  if (response.ok === true) {
+    try {
+      return {
+        required: true,
+        readable: true,
+        complete: true,
+        payload: JSON.parse(response.body || "null"),
+        error: null,
+      };
+    } catch {
+      return {
+        required: true,
+        readable: false,
+        complete: false,
+        payload: null,
+        error: "branch protection returned invalid JSON",
+      };
+    }
+  }
+  if (isExplicitNotFound(response.error)) {
+    return {
+      required: false,
+      readable: true,
+      complete: true,
+      payload: null,
+      error: null,
+    };
+  }
+  return {
+    required: true,
+    readable: false,
+    complete: false,
+    payload: null,
+    error: response.error || "branch protection request failed",
+  };
+}
+
+export function verifySnapshotBoundary(initialPr = {}, finalPr = {}) {
+  const initialHead = String(initialPr.headRefOid || "").toLowerCase();
+  const finalHead = String(finalPr.headRefOid || "").toLowerCase();
+  if (!initialHead || !finalHead || initialHead !== finalHead) {
+    throw new Error(
+      `snapshot_head_moved: expected ${initialHead || "missing"}, observed ${finalHead || "missing"}`,
+    );
+  }
+  const initialBase = String(initialPr.baseRefName || "");
+  const finalBase = String(finalPr.baseRefName || "");
+  if (!initialBase || !finalBase || initialBase !== finalBase) {
+    throw new Error(
+      `snapshot_base_moved: expected ${initialBase || "missing"}, observed ${finalBase || "missing"}`,
+    );
+  }
+  return { headOid: initialHead, baseRefName: initialBase };
+}
+
 export function assembleSnapshotCapture({
   prEvidence,
   changedFiles,

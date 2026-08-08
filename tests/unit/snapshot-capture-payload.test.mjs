@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { assembleSnapshotCapture } from "../../scripts/lib/snapshot-capture-payload.mjs";
+import {
+  assembleSnapshotCapture,
+  classifyBranchProtectionResponse,
+  verifySnapshotBoundary,
+} from "../../scripts/lib/snapshot-capture-payload.mjs";
 
 function collection(rows = []) {
   return { readable: true, complete: true, pages: 1, rows, error: null };
@@ -128,4 +132,68 @@ test("marks a required policy source incomplete instead of manufacturing a compl
 
   assert.equal(result.sources.policyGraphql.complete, false);
   assert.equal(result.sources.policyGraphql.error, "GraphQL unavailable");
+});
+
+test("snapshot boundary rejects a PR head that moved during capture", () => {
+  assert.throws(
+    () =>
+      verifySnapshotBoundary(
+        { headRefOid: "head-a", baseRefName: "main" },
+        { headRefOid: "head-b", baseRefName: "main" },
+      ),
+    /snapshot_head_moved/,
+  );
+});
+
+test("snapshot boundary rejects a base retarget during capture", () => {
+  assert.throws(
+    () =>
+      verifySnapshotBoundary(
+        { headRefOid: "head-a", baseRefName: "main" },
+        { headRefOid: "head-a", baseRefName: "release" },
+      ),
+    /snapshot_base_moved/,
+  );
+});
+
+test("snapshot boundary accepts unchanged head and base", () => {
+  assert.deepEqual(
+    verifySnapshotBoundary(
+      { headRefOid: "head-a", baseRefName: "main" },
+      { headRefOid: "head-a", baseRefName: "main" },
+    ),
+    { headOid: "head-a", baseRefName: "main" },
+  );
+});
+
+test("branch protection response treats only explicit 404 as unprotected", () => {
+  const notFound = classifyBranchProtectionResponse({
+    ok: false,
+    body: "",
+    error: "HTTP 404: Not Found",
+  });
+  assert.equal(notFound.required, false);
+  assert.equal(notFound.readable, true);
+  assert.equal(notFound.complete, true);
+
+  const forbidden = classifyBranchProtectionResponse({
+    ok: false,
+    body: "",
+    error: "HTTP 403: Resource not accessible by integration",
+  });
+  assert.equal(forbidden.required, true);
+  assert.equal(forbidden.readable, false);
+  assert.equal(forbidden.complete, false);
+});
+
+test("branch protection response parses an authoritative protected branch payload", () => {
+  const result = classifyBranchProtectionResponse({
+    ok: true,
+    body: JSON.stringify({ required_status_checks: { strict: true } }),
+    error: null,
+  });
+  assert.equal(result.required, true);
+  assert.equal(result.readable, true);
+  assert.equal(result.complete, true);
+  assert.equal(result.payload.required_status_checks.strict, true);
 });

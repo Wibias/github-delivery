@@ -7,7 +7,11 @@
 import { Buffer } from "node:buffer";
 import { spawnSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
-import { assembleSnapshotCapture } from "./lib/snapshot-capture-payload.mjs";
+import {
+  assembleSnapshotCapture,
+  classifyBranchProtectionResponse,
+  verifySnapshotBoundary,
+} from "./lib/snapshot-capture-payload.mjs";
 import { collectPaginated } from "./lib/github-pagination.mjs";
 import { createSnapshotEnvelope } from "./lib/snapshot-schema.mjs";
 
@@ -392,60 +396,13 @@ function fetchPolicy(owner, name, pr) {
   };
 }
 
-function patternMatchesBranch(pattern, branch) {
-  if (!pattern) return false;
-  if (pattern === branch) return true;
-  const expression = String(pattern)
-    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
-    .replace(/\*\*/g, "<<<STARSTAR>>>")
-    .replace(/\*/g, "[^/]*")
-    .replace(/<<<STARSTAR>>>/g, ".*");
-  return new RegExp(`^${expression}$`).test(branch);
-}
-
-function fetchBranchProtection(owner, name, base, policy) {
-  const matchingCount = (policy.branchProtectionRules?.nodes || []).filter((rule) =>
-    patternMatchesBranch(rule?.pattern, base),
-  ).length;
-  const response = ghOk([
-    "api",
-    `repos/${owner}/${name}/branches/${encodeURIComponent(base)}/protection`,
-  ]);
-  if (response.ok) {
-    try {
-      return {
-        required: matchingCount > 0,
-        readable: true,
-        complete: true,
-        payload: JSON.parse(response.body),
-        error: null,
-      };
-    } catch {
-      return {
-        required: matchingCount > 0,
-        readable: false,
-        complete: false,
-        payload: null,
-        error: "branch protection returned invalid JSON",
-      };
-    }
-  }
-  if (matchingCount === 0) {
-    return {
-      required: false,
-      readable: true,
-      complete: true,
-      payload: null,
-      error: null,
-    };
-  }
-  return {
-    required: true,
-    readable: false,
-    complete: false,
-    payload: null,
-    error: response.error || "branch protection request failed",
-  };
+function fetchBranchProtection(owner, name, base) {
+  return classifyBranchProtectionResponse(
+    ghOk([
+      "api",
+      `repos/${owner}/${name}/branches/${encodeURIComponent(base)}/protection`,
+    ]),
+  );
 }
 
 function scanTargetWorkflows(owner, name, base, mergeQueueEnabled) {
@@ -641,7 +598,7 @@ try {
   );
   const threads = reviewThreads(owner, name, pr);
   const policy = fetchPolicy(owner, name, pr);
-  const branchProtection = fetchBranchProtection(owner, name, base, policy);
+  const branchProtection = fetchBranchProtection(owner, name, base);
   const codeowners = fetchCodeowners(owner, name, base);
   const workflowCoverage = scanTargetWorkflows(
     owner,
@@ -650,6 +607,17 @@ try {
     policy.mergeQueue?.enabled === true,
   );
   const viewer = fetchViewer();
+
+  const finalPrEvidence = ghJson([
+    "pr",
+    "view",
+    String(pr),
+    "--repo",
+    repo,
+    "--json",
+    "baseRefName,headRefOid",
+  ]);
+  verifySnapshotBoundary(prEvidence, finalPrEvidence);
 
   const capture = assembleSnapshotCapture({
     prEvidence,
