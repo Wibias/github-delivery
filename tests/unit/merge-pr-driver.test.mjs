@@ -80,19 +80,26 @@ test("merge driver gate blocks on required-check pending", () => {
   assert.ok(gate.blockers.some((blocker) => blocker.includes("requiredChecks")));
 });
 
-test("merge driver buildThankRequest produces an idempotent post_comment plan", () => {
+test("merge driver buildThankRequest produces a remotely idempotent post_comment plan", () => {
+  const visibleBody = "Thanks @alice - merging.";
   const request = buildThankRequest({
     repo: "acme/widget",
     pr: 42,
     expectedHead: HEAD,
-    body: "Thanks @alice - merging.",
+    body: visibleBody,
   });
   const plan = planMutationRequest(request);
   assert.equal(plan.action, "post_comment");
   assert.equal(plan.idempotencyKey, "merge-thanks-pr-42");
   assert.equal(plan.expectedHead, HEAD);
   assert.deepEqual(plan.command.slice(0, 3), ["gh", "pr", "comment"]);
-  assert.ok(plan.command.includes("Thanks @alice - merging."));
+  const bodyIndex = plan.command.indexOf("--body") + 1;
+  assert.ok(bodyIndex > 0);
+  assert.match(plan.command[bodyIndex], /^Thanks @alice - merging\./);
+  assert.match(
+    plan.command[bodyIndex],
+    /<!-- github-delivery:idempotency [0-9a-f]{64} -->$/,
+  );
 });
 
 test("merge driver buildMergeRequest pins the head with --match-head-commit", () => {
