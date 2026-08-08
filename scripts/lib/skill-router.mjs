@@ -14,6 +14,7 @@ function result(workflow, mutationMode = "read-only", explicitActions = []) {
 const SIMPLIFY_REQUEST =
   /\b(simplify|simplification|cleanup|clean up|deduplicate|dedupe|reduce duplication)\b/;
 const MERGE_INTENT = /\b(merge|ship)\b/;
+const MERGE_READY_PHRASE = /\bmerge[- ]?ready\b/g;
 const NEGATED_MERGE_INTENT = /\b(?:do not|don't|never)\s+(?:merge|ship)\b/;
 const PR_REFERENCE = /\bpr\s*#?\d+\b/;
 const FULL_REVIEW_REQUEST = /\b(full review|review .* for real bugs|usefulness verdict)\b/;
@@ -28,8 +29,12 @@ function prepareAndMergeActions(text) {
   return actions;
 }
 
+function hasExplicitMergeIntent(text) {
+  return MERGE_INTENT.test(text.replace(MERGE_READY_PHRASE, ""));
+}
+
 function isPrepareAndMergeRequest(text) {
-  if (!MERGE_INTENT.test(text) || NEGATED_MERGE_INTENT.test(text) || !PR_REFERENCE.test(text)) {
+  if (!hasExplicitMergeIntent(text) || NEGATED_MERGE_INTENT.test(text) || !PR_REFERENCE.test(text)) {
     return false;
   }
   return (
