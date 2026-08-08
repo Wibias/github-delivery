@@ -1,12 +1,15 @@
 import { createHash, createPublicKey, verify } from "node:crypto";
 
-import { MUTATION_MODES, normalizeMutationMode } from "./mutation-policy.mjs";
+import { authorityScopeSha256 } from "./authority-scope.mjs";
 
 const TOKEN_PREFIX = "gd1";
 const AUDIENCE = "github-delivery";
 const DEFAULT_MAX_TTL_SECONDS = 600;
 const DEFAULT_CLOCK_SKEW_SECONDS = 30;
 const BASE64URL_RE = /^[A-Za-z0-9_-]+$/;
+const SHA256_RE = /^[0-9a-f]{64}$/i;
+const MUTATION_MODES = ["read-only", "review", "maintainer", "autonomous"];
+const SUPPORTED_ALGORITHMS = new Set(["EdDSA", "ES256"]);
 const NUMERIC_RESOURCE_FIELDS = new Set(["pr", "issue", "commentId", "supersedingPr"]);
 const RESOURCE_FIELDS = [
   "pr",
@@ -37,9 +40,16 @@ function normalizeNow(value) {
   return Math.floor(value);
 }
 
+function normalizeMutationMode(value = "read-only") {
+  const mode = String(value || "read-only").toLowerCase();
+  if (!MUTATION_MODES.includes(mode)) {
+    throw new Error("mutation_mode_invalid");
+  }
+  return mode;
+}
+
 function modeRank(value) {
-  const mode = normalizeMutationMode(value);
-  return MUTATION_MODES.indexOf(mode);
+  return MUTATION_MODES.indexOf(normalizeMutationMode(value));
 }
 
 function resourceValue(field, value) {
@@ -88,6 +98,12 @@ function parseToken(token) {
 
 function validateClaims(payload) {
   if (payload.version !== 1) return "version_invalid";
+  if (payload.alg !== undefined && (typeof payload.alg !== "string" || !payload.alg)) {
+    return "algorithm_invalid";
+  }
+  if (payload.kid !== undefined && (typeof payload.kid !== "string" || !payload.kid)) {
+    return "key_id_invalid";
+  }
   if (typeof payload.aud !== "string" || !payload.aud) return "audience_missing";
   if (typeof payload.repo !== "string" || !payload.repo.includes("/")) return "repo_invalid";
   if (typeof payload.action !== "string" || !payload.action) return "action_invalid";
@@ -98,9 +114,24 @@ function validateClaims(payload) {
   if (typeof payload.explicitInstruction !== "boolean") return "explicit_instruction_invalid";
   if (!finiteInteger(payload.issuedAt) || !finiteInteger(payload.expiresAt)) return "time_invalid";
   if (typeof payload.nonce !== "string" || !payload.nonce) return "nonce_invalid";
+  if (payload.scopeSha256 !== undefined && !SHA256_RE.test(String(payload.scopeSha256))) {
+    return "scope_hash_invalid";
+  }
+  if (payload.batchId !== undefined && (typeof payload.batchId !== "string" || !payload.batchId)) {
+    return "batch_id_invalid";
+  }
+  if (payload.batchIndex !== undefined && (!finiteInteger(payload.batchIndex) || payload.batchIndex < 0)) {
+    return "batch_index_invalid";
+  }
+  if (payload.batchSha256 !== undefined && !SHA256_RE.test(String(payload.batchSha256))) {
+    return "batch_hash_invalid";
+  }
+  if (payload.redemption !== undefined && payload.redemption !== "required") {
+    return "redemption_invalid";
+  }
   if (
     payload.exactTextSha256 !== undefined &&
-    !/^[0-9a-f]{64}$/i.test(String(payload.exactTextSha256))
+    !SHA256_RE.test(String(payload.exactTextSha256))
   ) {
     return "exact_text_hash_invalid";
   }
@@ -118,36 +149,137 @@ function verifyResourceBinding(payload, request) {
   return true;
 }
 
+function normalizeAlgorithm(payload) {
+  if (payload.alg === undefined) return "EdDSA";
+  return String(payload.alg);
+}
+
+function validateTrustStore(trustStore) {
+  if (!plainObject(trustStore) || trustStore.schemaVersion !== 1 || !Array.isArray(trustStore.keys)) {
+    return false;
+  }
+  return trustStore.keys.every((entry) => plainObject(entry));
+}
+
+function selectTrustStoreKey({ payload, trustStore, now }) {
+  if (!validateTrustStore(trustStore)) {
+    return { ok: false, reason: "trust_store_invalid" };
+  }
+  if (typeof payload.kid !== "string" || !payload.kid) {
+    return { ok: false, reason: "key_id_missing" };
+  }
+  const entry = trustStore.keys.find((candidate) => candidate.kid === payload.kid);
+  if (!entry) return { ok: false, reason: "key_not_found" };
+
+  const algorithm = normalizeAlgorithm(payload);
+  if (entry.alg !== algorithm) return { ok: false, reason: "key_algorithm_mismatch" };
+  if (!entry.publicKey || typeof entry.publicKey !== "string") {
+    return { ok: false, reason: "public_key_missing" };
+  }
+  if (entry.status === "retired") return { ok: false, reason: "key_retired" };
+  if (!new Set(["active", "retiring"]).has(entry.status || "active")) {
+    return { ok: false, reason: "key_status_invalid" };
+  }
+  if (entry.notBefore !== undefined && (!finiteInteger(entry.notBefore) || now < entry.notBefore)) {
+    return { ok: false, reason: "key_not_yet_valid" };
+  }
+  if (entry.notAfter !== undefined && (!finiteInteger(entry.notAfter) || now > entry.notAfter)) {
+    return { ok: false, reason: "key_expired" };
+  }
+  if (entry.repos !== undefined) {
+    if (!Array.isArray(entry.repos) || !entry.repos.every((repo) => typeof repo === "string")) {
+      return { ok: false, reason: "key_repo_scope_invalid" };
+    }
+    if (!entry.repos.includes(payload.repo)) {
+      return { ok: false, reason: "key_repo_denied" };
+    }
+  }
+  return { ok: true, entry };
+}
+
+function verificationKey({ payload, publicKey, trustStore, now }) {
+  const algorithm = normalizeAlgorithm(payload);
+  if (!SUPPORTED_ALGORITHMS.has(algorithm)) {
+    return { ok: false, reason: "algorithm_unsupported" };
+  }
+
+  if (payload.alg === undefined) {
+    if (!publicKey) return { ok: false, reason: "public_key_missing" };
+    return { ok: true, algorithm, keyMaterial: publicKey, entry: null };
+  }
+
+  if (!payload.kid && algorithm === "EdDSA" && publicKey) {
+    return { ok: true, algorithm, keyMaterial: publicKey, entry: null };
+  }
+
+  if (!trustStore) return { ok: false, reason: "trust_store_missing" };
+  const selected = selectTrustStoreKey({ payload, trustStore, now });
+  if (!selected.ok) return selected;
+  return {
+    ok: true,
+    algorithm,
+    keyMaterial: selected.entry.publicKey,
+    entry: selected.entry,
+  };
+}
+
+function verifySignature({ algorithm, key, signedBytes, signature }) {
+  try {
+    if (algorithm === "EdDSA") {
+      return verify(null, signedBytes, key, signature);
+    }
+    if (algorithm === "ES256") {
+      return verify(
+        "sha256",
+        signedBytes,
+        { key, dsaEncoding: "der" },
+        signature,
+      );
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
 function sanitizedClaims(payload) {
   return {
     version: payload.version,
+    ...(payload.alg ? { alg: payload.alg } : {}),
+    ...(payload.kid ? { kid: payload.kid } : {}),
     aud: payload.aud,
     repo: payload.repo,
     action: payload.action,
     resource: structuredClone(payload.resource),
+    ...(payload.scopeSha256 ? { scopeSha256: payload.scopeSha256 } : {}),
+    ...(payload.batchId ? { batchId: payload.batchId } : {}),
+    ...(payload.batchIndex !== undefined ? { batchIndex: payload.batchIndex } : {}),
+    ...(payload.batchSha256 ? { batchSha256: payload.batchSha256 } : {}),
     maxMutationMode: normalizeMutationMode(payload.maxMutationMode),
     explicitInstruction: payload.explicitInstruction,
     issuedAt: payload.issuedAt,
     expiresAt: payload.expiresAt,
     nonce: payload.nonce,
+    ...(payload.redemption ? { redemption: payload.redemption } : {}),
+    ...(payload.approvalMethod ? { approvalMethod: String(payload.approvalMethod) } : {}),
     ...(payload.exactTextSha256 ? { exactTextSha256: payload.exactTextSha256 } : {}),
   };
+}
+
+function unverified(reason) {
+  return { provenance: "caller_asserted", verified: false, claims: null, reason };
 }
 
 export function verifyAuthorityGrant({
   token,
   publicKey,
+  trustStore = null,
   request = {},
   now,
   maxTtlSeconds = DEFAULT_MAX_TTL_SECONDS,
   clockSkewSeconds = DEFAULT_CLOCK_SKEW_SECONDS,
 } = {}) {
-  if (!token) {
-    return { provenance: "caller_asserted", verified: false, claims: null, reason: "grant_absent" };
-  }
-  if (!publicKey) {
-    return { provenance: "caller_asserted", verified: false, claims: null, reason: "public_key_missing" };
-  }
+  if (!token) return unverified("grant_absent");
   if (!Number.isFinite(maxTtlSeconds) || maxTtlSeconds <= 0) {
     throw new Error("authority_max_ttl_invalid");
   }
@@ -155,73 +287,76 @@ export function verifyAuthorityGrant({
     throw new Error("authority_clock_skew_invalid");
   }
 
-  const parsed = parseToken(token);
-  if (!parsed.ok) {
-    return { provenance: "caller_asserted", verified: false, claims: null, reason: parsed.reason };
+  if (trustStore === null && plainObject(publicKey) && publicKey.schemaVersion === 1) {
+    trustStore = publicKey;
+    publicKey = null;
   }
+
+  const parsed = parseToken(token);
+  if (!parsed.ok) return unverified(parsed.reason);
+
+  const current = normalizeNow(now);
+  const selected = verificationKey({
+    payload: parsed.payload,
+    publicKey,
+    trustStore,
+    now: current,
+  });
+  if (!selected.ok) return unverified(selected.reason);
 
   let key;
   try {
-    key = createPublicKey(publicKey);
+    key = createPublicKey(selected.keyMaterial);
   } catch {
-    return { provenance: "caller_asserted", verified: false, claims: null, reason: "public_key_invalid" };
+    return unverified("public_key_invalid");
   }
 
-  let signatureValid = false;
-  try {
-    signatureValid = verify(null, parsed.signedBytes, key, parsed.signature);
-  } catch {
-    signatureValid = false;
-  }
-  if (!signatureValid) {
-    return { provenance: "caller_asserted", verified: false, claims: null, reason: "bad_signature" };
+  if (!verifySignature({
+    algorithm: selected.algorithm,
+    key,
+    signedBytes: parsed.signedBytes,
+    signature: parsed.signature,
+  })) {
+    return unverified("bad_signature");
   }
 
   const payload = parsed.payload;
   const claimError = validateClaims(payload);
-  if (claimError) {
-    return { provenance: "caller_asserted", verified: false, claims: null, reason: claimError };
-  }
-  if (payload.aud !== AUDIENCE) {
-    return { provenance: "caller_asserted", verified: false, claims: null, reason: "wrong_audience" };
-  }
-  if (payload.repo !== request.repo) {
-    return { provenance: "caller_asserted", verified: false, claims: null, reason: "repo_mismatch" };
-  }
-  if (payload.action !== request.action) {
-    return { provenance: "caller_asserted", verified: false, claims: null, reason: "action_mismatch" };
-  }
-  if (!verifyResourceBinding(payload, request)) {
-    return { provenance: "caller_asserted", verified: false, claims: null, reason: "resource_mismatch" };
+  if (claimError) return unverified(claimError);
+  if (payload.aud !== AUDIENCE) return unverified("wrong_audience");
+  if (payload.repo !== request.repo) return unverified("repo_mismatch");
+  if (payload.action !== request.action) return unverified("action_mismatch");
+  if (!verifyResourceBinding(payload, request)) return unverified("resource_mismatch");
+
+  const requireScopeHash = selected.entry?.requireScopeHash === true;
+  if (requireScopeHash && !payload.scopeSha256) return unverified("scope_hash_missing");
+  if (payload.scopeSha256) {
+    let actualScope;
+    try {
+      actualScope = authorityScopeSha256(request);
+    } catch {
+      return unverified("scope_invalid");
+    }
+    if (payload.scopeSha256 !== actualScope) return unverified("scope_mismatch");
   }
 
-  const current = normalizeNow(now);
-  if (payload.issuedAt > current + clockSkewSeconds) {
-    return { provenance: "caller_asserted", verified: false, claims: null, reason: "not_yet_valid" };
-  }
-  if (payload.expiresAt < current - clockSkewSeconds) {
-    return { provenance: "caller_asserted", verified: false, claims: null, reason: "expired" };
-  }
-  if (payload.expiresAt <= payload.issuedAt) {
-    return { provenance: "caller_asserted", verified: false, claims: null, reason: "time_invalid" };
-  }
-  if (payload.expiresAt - payload.issuedAt > maxTtlSeconds) {
-    return { provenance: "caller_asserted", verified: false, claims: null, reason: "ttl_exceeded" };
-  }
+  if (payload.issuedAt > current + clockSkewSeconds) return unverified("not_yet_valid");
+  if (payload.expiresAt < current - clockSkewSeconds) return unverified("expired");
+  if (payload.expiresAt <= payload.issuedAt) return unverified("time_invalid");
+  if (payload.expiresAt - payload.issuedAt > maxTtlSeconds) return unverified("ttl_exceeded");
 
   let requestedMode;
   try {
     requestedMode = normalizeMutationMode(request.mutationMode);
   } catch {
-    return { provenance: "caller_asserted", verified: false, claims: null, reason: "mutation_mode_invalid" };
+    return unverified("mutation_mode_invalid");
   }
   if (modeRank(requestedMode) > modeRank(payload.maxMutationMode)) {
-    return {
-      provenance: "caller_asserted",
-      verified: false,
-      claims: null,
-      reason: "mutation_mode_exceeds_grant",
-    };
+    return unverified("mutation_mode_exceeds_grant");
+  }
+
+  if (selected.entry?.requireRedemption === true && payload.redemption !== "required") {
+    return unverified("redemption_required");
   }
 
   let exactTextConfirmed = false;
@@ -232,12 +367,7 @@ export function verifyAuthorityGrant({
       payload.exactTextSha256 !== actualHash ||
       request.exactTextSha256 !== actualHash
     ) {
-      return {
-        provenance: "caller_asserted",
-        verified: false,
-        claims: null,
-        reason: "exact_text_hash_mismatch",
-      };
+      return unverified("exact_text_hash_mismatch");
     }
     exactTextConfirmed = true;
   }
@@ -259,6 +389,7 @@ export function classifyAuthority({
   request = {},
   token = request.authorityGrant,
   publicKey = null,
+  trustStore = null,
   requireTrusted = false,
   now,
   maxTtlSeconds,
@@ -267,6 +398,7 @@ export function classifyAuthority({
   const result = verifyAuthorityGrant({
     token,
     publicKey,
+    trustStore,
     request,
     now,
     maxTtlSeconds,

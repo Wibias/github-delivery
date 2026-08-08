@@ -38,3 +38,23 @@ jobs:
 
       - name: Run checks
         run: npm run check
+
+      - name: Build Windows authority host
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          & dotnet build authority-host/windows/GitHubDeliveryAuthority/GitHubDeliveryAuthority.csproj --configuration Release 2>&1 |
+            Tee-Object -FilePath authority-host-build.log
+          $exitCode = $LASTEXITCODE
+          if ($exitCode -ne 0) {
+            Get-Content authority-host-build.log | ForEach-Object {
+              $line = $_ -replace '%','%25' -replace "`r",'%0D' -replace "`n",'%0A'
+              Write-Host "::error::$line"
+            }
+            exit $exitCode
+          }
+
+      - name: Run Windows authority host self-test
+        if: runner.os == 'Windows'
+        run: dotnet run --project authority-host/windows/GitHubDeliveryAuthority/GitHubDeliveryAuthority.csproj --configuration Release --no-build -- --self-test
