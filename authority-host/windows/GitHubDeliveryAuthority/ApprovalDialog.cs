@@ -33,7 +33,7 @@ internal sealed class ApprovalDialog : Form
             Text = "Review the exact GitHub mutations below. Windows Hello approves only this displayed batch.",
             Dock = DockStyle.Fill,
             AutoSize = true,
-            Font = new Font(SystemFonts.MessageBoxFont, FontStyle.Bold),
+            Font = new Font(FontFamily.GenericSansSerif, 9, FontStyle.Bold),
         }, 0, 0);
 
         var details = new TextBox
