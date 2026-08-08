@@ -1,3 +1,13 @@
+<!-- policy-modules:start -->
+Policy modules:
+- policy-kernel
+- mutation
+- evidence
+- issues
+- reviews
+- publication
+<!-- policy-modules:end -->
+
 # Research issue(s)
 
 **Trigger:** “Research issue #N”, “research issues #A #B”, “is #N still an issue on latest dev?”, “triage/research this issue”.
