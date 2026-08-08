@@ -22,12 +22,12 @@
     "requiredReviewers": 1
   },
   "requiredChecks": [
-    "Node 20 / ubuntu-latest",
-    "Node 20 / windows-latest",
-    "Node 20 / macos-latest",
     "Node 22 / ubuntu-latest",
     "Node 22 / windows-latest",
     "Node 22 / macos-latest",
+    "Node 24 / ubuntu-latest",
+    "Node 24 / windows-latest",
+    "Node 24 / macos-latest",
     "Dependency Review",
     "CodeQL / Analyze (javascript-typescript)"
   ]
