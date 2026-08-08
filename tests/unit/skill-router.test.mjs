@@ -19,6 +19,29 @@ test("routes a bare full review with verdict-comment authority", () => {
   assert.deepEqual(route.explicitActions, []);
 });
 
+test("routes full-review plus merge through a composed prepare-and-merge workflow", () => {
+  const route = routeShippingGithubPrompt("full review PR #42 and merge it if it passes");
+  assert.equal(route.workflow, "references/prepare-and-merge-pr.md");
+  assert.equal(route.mutationMode, "maintainer");
+  assert.ok(route.explicitActions.includes("merge_pr"));
+});
+
+test("routes fix-review-comments plus merge through prepare-and-merge", () => {
+  const route = routeShippingGithubPrompt("fix the review comments on PR #18 and merge it");
+  assert.equal(route.workflow, "references/prepare-and-merge-pr.md");
+  assert.equal(route.mutationMode, "maintainer");
+  assert.ok(route.explicitActions.includes("push_code"));
+  assert.ok(route.explicitActions.includes("merge_pr"));
+});
+
+test("routes simplify plus merge through prepare-and-merge", () => {
+  const route = routeShippingGithubPrompt("simplify PR #65 safely and merge it when green");
+  assert.equal(route.workflow, "references/prepare-and-merge-pr.md");
+  assert.equal(route.mutationMode, "maintainer");
+  assert.ok(route.explicitActions.includes("push_code"));
+  assert.ok(route.explicitActions.includes("merge_pr"));
+});
+
 test("routes status and watch requests without granting mutation authority", () => {
   assert.equal(
     routeShippingGithubPrompt("what is left on PR #41?").workflow,
