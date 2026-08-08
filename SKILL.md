@@ -25,6 +25,13 @@ modules declared at the top of that workflow. Do **not** load
 index. Every routed workflow includes `policy-kernel` plus only the domains it
 needs.
 
+**Full-review routing is explicit:** when the user asks for a full review, route
+to `references/full-review-pr.md`; bot-fix, CodeRabbit, Codex, security, or
+simplify clauses in the same request do not steal that route. When the same
+request also explicitly asks to merge, route to
+`references/prepare-and-merge-pr.md`, complete the requested full-review/fix/
+simplify preparation first, then enter the merge workflow.
+
 | Request shape                                                                                      | Workflow                                           |
 | ---------------------------------------------------------------------------------------------------| ---------------------------------------------------|
 | Create a PRD from conversation, repository context, or an idea                                     | `references/issue-workflows.md` → PRD Workflow     |
