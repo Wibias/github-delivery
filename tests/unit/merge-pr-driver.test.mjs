@@ -8,6 +8,7 @@ import {
   buildThankRequest,
   defaultThanksBody,
   detectMergeMethod,
+  executeMergeTransaction,
 } from "../../scripts/merge-pr-driver.mjs";
 
 const HEAD = "a93fc4ac8773de2533707c4a08ee8fc1fcec69de";
@@ -81,7 +82,7 @@ test("merge driver gate blocks on required-check pending", () => {
 });
 
 test("merge driver buildThankRequest produces a remotely idempotent post_comment plan", () => {
-  const visibleBody = "Thanks @alice - merging.";
+  const visibleBody = "Thanks @alice - merged successfully.";
   const request = buildThankRequest({
     repo: "acme/widget",
     pr: 42,
@@ -95,7 +96,7 @@ test("merge driver buildThankRequest produces a remotely idempotent post_comment
   assert.deepEqual(plan.command.slice(0, 3), ["gh", "pr", "comment"]);
   const bodyIndex = plan.command.indexOf("--body") + 1;
   assert.ok(bodyIndex > 0);
-  assert.match(plan.command[bodyIndex], /^Thanks @alice - merging\./);
+  assert.match(plan.command[bodyIndex], /^Thanks @alice - merged successfully\./);
   assert.match(
     plan.command[bodyIndex],
     /<!-- github-delivery:idempotency [0-9a-f]{64} -->$/,
@@ -124,11 +125,47 @@ test("merge driver buildMergeRequest pins the head with --match-head-commit", ()
   ]);
 });
 
-test("merge driver defaults to merge commits and builds a thanks body", () => {
+test("merge driver defaults to merge commits and builds a post-merge thanks body", () => {
   assert.equal(detectMergeMethod(), "merge");
   const body = defaultThanksBody({ author: "alice", repo: "acme/widget", pr: 42, title: "Test PR" });
   assert.match(body, /@alice/);
-  assert.match(body, /merging/);
+  assert.match(body, /merged/i);
+  assert.doesNotMatch(body, /merging this/i);
+});
+
+test("merge transaction executes the merge before the social thank-you", () => {
+  const calls = [];
+  const receipts = executeMergeTransaction({
+    mergeRequest: { action: "merge_pr" },
+    thankRequest: { action: "post_comment" },
+    executeRequest(request) {
+      calls.push(request.action);
+      return { action: request.action, status: "succeeded" };
+    },
+  });
+  assert.deepEqual(calls, ["merge_pr", "post_comment"]);
+  assert.deepEqual(
+    receipts.map((item) => item.name),
+    ["merge", "post_merge_thanks"],
+  );
+});
+
+test("merge transaction never posts thanks when the merge fails", () => {
+  const calls = [];
+  assert.throws(
+    () =>
+      executeMergeTransaction({
+        mergeRequest: { action: "merge_pr" },
+        thankRequest: { action: "post_comment" },
+        executeRequest(request) {
+          calls.push(request.action);
+          if (request.action === "merge_pr") throw new Error("merge failed");
+          return { action: request.action, status: "succeeded" };
+        },
+      }),
+    /merge failed/,
+  );
+  assert.deepEqual(calls, ["merge_pr"]);
 });
 
 test("merge method detection follows squash-only repository capabilities", () => {
