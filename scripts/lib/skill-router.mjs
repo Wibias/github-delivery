@@ -13,6 +13,36 @@ function result(workflow, mutationMode = "read-only", explicitActions = []) {
 
 const SIMPLIFY_REQUEST =
   /\b(simplify|simplification|cleanup|clean up|deduplicate|dedupe|reduce duplication)\b/;
+const MERGE_INTENT = /\b(merge|ship)\b/;
+const MERGE_READY_PHRASE = /\bmerge[- ]?ready\b/g;
+const NEGATED_MERGE_INTENT = /\b(?:do not|don't|never)\s+(?:merge|ship)\b/;
+const PR_REFERENCE = /\bpr\s*#?\d+\b/;
+const FULL_REVIEW_REQUEST = /\b(full review|review .* for real bugs|usefulness verdict)\b/;
+const FIX_REVIEW_REQUEST =
+  /\b(fix|address)\b[\s\S]*(review|coderabbit|codex|comment|feedback)/;
+
+function prepareAndMergeActions(text) {
+  const actions = ["merge_pr", "post_comment", "post_issue_comment", "close_linked_issue"];
+  if (FIX_REVIEW_REQUEST.test(text) || SIMPLIFY_REQUEST.test(text)) {
+    actions.unshift("push_code");
+  }
+  return actions;
+}
+
+function hasExplicitMergeIntent(text) {
+  return MERGE_INTENT.test(text.replace(MERGE_READY_PHRASE, ""));
+}
+
+function isPrepareAndMergeRequest(text) {
+  if (!hasExplicitMergeIntent(text) || NEGATED_MERGE_INTENT.test(text) || !PR_REFERENCE.test(text)) {
+    return false;
+  }
+  return (
+    FULL_REVIEW_REQUEST.test(text) ||
+    FIX_REVIEW_REQUEST.test(text) ||
+    SIMPLIFY_REQUEST.test(text)
+  );
+}
 
 export function routeShippingGithubPrompt(prompt) {
   const text = normalized(prompt);
@@ -26,6 +56,14 @@ export function routeShippingGithubPrompt(prompt) {
   }
   if (/create .*agent skill|skill-ratchet|pdf table extraction/.test(text)) {
     return null;
+  }
+
+  if (isPrepareAndMergeRequest(text)) {
+    return result(
+      "references/prepare-and-merge-pr.md",
+      "maintainer",
+      prepareAndMergeActions(text),
+    );
   }
 
   if (
@@ -63,7 +101,7 @@ export function routeShippingGithubPrompt(prompt) {
     ]);
   }
 
-  if (/\b(full review|review .* for real bugs|usefulness verdict)\b/.test(text)) {
+  if (FULL_REVIEW_REQUEST.test(text)) {
     const simplifyRequested = SIMPLIFY_REQUEST.test(text);
     return result(
       "references/full-review-pr.md",
@@ -72,7 +110,7 @@ export function routeShippingGithubPrompt(prompt) {
     );
   }
 
-  if (SIMPLIFY_REQUEST.test(text) && /\bpr\s*#?\d+\b/.test(text)) {
+  if (SIMPLIFY_REQUEST.test(text) && PR_REFERENCE.test(text)) {
     return result("references/simplify-pr.md", "maintainer", ["push_code"]);
   }
 
@@ -105,9 +143,7 @@ export function routeShippingGithubPrompt(prompt) {
   }
 
   if (
-    /\b(fix|address)\b[\s\S]*(review|coderabbit|codex|comment|feedback)/.test(
-      text,
-    ) ||
+    FIX_REVIEW_REQUEST.test(text) ||
     /\bmake\b[\s\S]*\bpr\b[\s\S]*\bmerge[- ]?ready\b/.test(text)
   ) {
     return result("references/fix-pr-bots.md", "maintainer", ["push_code"]);
