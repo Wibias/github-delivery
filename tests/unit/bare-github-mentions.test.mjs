@@ -29,3 +29,23 @@ test("merge workflow keeps broker architecture and bare mentions", () => {
   assert.match(source, /keep the real `@login` bare and omit self-thanks/);
   assert.doesNotMatch(source, /<<<<<<<|=======|>>>>>>>/);
 });
+
+test("create-PR lifecycle has no executable bare GitHub or remote-Git mutation commands", () => {
+  const source = read("references/create-pr-for-issue.md");
+  assert.match(source, /action": "push_code"/);
+  assert.match(source, /action": "create_pr"/);
+  assert.match(source, /broker action `update_pr_body`/);
+  assert.match(source, /broker action `assign_issue`/);
+  assert.doesNotMatch(source, /^\s*git\s+push\b/m);
+  assert.doesNotMatch(source, /^\s*gh\s+pr\s+create\b/m);
+  assert.doesNotMatch(source, /^\s*gh\s+pr\s+edit\b/m);
+  assert.doesNotMatch(source, /^\s*gh\s+issue\s+edit\b/m);
+});
+
+test("stack restacks publish only through the push_code broker action", () => {
+  const source = read("references/stacked-prs.md");
+  assert.match(source, /action": "push_code"/);
+  assert.match(source, /expectedRemoteTip/);
+  assert.match(source, /forceWithLease/);
+  assert.doesNotMatch(source, /^\s*git\s+push\b/m);
+});

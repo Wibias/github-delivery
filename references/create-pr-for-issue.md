@@ -19,6 +19,8 @@ Policy modules:
 
 Open **one** PR on the **canonical** (issue’s) repository that fixes issue `#N`, with verified bidirectional linking, self-assignment, review/CI cleanup, merge-ready. **Run the pre-open bug + security gate before opening** and only open when the gate permits. Do **not** merge. Do **not** batch other issues’ PRs unless the user explicitly demanded a batch.
 
+Every network-visible write in this workflow is brokered. Do not use bare `git push`, `gh pr create`, mutating `gh pr edit`, or `gh issue edit`. Use `scripts/github-mutate.mjs` with an exact lifecycle action and trusted authority where required.
+
 ## Workflow (single sequence)
 
 ### A. Need-to-fix preflight (required — report before coding)
@@ -76,60 +78,78 @@ Run the **bug-finding** and **security review** passes on the code that will go 
 
 ### D. Implement + open canonical PR
 
-1. Resolve `owner/repo` from the **issue** (not from a fork remote you happen to be in). Always use `--repo OWNER/REPO`.
+1. Resolve `OWNER/REPO` from the **issue** (not from a fork remote you happen to be in).
 2. Base branch = that repo’s development/default as appropriate.
-3. Push the head branch (upstream if you can; else fork head is OK for the head ref).
-4. Load **`references/pr-description.md`**. Build the body from the issue and acceptance criteria, the actual current diff, and completed validation — not from the planned work or commit narration.
-   Include scope clarifications from the full comment thread when they change or narrow the ask.
-5. Create with UTF-8 **`--body-file`** (Windows-safe; shared encoding rules). The body must follow the PR-description policy and include same-repo `Fixes #N` on its own line:
+3. Resolve the exact local commit to publish (`NEW_TIP`) and the remote branch generation. Use `expectedRemoteTip: "absent"` for a new branch; otherwise record the exact current remote SHA. Build a `push_code` request. For a new branch:
 
-   ```bash
-   gh pr create --repo OWNER/REPO --base <base> --head <head> \
-     --title "…" --body-file body.md
+   ```json
+   {
+     "schemaVersion": 1,
+     "action": "push_code",
+     "mutationMode": "maintainer",
+     "explicitInstruction": true,
+     "repo": "OWNER/REPO",
+     "remote": "origin",
+     "branch": "feature/head",
+     "expectedRemoteTip": "absent",
+     "newTip": "NEW_TIP",
+     "forceWithLease": false
+   }
    ```
 
-6. Confirm the PR URL is `https://github.com/OWNER/REPO/pull/…`. If it is fork-only (`https://github.com/<your-fork>/…`): **wrong** — close it and recreate against `OWNER/REPO`.
+   Plan, authorize, then execute it through `scripts/github-mutate.mjs`. Existing-branch updates use the exact observed remote SHA. Rewrites set `forceWithLease: true` only when the selected workflow explicitly permits rewriting that branch.
+4. Load **`references/pr-description.md`**. Build the body from the issue and acceptance criteria, the actual current diff, and completed validation — not from planned work or commit narration. Include scope clarifications from the full comment thread when they change or narrow the ask.
+5. Create the canonical PR through broker action `create_pr`. The request must bind exact base/head/title/body plus a stable idempotency key; same-repo linkage must include `Fixes #N` on its own line:
+
+   ```json
+   {
+     "schemaVersion": 1,
+     "action": "create_pr",
+     "mutationMode": "maintainer",
+     "explicitInstruction": true,
+     "repo": "OWNER/REPO",
+     "base": "main",
+     "head": "feature/head",
+     "draft": false,
+     "idempotencyKey": "create-pr-for-issue-N",
+     "title": "…",
+     "body": "…\n\nFixes #N"
+   }
+   ```
+
+   The broker adds a hidden idempotency marker, does remote read-before-write, and verifies the created PR by that marker. Do not substitute bare `gh pr create`.
+6. Confirm the returned PR URL is `https://github.com/OWNER/REPO/pull/…`. If topology is wrong, stop and use the separately authorized close/recreate sequence; do not silently mutate a different repository.
 
 ### E. Link + assign + opened comment
 
 1. **PR → issue:** body contains `Fixes #N` or `Closes #N`.
-2. Verify:
-
-   ```bash
-   gh pr view <pr> --repo OWNER/REPO --json number,url,body,closingIssuesReferences
-   ```
-
-   `closingIssuesReferences` must include issue `#N`. If empty: edit the PR body (UTF-8 file / PATCH), re-check.
-3. **Assign yourself on the issue** (PR assignee alone does not count):
-
-   ```bash
-   gh issue edit N --repo OWNER/REPO --add-assignee @me
-   ```
-
-   If assign fails (permissions), report once and continue.
-4. **One issue comment** (idempotent — edit if a prior `[GD] Opened PR` exists):
+2. Verify read-only with `gh pr view <pr> --repo OWNER/REPO --json number,url,body,closingIssuesReferences`. `closingIssuesReferences` must include issue `#N`.
+3. If linkage is missing, rebuild the correct exact body and use broker action `update_pr_body` bound to the PR's current `expectedHead`. Re-read `closingIssuesReferences` afterwards. Do not use a bare mutating PR edit/PATCH.
+4. **Assign yourself on the issue** using broker action `assign_issue` with the exact issue and assignee login. If assignment is denied by GitHub permissions, report once and continue; never bypass the broker.
+5. **One issue comment** through existing idempotent broker action `post_issue_comment`:
 
    ```markdown
    [GD] Opened PR #<pr> to address this.
    ```
 
-5. Spot-check Development sidebar / linked PRs still point at the **canonical** PR.
+6. Spot-check Development sidebar / linked PRs still point at the **canonical** PR.
 
 ### F. Make merge-ready (same bar as `fix-pr-bots`)
 
-1. Keep branch up to date with base; resolve conflicts; **compile against tip**.
-2. Review wait-loop: owners/maintainers + humans + bots; push; keep going until stable or hard blocker.
+1. Keep branch up to date with base; resolve conflicts; **compile against tip**. Every remote branch update goes through `push_code`; local Git operations remain subject to `references/policy/git.md`.
+2. Review wait-loop: owners/maintainers + humans + bots; push through the broker when fixes change the head; keep going until stable or hard blocker.
 3. Fix CLI / project / **required CI** failures on this head (including pre-existing / “unrelated” required failures — shared rules); required CI green (`scripts/required-checks.mjs` when helpful).
 4. **Own reviews (required):** **bug** via **`references/bug-review.md`**; **security** via **`references/security-review.md`** (never Cursor harness `security-review` / `review-security`); **Spec + Standards** (`review` skill or short pass); **proactive contract verification** (shared rules: wiring trace, operator smoke, test-honesty, docs-vs-non-goals, input-shape/evidence semantics, hot-path scale/determinism, malformed-input robustness). Checkout preflight still applies.
 5. CODEOWNERS path check (`scripts/codeowners-for-pr.mjs` when helpful).
 6. Changelog nudge if user-facing → `git-workflow-and-versioning` for authoring.
-7. Final evidence sweep: reconcile the PR body with the final head using **`references/pr-description.md`**. Update stale scope, behavior, validation, review notes, or limitations and confirm the closing issue reference still resolves.
-8. **Thin settle** (~3–5 min quiet + recheck; shared rules); then post merge-ready PR + linked-issue notify (idempotent). Do **not** merge. For a docs/markdown-only head, use the shared-rules **~30–60s** fast-path settle; if a bot review lands during the settle with findings on this diff, fix + push and re-enter the settle on the new head instead of burning the old window.
+7. Final evidence sweep: reconcile the PR body with the final head using **`references/pr-description.md`**. Update stale scope, behavior, validation, review notes, or limitations through `update_pr_body` and confirm the closing issue reference still resolves.
+8. **Thin settle** (~3–5 min quiet + recheck; shared rules); then post merge-ready PR + linked-issue notify through the broker. Do **not** merge. For a docs/markdown-only head, use the shared-rules **~30–60s** fast-path settle; if a bot review lands during the settle with findings on this diff, fix + broker the new head and re-enter the settle instead of burning the old window.
 
 ## Done when
 
 - Exactly the requested PR count (default **one**); no surprise batch
 - PR on **issue’s** repo (not fork-only)
+- Every network-visible write used the broker and any high-assurance write redeemed trusted authority
 - PR body is evidence-grounded, follows `references/pr-description.md`, and matches the final head
 - `closingIssuesReferences` includes the issue; **issue** self-assigned when possible
 - Single complete opened-PR comment (no duplicates/cut-offs)

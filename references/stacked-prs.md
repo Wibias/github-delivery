@@ -48,7 +48,7 @@ Before the first mutation:
 5. identify expected remote tips and backup refs;
 6. stop if any required branch is unwritable.
 
-Never mutate trunk or another protected/shared branch. Never use bare `--force`; only the narrow `--force-with-lease` exception in `SKILL.md` is allowed.
+Never mutate trunk or another protected/shared branch. Never use bare `--force`. **Every network-visible branch push goes through broker action `push_code`; never execute a bare `git push` from this workflow.** The broker binds the repository identity, resolved remote, branch name, expected remote generation, exact new tip, and rewrite flag into trusted authority before an exact lease-pinned push.
 
 ## 1. State preflight
 
@@ -83,7 +83,9 @@ if (-not $PushRemote) {
 }
 ```
 
-Use `$PushRemote` for every fetch, remote-tip read, ancestry check, rebase remote-tracking ref, lease, and push.
+Resolve the repository identity of `$PushRemote` too. The `push_code.repo` field must name the repository that remote actually targets; the broker independently checks that identity before execution.
+
+Use `$PushRemote` for every fetch, remote-tip read, ancestry check, rebase remote-tracking ref, and brokered push.
 
 Before review/readiness/merge, each child's current parent remote tip must be an ancestor:
 
@@ -204,7 +206,7 @@ $BackupRef = "refs/backup/$Child-$Timestamp"
 git update-ref $BackupRef $LocalTip
 ```
 
-Plan must identify branch, old local tip, expected remote tip, new parent, backup ref, and lease-pinned push. Create a backup ref for every branch whose tip may be lost.
+Plan must identify branch, old local tip, expected remote tip, new parent, backup ref, and lease-pinned brokered push. Create a backup ref for every branch whose tip may be lost.
 
 ## 5. Restack execution
 
@@ -224,17 +226,43 @@ After rebase:
 2. run focused and required checks;
 3. re-read the remote tip;
 4. refuse if it changed;
-5. push with an exact lease only.
+5. resolve the exact rewritten local SHA;
+6. execute only a trusted, exact `push_code` request.
 
 ```powershell
 $CurrentRemoteTip = git ls-remote --heads $PushRemote "refs/heads/$Child" |
   ForEach-Object { ($_ -split '\s+')[0] }
 if ($CurrentRemoteTip -ne $RemoteTip) { throw "Remote tip changed; refusing rewritten push." }
-git push --force-with-lease="refs/heads/$Child`:$RemoteTip" `
-  $PushRemote "HEAD:refs/heads/$Child"
+$NewTip = git rev-parse "refs/heads/$Child"
 ```
 
-Stop on lease rejection. Never weaken the lease.
+Build the broker request with the **actual repository targeted by `$PushRemote`**:
+
+```json
+{
+  "schemaVersion": 1,
+  "action": "push_code",
+  "mutationMode": "maintainer",
+  "explicitInstruction": true,
+  "repo": "PUSH_OWNER/PUSH_REPO",
+  "remote": "RESOLVED_PUSH_REMOTE",
+  "branch": "CHILD_BRANCH",
+  "expectedRemoteTip": "RECORDED_REMOTE_TIP",
+  "newTip": "REWRITTEN_LOCAL_TIP",
+  "forceWithLease": true
+}
+```
+
+Plan and execute it through `scripts/github-mutate.mjs`. The broker:
+
+- verifies the named Git remote resolves to the authorized GitHub repository;
+- re-reads the exact remote branch generation;
+- binds old/new tips and the rewrite flag into the trusted grant scope;
+- redeems the grant immediately before the exact push command;
+- uses an exact `--force-with-lease` expectation;
+- verifies the remote branch equals `newTip` after the push.
+
+Stop on lease rejection, authority denial, repository mismatch, or verification mismatch. Never weaken the lease and never fall back to a bare push.
 
 ## 6. Retarget a PR base
 
@@ -325,11 +353,11 @@ git update-ref "refs/heads/$Child" $BackupRef
 git switch $Child
 ```
 
-If no backup exists, inspect reflog. Do not hard-reset or push a recovered tip without explicit approval and a verified target SHA. Never recover by rewriting trunk. Re-inspect the complete stack after recovery.
+If no backup exists, inspect reflog. Do not hard-reset or broker a recovered push without explicit approval and a verified target SHA. Never recover by rewriting trunk. Re-inspect the complete stack after recovery.
 
 ## 11. Optional stack links in PR bodies
 
-Only when requested or established by repository convention, maintain a deterministic marked block. Editing PR bodies requires mutation authority; replace the existing block and read it back after mutation.
+Only when requested or established by repository convention, maintain a deterministic marked block. Editing PR bodies requires mutation authority; use broker action `update_pr_body` bound to the current PR head, then read the body back.
 
 ## 12. Validation after every mutation
 
@@ -337,7 +365,7 @@ After restack, retarget, recovery, body update, or parent merge:
 
 1. rerun the complete paginated stack inspector;
 2. verify every remaining `baseRefName`;
-3. verify every rewritten remote head equals the pushed SHA;
+3. verify every rewritten remote head equals the brokered `newTip`;
 4. inspect each affected diff against intended parent;
 5. rerun focused/required checks;
 6. re-check threads, approvals, CODEOWNERS, draft state, and policies;

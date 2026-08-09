@@ -15,6 +15,10 @@ const ACTIONS = [
   "reply_bot_thread",
   "reply_human_thread",
   "push_code",
+  "create_pr",
+  "update_pr_body",
+  "create_issue",
+  "assign_issue",
   "resolve_thread",
   "resolve_bot_thread",
   "change_draft_state",
@@ -70,6 +74,10 @@ function buildProfile(mode) {
     allow(
       profile,
       [
+        "create_pr",
+        "update_pr_body",
+        "create_issue",
+        "assign_issue",
         "resolve_thread",
         "change_draft_state",
         "request_reviewers",
@@ -85,6 +93,10 @@ function buildProfile(mode) {
   }
   if (mode === "autonomous") {
     allow(profile, [
+      "create_pr",
+      "update_pr_body",
+      "create_issue",
+      "assign_issue",
       "resolve_thread",
       "change_draft_state",
       "request_reviewers",

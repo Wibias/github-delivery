@@ -111,6 +111,50 @@ export function authorityScopeForRequest(request = {}) {
         newBase: exactString(request.newBase, "new_base"),
       };
 
+    case "push_code":
+      return {
+        ...scope,
+        remote: exactString(request.remote, "remote"),
+        branch: exactString(request.branch, "branch"),
+        expectedRemoteTip: exactString(request.expectedRemoteTip, "expected_remote_tip"),
+        newTip: exactString(request.newTip, "new_tip"),
+        forceWithLease: request.forceWithLease === true,
+      };
+
+    case "create_pr":
+      return {
+        ...scope,
+        base: exactString(request.base, "base"),
+        head: exactString(request.head, "head"),
+        draft: request.draft === true,
+        idempotencyKey: exactString(request.idempotencyKey, "idempotency_key"),
+        titleSha256: sha256(exactString(request.title, "title")),
+        bodySha256: bodyHash(request.body),
+      };
+
+    case "update_pr_body":
+      return {
+        ...scope,
+        ...prScope(request),
+        bodySha256: bodyHash(request.body),
+      };
+
+    case "create_issue":
+    case "create_follow_up_issue":
+      return {
+        ...scope,
+        idempotencyKey: exactString(request.idempotencyKey, "idempotency_key"),
+        titleSha256: sha256(exactString(request.title, "title")),
+        bodySha256: bodyHash(request.body),
+      };
+
+    case "assign_issue":
+      return {
+        ...scope,
+        issue: positiveInteger(request.issue, "issue"),
+        assignee: exactString(request.assignee, "assignee"),
+      };
+
     case "post_comment":
     case "post_resolution_record":
     case "post_review":
@@ -199,14 +243,6 @@ export function authorityScopeForRequest(request = {}) {
       return {
         ...scope,
         issue: positiveInteger(request.issue, "issue"),
-      };
-
-    case "create_follow_up_issue":
-      return {
-        ...scope,
-        idempotencyKey: exactString(request.idempotencyKey, "idempotency_key"),
-        titleSha256: sha256(exactString(request.title, "title")),
-        bodySha256: bodyHash(request.body),
       };
 
     case "delete_head_branch":
