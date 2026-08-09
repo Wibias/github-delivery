@@ -59,10 +59,40 @@ test("rejects unpinned actions and pull_request_target", () => {
   assert(errors.some((error) => error.code === "action_not_pinned"));
 });
 
+test("quoted YAML keys cannot bypass pull_request_target or write checks", () => {
+  const source = `name: Bad\n'on':\n  'pull_request_target':\n'permissions':\n  'contents': write\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - 'uses': 'actions/checkout@v6'\n`;
+  const errors = validateWorkflowFile(".github/workflows/bad.yml", source);
+  assert(errors.some((error) => error.code === "pull_request_target_forbidden"));
+  assert(errors.some((error) => error.code === "write_permission_not_allowed"));
+  assert(errors.some((error) => error.code === "action_not_pinned"));
+});
+
+test("inline trigger and permissions mappings are inspected semantically", () => {
+  const source = `name: Bad\non: [push, 'pull_request_target']\npermissions: { contents: write }\njobs:\n  test:\n    runs-on: ubuntu-latest\n`;
+  const errors = validateWorkflowFile(".github/workflows/bad.yml", source);
+  assert(errors.some((error) => error.code === "pull_request_target_forbidden"));
+  assert(errors.some((error) => error.code === "write_permission_not_allowed"));
+});
+
+test("unsupported YAML indirection fails closed", () => {
+  const source = `name: Bad\non:\n  push:\npermissions: *privileged\njobs:\n  test:\n    runs-on: ubuntu-latest\n`;
+  const errors = validateWorkflowFile(".github/workflows/bad.yml", source);
+  assert(errors.some((error) => error.code === "workflow_yaml_unsupported"));
+});
+
 test("rejects checkout with persisted credentials", () => {
   const source = `name: Bad\non:\n  pull_request:\npermissions:\n  contents: read\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@${"a".repeat(40)}\n`;
   const errors = validateWorkflowFile(".github/workflows/bad.yml", source);
   assert(errors.some((error) => error.code === "checkout_credentials_not_disabled"));
+});
+
+test("accepts checkout only when its own step disables credential persistence", () => {
+  const source = `name: Good\non:\n  pull_request:\npermissions:\n  contents: read\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@${"a".repeat(40)}\n        with:\n          persist-credentials: false\n      - run: echo ok\n`;
+  const errors = validateWorkflowFile(".github/workflows/good.yml", source);
+  assert.equal(
+    errors.some((error) => error.code === "checkout_credentials_not_disabled"),
+    false,
+  );
 });
 
 test("rejects write permissions outside approved workflows", () => {
