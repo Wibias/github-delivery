@@ -9,6 +9,7 @@ internal static class MutationClassifier
         "push_code",
         "reply_human_thread",
         "resolve_thread",
+        "resolve_bot_thread",
         "change_draft_state",
         "request_reviewers",
         "close_linked_issue",

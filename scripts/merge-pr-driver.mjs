@@ -9,6 +9,8 @@ import { spawnSync } from "node:child_process";
 import { appendFileSync, realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
+import { attachAuthorityGrants } from "./lib/authority-batch.mjs";
+import { authorizeBatchSync } from "./lib/authority-host-client.mjs";
 import { captureLiveSnapshot } from "./lib/live-snapshot.mjs";
 import {
   evaluateCodeownersSnapshot,
@@ -127,6 +129,29 @@ export function buildMergeRequest({ repo, pr, expectedHead, mergeMethod }) {
     pr,
     expectedHead,
     mergeMethod,
+  };
+}
+
+export function authorizeMergeRequests(
+  requests,
+  {
+    authorize = authorizeBatchSync,
+    pipeName = process.env.GITHUB_DELIVERY_AUTHORITY_PIPE || undefined,
+  } = {},
+) {
+  if (!Array.isArray(requests) || requests.length === 0) {
+    throw new Error("merge_authority_requests_required");
+  }
+  const operations = requests.map(({ request }) => request);
+  const authorization = authorize(operations, { pipeName });
+  const batch = attachAuthorityGrants(operations, authorization);
+  return {
+    batchId: batch.batchId,
+    expiresAt: batch.expiresAt,
+    requests: requests.map((entry, index) => ({
+      ...entry,
+      request: batch.requests[index],
+    })),
   };
 }
 
@@ -325,6 +350,17 @@ async function main() {
     return;
   }
 
+  // Authorize the exact precomputed mutation batch first. Then recapture all
+  // gate-critical state before redeeming any grant or touching GitHub.
+  const authorizedBatch = authorizeMergeRequests(requests);
+  const authorizedMergeRequest = authorizedBatch.requests.find(
+    (entry) => entry.name === "merge",
+  )?.request;
+  const authorizedThankRequest = authorizedBatch.requests.find(
+    (entry) => entry.name === "post_merge_thanks",
+  )?.request || null;
+  if (!authorizedMergeRequest) throw new Error("authorized_merge_request_missing");
+
   const freshSnapshot = captureLiveSnapshot({ repo: args.repo, pr: args.pr });
   const finalBoundary = verifyFinalMergeBoundary({
     approvedBoundary,
@@ -334,8 +370,8 @@ async function main() {
   });
 
   const receipts = executeMergeTransaction({
-    mergeRequest,
-    thankRequest,
+    mergeRequest: authorizedMergeRequest,
+    thankRequest: authorizedThankRequest,
     executeRequest(request) {
       const receipt = executeMutationWithAuthority({ request, execute: true });
       if (args.audit) appendFileSync(args.audit, `${JSON.stringify(receipt)}\n`, "utf8");
@@ -354,6 +390,10 @@ async function main() {
   const final = {
     ...summary,
     executed: true,
+    authorityBatch: {
+      batchId: authorizedBatch.batchId,
+      expiresAt: authorizedBatch.expiresAt,
+    },
     finalBoundary,
     receipts: receipts.map(({ name, receipt }) => ({
       name,
