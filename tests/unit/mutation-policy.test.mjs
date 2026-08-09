@@ -19,12 +19,32 @@ test("read-only permits evidence reads but denies GitHub writes", () => {
   assert.equal(profile.actions.post_comment.allowed, false);
 });
 
-test("review can publish reviews and resolve bot threads but not human threads", () => {
+test("review can publish reviews and resolve bot threads", () => {
   const profile = mutationProfile("review");
   assert.equal(profile.actions.post_review.allowed, true);
   assert.equal(profile.actions.resolve_thread.allowed, false);
   assert.equal(profile.actions.resolve_bot_thread.allowed, true);
-  assert.equal(profile.actions.reply_human_thread.allowed, false);
+});
+
+test("review human replies require exact text and trusted execution", () => {
+  const denied = authorizeMutation({
+    mode: "review",
+    action: "reply_human_thread",
+  });
+  const allowed = authorizeMutation({
+    mode: "review",
+    action: "reply_human_thread",
+    exactTextConfirmed: true,
+  });
+  assert.equal(denied.reason, "exact_text_confirmation_required");
+  assert.equal(allowed.allowed, true);
+  assert.equal(
+    mutationRequiresTrustedAuthority({
+      mutationMode: "review",
+      action: "reply_human_thread",
+    }),
+    true,
+  );
 });
 
 test("maintainer human replies still require exact-text confirmation", () => {
