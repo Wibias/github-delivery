@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { summarizeSources } from "./snapshot-schema.mjs";
+import { snapshotIntegritySha256, summarizeSources } from "./snapshot-schema.mjs";
 
 const SNAPSHOT_KIND = "github-delivery/evidence-snapshot";
 const SNAPSHOT_SCHEMA_VERSION = 1;
@@ -96,6 +96,7 @@ export function validateSnapshot({
   maxAgeSeconds = 300,
   now = Date.now(),
   requireComplete = true,
+  requireIntegrity = false,
 } = {}) {
   const reasons = [];
   if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) {
@@ -139,6 +140,23 @@ export function validateSnapshot({
     (snapshot.complete !== true || summary.incomplete.length > 0)
   ) {
     reasons.push("snapshot_incomplete");
+  }
+
+  if (requireIntegrity || snapshot.integritySha256) {
+    if (
+      typeof snapshot.integritySha256 !== "string" ||
+      !/^[0-9a-f]{64}$/i.test(snapshot.integritySha256)
+    ) {
+      reasons.push("snapshot_integrity_missing");
+    } else {
+      const actual = snapshotIntegritySha256(snapshot);
+      if (actual !== snapshot.integritySha256.toLowerCase()) {
+        reasons.push("snapshot_integrity_mismatch");
+      }
+      if (snapshot.snapshotId !== snapshot.integritySha256) {
+        reasons.push("snapshot_id_integrity_mismatch");
+      }
+    }
   }
 
   return { valid: reasons.length === 0, reasons: [...new Set(reasons)] };

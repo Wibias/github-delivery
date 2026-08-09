@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
+
+import { snapshotIntegritySha256 } from "../../scripts/lib/snapshot-schema.mjs";
 
 const ROOT = resolve(import.meta.dirname, "../..");
 
@@ -17,7 +19,6 @@ function writeSnapshot() {
   const snapshot = {
     schemaVersion: 1,
     kind: "github-delivery/evidence-snapshot",
-    snapshotId: "ship-gate-snapshot",
     capturedAt: "2026-08-01T00:00:00.000Z",
     repo: "Wibias/github-delivery",
     pr: 42,
@@ -87,6 +88,9 @@ function writeSnapshot() {
       viewer: { login: "Wibias" },
     },
   };
+  const integritySha256 = snapshotIntegritySha256(snapshot);
+  snapshot.snapshotId = integritySha256;
+  snapshot.integritySha256 = integritySha256;
   writeFileSync(path, JSON.stringify(snapshot), "utf8");
   return path;
 }
@@ -114,16 +118,20 @@ function runShipGate(snapshotPath, extraArgs = []) {
   );
 }
 
-test("ship-gate evaluates one supplied snapshot without invoking gh", () => {
+test("ship-gate evaluates a sealed replay without treating it as authoritative ready", () => {
   const result = runShipGate(writeSnapshot());
   assert.equal(
     result.status,
-    0,
+    2,
     `stdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
   );
   const output = JSON.parse(result.stdout);
-  assert.equal(output.decision, "ready");
-  assert.equal(output.snapshotId, "ship-gate-snapshot");
+  assert.equal(output.decision, "unknown");
+  assert.equal(output.replayDecision, "ready");
+  assert.equal(output.authoritative, false);
+  assert.equal(output.evidenceMode, "snapshot_replay");
+  assert.ok(output.unknowns.includes("snapshot_replay_not_authoritative"));
+  assert.match(output.snapshotId, /^[0-9a-f]{64}$/);
   assert.equal(output.mutationMode, "read-only");
   assert.equal(output.mutationProfile.actions.merge_pr.allowed, false);
   assert.equal(output.components.baseHealth.comparisonRequired, false);
@@ -137,12 +145,23 @@ test("ship-gate evaluates one supplied snapshot without invoking gh", () => {
   ]);
 });
 
-test("ship-gate reports an explicitly selected mutation profile", () => {
+test("ship-gate rejects replay evidence that was modified after sealing", () => {
+  const path = writeSnapshot();
+  const snapshot = JSON.parse(readFileSync(path, "utf8"));
+  snapshot.evidence.pullRequest.reviewDecision = "CHANGES_REQUESTED";
+  writeFileSync(path, JSON.stringify(snapshot), "utf8");
+  const result = runShipGate(path);
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /snapshot_integrity_mismatch/);
+  assert.equal(result.stdout, "");
+});
+
+test("ship-gate reports the selected mutation profile on a non-authoritative replay", () => {
   const result = runShipGate(writeSnapshot(), [
     "--mutation-mode",
     "maintainer",
   ]);
-  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.status, 2, result.stderr);
   const output = JSON.parse(result.stdout);
   assert.equal(output.mutationMode, "maintainer");
   assert.equal(output.mutationProfile.actions.push_code.allowed, true);
@@ -150,6 +169,7 @@ test("ship-gate reports an explicitly selected mutation profile", () => {
     output.mutationProfile.actions.merge_pr.requiresExplicitInstruction,
     true,
   );
+  assert.equal(output.authoritative, false);
 });
 
 test("ship-gate rejects a self-selected read-only mode for the full-review workflow", () => {
@@ -164,17 +184,18 @@ test("ship-gate rejects a self-selected read-only mode for the full-review workf
   assert.match(result.stderr, /allowed: review, maintainer/);
 });
 
-test("ship-gate accepts the routed review mode for the full-review workflow", () => {
+test("ship-gate accepts routed review mode but keeps replay non-authoritative", () => {
   const result = runShipGate(writeSnapshot(), [
     "--mutation-mode",
     "review",
     "--workflow",
     "references/full-review-pr.md",
   ]);
-  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.status, 2, result.stderr);
   const output = JSON.parse(result.stdout);
   assert.equal(output.mutationMode, "review");
   assert.equal(output.workflow, "references/full-review-pr.md");
+  assert.equal(output.authoritative, false);
 });
 
 test("ship-gate fails closed on an unknown workflow", () => {
