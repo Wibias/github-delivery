@@ -22,7 +22,7 @@ Speak naturally. `github-delivery` routes the request, gathers live evidence, ru
 |---|---|
 | **Scope** | PRDs and issue intake → research → implementation → PR review/fix/watch → stacks → merge and linked-issue close-out |
 | **Default mode** | `read-only` |
-| **Write boundary** | Typed mutation policy + broker; stale-head, exact-effect, and idempotency checks where applicable |
+| **Write boundary** | Typed mutation policy + broker; stale-head, exact-effect, authenticated-receipt idempotency, and postcondition checks where applicable |
 | **High-assurance writes** | Exact-scope trusted grants; optional Windows 11 / Windows Hello authority host |
 | **Review model** | Bug + Security + Spec + Standards + semantic propagation + proactive contract verification |
 | **Ship decision** | One authoritative `ready`, `blocked`, or `unknown` result from live evidence |
@@ -49,6 +49,7 @@ simplify PR #42 without changing behavior
 full review PR #42 and simplify it safely
 review PR #42, fix it, and merge it when green
 merge PR #32
+merge PR #42 only after I confirm again
 
 inspect this PR stack and tell me the safe merge order
 supersede PR #12 with PR #45
@@ -56,6 +57,8 @@ maintainer overtake PR #32 and finish it
 ```
 
 A question such as `is PR #42 safe to merge?` stays **read-only**. A destructive merge route is selected only from an actual merge instruction such as `merge PR #42` or `review PR #42 and merge it when green`.
+
+Deferred or conditional permission is **not** current merge authority. Wording such as `merge PR #42 only after I confirm again`, `merge it when I approve it later`, or `ask me again before you merge` remains on the read-only status path until a fresh direct merge instruction is actually given.
 
 ---
 
@@ -78,7 +81,7 @@ A question such as `is PR #42 safe to merge?` stays **read-only**. A destructive
 | **Safe simplification** | Behavior-preserving cleanup with approval and mandatory re-review | `references/simplify-pr.md` |
 | **Status** | What is left / why blocked / merge readiness | `references/status.md` |
 | **Prepare + merge** | Compound review/fix/simplify request that explicitly includes merge | `references/prepare-and-merge-pr.md` |
-| **Merge** | Final gate, pre-merge explanation, head-pinned merge, thanks, linked-issue close-out | `references/merge-pr.md` |
+| **Merge** | Final gate, exact transaction authorization, final-boundary recheck, head-pinned merge, thanks, linked-issue close-out | `references/merge-pr.md` |
 | **Supersede** | Close an obsolete PR in favor of a replacement | `references/supersede-pr.md` |
 | **Maintainer overtake** | Take over an unresponsive author's PR under explicit maintainer scope | `references/overtake-pr.md` |
 | **Conflicts** | Resolve active conflicts from both sides' intent/evidence, then resume | `references/resolve-conflicts.md` |
@@ -129,11 +132,11 @@ Executable gates and the canonical policy kernel/modules are stricter than workf
 
 The profile is not a waiver. Maintainer-grade actions such as merge, close, supersede, reviewer changes, ordinary human-thread resolution, or branch deletion still require the direct instruction required by the selected workflow.
 
-The merge router uses a narrow positive command grammar. Status questions containing words such as *merge* or *ship* do not silently become destructive requests.
+The merge router uses a narrow positive command grammar. Status questions containing words such as *merge* or *ship* do not silently become destructive requests. Future or conditional permission is also excluded: confirmation/approval that the user explicitly defers until later remains read-only until the later confirmation actually happens.
 
 ### 2. Every network-visible GitHub write crosses one mutation boundary
 
-Creating/editing issues or PRs, labels, assignments, comments, reviews, thread state, draft state, reviewers, remote branches, closes, merges, and follow-up objects are brokered through `scripts/github-mutate.mjs` / `scripts/lib/github-mutation-broker.mjs`.
+Creating/editing issues or PRs, labels, assignments, comments, reviews, thread state, draft state, reviewers, remote branches, closes, merges, and follow-up objects are brokered through `scripts/github-mutate.mjs`, `scripts/lib/github-mutation-router.mjs`, and the lifecycle/legacy broker implementations behind that router.
 
 The action model is centralized in `scripts/lib/mutation-action-registry.mjs`. Policy, broker behavior, routing/high-assurance semantics, and architecture tests are derived or cross-checked from that registry so adding an action cannot silently skip a safety layer.
 
@@ -146,6 +149,8 @@ A repository-wide mutation-boundary regression check rejects direct production G
 Caller fields such as `mutationMode`, `explicitInstruction`, `exactTextConfirmed`, `source: user`, or `trusted: true` are policy assertions — not proof of consent.
 
 Where trusted authority is required, a host-issued grant binds a deterministic `scopeSha256` over the semantically relevant effect: repository, action, mode, PR/head, merge method, targets, idempotency key, and hashes of human-visible text. Redemption-required grants are short-lived and one-time.
+
+Protected thread-state mutations are part of that high-assurance boundary. In particular, `resolve_bot_thread` cannot be authorized merely because repository/bot content caused the request; the Windows authority host classifies it as Windows Hello-protected even in `review` mode.
 
 #### Human-thread replies
 
@@ -162,9 +167,11 @@ A format-valid `[GD]` verdict posted by the authenticated GitHub actor is not au
 
 Full-review publication is a high-assurance special case: `scripts/github-authorize.mjs` stamps durable hidden authority provenance onto the exact reviewed-head verdict request. `scripts/verify-verdict-published.mjs` verifies both the verdict format and the historical trusted-authority provenance at the comment's creation time. Same-actor lookalike verdicts without a valid scoped grant are rejected as merge-review evidence.
 
-### 4. Idempotent social writes and safe retries
+### 4. Exact idempotency receipts and safe retries
 
-Durable social creates use stable idempotency keys plus remote read-before-write evidence. Autonomous same-key effects use a remote claim so competing workers cannot both publish the same durable effect.
+Durable creates and social writes use stable idempotency keys plus remote read-before-write evidence, but a predictable hidden marker is **not** sufficient proof that the intended effect already happened.
+
+Receipt reuse is bound to the authenticated GitHub actor and the exact visible effect. The verifier rejects foreign-actor marker collisions, rejects pull requests returned by the Issues API when verifying issue creation, binds PR creation to the intended title/base/head, and binds review-thread replies to the intended parent comment. Autonomous same-key effects still use a remote claim so competing workers cannot both publish the same durable effect.
 
 GitHub rate-limit retries are deliberately asymmetric:
 
@@ -172,6 +179,8 @@ GitHub rate-limit retries are deliberately asymmetric:
 - `Retry-After` and `X-RateLimit-Reset` are honored when present;
 - fallback backoff is bounded, with **3 attempts by default**;
 - GraphQL `mutation`, GitHub writes, and ambiguous API calls are **never blindly retried** after an unknown result.
+
+A merge write that returns a non-zero/transport error after the exact write reached the runner is handled by **read-only reconciliation**, not a second merge attempt. The broker re-reads the exact-head merge state and returns `reconciled_after_error` only when GitHub proves the intended merged/queued/auto-merge outcome. If the result cannot be proved, the outcome remains explicitly unknown.
 
 ### 5. Ownership and foreign-PR boundary
 
@@ -214,6 +223,8 @@ Known bug/security classes are named probes in `scripts/lib/probe-registry.mjs`.
 - Offline scope fixtures pin the exact expected probe set.
 - Retained regression assertions are bound to documentation anchors.
 - Each required probe must emit `{ probeId, status, files?, reason? }` evidence.
+- A required probe with concrete trigger files must resolve to `clean` or `findings`; it cannot be downgraded to `n-a` by free-form model prose.
+- `n-a` remains valid only for the no-trigger edge case and requires a non-empty reason.
 - `scripts/verify-probe-coverage.mjs` must accept that evidence before the axis can be considered complete.
 
 Dropping a trigger, probe tag, assertion anchor, or required application record is a CI failure rather than silent review drift.
@@ -251,8 +262,11 @@ The ship path deliberately models platform details that commonly cause "green bu
 - Required checks belong to the exact current PR generation; old-SHA results, partial matrices, queued checks, and incomplete evidence do not count.
 - Check evidence preserves expected workflow/app/integration identity; same-name Check Run / Commit Status collisions cannot impersonate an app-bound required check.
 - GitHub's authoritative check target is used where the platform evaluates a test-merge/merge-queue generation instead of naively trusting a convenient head result.
+- Active applicable `required_status_checks` rules are aggregated; strict server-enforced base coherence is present when **any** applicable active rule requires strict required checks, independent of ruleset ordering.
 - GitHub review decision, stale approvals, last-push approval requirements, unresolved review threads, conflicts, behind state, and merge-queue state are evaluated.
+- The canonical merge driver precomputes the exact merge + optional post-merge-thanks transaction, obtains trusted grants for that exact batch, then recaptures live state and re-verifies the final merge boundary and review evidence **before** redeeming a grant or writing.
 - `gh pr merge`/API success is not automatically reported as an immediate merge: queued/auto-merge and actual merged outcomes remain distinct.
+- An error after an attempted merge write is reconciled from read-only exact-head state; the write is never blindly retried.
 - Unknown future GitHub enum/state values fail closed instead of being treated as success.
 - Dependency Review degradation fails closed across real dependency surfaces, including nested/non-Node dependency graphs such as NuGet.
 - Merge execution requires same-head github-delivery review evidence, not merely a green ship gate.
@@ -381,19 +395,28 @@ See [`docs/live-integration.md`](docs/live-integration.md) and [`docs/live-githu
 | Surface | Responsibility |
 |---|---|
 | `SKILL.md` | Host discovery, deterministic natural-language routing, entrypoint contracts |
+| `scripts/lib/skill-router.mjs` | Positive/negative/deferred natural-language merge-intent classification |
 | `references/policy-kernel.md` | Canonical cross-workflow invariants |
 | `references/policy/*.md` | Focused mutation, evidence, review, CI, Git, issue, publication, release, and stack policy modules |
 | `scripts/policy-bundle.mjs` | Deterministic workflow → policy-module resolution and architecture validation |
 | `scripts/ship-gate-snapshot.mjs` | Capture one paginated evidence snapshot |
 | `scripts/ship-gate.mjs` | Produce the authoritative `ready` / `blocked` / `unknown` decision |
+| `scripts/lib/merge-boundary.mjs` | Bind head/base/rules fingerprints and aggregate strict ruleset enforcement |
+| `scripts/merge-pr-driver.mjs` | Authorize the exact merge transaction, recapture final state, execute and summarize |
 | `scripts/lib/mutation-action-registry.mjs` | Central mutation action semantics and propagation contract |
 | `scripts/github-mutate.mjs` | Dry-run and execute authorized GitHub writes |
-| `scripts/lib/github-mutation-broker.mjs` | Typed executors, stale checks, idempotency and postconditions |
+| `scripts/lib/github-mutation-router.mjs` | Route lifecycle and legacy mutation execution through one public mutation surface |
+| `scripts/lib/github-mutation-broker.mjs` | Typed legacy/social executors, stale checks, idempotency and postconditions |
+| `scripts/lib/github-lifecycle-mutation-broker.mjs` | Typed lifecycle creates/updates with exact remote receipt verification |
+| `scripts/lib/idempotency-receipt.mjs` | Authenticated actor + exact-effect receipt matching |
+| `scripts/lib/idempotency-receipt-runner.mjs` | Filter forged/non-exact marker hits from social idempotency reads |
+| `scripts/lib/mutation-execution-context.mjs` | Trusted execution/redemption and ambiguous merge-outcome reconciliation |
 | `scripts/github-authorize.mjs` | Attach exact-scope trusted authority grants and verdict provenance |
 | `authority-host/windows/` | Optional Windows 11 / Windows Hello local trusted-authority issuer |
 | `scripts/lib/github-retry.mjs` | Bounded retry policy for proven GitHub reads only |
 | `scripts/review-scope.mjs` | Evidence-ranked review scope and required probes |
 | `scripts/lib/probe-registry.mjs` | Deterministic diff-shape → named review-probe routing |
+| `scripts/lib/probe-evidence.mjs` | Validate required probe evidence and reject required-trigger `n-a` downgrades |
 | `scripts/verify-probe-coverage.mjs` | Machine-check required probe-application evidence |
 | `scripts/pre-open-gate.mjs` | Gate PR publication on the implemented candidate diff |
 | `scripts/inspect-stack.mjs` | Discover repository-qualified stack topology and safe order |
@@ -442,7 +465,7 @@ Typical skill locations include:
 
 `authority-host/windows/` provides a stronger local approval path on Windows 11:
 
-- Windows Hello for protected/high-assurance approval, including maintainer mode, destructive actions, human replies, and format-recognized full-review verdicts;
+- Windows Hello for protected/high-assurance approval, including maintainer mode, destructive actions, protected bot-thread resolution, human replies, and format-recognized full-review verdicts;
 - non-exportable ECDSA P-256 signing key via the Microsoft Platform Crypto Provider (TPM-backed when available);
 - repository allowlist;
 - finite exact-scope batches;
@@ -495,6 +518,6 @@ Do not publish suspected vulnerability details in a public issue or pull request
 
 ## Current state
 
-The complete issue/PR delivery lifecycle and its safety architecture are implemented: evidence-backed routing and ship gates, brokered lifecycle mutations, trusted authority and durable verdict provenance, deep review, semantic propagation, deterministic probes, pre-open review, safe simplification, repository-qualified stacks, conflict recovery, merge-queue semantics, idempotent autonomous social effects, safe read retries, issue close-out, deterministic release packaging, repository controls, and dedicated live lifecycle fixtures.
+The complete issue/PR delivery lifecycle and its safety architecture are implemented: evidence-backed routing and ship gates, deferred-intent-safe merge routing, brokered lifecycle mutations, trusted exact-scope authority and durable verdict provenance, Windows Hello protection for high-assurance thread actions, deep review, semantic propagation, deterministic probes with non-bypassable required evidence, pre-open review, safe simplification, repository-qualified stacks, conflict recovery, merge-queue semantics, aggregated strict-ruleset enforcement, authenticated exact-effect idempotency receipts, ambiguous-merge readback reconciliation, safe read retries, issue close-out, deterministic release packaging, repository controls, and dedicated live lifecycle fixtures.
 
 Remaining work is primarily **operational** rather than a missing architecture layer: keep live repository rules/security settings aligned with the documented policy, provision and maintain the dedicated live fixture target/credential, run release acceptance for new versions, and extend the regression corpus as GitHub and agent hosts evolve.
