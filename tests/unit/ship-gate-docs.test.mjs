@@ -24,3 +24,15 @@ test("gate helper reference leads with one decision and demotes component helper
   assert.match(reference, /exit `2`, `decision: "unknown"`/);
   assert.match(reference, /An unrelated later commit does not clear feedback/);
 });
+
+test("merge documentation cannot waive required current-head review evidence", () => {
+  const merge = read("references/merge-pr.md");
+  assert.match(
+    merge,
+    /Missing review evidence is not waivable inside the merge workflow/,
+  );
+  assert.doesNotMatch(
+    merge,
+    /explicit merge-anyway instruction|merge-anyway instruction/i,
+  );
+});
