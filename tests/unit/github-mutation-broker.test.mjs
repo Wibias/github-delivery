@@ -56,6 +56,7 @@ test("plans a head-pinned merge without executing it", () => {
 
 test("checks the current PR head before a write", () => {
   const calls = [];
+  let mergeCalled = false;
   const result = executeMutationRequest({
     request: mergeRequest(),
     execute: true,
@@ -65,18 +66,36 @@ test("checks the current PR head before a write", () => {
         return { status: 0, stdout: "abcdef1234567890\n", stderr: "" };
       }
       if (args[0] === "pr" && args[1] === "merge") {
+        mergeCalled = true;
         return { status: 0, stdout: "merged\n", stderr: "" };
       }
-      return {
-        status: 0,
-        stdout: JSON.stringify({ state: "MERGED", mergedAt: "2026-08-01T00:00:00Z" }),
-        stderr: "",
-      };
+      if (args[0] === "api" && args[1] === "graphql") {
+        return {
+          status: 0,
+          stdout: JSON.stringify({
+            data: {
+              repository: {
+                pullRequest: {
+                  state: mergeCalled ? "MERGED" : "OPEN",
+                  mergedAt: mergeCalled ? "2026-08-01T00:00:00Z" : null,
+                  headRefOid: "abcdef1234567890",
+                  isInMergeQueue: false,
+                  mergeQueueEntry: null,
+                  autoMergeRequest: null,
+                },
+              },
+            },
+          }),
+          stderr: "",
+        };
+      }
+      throw new Error(`unexpected command: ${command} ${args.join(" ")}`);
     },
   });
   assert.equal(result.executed, true);
   assert.equal(result.status, "succeeded");
-  assert.equal(calls.length, 3);
+  assert.equal(result.outcome, "merged");
+  assert.equal(calls.length, 4);
   assert.deepEqual(calls[0].slice(0, 4), ["gh", "pr", "view", "32"]);
 });
 
