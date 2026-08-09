@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { evaluateHeadBranchCleanup } from "../../scripts/lib/merge-branch-cleanup.mjs";
 
-test("evaluateHeadBranchCleanup deletes the actor's own fork head after merge", () => {
+test("evaluateHeadBranchCleanup keeps the actor's own fork head until deletion can be expected-tip bound", () => {
   const decision = evaluateHeadBranchCleanup({
     actorLogin: "Wibias",
     headOwnerLogin: "Wibias",
@@ -14,9 +14,10 @@ test("evaluateHeadBranchCleanup deletes the actor's own fork head after merge", 
     baseRepo: "lidge-jun/opencodex",
   });
 
-  assert.equal(decision.action, "delete");
+  assert.equal(decision.action, "skip");
   assert.equal(decision.targetRepo, "Wibias/opencodex");
-  assert.equal(decision.status, "branch deleted: Wibias/opencodex@feat/ri-02-request-history-index");
+  assert.match(decision.reason, /automatic deletion disabled/i);
+  assert.equal(decision.status, decision.reason);
 });
 
 test("evaluateHeadBranchCleanup keeps another contributor's head", () => {
@@ -35,7 +36,7 @@ test("evaluateHeadBranchCleanup keeps another contributor's head", () => {
   assert.equal(decision.status, "branch kept: head owned by @other-contributor");
 });
 
-test("evaluateHeadBranchCleanup prefers the gh pr view headRepository field for fork heads", () => {
+test("evaluateHeadBranchCleanup retains resolved fork repository in disabled cleanup decision", () => {
   const decision = evaluateHeadBranchCleanup({
     actorLogin: "Wibias",
     headOwnerLogin: "Wibias",
@@ -46,11 +47,12 @@ test("evaluateHeadBranchCleanup prefers the gh pr view headRepository field for 
     baseRepository: "lidge-jun/opencodex",
   });
 
-  assert.equal(decision.action, "delete");
+  assert.equal(decision.action, "skip");
   assert.equal(decision.targetRepo, "Wibias/opencodex");
+  assert.match(decision.reason, /automatic deletion disabled/i);
 });
 
-test("evaluateHeadBranchCleanup lets an explicit targetRepo win over head and base", () => {
+test("evaluateHeadBranchCleanup still prefers an explicit targetRepo while deletion is disabled", () => {
   const decision = evaluateHeadBranchCleanup({
     actorLogin: "Wibias",
     headOwnerLogin: "Wibias",
@@ -62,6 +64,20 @@ test("evaluateHeadBranchCleanup lets an explicit targetRepo win over head and ba
     baseRepository: "lidge-jun/opencodex",
   });
 
-  assert.equal(decision.action, "delete");
+  assert.equal(decision.action, "skip");
   assert.equal(decision.targetRepo, "Wibias/opencodex");
+  assert.match(decision.reason, /automatic deletion disabled/i);
+});
+
+test("evaluateHeadBranchCleanup honors an explicit keep request", () => {
+  const decision = evaluateHeadBranchCleanup({
+    actorLogin: "Wibias",
+    headOwnerLogin: "Wibias",
+    headRefName: "feat/keep-me",
+    isMerged: true,
+    keepBranch: true,
+  });
+
+  assert.equal(decision.action, "skip");
+  assert.equal(decision.reason, "branch kept: user requested keep");
 });
