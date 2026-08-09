@@ -9,9 +9,10 @@ The user never needs to choose CLI flags. The agent derives the narrowest approp
 | Action | read-only | review | maintainer | autonomous |
 |---|---:|---:|---:|---:|
 | Read evidence and draft text | yes | yes | yes | yes |
-| Publish PR/issue comments and reviews | no | yes | yes | yes |
+| Publish ordinary PR/issue comments and reviews | no | yes | yes | yes |
+| Publish a full-review verdict | no | yes, trusted authority required | yes, trusted authority required | yes, trusted authority required |
 | Reply to a bot thread | no | yes | yes | yes |
-| Reply to a human thread | no | exact text required | exact text required | exact text required |
+| Reply to a human thread | no | no | exact text + trusted authority required | exact text + trusted authority required |
 | Push scoped code | no | no | yes | yes |
 | Post feedback-resolution records | no | no | yes | yes |
 | Resolve bot-authored threads (`--resolve-bot`) | no | yes, after verification | yes | yes |
@@ -27,20 +28,35 @@ The profile is an upper bound, not a waiver. Draft/WIP gates, exact-text confirm
 
 Mutation mode describes what a workflow may request. It is not, by itself, proof that a human granted the exact effect.
 
-Dry-run planning remains available with the normal mode rules so the agent can show the bounded operation before approval. At `--execute`, the mutation boundary additionally requires a scoped trusted authority grant when either condition is true:
+Dry-run planning remains available with the normal mode rules so the agent can show the bounded operation before approval. At `--execute`, the mutation boundary additionally requires a scoped trusted authority grant when any condition is true:
 
-- the request uses `autonomous` mode; or
-- the action is high-assurance/destructive: `push_code`, `resolve_thread`, `close_linked_issue`, `close_pr`, `merge_pr`, `retarget_pr`, or `delete_head_branch`.
+- the request uses `autonomous` mode;
+- the action is high-assurance/destructive: `push_code`, `reply_human_thread`, `resolve_thread`, `resolve_bot_thread`, `close_linked_issue`, `close_pr`, `merge_pr`, `retarget_pr`, or `delete_head_branch`; or
+- a `post_comment` body is a format-recognized full-review verdict (`## [GD] Verdict:` plus the `github-delivery:full-review-verdict` run/head marker).
 
 The existing `GITHUB_DELIVERY_REQUIRE_TRUSTED_AUTHORITY=1` switch remains a stronger global policy and requires trusted authority for every executed mutation. In every strict case, the trusted grant must contain `scopeSha256`; a legacy resource-only signature is not enough.
 
 This keeps hostile repository text and model-selected mode inside the request layer. The actual high-impact write still needs an independently verified grant for the exact effect.
 
+### Durable full-review verdict provenance
+
+A full-review verdict is not trusted merge evidence merely because its Markdown is valid and it was posted by the authenticated GitHub actor.
+
+The full-review publication path must:
+
+1. build the normal `post_comment` request for the exact reviewed head and verdict body;
+2. obtain scoped trusted authority through `scripts/github-authorize.mjs`;
+3. use the authorized request returned by that helper — it automatically adds a hidden `github-delivery:review-authority` marker that carries the exact scoped grant without changing the human-visible body hash;
+4. execute that stamped request through `scripts/github-mutate.mjs`;
+5. run `scripts/verify-verdict-published.mjs`, which now requires both valid verdict format and valid historical trusted-authority provenance.
+
+The provenance check re-verifies the signed grant at the comment's GitHub creation time and requires `windows_hello`, `scopeSha256`, and the one-time redemption claim. A generic `post_comment` that merely copies the `[GD]` format never satisfies merge review evidence.
+
 ## Natural-language selection
 
 Examples:
 
-- `full review PR #32` → `review` (the full-review workflow publishes its verdict comment)
+- `full review PR #32` → `review` (the full-review workflow publishes its verdict comment through trusted verdict authority)
 - `what is left on PR #32?` → `read-only`
 - `review PR #32 and post the findings` → `review`
 - `fix PR #32 and make it merge ready` → `maintainer`
@@ -55,8 +71,8 @@ Do not ask users to run scripts. These mappings are agent behavior.
 
 The router output is authoritative. A full review resolves to `review` (bare)
 or `maintainer` (when `fix` or `simplify` is explicitly requested); both
-profiles permit `post_comment`, so publishing the verdict is intrinsic to the
-workflow.
+profiles permit ordinary `post_comment`, while the final full-review verdict is
+a high-assurance special case and requires trusted authority at execution.
 
 Gate invocations must pass the routed mutation mode plus `--workflow`, and the
 gate rejects incompatible combinations (for example
@@ -98,4 +114,5 @@ The first form is a dry run. The second executes and records a versioned receipt
 - `unknown_action`: the requested mutation is not part of the policy schema
 - `trusted_authority_required:*`: execution requires independently verified scoped authority
 - `expected_head_mismatch`: the PR changed after the decision was made
+- `review_authority_*`: a full-review verdict lacks valid durable trusted provenance
 - request validation failures such as `idempotency_key_required`
