@@ -135,6 +135,7 @@ export function validateRepositoryPolicy(policy) {
   if (JSON.stringify(policy?.merge?.methods) !== JSON.stringify(["merge"])) add("merge_method_invalid", "Only merge commits are approved");
   if (policy?.merge?.updateBranch !== true) add("update_branch_required", "Update branch support must be enabled");
   if (policy?.merge?.autoMerge !== true) add("auto_merge_required", "Auto-merge must be enabled");
+  if (policy?.rulesets?.allowBypassActors !== false) add("ruleset_bypass_policy_required", "Ruleset bypass actors must be forbidden by checked-in policy.");
   if (policy?.release?.environment !== "release") add("release_environment_required", "Release environment must be named release");
   if (policy?.release?.protectedTagPattern !== "v*") add("release_tag_pattern_invalid", "Release tags must use v*");
   if (!Number.isInteger(policy?.release?.requiredReviewers) || policy.release.requiredReviewers < 1) add("release_reviewer_required", "Release environment needs at least one reviewer");
@@ -144,35 +145,82 @@ export function validateRepositoryPolicy(policy) {
   return errors;
 }
 
-function pullRequestRule(activeRules) {
-  return (activeRules || []).find((rule) => rule?.type === "pull_request") || null;
+function rulesOfType(activeRules, type) {
+  return (activeRules || []).filter((rule) => rule?.type === type);
 }
 
-function requiredStatusRule(activeRules) {
-  return (activeRules || []).find((rule) => rule?.type === "required_status_checks") || null;
+function intersectStringLists(lists) {
+  if (!lists.length) return [];
+  const [first, ...rest] = lists.map((rows) => [...new Set(rows.map(String))]);
+  return first.filter((value) => rest.every((rows) => rows.includes(value))).sort();
 }
 
-function requiredCheckDescriptors(activeRules) {
-  const rule = requiredStatusRule(activeRules);
-  const rows =
+function effectivePullRequestPolicy(activeRules) {
+  const rules = rulesOfType(activeRules, "pull_request");
+  if (!rules.length) return null;
+  const parameters = rules.map((rule) => rule?.parameters || {});
+  const mergeMethodLists = parameters
+    .map((row) => row.allowed_merge_methods)
+    .filter(Array.isArray);
+  return {
+    dismissStaleApprovals: parameters.some(
+      (row) => row.dismiss_stale_reviews_on_push === true,
+    ),
+    conversationResolution: parameters.some(
+      (row) => row.required_review_thread_resolution === true,
+    ),
+    allowedMergeMethods: intersectStringLists(mergeMethodLists),
+  };
+}
+
+function checkRows(rule) {
+  return (
     rule?.parameters?.required_status_checks ||
     rule?.parameters?.checks ||
     rule?.parameters?.contexts ||
-    [];
-  return rows
-    .map((check) =>
-      typeof check === "string"
-        ? { context: check, integrationId: null }
-        : {
-            context: check?.context ? String(check.context) : null,
-            integrationId: Number.isInteger(check?.integration_id)
-              ? check.integration_id
-              : Number.isInteger(check?.app_id)
-                ? check.app_id
-                : null,
-          },
-    )
-    .filter((check) => check.context);
+    []
+  );
+}
+
+function normalizeCheckDescriptor(check) {
+  return typeof check === "string"
+    ? { context: check, integrationId: null }
+    : {
+        context: check?.context ? String(check.context) : null,
+        integrationId: Number.isInteger(check?.integration_id)
+          ? check.integration_id
+          : Number.isInteger(check?.app_id)
+            ? check.app_id
+            : null,
+      };
+}
+
+function effectiveRequiredStatusPolicy(activeRules) {
+  const rules = rulesOfType(activeRules, "required_status_checks");
+  const descriptors = [];
+  const seen = new Set();
+  for (const rule of rules) {
+    for (const row of checkRows(rule)) {
+      const descriptor = normalizeCheckDescriptor(row);
+      if (!descriptor.context) continue;
+      const key = `${descriptor.context}\u0000${descriptor.integrationId ?? "none"}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      descriptors.push(descriptor);
+    }
+  }
+  descriptors.sort(
+    (left, right) =>
+      left.context.localeCompare(right.context) ||
+      String(left.integrationId ?? "").localeCompare(String(right.integrationId ?? "")),
+  );
+  return {
+    present: rules.length > 0,
+    strict: rules.some(
+      (rule) => rule?.parameters?.strict_required_status_checks_policy === true,
+    ),
+    descriptors,
+  };
 }
 
 function requiredReviewerCount(environment) {
@@ -205,6 +253,32 @@ function sameStringSet(a = [], b = []) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
+function normalizeBypassActor(actor = {}) {
+  return {
+    actorId: actor.actor_id ?? actor.actorId ?? null,
+    actorType: actor.actor_type ?? actor.actorType ?? null,
+    bypassMode: actor.bypass_mode ?? actor.bypassMode ?? null,
+  };
+}
+
+function activeRulesetBypassState(live = {}) {
+  const rulesets = Array.isArray(live.activeRulesets) ? live.activeRulesets : [];
+  const bypassActors = rulesets.flatMap((ruleset) =>
+    (Array.isArray(ruleset?.bypass_actors) ? ruleset.bypass_actors : []).map(
+      normalizeBypassActor,
+    ),
+  );
+  const currentUserBypass = rulesets
+    .map((ruleset) => ruleset?.current_user_can_bypass)
+    .filter((value) => value !== undefined && value !== null)
+    .map(String);
+  return {
+    complete: live.activeRulesetsComplete === true,
+    bypassActors,
+    currentUserBypass,
+  };
+}
+
 export function evaluateLiveRepositoryPolicy({ policy, live } = {}) {
   const errors = [];
   const add = (code, detail) => errors.push({ code, detail });
@@ -231,40 +305,37 @@ export function evaluateLiveRepositoryPolicy({ policy, live } = {}) {
     add("active_rules_missing", `No active GitHub rules apply to ${expectedBranch || "the default branch"}.`);
   }
 
-  const prRule = pullRequestRule(activeRules);
-  const prParameters = prRule?.parameters || {};
-  if (policy?.pullRequests?.required === true && !prRule) {
+  const prPolicy = effectivePullRequestPolicy(activeRules);
+  if (policy?.pullRequests?.required === true && !prPolicy) {
     add("pull_request_rule_missing", "No active pull-request rule enforces the declared PR requirement.");
   }
   if (
     policy?.pullRequests?.conversationResolution === true &&
-    prParameters.required_review_thread_resolution !== true
+    prPolicy?.conversationResolution !== true
   ) {
     add(
       "conversation_resolution_rule_missing",
-      "The active pull-request rule does not require review-thread resolution.",
+      "The effective pull-request rules do not require review-thread resolution.",
     );
   }
   if (
     policy?.pullRequests?.dismissStaleApprovals === true &&
-    prParameters.dismiss_stale_reviews_on_push !== true
+    prPolicy?.dismissStaleApprovals !== true
   ) {
     add(
       "stale_approvals_not_enforced",
-      "The active pull-request rule does not dismiss stale approvals after a push.",
+      "The effective pull-request rules do not dismiss stale approvals after a push.",
     );
   }
 
-  const observedRuleMergeMethods = Array.isArray(prParameters.allowed_merge_methods)
-    ? prParameters.allowed_merge_methods
-    : [];
+  const observedRuleMergeMethods = prPolicy?.allowedMergeMethods || [];
   if (
     policy?.merge?.methods?.length &&
     !sameStringSet(observedRuleMergeMethods, policy.merge.methods)
   ) {
     add(
       "ruleset_merge_methods_mismatch",
-      `Ruleset merge methods ${observedRuleMergeMethods.join(", ") || "missing"} do not match ${policy.merge.methods.join(", ")}.`,
+      `Effective ruleset merge methods ${observedRuleMergeMethods.join(", ") || "missing"} do not match ${policy.merge.methods.join(", ")}.`,
     );
   }
 
@@ -275,16 +346,15 @@ export function evaluateLiveRepositoryPolicy({ policy, live } = {}) {
     add("deletion_rule_missing", "No active deletion rule protects the default branch.");
   }
 
-  const statusRule = requiredStatusRule(activeRules);
-  const statusParameters = statusRule?.parameters || {};
+  const statusPolicy = effectiveRequiredStatusPolicy(activeRules);
   if (
     policy?.requiredChecksStrict === true &&
-    statusParameters.strict_required_status_checks_policy !== true
+    statusPolicy.strict !== true
   ) {
-    add("strict_required_checks_not_enforced", "Required status checks are not configured as strict.");
+    add("strict_required_checks_not_enforced", "Effective required status checks are not configured as strict.");
   }
 
-  const descriptors = requiredCheckDescriptors(activeRules);
+  const descriptors = statusPolicy.descriptors;
   const observedChecks = new Set(descriptors.map((row) => row.context));
   const missingRequiredChecks = (policy?.requiredChecks || [])
     .filter((context) => !observedChecks.has(context))
@@ -296,19 +366,45 @@ export function evaluateLiveRepositoryPolicy({ policy, live } = {}) {
     );
   }
   const expectedIntegrationId = policy?.requiredCheckIntegrationId;
-  const wrongProducerChecks = descriptors
-    .filter(
-      (descriptor) =>
-        (policy?.requiredChecks || []).includes(descriptor.context) &&
-        descriptor.integrationId !== expectedIntegrationId,
-    )
-    .map((descriptor) => descriptor.context)
-    .sort();
+  const wrongProducerChecks = [...new Set(
+    descriptors
+      .filter(
+        (descriptor) =>
+          (policy?.requiredChecks || []).includes(descriptor.context) &&
+          descriptor.integrationId !== expectedIntegrationId,
+      )
+      .map((descriptor) => descriptor.context),
+  )].sort();
   if (wrongProducerChecks.length) {
     add(
       "required_check_producer_mismatch",
-      `Required checks are not bound to integration ${expectedIntegrationId}: ${wrongProducerChecks.join(", ")}`,
+      `Required checks are not bound exclusively to integration ${expectedIntegrationId}: ${wrongProducerChecks.join(", ")}`,
     );
+  }
+
+  const bypassState = activeRulesetBypassState(live || {});
+  if (policy?.rulesets?.allowBypassActors === false) {
+    if (!bypassState.complete) {
+      add(
+        "ruleset_bypass_evidence_incomplete",
+        "Active ruleset bypass configuration could not be read completely.",
+      );
+    }
+    if (bypassState.bypassActors.length) {
+      add(
+        "ruleset_bypass_actor_present",
+        `Active rulesets expose ${bypassState.bypassActors.length} bypass actor(s), but checked-in policy forbids bypass actors.`,
+      );
+    }
+    const bypassModes = bypassState.currentUserBypass.filter(
+      (value) => value.toLowerCase() !== "never",
+    );
+    if (bypassModes.length) {
+      add(
+        "current_user_can_bypass_ruleset",
+        `The current GitHub actor can bypass an active ruleset: ${[...new Set(bypassModes)].join(", ")}.`,
+      );
+    }
   }
 
   const observedRepoMerge = repositoryMergeMethods(repository);
@@ -373,19 +469,15 @@ export function evaluateLiveRepositoryPolicy({ policy, live } = {}) {
     defaultBranch: observedBranch || null,
     protected: live?.branch?.protected === true,
     activeRuleTypes: activeRules.map((rule) => rule?.type).filter(Boolean),
-    observedPullRequestPolicy: prRule
-      ? {
-          dismissStaleApprovals: prParameters.dismiss_stale_reviews_on_push === true,
-          conversationResolution: prParameters.required_review_thread_resolution === true,
-          allowedMergeMethods: observedRuleMergeMethods,
-        }
-      : null,
-    strictRequiredChecks:
-      statusParameters.strict_required_status_checks_policy === true,
+    observedPullRequestPolicy: prPolicy,
+    strictRequiredChecks: statusPolicy.strict === true,
     observedRequiredChecks: [...observedChecks].sort(),
     observedRequiredCheckDescriptors: descriptors,
     missingRequiredChecks,
     wrongProducerChecks,
+    activeRulesetsComplete: bypassState.complete,
+    observedRulesetBypassActors: bypassState.bypassActors,
+    currentUserRulesetBypass: bypassState.currentUserBypass,
     repositoryMergeMethods: observedRepoMerge.methods,
     repositoryMergeSettingsComplete: observedRepoMerge.complete,
     releaseEnvironment: observedEnvironment || null,
