@@ -1,86 +1,123 @@
 # Live Integration setup
 
-The **Live Integration** workflow exercises the complete GitHub lifecycle against temporary, namespaced resources. It creates an issue, branch, and pull request; observes required checks; captures ship-gate evidence; proves stale-head rejection; closes or merges the fixture pull request; and removes the branch.
+The **Live Integration** workflow exercises the real GitHub lifecycle against a **dedicated fixture repository**. The source repository is never accepted as its own live-mutation target.
 
-## Why a dedicated credential is required
+The fixture run creates namespaced temporary issues, branches, and pull requests; observes the required checks; captures ship-gate evidence; proves stale-head rejection; closes the fixture pull request; and performs independent cleanup.
 
-GitHub's workflow `GITHUB_TOKEN` can be granted contents, issues, pull-request, Actions, Checks, and commit-status permissions, but it cannot be granted the repository Administration read permission required for complete branch-protection and policy evidence.
+## Safety boundary
 
-The lifecycle therefore fails before mutation unless the repository Actions secret `LIVE_FIXTURE_TOKEN` is configured and passes the non-mutating capability preflight.
+Live Integration is fail-closed before the first fixture mutation. The workflow requires all of these to agree:
 
-The ordinary workflow token remains read-only. The dedicated credential is exposed only to the preflight, lifecycle, and cleanup steps.
+1. a dedicated `OWNER/REPO` fixture repository;
+2. that repository's immutable numeric GitHub repository ID;
+3. an observed fixture repository ID equal to the configured ID;
+4. source and fixture repository names to differ;
+5. source and fixture numeric repository IDs to differ; and
+6. a sentinel on the fixture base branch that binds the exact source and fixture names **and** numeric IDs.
 
-## Current GitHub token limitation
+A mistyped repository name that happens to point at another writable repository is therefore not enough to authorize the fixture.
 
-GitHub does not currently expose the **Checks** permission when creating a fine-grained personal access token. GitHub's REST endpoint pages still describe a fine-grained `Checks: read` permission, but GitHub's personal-access-token documentation lists the Checks API as an unsupported fine-grained-token use case.
+## 1. Prepare the dedicated fixture repository
 
-For this public repository, use a classic personal access token with only the `public_repo` scope for the acceptance workflow. Do not select the broader `repo` scope.
+Choose a repository used only for github-delivery acceptance/lifecycle testing. Its default fixture base is `main`.
 
-A GitHub App is the preferred future option when strict single-repository scoping is required because an App can receive repository-specific Administration and Checks permissions. The classic-token path is retained here as the simplest working acceptance credential.
+The target must be able to produce the checks that the lifecycle verifies:
 
-## Create the token
+- `CI / Node 22 / ubuntu-latest`
+- `CI / Node 22 / windows-latest`
+- `CI / Node 22 / macos-latest`
+- `CI / Node 24 / ubuntu-latest`
+- `CI / Node 24 / windows-latest`
+- `CI / Node 24 / macos-latest`
+- Dependency Review
+- CodeQL
 
-Create a classic personal access token under the maintainer account:
+The lifecycle branch is built from the checked-out github-delivery source tree, but GitHub evaluates pull-request workflows according to the target repository's configuration. Keep the dedicated target's acceptance workflow/rules configuration aligned with the source repository.
 
-1. Open GitHub **Settings**.
-2. Open **Developer settings**.
-3. Open **Personal access tokens** → **Tokens (classic)**.
-4. Choose **Generate new token (classic)**.
-5. Use a descriptive note such as `github-delivery live fixture`.
-6. Select a short expiration, such as 90 days.
-7. Select only the `public_repo` scope.
+## 2. Add the immutable target sentinel
 
-Do not select:
+On the fixture repository's `main` branch, create:
 
-- `repo`, which includes private-repository access
-- `workflow`, because the fixture does not create or modify workflow files
-- organization, package, hook, admin, or user scopes
-
-A classic token cannot be restricted to one repository. Limit its lifetime, store it only as the repository Actions secret, and rotate it before expiration.
-
-## Store the token
-
-In `Wibias/github-delivery`:
-
-1. Open **Settings** → **Secrets and variables** → **Actions**.
-2. Choose **New repository secret**.
-3. Name it exactly `LIVE_FIXTURE_TOKEN`.
-4. Paste the classic token as the value.
-
-The secret is not available to pull-request workflows. The Live Integration workflow runs only through manual dispatch or its explicitly enabled schedule on the default branch.
-
-## Preflight behavior
-
-Before creating any fixture resource, the workflow runs:
-
-```bash
-node scripts/verify-live-fixture-token.mjs Wibias/github-delivery --base main
+```text
+.github/github-delivery-live-fixture.json
 ```
 
-The verifier performs read-only probes for:
+with this shape:
 
-- authenticated user identity
-- repository visibility
-- Actions workflow runs
-- commit check runs
-- commit statuses
-- active repository rules
-- GraphQL branch-protection rules
+```json
+{
+  "schemaVersion": 1,
+  "kind": "github-delivery/live-fixture-target",
+  "fixtureRepository": "OWNER/FIXTURE_REPO",
+  "fixtureRepositoryId": 123456789,
+  "sourceRepository": "Wibias/github-delivery",
+  "sourceRepositoryId": 1317569489
+}
+```
 
-A missing or under-scoped credential fails before issue, branch, or pull-request creation. The verifier never prints the credential.
+Use the real immutable numeric ID of the fixture repository. The source repository ID for `Wibias/github-delivery` is `1317569489`.
 
-GitHub does not provide a reliable non-mutating probe for every write capability. The `public_repo` scope supplies the public-repository writes used by the fixture. Any denied write still fails the lifecycle and triggers namespaced cleanup.
+The verifier reads both repository objects from GitHub and reads this sentinel from the target base branch before accepting the target.
+
+## 3. Configure source-repository Actions values
+
+In `Wibias/github-delivery`, configure these repository Actions values:
+
+| Name | Type | Purpose |
+|---|---|---|
+| `LIVE_FIXTURE_REPOSITORY` | variable | Dedicated `OWNER/REPO` target |
+| `LIVE_FIXTURE_REPOSITORY_ID` | variable | Immutable numeric ID of that target |
+| `LIVE_FIXTURE_TOKEN` | secret | Credential used by identity/capability preflight, lifecycle writes, and cleanup |
+| `LIVE_FIXTURE_ENABLED` | variable, optional | Set to `true` only when scheduled execution should run |
+
+Manual `workflow_dispatch` does not require `LIVE_FIXTURE_ENABLED=true`; the variable controls the scheduled run.
+
+## Credential requirements
+
+The ordinary workflow token remains read-only. `LIVE_FIXTURE_TOKEN` is exposed only to the target preflight, lifecycle, and cleanup steps.
+
+Use a short-lived credential with the narrowest practical access to the dedicated fixture repository. It must be able to perform the lifecycle writes and pass the read-only capability preflight. The verifier checks:
+
+- authenticated user identity;
+- repository access;
+- Actions workflow-run access;
+- commit check-run access;
+- commit-status access;
+- active repository rules; and
+- GraphQL branch-protection rules.
+
+The verifier never prints the credential. Missing or under-scoped capability evidence fails before issue, branch, or pull-request creation.
+
+## Preflight command
+
+The workflow runs the equivalent of:
+
+```bash
+node scripts/verify-live-fixture-token.mjs \
+  "OWNER/FIXTURE_REPO" \
+  --source-repo "Wibias/github-delivery" \
+  --fixture-repo-id "123456789" \
+  --base main
+```
+
+with `GH_TOKEN` set from `LIVE_FIXTURE_TOKEN`.
+
+This first verifies immutable target identity and the sentinel, then performs the non-mutating capability probes.
 
 ## Run acceptance
 
-After storing the secret:
-
-1. Open **Actions** → **Live Integration**.
+1. Open **Actions** → **Live Integration** in `Wibias/github-delivery`.
 2. Choose **Run workflow** from `main`.
-3. Keep `disposition` set to `close`.
-4. If GitHub requests approval for the temporary fixture pull request workflows, approve them.
-5. Confirm the lifecycle completes successfully.
-6. Download the `live-fixture-<run-id>-<attempt>` artifact.
+3. The workflow validates fixture variables before checkout.
+4. Identity and credential capability checks run before mutation.
+5. The lifecycle creates namespaced temporary resources in the dedicated fixture repository.
+6. If GitHub requires approval for the temporary PR workflows, approve them before the observation timeout.
+7. The workflow closes the fixture PR and removes the temporary issue/branch resources during cleanup.
+8. Download the `live-fixture-<run-id>-<attempt>` artifact.
+
+The workflow intentionally uses `--disposition close`. Live acceptance does not merge fixture PRs because a merge would require a real trusted authority grant.
+
+## Evidence artifact
 
 The artifact contains:
 
@@ -88,8 +125,24 @@ The artifact contains:
 - `live-fixture-receipt.json`
 - `live-fixture-cleanup.json`
 
-A successful acceptance receipt has `passed: true`, records all required checks, and confirms fixture cleanup.
+A successful lifecycle receipt has `passed: true`, records complete required-check evidence, includes the stale-head rejection proof, and is accompanied by cleanup evidence.
 
-## Rotation
+## Failure and cleanup behavior
 
-Rotate the classic token before expiration and immediately after suspected exposure. Replace the repository secret in place; no workflow change is required.
+Lifecycle resources are namespaced by the exact run marker and derived branch. Normal failures trigger best-effort cleanup inside the lifecycle, and a separate `if: always()` workflow step performs independent cleanup if the lifecycle process fails or is interrupted.
+
+Cleanup repeats the same fixture identity verification before destructive cleanup operations. It will not use a stale/mistyped repository configuration as a reason to clean an unrelated repository.
+
+## Scheduled execution
+
+The workflow has a weekly schedule, but scheduled execution is opt-in:
+
+```text
+LIVE_FIXTURE_ENABLED=true
+```
+
+Leave that variable unset or false until the dedicated target, sentinel, credential, and expected checks are provisioned.
+
+## Rotation and operational maintenance
+
+Rotate the fixture credential according to its issuer's policy and immediately after suspected exposure. If the fixture repository is recreated, renamed, or replaced, update **both** the configured repository ID and the sentinel; an old ID intentionally causes the workflow to fail closed.

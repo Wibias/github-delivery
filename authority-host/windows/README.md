@@ -5,11 +5,13 @@ This optional Windows 11 host turns a real local user approval into short-lived 
 ## Security boundary
 
 - ECDSA P-256 signing key is persisted by the Microsoft Platform Crypto Provider (TPM-backed when available) and marked non-exportable.
-- Maintainer/destructive batches require Windows Hello before issuance.
+- Windows Hello is required for protected/high-assurance issuance: maintainer-mode operations, destructive actions such as code pushes/merges/human-thread replies, and format-recognized full-review verdict publication.
 - One Hello approval can cover a finite, fully rendered batch; each mutation receives its own exact-scope grant.
+- Human-thread reply grants bind the exact outgoing text; caller-supplied `exactTextConfirmed` is not sufficient by itself.
+- Full-review verdict grants bind the exact human-visible verdict and support the durable provenance marker later re-verified as merge-review evidence.
 - The host exposes only `status`, `authorizeBatch`, and `redeemGrant` over a current-user Named Pipe.
 - Repository access is default-deny. Allowlist changes and key rotation are only available in local UI and require Windows Hello.
-- Grants expire after 60 seconds and must be redeemed exactly once before the GitHub write.
+- Grants expire after 60 seconds and must be redeemed exactly once before the GitHub write when redemption is required.
 - The agent never receives private key material and the host has no arbitrary `sign(bytes)` endpoint.
 
 The host is an optional stronger authorization path. Installing it does **not** enable `GITHUB_DELIVERY_REQUIRE_TRUSTED_AUTHORITY=1` automatically.
@@ -48,13 +50,17 @@ Authorize a precomputed batch:
 node scripts/github-authorize.mjs --request batch.json --out authorized.json
 ```
 
-The output contains the same broker requests with one `authorityGrant` attached to each operation. Execute individual requests through `scripts/github-mutate.mjs` as usual. Grants that declare `redemption: required` are atomically consumed by the host immediately before the GitHub mutation.
+The output contains the same broker requests with one `authorityGrant` attached to each operation. For a full-review verdict, the helper also stamps the durable hidden review-authority provenance required by the verdict verifier without changing the human-visible verdict hash.
 
-To require trusted authority for broker requests in a deployment, opt in explicitly:
+Execute individual requests through `scripts/github-mutate.mjs` as usual. Grants that declare `redemption: required` are atomically consumed by the host immediately before the GitHub mutation.
+
+To require trusted authority for every broker request in a deployment, opt in explicitly:
 
 ```powershell
 $env:GITHUB_DELIVERY_REQUIRE_TRUSTED_AUTHORITY = '1'
 ```
+
+High-assurance actions can still require trusted authority even when that global switch is not enabled.
 
 ## Key rotation
 
@@ -68,4 +74,4 @@ The CI self-test intentionally does not invoke TPM or Windows Hello:
 dotnet run --project .\authority-host\windows\GitHubDeliveryAuthority\GitHubDeliveryAuthority.csproj -c Release -- --self-test
 ```
 
-It checks the shared Node/C# canonical scope fixture, ES256 token verification with an ephemeral software key, the SQLite one-time redemption invariant, and the maintainer/review classifier.
+It checks the shared Node/C# canonical scope fixture, ES256 token verification with an ephemeral software key, the SQLite one-time redemption invariant, and mutation classification including the high-assurance review-verdict/human-reply cases.

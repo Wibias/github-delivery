@@ -10,7 +10,7 @@ The scripts below are maintainer and installation tooling, not the normal way to
 
 ## Requirements
 
-- Node.js 20 or newer
+- Node.js 22 or 24
 - Git
 - GitHub network access
 - An authenticated GitHub CLI or a host-provided brokered connector for GitHub writes
@@ -59,6 +59,12 @@ node scripts/install-skill.mjs \
 ## Manual installation
 
 Extract an archive and copy the resulting `github-delivery` directory into the host's skill directory. Keep the directory name exactly `github-delivery`, because the Agent Skills specification requires it to match the `name` field in `SKILL.md`.
+
+## Optional Windows authority host
+
+The optional Windows 11 authority host turns a local Windows Hello approval into short-lived, exact-scope trusted grants for high-assurance mutations. It is not required for ordinary installation and does not automatically enable global strict-authority enforcement.
+
+See [`authority-host/windows/README.md`](authority-host/windows/README.md) for requirements and installation.
 
 ## Uninstall
 
