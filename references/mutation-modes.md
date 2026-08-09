@@ -12,7 +12,7 @@ The user never needs to choose CLI flags. The agent derives the narrowest approp
 | Publish ordinary PR/issue comments and reviews | no | yes | yes | yes |
 | Publish a full-review verdict | no | yes, trusted authority required | yes, trusted authority required | yes, trusted authority required |
 | Reply to a bot thread | no | yes | yes | yes |
-| Reply to a human thread | no | no | exact text + trusted authority required | exact text + trusted authority required |
+| Reply to a human thread | no | exact text + trusted authority required | exact text + trusted authority required | exact text + trusted authority required |
 | Push scoped code | no | no | yes | yes |
 | Post feedback-resolution records | no | no | yes | yes |
 | Resolve bot-authored threads (`--resolve-bot`) | no | yes, after verification | yes | yes |
@@ -37,6 +37,8 @@ Dry-run planning remains available with the normal mode rules so the agent can s
 The existing `GITHUB_DELIVERY_REQUIRE_TRUSTED_AUTHORITY=1` switch remains a stronger global policy and requires trusted authority for every executed mutation. In every strict case, the trusted grant must contain `scopeSha256`; a legacy resource-only signature is not enough.
 
 This keeps hostile repository text and model-selected mode inside the request layer. The actual high-impact write still needs an independently verified grant for the exact effect.
+
+A review-mode human reply may be planned so the exact text can be shown for approval, but it cannot execute from caller-supplied `exactTextConfirmed` alone. Execution requires a trusted grant whose `exactTextSha256` matches the exact outgoing body.
 
 ### Durable full-review verdict provenance
 
