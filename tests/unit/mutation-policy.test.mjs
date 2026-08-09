@@ -36,24 +36,33 @@ test("maintainer mutations require explicit instruction", () => {
   assert.equal(allowed.allowed, true);
 });
 
-test("supersede_pr and close_pr require explicit maintainer instruction", () => {
-  for (const action of ["supersede_pr", "close_pr"]) {
-    const denied = authorizeMutation({ mode: "maintainer", action });
-    const allowed = authorizeMutation({
-      mode: "maintainer",
-      action,
-      explicitInstruction: true,
-    });
-    assert.equal(denied.reason, "explicit_instruction_required");
-    assert.equal(allowed.allowed, true);
-  }
+test("close_pr requires explicit maintainer instruction", () => {
+  const denied = authorizeMutation({ mode: "maintainer", action: "close_pr" });
+  const allowed = authorizeMutation({
+    mode: "maintainer",
+    action: "close_pr",
+    explicitInstruction: true,
+  });
+  assert.equal(denied.reason, "explicit_instruction_required");
+  assert.equal(allowed.allowed, true);
 });
 
-test("read-only and review never allow closing or superseding a PR", () => {
+test("legacy composite supersede_pr is not a primitive mutation", () => {
+  const decision = authorizeMutation({
+    mode: "maintainer",
+    action: "supersede_pr",
+    explicitInstruction: true,
+  });
+  assert.equal(decision.allowed, false);
+  assert.equal(decision.reason, "unknown_action");
+  assert.equal(mutationProfile("maintainer").actions.supersede_pr, undefined);
+});
+
+test("read-only and review never allow closing a PR", () => {
   for (const mode of ["read-only", "review"]) {
     const profile = mutationProfile(mode);
     assert.equal(profile.actions.close_pr.allowed, false);
-    assert.equal(profile.actions.supersede_pr.allowed, false);
+    assert.equal(profile.actions.supersede_pr, undefined);
   }
 });
 

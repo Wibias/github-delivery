@@ -88,13 +88,13 @@ test("routes fix-and-merge-ready to the maintainer workflow", () => {
   assert.equal(route.mutationMode, "maintainer");
 });
 
-test("routes a supersede request to the supersede workflow", () => {
+test("routes supersede to separately recoverable close and comment actions", () => {
   const route = routeShippingGithubPrompt(
     "supersede PR #12 with PR #45 — close the old one and point everyone at the new one",
   );
   assert.equal(route.workflow, "references/supersede-pr.md");
   assert.equal(route.mutationMode, "maintainer");
-  assert.ok(route.explicitActions.includes("supersede_pr"));
+  assert.deepEqual(route.explicitActions, ["close_pr", "post_comment"]);
 });
 
 test("routes a maintainer overtake request to the overtake workflow", () => {

@@ -141,43 +141,31 @@ test("social writes require an idempotency key", () => {
   );
 });
 
-test("supersede_pr plans a close with a replacement-naming comment", () => {
-  const plan = planMutationRequest({
-    schemaVersion: 1,
-    action: "supersede_pr",
-    mutationMode: "maintainer",
-    explicitInstruction: true,
-    repo: "acme/widgets",
-    pr: 12,
-    expectedHead: "abcdef1234567890",
-    supersedingPr: 45,
-    idempotencyKey: "supersede-pr-12-by-45",
-  });
-  assert.equal(plan.authorization.allowed, true);
-  assert.deepEqual(plan.command.slice(0, 5), [
-    "gh",
-    "pr",
-    "close",
-    "12",
-    "--repo",
-  ]);
-  assert.match(plan.command.join(" "), /Superseded by PR #45/);
-});
-
-test("supersede_pr requires an idempotency key and a body or superseding PR", () => {
+test("legacy composite supersede_pr is rejected before execution", () => {
+  let calls = 0;
   assert.throws(
     () =>
-      planMutationRequest({
-        schemaVersion: 1,
-        action: "supersede_pr",
-        mutationMode: "maintainer",
-        explicitInstruction: true,
-        repo: "acme/widgets",
-        pr: 12,
-        expectedHead: "abcdef1234567890",
+      executeMutationRequest({
+        request: {
+          schemaVersion: 1,
+          action: "supersede_pr",
+          mutationMode: "maintainer",
+          explicitInstruction: true,
+          repo: "acme/widgets",
+          pr: 12,
+          expectedHead: "abcdef1234567890",
+          supersedingPr: 45,
+          idempotencyKey: "supersede-pr-12-by-45",
+        },
+        execute: true,
+        runner() {
+          calls += 1;
+          return { status: 0, stdout: "", stderr: "" };
+        },
       }),
-    /idempotency_key_required|body_or_superseding_pr_required/,
+    /mutation_denied:unknown_action/,
   );
+  assert.equal(calls, 0);
 });
 
 test("close_pr plans a close and verifies the closed state", () => {
