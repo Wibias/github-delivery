@@ -95,6 +95,80 @@ export function normalizeRequiredChecks({
   };
 }
 
+function normalizedSha(value) {
+  const sha = String(value || "").trim().toLowerCase();
+  return sha || null;
+}
+
+export function selectAuthoritativeCheckEvidence({
+  headOid,
+  testMergeOid = null,
+  headCheckRuns = [],
+  headStatuses = [],
+  testMergeCheckRuns = [],
+  testMergeStatuses = [],
+  headEvidenceComplete = true,
+  testMergeEvidenceComplete = true,
+} = {}) {
+  const head = normalizedSha(headOid);
+  if (!head) {
+    return {
+      complete: false,
+      sha: null,
+      reason: "head_sha_missing",
+      checkRuns: [],
+      statuses: [],
+      incompleteReasons: ["authoritative_check_sha_missing"],
+    };
+  }
+
+  const testMerge = normalizedSha(testMergeOid);
+  if (testMerge) {
+    if (testMergeEvidenceComplete !== true) {
+      return {
+        complete: false,
+        sha: testMerge,
+        reason: "test_merge_evidence_incomplete",
+        checkRuns: testMergeCheckRuns || [],
+        statuses: testMergeStatuses || [],
+        incompleteReasons: ["test_merge_check_evidence_incomplete"],
+      };
+    }
+    const hasTestMergeEvidence =
+      (testMergeCheckRuns || []).length > 0 || (testMergeStatuses || []).length > 0;
+    if (hasTestMergeEvidence) {
+      return {
+        complete: true,
+        sha: testMerge,
+        reason: "test_merge_has_status",
+        checkRuns: testMergeCheckRuns || [],
+        statuses: testMergeStatuses || [],
+        incompleteReasons: [],
+      };
+    }
+  }
+
+  if (headEvidenceComplete !== true) {
+    return {
+      complete: false,
+      sha: head,
+      reason: testMerge ? "test_merge_has_no_status" : "head_only",
+      checkRuns: headCheckRuns || [],
+      statuses: headStatuses || [],
+      incompleteReasons: ["head_check_evidence_incomplete"],
+    };
+  }
+
+  return {
+    complete: true,
+    sha: head,
+    reason: testMerge ? "test_merge_has_no_status" : "head_only",
+    checkRuns: headCheckRuns || [],
+    statuses: headStatuses || [],
+    incompleteReasons: [],
+  };
+}
+
 function newestTimestamp(row) {
   const candidates = [
     row?.completed_at,
