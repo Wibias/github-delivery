@@ -97,7 +97,7 @@ export function injectSkillMetadata(source, { version }) {
   if (end === -1) throw new Error("SKILL.md frontmatter is not closed");
   const frontmatter = stripExistingDistributionMetadata(source.slice(4, end));
   const body = source.slice(end + 4).replace(/^\n?/, "\n");
-  return `---\n${frontmatter}\nlicense: MIT\ncompatibility: Requires Node.js 20+, git, GitHub network access, and an authenticated gh or brokered connector for writes.\nmetadata:\n  author: Wibias\n  version: "${version}"\n  repository: "https://github.com/Wibias/github-delivery"\n---${body}`;
+  return `---\n${frontmatter}\nlicense: MIT\ncompatibility: Requires Node.js 22 or 24, git, GitHub network access, and an authenticated gh or brokered connector for writes.\nmetadata:\n  author: Wibias\n  version: "${version}"\n  repository: "https://github.com/Wibias/github-delivery"\n---${body}`;
 }
 
 function runtimeReferences(markdown) {
