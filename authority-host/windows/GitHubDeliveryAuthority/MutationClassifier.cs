@@ -13,6 +13,7 @@ internal static class MutationClassifier
         "close_pr",
         "supersede_pr",
         "merge_pr",
+        "retarget_pr",
         "delete_head_branch",
         "create_follow_up_issue",
     };
