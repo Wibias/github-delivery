@@ -44,8 +44,10 @@ const REMOTE_IDEMPOTENT_CREATE_ACTIONS = new Set([
   "post_resolution_record",
 ]);
 
+const REVIEW_THREAD_ACTIONS = new Set(["resolve_thread", "resolve_bot_thread"]);
 const CLEANUP_ACTIONS = new Set(["delete_head_branch"]);
 const IDEMPOTENCY_MARKER_RE = /\n\n<!-- github-delivery:idempotency [0-9a-f]{64} -->\s*$/i;
+const BOT_LOGIN_RE = /\[bot\]$/i;
 
 function sha256(value) {
   return createHash("sha256").update(String(value ?? ""), "utf8").digest("hex");
@@ -365,6 +367,55 @@ function verifyHead({ request, runner }) {
   return output;
 }
 
+function verifyReviewThreadTarget({ request, runner }) {
+  if (!REVIEW_THREAD_ACTIONS.has(request.action)) return null;
+  const threadId = required(request.threadId, "thread_id");
+  const query = `query($id:ID!){node(id:$id){... on PullRequestReviewThread{id isResolved repository{nameWithOwner} pullRequest{number headRefOid} comments(first:1){nodes{author{login}}}}}}`;
+  const payload = parseJson(
+    runOrThrow(runner, [
+      "gh",
+      "api",
+      "graphql",
+      "-f",
+      `query=${query}`,
+      "-F",
+      `id=${threadId}`,
+    ]),
+    "review_thread_evidence_invalid",
+  );
+  if (payload.errors?.length) {
+    throw new Error(`review_thread_evidence_error:${JSON.stringify(payload.errors)}`);
+  }
+  const thread = payload.data?.node;
+  if (!thread || thread.id !== threadId) {
+    throw new Error("review_thread_target_missing");
+  }
+  const repo = required(thread.repository?.nameWithOwner, "review_thread_repo");
+  if (String(repo).toLowerCase() !== String(request.repo).toLowerCase()) {
+    throw new Error("review_thread_target_mismatch:repo");
+  }
+  const pr = positiveInteger(thread.pullRequest?.number, "review_thread_pr");
+  if (pr !== positiveInteger(request.pr, "pr")) {
+    throw new Error("review_thread_target_mismatch:pr");
+  }
+  const head = required(thread.pullRequest?.headRefOid, "review_thread_head");
+  if (String(head).toLowerCase() !== String(request.expectedHead).toLowerCase()) {
+    throw new Error("review_thread_target_mismatch:head");
+  }
+  const author = thread.comments?.nodes?.[0]?.author?.login || null;
+  if (request.action === "resolve_bot_thread" && !BOT_LOGIN_RE.test(String(author || ""))) {
+    throw new Error("resolve_bot_thread_target_not_bot");
+  }
+  return {
+    threadId,
+    repo,
+    pr,
+    expectedHead: head,
+    author,
+    isResolved: thread.isResolved === true,
+  };
+}
+
 function verifyRetargetBase({ request, runner }) {
   if (request.action !== "retarget_pr") return null;
   const expectedBase = required(request.expectedBase, "expected_base");
@@ -626,6 +677,9 @@ export function planMutationRequest(
     positiveInteger(request.pr, "pr");
     required(request.expectedHead, "expected_head");
   }
+  if (REVIEW_THREAD_ACTIONS.has(request.action)) {
+    required(request.threadId, "thread_id");
+  }
   if (request.action === "retarget_pr") {
     const expectedBase = required(request.expectedBase, "expected_base");
     const newBase = required(request.newBase, "new_base");
@@ -701,8 +755,23 @@ export function executeMutationRequest({
   }
 
   const observedHead = verifyHead({ request: plan.request, runner });
+  const threadTarget = verifyReviewThreadTarget({ request: plan.request, runner });
   const retargetState = verifyRetargetBase({ request: plan.request, runner });
   const commentEditTarget = verifyOwnCommentTarget({ request: plan.request, runner });
+  if (threadTarget?.isResolved) {
+    return {
+      ...plan,
+      executed: false,
+      status: "already_applied",
+      observedHead,
+      observedBase: retargetState?.observedBase ?? null,
+      threadTarget,
+      commentEditTarget,
+      existingMutation: null,
+      stdout: "",
+      verification: threadTarget,
+    };
+  }
   if (retargetState?.alreadyApplied) {
     return {
       ...plan,
@@ -710,6 +779,7 @@ export function executeMutationRequest({
       status: "already_applied",
       observedHead,
       observedBase: retargetState.observedBase,
+      threadTarget,
       commentEditTarget,
       existingMutation: null,
       stdout: "",
@@ -727,6 +797,7 @@ export function executeMutationRequest({
       status: "already_applied",
       observedHead,
       observedBase: retargetState?.observedBase ?? null,
+      threadTarget,
       commentEditTarget,
       existingMutation,
       stdout: "",
@@ -736,8 +807,16 @@ export function executeMutationRequest({
 
   const stdout = runOrThrow(runner, plan.command);
   const branchDeletion = verifyBranchDeleted({ request: plan.request, runner });
-  const verify = verificationCommand(plan.request);
-  const verification = verify ? runOrThrow(runner, verify) : branchDeletion;
+  let verification;
+  if (REVIEW_THREAD_ACTIONS.has(plan.request.action)) {
+    verification = verifyReviewThreadTarget({ request: plan.request, runner });
+    if (verification.isResolved !== true) {
+      throw new Error("review_thread_resolution_verification_failed");
+    }
+  } else {
+    const verify = verificationCommand(plan.request);
+    verification = verify ? runOrThrow(runner, verify) : branchDeletion;
+  }
   if (plan.request.action === "retarget_pr" && verification !== plan.request.newBase) {
     throw new Error(
       `retarget_verification_failed: expected ${plan.request.newBase}, observed ${verification || "missing"}`,
@@ -750,6 +829,7 @@ export function executeMutationRequest({
     status: "succeeded",
     observedHead,
     observedBase: retargetState?.observedBase ?? null,
+    threadTarget,
     commentEditTarget,
     existingMutation: null,
     stdout,
