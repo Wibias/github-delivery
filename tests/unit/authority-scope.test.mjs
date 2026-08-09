@@ -46,6 +46,63 @@ test("merge authority scope binds method and exact head", () => {
   );
 });
 
+test("push authority scope binds repository remote, exact generation, new tip, and rewrite flag", () => {
+  const request = {
+    schemaVersion: 1,
+    action: "push_code",
+    mutationMode: "maintainer",
+    explicitInstruction: true,
+    repo: "Wibias/github-delivery",
+    remote: "origin",
+    branch: "feature/safe",
+    expectedRemoteTip: "a".repeat(40),
+    newTip: "b".repeat(40),
+    forceWithLease: true,
+  };
+  assert.deepEqual(authorityScopeForRequest(request), {
+    action: "push_code",
+    mutationMode: "maintainer",
+    repo: "Wibias/github-delivery",
+    remote: "origin",
+    branch: "feature/safe",
+    expectedRemoteTip: "a".repeat(40),
+    newTip: "b".repeat(40),
+    forceWithLease: true,
+  });
+  assert.notEqual(
+    authorityScopeSha256(request),
+    authorityScopeSha256({ ...request, newTip: "c".repeat(40) }),
+  );
+  assert.notEqual(
+    authorityScopeSha256(request),
+    authorityScopeSha256({ ...request, branch: "feature/other" }),
+  );
+});
+
+test("PR creation scope binds exact content, topology, and idempotency key", () => {
+  const request = {
+    schemaVersion: 1,
+    action: "create_pr",
+    mutationMode: "maintainer",
+    explicitInstruction: true,
+    repo: "Wibias/github-delivery",
+    base: "main",
+    head: "feature/safe",
+    draft: true,
+    idempotencyKey: "create-pr-feature-safe",
+    title: "Fix safe lifecycle",
+    body: "Body",
+  };
+  const scope = authorityScopeForRequest(request);
+  assert.equal(scope.base, "main");
+  assert.equal(scope.head, "feature/safe");
+  assert.equal(scope.draft, true);
+  assert.match(scope.titleSha256, /^[0-9a-f]{64}$/);
+  assert.match(scope.bodySha256, /^[0-9a-f]{64}$/);
+  assert.equal("title" in scope, false);
+  assert.equal("body" in scope, false);
+});
+
 test("social writes bind exact visible content and idempotency key", () => {
   const request = {
     schemaVersion: 1,

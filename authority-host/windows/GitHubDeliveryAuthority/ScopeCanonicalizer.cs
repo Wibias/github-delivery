@@ -44,6 +44,46 @@ internal static partial class ScopeCanonicalizer
                 scope["mergeMethod"] = NormalizeMergeMethod(OptionalString(request, "mergeMethod"));
                 break;
 
+            case "retarget_pr":
+                AddPrScope(scope, request);
+                scope["expectedBase"] = RequiredString(request, "expectedBase");
+                scope["newBase"] = RequiredString(request, "newBase");
+                break;
+
+            case "push_code":
+                scope["remote"] = RequiredString(request, "remote");
+                scope["branch"] = RequiredString(request, "branch");
+                scope["expectedRemoteTip"] = RequiredString(request, "expectedRemoteTip");
+                scope["newTip"] = RequiredString(request, "newTip");
+                scope["forceWithLease"] = request.TryGetProperty("forceWithLease", out var forceWithLease) && forceWithLease.ValueKind == JsonValueKind.True;
+                break;
+
+            case "create_pr":
+                scope["base"] = RequiredString(request, "base");
+                scope["head"] = RequiredString(request, "head");
+                scope["draft"] = request.TryGetProperty("draft", out var draft) && draft.ValueKind == JsonValueKind.True;
+                scope["idempotencyKey"] = RequiredString(request, "idempotencyKey");
+                scope["titleSha256"] = Sha256(RequiredString(request, "title"));
+                scope["bodySha256"] = BodySha256(request);
+                break;
+
+            case "update_pr_body":
+                AddPrScope(scope, request);
+                scope["bodySha256"] = BodySha256(request);
+                break;
+
+            case "create_issue":
+            case "create_follow_up_issue":
+                scope["idempotencyKey"] = RequiredString(request, "idempotencyKey");
+                scope["titleSha256"] = Sha256(RequiredString(request, "title"));
+                scope["bodySha256"] = BodySha256(request);
+                break;
+
+            case "assign_issue":
+                scope["issue"] = PositiveInt(request, "issue");
+                scope["assignee"] = RequiredString(request, "assignee");
+                break;
+
             case "post_comment":
             case "post_resolution_record":
             case "post_review":
@@ -114,12 +154,6 @@ internal static partial class ScopeCanonicalizer
                 scope["issue"] = PositiveInt(request, "issue");
                 break;
 
-            case "create_follow_up_issue":
-                scope["idempotencyKey"] = RequiredString(request, "idempotencyKey");
-                scope["titleSha256"] = Sha256(RequiredString(request, "title"));
-                scope["bodySha256"] = BodySha256(request);
-                break;
-
             case "delete_head_branch":
                 scope["pr"] = PositiveInt(request, "pr");
                 scope["targetRepo"] = RequiredString(request, "targetRepo", "authority_scope_target_repo_required");
@@ -149,7 +183,7 @@ internal static partial class ScopeCanonicalizer
     public static JsonObject BuildResource(JsonElement request)
     {
         var resource = new JsonObject();
-        foreach (var field in new[] { "pr", "issue", "commentId", "threadId", "expectedHead", "headRefName", "targetRepo", "supersedingPr" })
+        foreach (var field in new[] { "pr", "issue", "commentId", "threadId", "expectedHead", "headRefName", "targetRepo", "supersedingPr", "remote", "branch", "expectedRemoteTip", "newTip", "base", "head", "assignee" })
         {
             if (!request.TryGetProperty(field, out var value) || value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
             {
