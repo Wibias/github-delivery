@@ -118,7 +118,7 @@ repos it refuses to guess.
 the parent's current remote tip must be an **ancestor** of the child:
 
 ```powershell
-git merge-base --is-ancestor "origin/$Parent" "refs/heads/$Child"
+git merge-base --is-ancestor "$PushRemote/$Parent" "refs/heads/$Child"
 if ($LASTEXITCODE -ne 0) { throw "Child $Child is behind its parent; restack first." }
 ```
 
@@ -264,14 +264,14 @@ $Child = "feature/child"
 $Parent = "feature/parent"
 $Timestamp = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
 
-git fetch origin
+git fetch $PushRemote
 
 $LocalTip = git rev-parse "refs/heads/$Child"
-$RemoteTip = git ls-remote --heads origin "refs/heads/$Child" |
+$RemoteTip = git ls-remote --heads $PushRemote "refs/heads/$Child" |
   ForEach-Object { ($_ -split '\s+')[0] }
 
 if (-not $RemoteTip) {
-  throw "Remote branch origin/$Child was not found."
+  throw "Remote branch $PushRemote/$Child was not found."
 }
 
 $BackupRef = "refs/backup/$Child-$Timestamp"
@@ -296,9 +296,9 @@ Create a backup ref for every branch whose tip may be lost.
 Fetch immediately before each rewrite.
 
 ```powershell
-git fetch origin
+git fetch $PushRemote
 git switch $Child
-git rebase "origin/$Parent"
+git rebase "$PushRemote/$Parent"
 ```
 
 When conflicts occur, load `references/resolve-conflicts.md`. Resolve only the
@@ -315,7 +315,7 @@ After the rebase:
 5. push only with lease.
 
 ```powershell
-$CurrentRemoteTip = git ls-remote --heads origin "refs/heads/$Child" |
+$CurrentRemoteTip = git ls-remote --heads $PushRemote "refs/heads/$Child" |
   ForEach-Object { ($_ -split '\s+')[0] }
 
 if ($CurrentRemoteTip -ne $RemoteTip) {
@@ -323,7 +323,7 @@ if ($CurrentRemoteTip -ne $RemoteTip) {
 }
 
 git push --force-with-lease="refs/heads/$Child`:$RemoteTip" `
-  origin "HEAD:refs/heads/$Child"
+  $PushRemote "HEAD:refs/heads/$Child"
 ```
 
 Stop on lease rejection. Never retry by weakening the lease or using bare
