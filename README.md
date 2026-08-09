@@ -78,7 +78,7 @@ routes through `references/full-review-pr.md`. The normal bug, security, standar
 - Every retained regression assertion is **bound to a probe anchor** in the skill docs: `validate-evals.mjs` requires each `regression-cases.jsonl` assertion id to have a matching `<!-- assertion: … -->` marker inside one of the case's expected resources. Deleting or renaming a Must-probe rule in `references/` now fails the offline evals (assertion drift is a CI break, not a silent gap).
 - Probe routing is **deterministic and CI-verified**: each bug class is a named probe (`<!-- probe: … -->` in `bug-review.md` / `security-review.md`) whose trigger regexes live in `scripts/lib/probe-registry.mjs`; `planReviewScope` emits `requiredProbes` from the diff shape, and `tests/evals/scope-cases.jsonl` pins the exact probe set each CodeRabbit/Codex diff-shape class must route to. A trigger that stops firing, a probe whose tag is dropped, or a regression assertion moved off its probe's doc all fail the offline evals.
 - Review axes must emit **machine-checkable probe-application evidence**: before the bug or security axis is complete, the agent records `{ probeId, status, files?, reason? }` for every `requiredProbes[]` id and `scripts/verify-probe-coverage.mjs` must exit `0`. `clean`/`findings`/`n-a` statuses are enforced (n-a requires a concrete reason; findings requires reviewed files that are probe trigger files), so "we ran the probes" is verifiable, not asserted.
-- Creating a PR runs a **pre-open bug + security gate** (`scripts/pre-open-gate.mjs`) against the local branch diff: the PR is not opened until required bug lenses and security surfaces are reviewed and Confirmed High/Critical findings are fixed, and never opened from an incomplete diff.
+- Creating a PR follows a bounded **research → implementation → pre-open review** sequence. `scripts/pre-open-gate.mjs` reviews the non-empty candidate implementation diff before publication: the PR is not opened until required bug lenses and security surfaces are reviewed and Confirmed High/Critical findings are fixed, and never opened from an incomplete diff.
 
 - Full review traces every changed domain concept from its authoritative source through all producers, consumers, public or derived representations, materially distinct variants, and positive and negative tests.
 - Family-wide behavior cannot be approved from one representative test unless equivalence is proved; canonical and derived representations must be reconciled for every material behavior partition.
@@ -102,7 +102,7 @@ routes through `references/full-review-pr.md`. The normal bug, security, standar
 | `scripts/verify-probe-coverage.mjs` | Verify the review emitted accepted probe-application evidence for every required probe |
 | `scripts/live-github-fixture.mjs`  | Exercise the real GitHub lifecycle with namespaced temporary resources   |
 | `scripts/review-scope.mjs`         | Produce one evidence-ranked bug and security review plan                 |
-| `scripts/pre-open-gate.mjs`        | Gate PR creation on bug + security scope for the unopened branch diff    |
+| `scripts/pre-open-gate.mjs`        | Gate PR publication on bug + security scope for the implemented branch diff |
 | `scripts/build-dist.mjs`           | Build deterministic versioned skill bundles                              |
 | `scripts/prepare-release.mjs`      | Verify release identity, checksums, SBOM, notes, and provenance subjects |
 
@@ -140,7 +140,7 @@ The broker defaults to dry-run. Execution requires `--execute`, re-checks the PR
 | Watch or babysit a PR                                                     | `references/watch-pr.md`                                     |
 | Re-review after commits or reviews                                        | `references/re-review-pr.md`                                 |
 | Research an issue on development tip                                      | `references/research-issue.md`                               |
-| Create a linked PR for an issue (pre-open bug/security gate first)        | `references/create-pr-for-issue.md`                          |
+| Create a linked PR for an issue (bounded preflight → implement → pre-open gate) | `references/create-pr-for-issue.md`                     |
 | Full bug, security, and standards review                                  | `references/full-review-pr.md`                               |
 | Bug review on a PR or branch (deep adversarial method)                    | `references/bug-review.md` + `references/bug-hunt-method.md` |
 | Credential-transport / OAuth-provider bug review                          | `references/bug-review.md` → probe: credential transport     |
@@ -217,5 +217,3 @@ Use the **Live Integration** workflow to exercise the real lifecycle. Scheduled 
 The planned implementation roadmap is complete: evidence snapshots, authoritative ship decisions, base-health isolation, feedback resolution, guarded mutations, capability discovery, behavioral evaluations, deterministic packaging, provenance-backed releases, repository security controls, private vulnerability reporting, live GitHub integration fixtures, evidence-based review scoping, the issue lifecycle (PRDs, breakdowns, triage, QA intake, refactor plans, agent briefs, out-of-scope records), internal stacked-PR lifecycle with bottom-up merging and gh-stack-derived operational practices (rerere conflict memory, remote.pushDefault resolution, parent-ancestor needsRebase preflight, layer-ownership editing, merge-queue all-or-nothing lower-stack merge), conflict resolution, adaptive settle verification, spec and standards review, explicit behavior-preserving simplification with mandatory post-change full review, a pre-open bug + security gate for PR creation, HTTPS-only credential-transport enforcement for OAuth/key provider reviews, immediate own-review reaction to bot full-review signals, regression-assertion → probe-anchor binding, deterministic diff-shape → probe routing with scope-case fixtures, and machine-checkable probe-application evidence gated by `verify-probe-coverage.mjs` are implemented.
 
 Remaining work is operational rather than architectural: maintain the documented live repository rules, keep available GitHub security features enabled, run release acceptance for new versions, and extend the regression corpus as GitHub and agent hosts evolve.
-
-MIT licensed.

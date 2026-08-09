@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import { planReviewScope } from "../../scripts/lib/review-scope.mjs";
@@ -19,6 +20,14 @@ test("pre-open gate: docs-only branch is ready", () => {
   const { decision, blockers } = gateDecision(plan);
   assert.equal(decision, "ready");
   assert.deepEqual(blockers, []);
+});
+
+test("pre-open gate: empty candidate diff is blocked until implementation exists", () => {
+  const plan = planReviewScope({ repo: "acme/widget", pr: null, headRefOid: "base", files: [] });
+  const result = evaluate(plan);
+  assert.equal(result.decision, "blocked");
+  assert.equal(result.implementationDiffPresent, false);
+  assert.deepEqual(result.blockers, ["workflow:implementation_missing"]);
 });
 
 test("pre-open gate: logic-bearing branch is blocked with required lenses", () => {
@@ -88,6 +97,14 @@ test("pre-open gate: evidence does not change the unknown decision", () => {
   assert.equal(decision, "unknown");
 });
 
+test("pre-open gate: evidence cannot clear a missing implementation diff", () => {
+  const plan = planReviewScope({ repo: "acme/widget", pr: null, headRefOid: "base", files: [] });
+  const evidence = { schemaVersion: 1, lenses: {}, surfaces: {} };
+  const result = evaluate(plan, evidence);
+  assert.equal(result.decision, "blocked");
+  assert.deepEqual(result.blockers, ["workflow:implementation_missing"]);
+});
+
 test("pre-open gate: invalid evidence is rejected by validation", () => {
   const invalid = validatePreOpenEvidence({ lenses: { silent_failures: "maybe" }, surfaces: {} });
   assert.equal(invalid.ok, false);
@@ -108,4 +125,36 @@ test("pre-open gate: evidenceClears accepts done and n/a-with-reason only", () =
   assert.equal(evidenceClears({ silent_failures: "n/a" }, "silent_failures"), false);
   assert.equal(evidenceClears({ silent_failures: "maybe" }, "silent_failures"), false);
   assert.equal(evidenceClears({}, "silent_failures"), false);
+});
+
+test("create-pr workflow has a bounded research-to-implementation transition", () => {
+  const workflow = readFileSync("references/create-pr-for-issue.md", "utf8");
+  const implementationIndex = workflow.indexOf("### D. Implement locally");
+  const gateIndex = workflow.indexOf("### D2. Pre-open bug + security gate");
+
+  assert.ok(implementationIndex >= 0, "implementation phase must exist");
+  assert.ok(gateIndex > implementationIndex, "pre-open gate must run after implementation");
+  assert.match(workflow, /Preflight completion boundary/);
+  assert.match(workflow, /Do not re-enter preflight/);
+  assert.match(workflow, /Finding another implementation call site[\s\S]*not by itself/);
+  assert.doesNotMatch(workflow, /required — before coding or opening/);
+});
+
+test("research workflow hands composed create-pr work off instead of looping", () => {
+  const workflow = readFileSync("references/research-issue.md", "utf8");
+  assert.match(workflow, /Composition handoff to create-PR/);
+  assert.match(workflow, /research is complete/i);
+  assert.match(workflow, /Do \*\*not\*\* continue repository-wide call-site/);
+  assert.match(workflow, /implementation discovery, \*\*not a reason to reopen research\*\*/);
+});
+
+test("entrypoint and README describe create-pr phases in forward-progress order", () => {
+  const skill = readFileSync("SKILL.md", "utf8");
+  const readme = readFileSync("README.md", "utf8");
+
+  assert.match(skill, /bounded preflight → implement → pre-open bug\/security gate/);
+  assert.match(skill, /post-implementation and pre-publication/);
+  assert.doesNotMatch(skill, /preflight \+ pre-open bug\/security gate\) first/);
+  assert.match(readme, /bounded \*\*research → implementation → pre-open review\*\* sequence/);
+  assert.doesNotMatch(readme, /pre-open bug\/security gate first/);
 });

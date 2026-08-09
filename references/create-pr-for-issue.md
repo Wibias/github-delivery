@@ -17,15 +17,15 @@ Policy modules:
 
 ## Goal
 
-Open **one** PR on the **canonical** (issue’s) repository that fixes issue `#N`, with verified bidirectional linking, self-assignment, review/CI cleanup, merge-ready. **Run the pre-open bug + security gate before opening** and only open when the gate permits. Do **not** merge. Do **not** batch other issues’ PRs unless the user explicitly demanded a batch.
+Open **one** PR on the **canonical** (issue’s) repository that fixes issue `#N`, with verified bidirectional linking, self-assignment, review/CI cleanup, merge-ready. **Run a bounded need-to-fix preflight before coding. Implement the fix locally, then run the pre-open bug + security gate on the resulting candidate diff before publishing/opening the PR.** Do **not** merge. Do **not** batch other issues’ PRs unless the user explicitly demanded a batch.
 
 Every network-visible write in this workflow is brokered. Do not use bare `git push`, `gh pr create`, mutating `gh pr edit`, or `gh issue edit`. Use `scripts/github-mutate.mjs` with an exact lifecycle action and trusted authority where required.
 
 ## Workflow (single sequence)
 
-### A. Need-to-fix preflight (required — report before coding)
+### A. Need-to-fix preflight (required — bounded, report before coding)
 
-Run a **research preflight** (same checks as `research-issue`, can be lighter) and **tell the user**:
+Run a **research preflight** using the four decision checks below and **tell the user**:
 
 1. Still needed on **latest development branch** tip?
 2. Already fixed on development (cite SHA/PR)?
@@ -39,7 +39,28 @@ Run a **research preflight** (same checks as `research-issue`, can be lighter) a
 | Duplicate issue | **Do not create a PR** on the duplicate; point at the canonical issue |
 | Still needs fix | Continue to **B** |
 
-If preflight is unclear, say what’s missing; do not open a speculative PR.
+If preflight is unclear because one of those four decisions lacks required evidence, say what is missing and restore that evidence. Do not open a speculative PR.
+
+#### Preflight completion boundary
+
+The create-PR preflight is complete as soon as all of the following are true on one captured development-tip / issue-state snapshot:
+
+- the latest development tip is identified and the issue is confirmed still actionable there;
+- the full issue conversation required by **A2** is available and yields an implementation contract;
+- covering open PR and obvious-duplicate checks are complete; and
+- the verdict is one of the table outcomes above.
+
+When the verdict is **Still needs fix** and the issue contract is actionable, **research is complete for this phase: proceed to B/C/D and start implementation.** Do not continue repository-wide call-site discovery merely to make the future implementation map exhaustive. Implementation-specific dependency discovery belongs in **D** and should be driven by concrete code dependencies as they are encountered.
+
+If `research-issue.md` was just completed for this same issue on the same development tip and unchanged issue conversation, reuse that verdict/evidence instead of repeating A.
+
+**Do not re-enter preflight** unless a new fact invalidates its decision, specifically:
+
+1. the development tip or authoritative issue scope changed materially;
+2. implementation discovers a concrete existing fix, covering PR, or duplicate that was not visible in the captured snapshot; or
+3. implementation exposes a product/scope contradiction that makes the issue contract non-actionable.
+
+Finding another implementation call site, edge case, adapter, GUI surface, test, or documentation consumer is **not by itself** a reason to restart preflight.
 
 ### A2. Issue conversation intake (required — before scoping or coding)
 
@@ -58,25 +79,39 @@ Follow shared **Issue conversation intake** (`references/shared-rules.md`). The 
 
 ### C. Confirm scope
 
-Confirm this request is **one** issue (or an explicit batch). Otherwise pick/ask — do not open extra PRs. If implementation scope explodes → hand off to `split-to-prs`. Explicit create batch of **>3** issues → **subagent fan-out** (shared rules).
+Confirm this request is **one** issue (or an explicit batch). Otherwise pick/ask — do not open extra PRs. Explicit create batch of **>3** issues → **subagent fan-out** (shared rules).
 
-### C2. Pre-open bug + security gate (required — before coding or opening)
+Treat implementation scope as “exploded” only when concrete evidence shows the issue contains multiple independently shippable concerns that should not share one atomic validation/review boundary, or the acceptance criteria conflict in a way that requires separate deliverables. **File count, cross-layer changes, or discovering more consumers is not enough by itself to split a cohesive vertical feature.** If a single acceptance contract legitimately spans config, CLI/API, runtime, UI, tests, and docs, keep it one PR and implement it incrementally. Hand off to `split-to-prs` only when that semantic split criterion is actually met.
 
-Run the **bug-finding** and **security review** passes on the code that will go into this PR **before opening it**. Do **not** open a PR while the gate is blocked or unknown.
+### D. Implement locally
 
-1. Run the gate on the branch diff (base → head):
+**Implementation happens before the pre-open bug/security gate.** The gate reviews the candidate implementation diff; it is not a prerequisite for writing that diff.
+
+1. Start from the exact development/base tip established in A. Use a task branch/worktree that preserves unrelated local user work; local branch creation and commits are not network-visible publication.
+2. Implement the smallest complete change that satisfies the issue contract. Inspect additional call sites or integration surfaces **as concrete dependencies require them**, then edit/test instead of returning to broad preflight research.
+3. Run the focused local validation appropriate to the changed code (tests/typecheck/build/repro as available) and obey repository-local instructions.
+4. Confirm there is a candidate base → head diff. If there is **no implementation diff** because the issue was actually already fixed or no change is required, return to the corresponding A verdict and do **not** open an empty PR.
+5. Once a non-empty candidate diff exists, continue immediately to **D2**.
+
+### D2. Pre-open bug + security gate (required — after implementation, before publication/opening)
+
+Run the **bug-finding** and **security review** passes on the code that will go into this PR **after the candidate implementation exists and before publishing/opening it**. Do **not** open a PR while the gate is blocked or unknown.
+
+1. Run the gate on the candidate branch diff (base → head):
    ```bash
    node "<github-delivery>/scripts/pre-open-gate.mjs" OWNER/REPO <base> <head>
    ```
-2. If `decision: "ready"` → no required bug/security scope (docs-only or clean); proceed to **D**.
-3. If `decision: "blocked"` → the diff has required bug lenses and/or security surfaces. Run the **bug axis** via **`references/bug-review.md`** and the **security axis** via **`references/security-review.md`** on the **branch diff** (not a PR head). Fix Confirmed High/Critical findings (and useful Mediums) **before** opening. Only proceed when:
-   - every required lens/surface is `done` or honestly `n/a (why)`, and
-   - no Confirmed High/Critical remains open.
+2. If `decision: "ready"` → no required bug/security scope remains; proceed to **E**.
+3. If `decision: "blocked"`:
+   - `workflow:implementation_missing` means the gate was invoked without a candidate implementation diff. **Return to D and implement; do not substitute more research.**
+   - Otherwise the diff has required bug lenses and/or security surfaces. Run the **bug axis** via **`references/bug-review.md`** and the **security axis** via **`references/security-review.md`** on the **branch diff** (not a PR head). Fix Confirmed High/Critical findings (and useful Mediums) **before** opening. Only proceed when:
+     - every required lens/surface is `done` or honestly `n/a (why)`, and
+     - no Confirmed High/Critical remains open.
    Rerun the gate after fixes to confirm the diff shape is what you reviewed; the exit code stays `blocked` for any logic-bearing diff unless you pass `--evidence-file` recording the completed lens/surface statuses. Clearance is the recorded `done`/`n/a` evidence you produce in the passes above — carry that evidence (not the bare exit code) forward as proof the blockers were addressed.
 4. If `decision: "unknown"` → **stop**. Restore complete branch evidence (fetch base, checkout head, resolve missing patches) and rerun. **Never open a PR from an incomplete diff.**
 5. Record the gate result (decision + blockers cleared) in chat and carry it into the PR body validation notes.
 
-### D. Implement + open canonical PR
+### E. Publish implementation + open canonical PR
 
 1. Resolve `OWNER/REPO` from the **issue** (not from a fork remote you happen to be in).
 2. Base branch = that repo’s development/default as appropriate.
@@ -120,7 +155,7 @@ Run the **bug-finding** and **security review** passes on the code that will go 
    The broker adds a hidden idempotency marker, does remote read-before-write, and verifies the created PR by that marker. Do not substitute bare `gh pr create`.
 6. Confirm the returned PR URL is `https://github.com/OWNER/REPO/pull/…`. If topology is wrong, stop and use the separately authorized close/recreate sequence; do not silently mutate a different repository.
 
-### E. Link + assign + opened comment
+### F. Link + assign + opened comment
 
 1. **PR → issue:** body contains `Fixes #N` or `Closes #N`.
 2. Verify read-only with `gh pr view <pr> --repo OWNER/REPO --json number,url,body,closingIssuesReferences`. `closingIssuesReferences` must include issue `#N`.
@@ -134,7 +169,7 @@ Run the **bug-finding** and **security review** passes on the code that will go 
 
 6. Spot-check Development sidebar / linked PRs still point at the **canonical** PR.
 
-### F. Make merge-ready (same bar as `fix-pr-bots`)
+### G. Make merge-ready (same bar as `fix-pr-bots`)
 
 1. Keep branch up to date with base; resolve conflicts; **compile against tip**. Every remote branch update goes through `push_code`; local Git operations remain subject to `references/policy/git.md`.
 2. Review wait-loop: owners/maintainers + humans + bots; push through the broker when fixes change the head; keep going until stable or hard blocker.
@@ -150,10 +185,12 @@ Run the **bug-finding** and **security review** passes on the code that will go 
 - Exactly the requested PR count (default **one**); no surprise batch
 - PR on **issue’s** repo (not fork-only)
 - Every network-visible write used the broker and any high-assurance write redeemed trusted authority
+- Bounded need-to-fix preflight reached one explicit verdict; unchanged completed research was not repeated
+- Implementation started after the actionable preflight and produced a non-empty candidate diff before the pre-open gate ran
 - PR body is evidence-grounded, follows `references/pr-description.md`, and matches the final head
 - `closingIssuesReferences` includes the issue; **issue** self-assigned when possible
 - Single complete opened-PR comment (no duplicates/cut-offs)
 - Screenshot gate passed (or N/A)
 - Full issue comment thread read when comments exist (shared **Issue conversation intake**)
-- **Pre-open bug + security gate** passed (decision `ready`, or `blocked` fully reviewed + Confirmed High/Critical fixed before opening)
+- **Pre-open bug + security gate** passed on the implemented candidate diff (decision `ready`, or `blocked` fully reviewed + Confirmed High/Critical fixed before opening)
 - Own bug + security + Spec/Standards done; reviews + required CI green on tip; merge-ready posted; **not** merged

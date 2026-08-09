@@ -30,6 +30,14 @@ Do **not** open a PR unless the user also asked to create one.
 - One or many issue numbers (`#12`, `#12 #34`, “issues 12 and 34”).
 - Default research head: repo’s **development branch** (often `dev` / `develop` / default trunk — detect; fetch latest). Do not assume `main` is “most up to date” if a dedicated development branch exists.
 
+## Composition handoff to create-PR
+
+When the same user request also asks to **create a PR**, this workflow owns the research verdict, not exhaustive implementation design.
+
+Once every requested issue has the required verdict/priority/security-relevance evidence and its required research comment is published, **research is complete**. For an issue whose verdict is **Needs fix on development**, hand the captured development-tip SHA, issue-conversation contract, duplicate/covering-PR result, and research verdict directly to `references/create-pr-for-issue.md` and begin that workflow’s implementation phase. Do **not** continue repository-wide call-site or integration-surface discovery merely to make the future implementation map exhaustive.
+
+On an unchanged development tip and unchanged authoritative issue conversation, `create-pr-for-issue` may reuse this evidence instead of repeating its need-to-fix preflight. Re-run research only when new evidence can invalidate the verdict: the development tip or issue scope changed materially, a concrete existing fix/covering PR/duplicate is discovered, or implementation exposes a product/scope contradiction. Finding another code consumer, adapter, edge case, test, GUI surface, or documentation path is implementation discovery, **not a reason to reopen research**.
+
 ## Per-issue checklist
 
 Run for **each** issue (batch in parallel when independent). If **>3** issues: fan out with **subagents** (shared **Multi-PR / multi-issue fan-out**) — one issue per subagent; parent aggregates the chat table.
@@ -96,3 +104,4 @@ Research may batch **comments**; it must **not** open PRs. Opening PRs is `creat
 - Security-review ask made when relevance is possible/likely
 - No PR opened unless also requested
 - No security review started unless the user said yes
+- For a composed research + create-PR request, the completed verdict/evidence is handed off once; unchanged research is not repeated and implementation discovery does not reopen this phase
