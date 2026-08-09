@@ -15,7 +15,12 @@ const SIMPLIFY_REQUEST =
   /\b(simplify|simplification|cleanup|clean up|deduplicate|dedupe|reduce duplication)\b/;
 const MERGE_INTENT = /\b(merge|ship)\b/;
 const MERGE_READY_PHRASE = /\bmerge[- ]?ready\b/g;
-const NEGATED_MERGE_INTENT = /\b(?:do not|don't|never)\s+(?:merge|ship)\b/;
+const NEGATED_MERGE_INTENT =
+  /\b(?:do not|don't|dont|never|without)\s+(?:merge|merging|ship|shipping)\b/;
+const DELIBERATIVE_MERGE =
+  /\b(?:should|can|could|would)\s+(?:i|we)\b[\s\S]*\b(?:merge|ship)\b|\b(?:why can't|why can’t|when should)\s+(?:i|we)\b[\s\S]*\b(?:merge|ship)\b|\b(?:what happens if|what if)\b[\s\S]*\b(?:merge|ship)\b|\bbefore\s+(?:i|we)\s+(?:merge|ship)\b/;
+const ASSISTANT_MERGE_REQUEST =
+  /\b(?:please\s+)?(?:merge|ship)\b|\b(?:can|could|would|will)\s+you\b[\s\S]*\b(?:merge|ship)\b|\bgo ahead(?: and)?\s+(?:merge|ship)\b/;
 const PR_REFERENCE = /\bpr\s*#?\d+\b/;
 const FULL_REVIEW_REQUEST = /\b(full review|review .* for real bugs|usefulness verdict)\b/;
 const FIX_REVIEW_REQUEST =
@@ -29,12 +34,25 @@ function prepareAndMergeActions(text) {
   return actions;
 }
 
-function hasExplicitMergeIntent(text) {
-  return MERGE_INTENT.test(text.replace(MERGE_READY_PHRASE, ""));
+function unquotedText(text) {
+  return text.replace(/"[^"\n]*"|`[^`\n]*`|'[^'\n]*'/g, " ");
+}
+
+function mergeText(text) {
+  return unquotedText(text).replace(MERGE_READY_PHRASE, "");
+}
+
+export function hasExplicitMergeIntent(prompt) {
+  const text = normalized(prompt);
+  const candidate = mergeText(text);
+  if (!MERGE_INTENT.test(candidate)) return false;
+  if (NEGATED_MERGE_INTENT.test(candidate)) return false;
+  if (DELIBERATIVE_MERGE.test(candidate)) return false;
+  return ASSISTANT_MERGE_REQUEST.test(candidate);
 }
 
 function isPrepareAndMergeRequest(text) {
-  if (!hasExplicitMergeIntent(text) || NEGATED_MERGE_INTENT.test(text) || !PR_REFERENCE.test(text)) {
+  if (!hasExplicitMergeIntent(text) || !PR_REFERENCE.test(text)) {
     return false;
   }
   return (
@@ -42,6 +60,10 @@ function isPrepareAndMergeRequest(text) {
     FIX_REVIEW_REQUEST.test(text) ||
     SIMPLIFY_REQUEST.test(text)
   );
+}
+
+function isMergeDiscussion(text) {
+  return PR_REFERENCE.test(text) && MERGE_INTENT.test(text.replace(MERGE_READY_PHRASE, "")) && !hasExplicitMergeIntent(text);
 }
 
 export function routeShippingGithubPrompt(prompt) {
@@ -67,8 +89,9 @@ export function routeShippingGithubPrompt(prompt) {
   }
 
   if (
-    /\b(merge|ship)\b[\s\S]*\bpr\s*#?\d+/.test(text) ||
-    /^merge it\b/.test(text)
+    (hasExplicitMergeIntent(text) && PR_REFERENCE.test(text)) ||
+    /^merge it\b/.test(text) ||
+    /^ship it\b/.test(text)
   ) {
     return result("references/merge-pr.md", "maintainer", [
       "merge_pr",
@@ -76,6 +99,10 @@ export function routeShippingGithubPrompt(prompt) {
       "post_issue_comment",
       "close_linked_issue",
     ]);
+  }
+
+  if (isMergeDiscussion(text)) {
+    return result("references/status.md", "read-only", []);
   }
 
   if (
