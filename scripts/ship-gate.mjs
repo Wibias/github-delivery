@@ -58,10 +58,21 @@ try {
         maxAgeSeconds: args.maxAgeSeconds,
       });
 
+  const requiredChecks = evaluateRequiredChecksSnapshot(snapshot);
+  const authoritativeChecks = snapshot.evidence?.checks?.authoritative || null;
+  if (authoritativeChecks?.sha) {
+    requiredChecks.sha = authoritativeChecks.sha;
+    requiredChecks.authoritativeCheckSha = authoritativeChecks.sha;
+    requiredChecks.authoritativeCheckReason = authoritativeChecks.reason || null;
+  } else {
+    requiredChecks.authoritativeCheckSha = requiredChecks.sha || snapshot.headOid || null;
+    requiredChecks.authoritativeCheckReason = "legacy_head_snapshot";
+  }
+
   const output = combineShipGateResults({
     snapshot,
     mutationProfile: mutationProfile(mutationArgs.mode),
-    requiredChecks: evaluateRequiredChecksSnapshot(snapshot),
+    requiredChecks,
     baseHealth: evaluateBaseHealthSnapshot(snapshot),
     reviewPolicy: evaluateReviewPolicySnapshot(snapshot),
     reviewThreads: evaluateReviewThreadsSnapshot(snapshot),
