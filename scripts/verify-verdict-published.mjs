@@ -180,7 +180,7 @@ try {
         repo: args.repo,
         pr: args.pr,
         head: args.head,
-        publicKey: authorityVerifier,
+        authorityVerifier,
       })
     : verdict
       ? { valid: false, reason: "review_authority_verifier_missing" }
