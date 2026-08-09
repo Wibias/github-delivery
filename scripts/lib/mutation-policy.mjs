@@ -65,9 +65,9 @@ function buildProfile(mode) {
       "reply_bot_thread",
       "resolve_bot_thread",
     ]);
-    allow(profile, ["reply_human_thread"], { exactText: true });
   }
   if (["maintainer", "autonomous"].includes(mode)) {
+    allow(profile, ["reply_human_thread"], { exactText: true });
     allow(profile, ["push_code", "post_resolution_record"]);
   }
   if (mode === "maintainer") {
@@ -192,7 +192,7 @@ export function extractMutationModeArgs(argv = []) {
   let explicitInstruction = false;
   let exactTextConfirmed = false;
   let seenMode = false;
-  for (let index = 0; index < argv.length; index++) {
+  for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];
     if (value === "--mutation-mode") {
       if (seenMode) throw new Error("--mutation-mode may only be provided once");
