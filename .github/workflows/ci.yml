@@ -45,11 +45,11 @@ jobs:
         run: |
           $Project = 'authority-host/windows/GitHubDeliveryAuthority/GitHubDeliveryAuthority.csproj'
           $ErrorActionPreference = 'Continue'
-          & dotnet restore $Project --locked-mode --verbosity normal 2>&1 |
+          & dotnet restore $Project --locked-mode --verbosity minimal 2>&1 |
             Tee-Object -FilePath authority-host-restore.log
           $exitCode = $LASTEXITCODE
           if ($exitCode -ne 0) {
-            Get-Content authority-host-restore.log | ForEach-Object {
+            Get-Content authority-host-restore.log | Select-Object -Last 10 | ForEach-Object {
               $line = $_ -replace '%','%25' -replace "`r",'%0D' -replace "`n",'%0A'
               Write-Host "::error::$line"
             }
