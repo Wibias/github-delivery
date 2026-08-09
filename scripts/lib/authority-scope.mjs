@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 
+import { actionDefinition } from "./mutation-action-registry.mjs";
+
 const MUTATION_MODES = new Set(["read-only", "review", "maintainer", "autonomous"]);
 const IDEMPOTENCY_MARKER_RE = /\n\n<!-- github-delivery:idempotency [0-9a-f]{64} -->\s*$/i;
 
@@ -95,7 +97,13 @@ export function canonicalJson(value) {
 
 export function authorityScopeForRequest(request = {}) {
   const scope = base(request);
-  switch (scope.action) {
+  const definition = actionDefinition(scope.action);
+  const scopeKind = definition?.authorityScopeKind || null;
+  if (!definition?.mutation || !scopeKind) {
+    throw new Error(`authority_scope_unsupported_action:${scope.action}`);
+  }
+
+  switch (scopeKind) {
     case "merge_pr":
       return {
         ...scope,
@@ -140,7 +148,6 @@ export function authorityScopeForRequest(request = {}) {
       };
 
     case "create_issue":
-    case "create_follow_up_issue":
       return {
         ...scope,
         idempotencyKey: exactString(request.idempotencyKey, "idempotency_key"),
@@ -155,9 +162,7 @@ export function authorityScopeForRequest(request = {}) {
         assignee: exactString(request.assignee, "assignee"),
       };
 
-    case "post_comment":
-    case "post_resolution_record":
-    case "post_review":
+    case "pr_body_social":
       return {
         ...scope,
         ...prScope(request),
@@ -165,7 +170,7 @@ export function authorityScopeForRequest(request = {}) {
         bodySha256: bodyHash(request.body),
       };
 
-    case "post_issue_comment":
+    case "issue_comment":
       return {
         ...scope,
         issue: positiveInteger(request.issue, "issue"),
@@ -182,8 +187,7 @@ export function authorityScopeForRequest(request = {}) {
         bodySha256: bodyHash(request.body),
       };
 
-    case "reply_bot_thread":
-    case "reply_human_thread":
+    case "reply_thread":
       return {
         ...scope,
         ...prScope(request),
@@ -193,7 +197,6 @@ export function authorityScopeForRequest(request = {}) {
       };
 
     case "resolve_thread":
-    case "resolve_bot_thread":
       return {
         ...scope,
         ...prScope(request),
