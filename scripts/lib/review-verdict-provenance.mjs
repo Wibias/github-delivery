@@ -22,11 +22,21 @@ function visibleBody(body) {
   return stripReviewAuthorityMarker(String(body || "").replace(IDEMPOTENCY_MARKER_RE, ""));
 }
 
+function verifierOptions(authorityVerifier, publicKey, trustStore) {
+  if (authorityVerifier !== undefined && authorityVerifier !== null) {
+    if (typeof authorityVerifier === "string") return { publicKey: authorityVerifier };
+    if (typeof authorityVerifier === "object") return { trustStore: authorityVerifier };
+    throw new Error("review_authority_verifier_invalid");
+  }
+  return { publicKey, trustStore };
+}
+
 export function verifyReviewVerdictProvenance({
   comment,
   repo,
   pr,
   head,
+  authorityVerifier = undefined,
   publicKey = null,
   trustStore = null,
 } = {}) {
@@ -55,10 +65,15 @@ export function verifyReviewVerdictProvenance({
     idempotencyKey: authorityMarker.idempotencyKey,
     body: visibleBody(body),
   };
+  let verifier;
+  try {
+    verifier = verifierOptions(authorityVerifier, publicKey, trustStore);
+  } catch (error) {
+    return { valid: false, reason: String(error?.message || error) };
+  }
   const authority = verifyAuthorityGrant({
     token: authorityMarker.authorityGrant,
-    publicKey,
-    trustStore,
+    ...verifier,
     request,
     now: time.now,
   });
