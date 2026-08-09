@@ -157,7 +157,7 @@ export function workflowSecurityFacts(source = "") {
   for (let index = 0; index < parsed.records.length; index += 1) {
     const row = parsed.records[index];
     if (row.key === "on") {
-      if (/^\[.*\]$/.test(row.value) && /(?:^|[\s,\[])pull_request_target(?:[\s,\]]|$)/.test(row.value)) {
+      if (row.value.includes("pull_request_target")) {
         facts.pullRequestTargetLines.push(row.line);
       }
       for (const child of descendants(parsed.records, index)) {
