@@ -39,13 +39,17 @@ jobs:
       - name: Run checks
         run: npm run check
 
-      - name: Restore Windows authority host in locked mode
+      - name: Regenerate Windows authority-host lockfile for security update
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $Project = 'authority-host/windows/GitHubDeliveryAuthority/GitHubDeliveryAuthority.csproj'
-          dotnet restore $Project --locked-mode
+          $Lock = 'authority-host/windows/GitHubDeliveryAuthority/packages.lock.json'
+          dotnet restore $Project --force-evaluate
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Write-Host '---BEGIN GENERATED PACKAGES.LOCK.JSON---'
+          Get-Content $Lock
+          Write-Host '---END GENERATED PACKAGES.LOCK.JSON---'
 
       - name: Build Windows authority host
         if: runner.os == 'Windows'
