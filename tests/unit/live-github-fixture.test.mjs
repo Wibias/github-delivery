@@ -27,6 +27,21 @@ function requiredChecks(overrides = {}) {
   ));
 }
 
+test("live fixture check contract matches the supported Node matrix", () => {
+  assert.deepEqual(
+    DEFAULT_EXPECTED_CHECKS.filter((item) => item.workflow === "CI").map((item) => item.name),
+    [
+      "Node 22 / ubuntu-latest",
+      "Node 22 / windows-latest",
+      "Node 22 / macos-latest",
+      "Node 24 / ubuntu-latest",
+      "Node 24 / windows-latest",
+      "Node 24 / macos-latest",
+    ],
+  );
+  assert.equal(DEFAULT_EXPECTED_CHECKS.some((item) => /Node 20/.test(item.name || "")), false);
+});
+
 test("builds namespaced deterministic fixture plans", () => {
   const plan = buildFixturePlan({ repo: "acme/widget", runId: "run-42" });
   assert.equal(plan.branch, "github-delivery-fixture/run-42");
@@ -70,11 +85,11 @@ test("keeps pending checks incomplete", () => {
 
 test("fails immediately when any observed check fails", () => {
   const checks = requiredChecks();
-  checks[0] = check("CI", "Node 20 / ubuntu-latest", "fail", "FAILURE");
+  checks[0] = check("CI", "Node 22 / ubuntu-latest", "fail", "FAILURE");
   const result = evaluateFixtureChecks({ checks });
   assert.equal(result.state, "blocked");
   assert.equal(result.code, "fixture_checks_failed");
-  assert.deepEqual(result.failedChecks, ["CI / Node 20 / ubuntu-latest"]);
+  assert.deepEqual(result.failedChecks, ["CI / Node 22 / ubuntu-latest"]);
 });
 
 test("waits when a required workflow has not appeared", () => {
@@ -86,11 +101,11 @@ test("waits when a required workflow has not appeared", () => {
 });
 
 test("waits when one CI matrix job has not appeared", () => {
-  const checks = requiredChecks().filter((item) => item.name !== "Node 20 / windows-latest");
+  const checks = requiredChecks().filter((item) => item.name !== "Node 24 / windows-latest");
   const result = evaluateFixtureChecks({ checks });
   assert.equal(result.state, "waiting");
   assert.equal(result.code, "fixture_required_checks_missing");
-  assert.deepEqual(result.missingChecks, ["CI / Node 20 / windows-latest"]);
+  assert.deepEqual(result.missingChecks, ["CI / Node 24 / windows-latest"]);
 });
 
 test("passes only after every required check succeeds and records extras", () => {
