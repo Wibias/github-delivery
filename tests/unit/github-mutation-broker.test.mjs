@@ -206,66 +206,26 @@ test("close_pr plans a close and verifies the closed state", () => {
   assert.equal(verification.state, "CLOSED");
 });
 
-test("delete_head_branch plans a ref delete for the actor-owned head", () => {
-  const plan = planMutationRequest({
-    schemaVersion: 1,
-    action: "delete_head_branch",
-    mutationMode: "maintainer",
-    explicitInstruction: true,
-    repo: "Wibias/opencodex",
-    pr: 1004,
-    headRefName: "feat/ri-02-request-history-index",
-    headOwnerLogin: "Wibias",
-    headRepo: "Wibias/opencodex",
-    baseRepo: "lidge-jun/opencodex",
-    actorLogin: "Wibias",
-    isMerged: true,
-    isCrossRepository: true,
-  });
-  assert.equal(plan.authorization.allowed, true);
-  assert.deepEqual(plan.command.slice(0, 4), ["gh", "api", "-X", "DELETE"]);
-  assert.match(plan.command[4], /repos\/Wibias\/opencodex\/git\/refs\/heads\/feat\/ri-02-request-history-index/);
-});
-
-test("delete_head_branch honors headRepository for a fork PR when headRepo is absent", () => {
-  const plan = planMutationRequest({
-    schemaVersion: 1,
-    action: "delete_head_branch",
-    mutationMode: "maintainer",
-    explicitInstruction: true,
-    repo: "lidge-jun/opencodex",
-    pr: 1011,
-    headRefName: "feat/ri-04-policy-profile-core",
-    headOwnerLogin: "Wibias",
-    headRepository: "Wibias/opencodex",
-    baseRepository: "lidge-jun/opencodex",
-    actorLogin: "Wibias",
-    isMerged: true,
-    isCrossRepository: true,
-  });
-  assert.equal(plan.authorization.allowed, true);
-  assert.equal(plan.request.targetRepo, "Wibias/opencodex");
-  assert.match(plan.command[4], /repos\/Wibias\/opencodex\/git\/refs\/heads\/feat\/ri-04-policy-profile-core/);
-  assert.ok(!/repos\/lidge-jun\/opencodex\/git/.test(plan.command[4]));
-});
-
-test("delete_head_branch lets an explicit targetRepo win over the base repo", () => {
-  const plan = planMutationRequest({
-    schemaVersion: 1,
-    action: "delete_head_branch",
-    mutationMode: "maintainer",
-    explicitInstruction: true,
-    repo: "lidge-jun/opencodex",
-    pr: 1011,
-    headRefName: "feat/ri-04-policy-profile-core",
-    headOwnerLogin: "Wibias",
-    targetRepo: "Wibias/opencodex",
-    actorLogin: "Wibias",
-    isMerged: true,
-    isCrossRepository: true,
-  });
-  assert.equal(plan.request.targetRepo, "Wibias/opencodex");
-  assert.match(plan.command[4], /repos\/Wibias\/opencodex\/git\/refs\/heads\/feat\/ri-04-policy-profile-core/);
+test("delete_head_branch fails closed until expected-tip compare-and-delete exists", () => {
+  assert.throws(
+    () =>
+      planMutationRequest({
+        schemaVersion: 1,
+        action: "delete_head_branch",
+        mutationMode: "maintainer",
+        explicitInstruction: true,
+        repo: "Wibias/opencodex",
+        pr: 1004,
+        headRefName: "feat/ri-02-request-history-index",
+        headOwnerLogin: "Wibias",
+        headRepo: "Wibias/opencodex",
+        baseRepo: "lidge-jun/opencodex",
+        actorLogin: "Wibias",
+        isMerged: true,
+        isCrossRepository: true,
+      }),
+    /automatic deletion disabled until expected-tip compare-and-delete is available/,
+  );
 });
 
 test("delete_head_branch rejects another user's head", () => {
@@ -420,59 +380,33 @@ test("edit_own_comment allows the authenticated actor to edit its comment on the
   assert.equal(calls.filter((call) => call.includes("PATCH")).length, 1);
 });
 
-function deleteHeadRequest() {
-  return {
-    schemaVersion: 1,
-    action: "delete_head_branch",
-    mutationMode: "maintainer",
-    explicitInstruction: true,
-    repo: "Wibias/opencodex",
-    pr: 1004,
-    headRefName: "feat/ri-02-request-history-index",
-    headOwnerLogin: "Wibias",
-    headRepo: "Wibias/opencodex",
-    baseRepo: "lidge-jun/opencodex",
-    actorLogin: "Wibias",
-    isMerged: true,
-    isCrossRepository: true,
-  };
-}
-
-test("delete_head_branch treats a 403 verification response as unknown instead of deleted", () => {
+test("delete_head_branch execution is rejected before any process spawns", () => {
+  let calls = 0;
   assert.throws(
     () =>
       executeMutationRequest({
-        request: deleteHeadRequest(),
+        request: {
+          schemaVersion: 1,
+          action: "delete_head_branch",
+          mutationMode: "maintainer",
+          explicitInstruction: true,
+          repo: "Wibias/opencodex",
+          pr: 1004,
+          headRefName: "feat/ri-02-request-history-index",
+          headOwnerLogin: "Wibias",
+          headRepo: "Wibias/opencodex",
+          baseRepo: "lidge-jun/opencodex",
+          actorLogin: "Wibias",
+          isMerged: true,
+          isCrossRepository: true,
+        },
         execute: true,
-        runner(command, args) {
-          if (args.includes("DELETE")) {
-            return { status: 0, stdout: "", stderr: "" };
-          }
-          return {
-            status: 1,
-            stdout: "",
-            stderr: "HTTP 403: Resource not accessible by integration",
-          };
+        runner() {
+          calls += 1;
+          return { status: 0, stdout: "", stderr: "" };
         },
       }),
-    /branch_delete_verification_failed/,
+    /automatic deletion disabled until expected-tip compare-and-delete is available/,
   );
-});
-
-test("delete_head_branch accepts only an explicit not-found verification as deleted", () => {
-  const result = executeMutationRequest({
-    request: deleteHeadRequest(),
-    execute: true,
-    runner(command, args) {
-      if (args.includes("DELETE")) {
-        return { status: 0, stdout: "", stderr: "" };
-      }
-      return {
-        status: 1,
-        stdout: "",
-        stderr: "HTTP 404: Not Found",
-      };
-    },
-  });
-  assert.equal(result.verification, "deleted");
+  assert.equal(calls, 0);
 });

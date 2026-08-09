@@ -40,13 +40,7 @@ function resolveRepository(input) {
 }
 
 function withStatus(decision) {
-  if (decision.action === "delete" && decision.targetRepository) {
-    return {
-      ...decision,
-      status: `branch deleted: ${decision.targetRepository}@${decision.branch}`,
-    };
-  }
-  if (decision.reason?.startsWith("branch kept: head owned by @")) {
+  if (decision.reason?.startsWith("branch kept:")) {
     return {
       ...decision,
       status: decision.reason,
@@ -57,6 +51,12 @@ function withStatus(decision) {
 
 /**
  * Decide whether a merged PR head branch should be deleted for the authenticated actor.
+ *
+ * github-delivery intentionally does not perform automatic ref deletion. GitHub's
+ * ref-delete API has no compare-and-delete precondition, so a branch may advance
+ * after cleanup is authorized and before DELETE reaches GitHub. Until deletion can
+ * be bound atomically to an expected remote tip, keep the branch and report the
+ * reason instead of exposing a racy destructive primitive.
  */
 export function evaluateHeadBranchCleanup(input) {
   const headRefName = normalizeBranch(input.headRefName);
@@ -75,33 +75,33 @@ export function evaluateHeadBranchCleanup(input) {
   }
 
   if (input.keepBranch) {
-    return {
+    return withStatus({
       action: "skip",
       reason: "branch kept: user requested keep",
       targetRepository: null,
       targetRepo: null,
       branch: headRefName || null,
-    };
+    });
   }
 
   if (!headRefName) {
-    return {
+    return withStatus({
       action: "skip",
       reason: "branch kept: missing head ref",
       targetRepository: null,
       targetRepo: null,
       branch: null,
-    };
+    });
   }
 
   if (!headOwnerLogin || !actorLogin) {
-    return {
+    return withStatus({
       action: "skip",
       reason: "branch kept: missing actor or head owner",
       targetRepository: null,
       targetRepo: null,
       branch: headRefName,
-    };
+    });
   }
 
   if (headOwnerLogin !== actorLogin) {
@@ -115,30 +115,29 @@ export function evaluateHeadBranchCleanup(input) {
   }
 
   if (protectedBranches.has(headRefName)) {
-    return {
+    return withStatus({
       action: "skip",
       reason: "branch kept: protected shared branch",
       targetRepository: null,
       targetRepo: null,
       branch: headRefName,
-    };
+    });
   }
 
   const targetRepository = resolveRepository(input);
-
   if (!targetRepository) {
-    return {
+    return withStatus({
       action: "skip",
       reason: "branch kept: missing target repository",
       targetRepository: null,
       targetRepo: null,
       branch: headRefName,
-    };
+    });
   }
 
   return withStatus({
-    action: "delete",
-    reason: "branch deleted: head owned by authenticated actor",
+    action: "skip",
+    reason: "branch kept: automatic deletion disabled until expected-tip compare-and-delete is available",
     targetRepository,
     targetRepo: targetRepository,
     branch: headRefName,

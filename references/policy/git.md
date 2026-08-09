@@ -26,6 +26,6 @@ If the authorized workflow requires changing a fork head and the authenticated a
 
 Before readiness or merge, update topology as required, then verify build/tests against the resulting current base/parent tip. A green result on an old SHA is not enough.
 
-### GD-GIT-007 — Verify branch deletion explicitly
+### GD-GIT-007 — Automatic branch deletion is disabled
 
-After branch deletion, only an explicit not-found response confirms deletion. Permission, rate-limit, transport, or generic nonzero failures are verification failures, not proof that the branch is gone.
+Do not automatically delete a merged PR head branch. GitHub's ref-delete API does not expose an expected-tip compare-and-delete precondition, so a branch can advance after cleanup is authorized but before deletion reaches GitHub. Keep the branch and report that automatic cleanup is disabled until the delete operation can be atomically bound to the expected remote tip. Never convert a prior cleanup decision into authority to delete a later branch generation.
