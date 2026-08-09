@@ -2,17 +2,8 @@
 /**
  * High-level merge driver: collapse the merge-pr ceremony into one call.
  *
- * Chains the existing gates, broker, and cleanup evaluators so the agent
- * reviews one plan and confirms execution instead of hand-rolling each step.
- * Usage:
- *   node scripts/merge-pr-driver.mjs OWNER/REPO N [--mode maintainer] [--settle]
- *     [--merge-method merge|squash|rebase] [--execute] [--audit FILE]
- *     [--expected-head SHA] [--thank-comment BODY] [--skip-thanks]
- *
- * Dry-run (default) prints the full plan and the exact commands that would run.
- * --execute performs the writes through the canonical authority-aware broker
- * context only after the gate is ready on the pinned head and the audited
- * head/base/rules generation is recaptured immediately before the merge.
+ * Chains the existing gates, broker, review evidence, and cleanup evaluators so
+ * the agent reviews one plan instead of hand-rolling each step.
  */
 import { spawnSync } from "node:child_process";
 import { appendFileSync, realpathSync } from "node:fs";
@@ -38,6 +29,10 @@ import {
   assertSameMergeBoundary,
   mergeBoundaryForSnapshot,
 } from "./lib/merge-boundary.mjs";
+import {
+  assertSameMergeReviewEvidence,
+  mergeReviewEvidenceForSnapshot,
+} from "./lib/merge-review-evidence.mjs";
 
 const USAGE =
   "Usage: node scripts/merge-pr-driver.mjs OWNER/REPO N [--mode MODE] [--settle] [--merge-method METHOD] [--execute] [--audit FILE] [--expected-head SHA] [--thank-comment BODY] [--skip-thanks]";
@@ -104,7 +99,7 @@ export function buildGateOutput(snapshot, mode) {
   });
 }
 
-export function defaultThanksBody({ author, repo, pr, title }) {
+export function defaultThanksBody({ author }) {
   return `Thanks @${author} - merged successfully. This PR addresses the tracked work cleanly and passed the full review + CI bar on the merged head.`;
 }
 
@@ -138,8 +133,7 @@ export function buildMergeRequest({ repo, pr, expectedHead, mergeMethod }) {
 export function executeMergeTransaction({
   mergeRequest,
   thankRequest = null,
-  executeRequest = (request) =>
-    executeMutationWithAuthority({ request, execute: true }),
+  executeRequest = (request) => executeMutationWithAuthority({ request, execute: true }),
 } = {}) {
   if (!mergeRequest) throw new Error("merge_request_required");
   const receipts = [];
@@ -166,9 +160,7 @@ export function detectMergeMethod(capabilities = null) {
     ["rebase", booleanCapability(capabilities, "rebaseMergeAllowed", "allow_rebase_merge")],
   ];
   const enabled = candidates.filter(([, allowed]) => allowed === true).map(([method]) => method);
-  if (!enabled.length) {
-    throw new Error("repository_has_no_enabled_merge_method");
-  }
+  if (!enabled.length) throw new Error("repository_has_no_enabled_merge_method");
   return enabled[0];
 }
 
@@ -216,7 +208,12 @@ async function settle({ repo, pr, mode, snapshot, totalMs = 60_000, pollMs = 20_
   return { ok: true, gate, snapshot };
 }
 
-export function verifyFinalMergeBoundary({ approvedBoundary, freshSnapshot, mode }) {
+export function verifyFinalMergeBoundary({
+  approvedBoundary,
+  approvedReviewEvidence,
+  freshSnapshot,
+  mode,
+}) {
   const freshGate = buildGateOutput(freshSnapshot, mode);
   if (!freshGate.ready) {
     throw new Error(
@@ -224,7 +221,15 @@ export function verifyFinalMergeBoundary({ approvedBoundary, freshSnapshot, mode
     );
   }
   const observedBoundary = assertSameMergeBoundary(approvedBoundary, freshSnapshot);
-  return { gate: freshGate, boundary: observedBoundary };
+  const observedReviewEvidence = assertSameMergeReviewEvidence(
+    approvedReviewEvidence,
+    freshSnapshot,
+  );
+  return {
+    gate: freshGate,
+    boundary: observedBoundary,
+    reviewEvidence: observedReviewEvidence,
+  };
 }
 
 async function main() {
@@ -241,12 +246,8 @@ async function main() {
     );
   }
   const pr = snapshot.evidence?.pullRequest || {};
-  if (pr.state === "MERGED") {
-    throw new Error("pr_already_merged");
-  }
-  if (pr.isDraft === true) {
-    throw new Error("pr_is_draft");
-  }
+  if (pr.state === "MERGED") throw new Error("pr_already_merged");
+  if (pr.isDraft === true) throw new Error("pr_is_draft");
 
   let gate = buildGateOutput(snapshot, mode);
   if (!gate.ready) {
@@ -255,23 +256,19 @@ async function main() {
 
   if (args.settle) {
     const settled = await settle({ repo: args.repo, pr: args.pr, mode, snapshot });
-    if (!settled.ok) {
-      throw new Error(`settle_failed:${settled.reason}`);
-    }
+    if (!settled.ok) throw new Error(`settle_failed:${settled.reason}`);
     snapshot = settled.snapshot;
     gate = settled.gate;
   }
 
   const approvedBoundary = mergeBoundaryForSnapshot(snapshot);
+  const approvedReviewEvidence = mergeReviewEvidenceForSnapshot(snapshot);
   const expectedHead = snapshot.headOid;
-  const mergeMethod =
-    args.mergeMethod || detectMergeMethod(readRepositoryMergeCapabilities(args.repo));
+  const mergeMethod = args.mergeMethod || detectMergeMethod(readRepositoryMergeCapabilities(args.repo));
   const authorLogin = pr.author?.login || null;
   const thankBody =
     args.thankComment ||
-    (authorLogin && !args.skipThanks
-      ? defaultThanksBody({ author: authorLogin, repo: args.repo, pr: args.pr, title: pr.title })
-      : null);
+    (authorLogin && !args.skipThanks ? defaultThanksBody({ author: authorLogin }) : null);
 
   const mergeRequest = buildMergeRequest({
     repo: args.repo,
@@ -286,7 +283,6 @@ async function main() {
     { name: "merge", request: mergeRequest },
     ...(thankRequest ? [{ name: "post_merge_thanks", request: thankRequest }] : []),
   ];
-
   const plans = requests.map(({ name, request }) => ({
     name,
     plan: planMutationWithAuthority(request),
@@ -300,6 +296,7 @@ async function main() {
     mode,
     headOid: expectedHead,
     mergeBoundary: approvedBoundary,
+    reviewEvidence: approvedReviewEvidence,
     gate: {
       decision: gate.decision,
       ready: gate.ready,
@@ -326,6 +323,7 @@ async function main() {
   const freshSnapshot = captureLiveSnapshot({ repo: args.repo, pr: args.pr });
   const finalBoundary = verifyFinalMergeBoundary({
     approvedBoundary,
+    approvedReviewEvidence,
     freshSnapshot,
     mode,
   });
@@ -335,9 +333,7 @@ async function main() {
     thankRequest,
     executeRequest(request) {
       const receipt = executeMutationWithAuthority({ request, execute: true });
-      if (args.audit) {
-        appendFileSync(args.audit, `${JSON.stringify(receipt)}\n`, "utf8");
-      }
+      if (args.audit) appendFileSync(args.audit, `${JSON.stringify(receipt)}\n`, "utf8");
       return receipt;
     },
   });
@@ -374,7 +370,7 @@ async function main() {
 
 if (process.argv[1]) {
   const invokedPath = realpathSync(process.argv[1]);
-  if (import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
+  if (import.meta.url === pathToFileURL(invokedPath).href) {
     main().catch((error) => {
       console.error(String(error?.message || error));
       process.exit(2);
