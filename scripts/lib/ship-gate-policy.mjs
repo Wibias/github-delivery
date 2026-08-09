@@ -64,6 +64,15 @@ export function combineShipGateResults({
     }
   }
 
+  const mergeQueueEnabled = reviewPolicy?.mergeQueue?.enabled === true;
+  const mergeGroupCoverage = reviewPolicy?.mergeGroupWorkflowCoverage || null;
+  if (
+    mergeQueueEnabled &&
+    mergeGroupCoverage?.requiredCheckWorkflowMappingComplete !== true
+  ) {
+    unknowns.push("reviewPolicy:merge_group_required_check_mapping_unverified");
+  }
+
   const advisories = [];
   if (codeowners?.complete !== true) {
     advisories.push({
@@ -78,11 +87,21 @@ export function combineShipGateResults({
       message: "GitHub reported CODEOWNERS parse errors.",
     });
   }
-  const workflowWarning = reviewPolicy?.mergeGroupWorkflowCoverage?.warning;
+  const workflowWarning = mergeGroupCoverage?.warning;
   if (workflowWarning) {
     advisories.push({
       code: "merge_group_workflow_warning",
       message: workflowWarning,
+    });
+  }
+  if (
+    mergeQueueEnabled &&
+    mergeGroupCoverage?.requiredCheckWorkflowMappingComplete !== true
+  ) {
+    advisories.push({
+      code: "merge_group_required_check_mapping_unverified",
+      message:
+        "Merge queue readiness is fail-closed until every required GitHub Actions check is mapped to a producing workflow with merge_group coverage.",
     });
   }
   if ((baseHealth?.baseOnlyFailures || []).length) {
