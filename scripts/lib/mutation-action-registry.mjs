@@ -13,7 +13,7 @@ const DEFINITIONS = [
   { action: "post_issue_comment", enabled: true, mutation: true, route: "legacy", minimumMode: "review", social: true, remoteIdempotentCreate: true, authorityScopeKind: "issue_comment" },
   { action: "edit_own_comment", enabled: true, mutation: true, route: "legacy", minimumMode: "review", prBound: true, social: true, authorityScopeKind: "edit_own_comment" },
   { action: "reply_bot_thread", enabled: true, mutation: true, route: "legacy", minimumMode: "review", prBound: true, social: true, remoteIdempotentCreate: true, authorityScopeKind: "reply_thread" },
-  { action: "reply_human_thread", enabled: true, mutation: true, route: "legacy", minimumMode: "maintainer", prBound: true, social: true, remoteIdempotentCreate: true, humanReply: true, authorityScopeKind: "reply_thread" },
+  { action: "reply_human_thread", enabled: true, mutation: true, route: "legacy", minimumMode: "maintainer", prBound: true, social: true, remoteIdempotentCreate: true, humanReply: true, highAssurance: true, authorityScopeKind: "reply_thread" },
   { action: "push_code", enabled: true, mutation: true, route: "lifecycle", minimumMode: "maintainer", highAssurance: true, authorityScopeKind: "push_code" },
   { action: "create_pr", enabled: true, mutation: true, route: "lifecycle", minimumMode: "maintainer", highAssurance: true, remoteIdempotentCreate: true, authorityScopeKind: "create_pr" },
   { action: "update_pr_body", enabled: true, mutation: true, route: "lifecycle", minimumMode: "maintainer", prBound: true, highAssurance: true, authorityScopeKind: "update_pr_body" },
