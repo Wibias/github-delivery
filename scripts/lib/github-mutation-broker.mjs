@@ -18,6 +18,7 @@ const PR_ACTIONS = new Set([
   "close_pr",
   "supersede_pr",
   "merge_pr",
+  "retarget_pr",
   "post_resolution_record",
 ]);
 
@@ -113,6 +114,18 @@ function commandFor(request) {
         method,
         "--match-head-commit",
         required(request.expectedHead, "expected_head"),
+      ];
+    }
+    case "retarget_pr": {
+      const { owner, name } = repoParts(repo);
+      return [
+        "gh",
+        "api",
+        `repos/${owner}/${name}/pulls/${positiveInteger(request.pr, "pr")}`,
+        "--method",
+        "PATCH",
+        "-f",
+        `base=${required(request.newBase, "new_base")}`,
       ];
     }
     case "post_comment":
@@ -352,6 +365,33 @@ function verifyHead({ request, runner }) {
   return output;
 }
 
+function verifyRetargetBase({ request, runner }) {
+  if (request.action !== "retarget_pr") return null;
+  const expectedBase = required(request.expectedBase, "expected_base");
+  const newBase = required(request.newBase, "new_base");
+  const observedBase = runOrThrow(runner, [
+    "gh",
+    "pr",
+    "view",
+    String(positiveInteger(request.pr, "pr")),
+    "--repo",
+    required(request.repo, "repo"),
+    "--json",
+    "baseRefName",
+    "--jq",
+    ".baseRefName",
+  ]);
+  if (observedBase === newBase) {
+    return { observedBase, alreadyApplied: true };
+  }
+  if (observedBase !== expectedBase) {
+    throw new Error(
+      `expected_base_mismatch: expected ${expectedBase}, observed ${observedBase || "missing"}`,
+    );
+  }
+  return { observedBase, alreadyApplied: false };
+}
+
 function verifyOwnCommentTarget({ request, runner }) {
   if (request.action !== "edit_own_comment") return null;
   const repo = required(request.repo, "repo");
@@ -458,6 +498,19 @@ function verificationCommand(request) {
         request.repo,
         "--json",
         "state,mergedAt,headRefOid",
+      ];
+    case "retarget_pr":
+      return [
+        "gh",
+        "pr",
+        "view",
+        String(request.pr),
+        "--repo",
+        request.repo,
+        "--json",
+        "baseRefName",
+        "--jq",
+        ".baseRefName",
       ];
     case "close_pr":
     case "supersede_pr":
@@ -573,6 +626,11 @@ export function planMutationRequest(
     positiveInteger(request.pr, "pr");
     required(request.expectedHead, "expected_head");
   }
+  if (request.action === "retarget_pr") {
+    const expectedBase = required(request.expectedBase, "expected_base");
+    const newBase = required(request.newBase, "new_base");
+    if (expectedBase === newBase) throw new Error("retarget_base_unchanged");
+  }
   if (CLEANUP_ACTIONS.has(request.action)) {
     positiveInteger(request.pr, "pr");
     required(request.headRefName, "head_ref_name");
@@ -611,6 +669,8 @@ export function planMutationRequest(
     repo: normalized.repo,
     pr: normalized.pr ?? null,
     expectedHead: normalized.expectedHead ?? null,
+    expectedBase: normalized.expectedBase ?? null,
+    newBase: normalized.newBase ?? null,
     idempotencyKey: normalized.idempotencyKey ?? null,
     idempotencyMarker: normalized.idempotencyMarker ?? null,
     authority: publicAuthorityReceipt(authorityDecision),
@@ -641,7 +701,21 @@ export function executeMutationRequest({
   }
 
   const observedHead = verifyHead({ request: plan.request, runner });
+  const retargetState = verifyRetargetBase({ request: plan.request, runner });
   const commentEditTarget = verifyOwnCommentTarget({ request: plan.request, runner });
+  if (retargetState?.alreadyApplied) {
+    return {
+      ...plan,
+      executed: false,
+      status: "already_applied",
+      observedHead,
+      observedBase: retargetState.observedBase,
+      commentEditTarget,
+      existingMutation: null,
+      stdout: "",
+      verification: retargetState.observedBase,
+    };
+  }
   const existingMutation = findExistingIdempotentMutation({
     request: plan.request,
     runner,
@@ -652,6 +726,7 @@ export function executeMutationRequest({
       executed: false,
       status: "already_applied",
       observedHead,
+      observedBase: retargetState?.observedBase ?? null,
       commentEditTarget,
       existingMutation,
       stdout: "",
@@ -663,12 +738,18 @@ export function executeMutationRequest({
   const branchDeletion = verifyBranchDeleted({ request: plan.request, runner });
   const verify = verificationCommand(plan.request);
   const verification = verify ? runOrThrow(runner, verify) : branchDeletion;
+  if (plan.request.action === "retarget_pr" && verification !== plan.request.newBase) {
+    throw new Error(
+      `retarget_verification_failed: expected ${plan.request.newBase}, observed ${verification || "missing"}`,
+    );
+  }
 
   return {
     ...plan,
     executed: true,
     status: "succeeded",
     observedHead,
+    observedBase: retargetState?.observedBase ?? null,
     commentEditTarget,
     existingMutation: null,
     stdout,
