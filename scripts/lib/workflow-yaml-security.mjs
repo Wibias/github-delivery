@@ -144,6 +144,31 @@ function descendants(records, index) {
   return rows;
 }
 
+function sequenceItemBlock(records, index) {
+  const row = records[index];
+  let sequenceIndex = row.sequence ? index : -1;
+  if (sequenceIndex < 0) {
+    for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+      const candidate = records[cursor];
+      if (candidate.sequence && candidate.indent < row.indent) {
+        sequenceIndex = cursor;
+        break;
+      }
+      if (candidate.indent < row.indent && !candidate.sequence) break;
+    }
+  }
+  if (sequenceIndex < 0) return descendants(records, index);
+  const sequence = records[sequenceIndex];
+  const rows = [];
+  for (let cursor = sequenceIndex; cursor < records.length; cursor += 1) {
+    const candidate = records[cursor];
+    if (cursor > sequenceIndex && candidate.sequence && candidate.indent === sequence.indent) break;
+    if (cursor > sequenceIndex && candidate.indent < sequence.indent) break;
+    rows.push(candidate);
+  }
+  return rows;
+}
+
 export function workflowSecurityFacts(source = "") {
   const parsed = parseWorkflowSecurityYaml(source);
   const facts = {
@@ -190,8 +215,8 @@ export function workflowSecurityFacts(source = "") {
     }
 
     if (row.key === "uses") {
-      const block = descendants(parsed.records, index);
-      const persist = block.find((item) => item.key === "persist-credentials");
+      const step = sequenceItemBlock(parsed.records, index);
+      const persist = step.find((item) => item.key === "persist-credentials");
       facts.uses.push({
         value: row.value,
         line: row.line,
