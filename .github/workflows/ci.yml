@@ -44,8 +44,17 @@ jobs:
         shell: pwsh
         run: |
           $Project = 'authority-host/windows/GitHubDeliveryAuthority/GitHubDeliveryAuthority.csproj'
-          dotnet restore $Project --locked-mode
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $ErrorActionPreference = 'Continue'
+          & dotnet restore $Project --locked-mode --verbosity normal 2>&1 |
+            Tee-Object -FilePath authority-host-restore.log
+          $exitCode = $LASTEXITCODE
+          if ($exitCode -ne 0) {
+            Get-Content authority-host-restore.log | ForEach-Object {
+              $line = $_ -replace '%','%25' -replace "`r",'%0D' -replace "`n",'%0A'
+              Write-Host "::error::$line"
+            }
+            exit $exitCode
+          }
 
       - name: Build Windows authority host
         if: runner.os == 'Windows'
