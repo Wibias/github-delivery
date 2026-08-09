@@ -19,7 +19,7 @@ Detail: `references/github-mutation-broker.md`, `references/mutation-modes.md`, 
 5. Before a final verdict or merge-ready claim, refresh current review threads, required checks, effective rules, base/head state, and the authoritative ship gate.
 6. Never turn unavailable evidence into a pass. Required unreadable/incomplete evidence is `unknown` or blocked.
 
-Detail: `references/full-review-pr.md`, `references/shared-rules.md`, `references/ci-forensics.md`.
+Detail: `references/full-review-pr.md`, `references/shared-rules.md`.
 
 ## Mandatory review axes
 
