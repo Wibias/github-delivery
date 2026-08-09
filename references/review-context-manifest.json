@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "kind": "github-delivery/review-context-manifest",
+  "bootstrap": "references/review-contract-compact.md",
+  "always": [
+    "references/review-contract-compact.md",
+    "references/semantic-propagation-review.md"
+  ],
+  "triggered": {
+    "bug": "references/bug-review.md",
+    "security": "references/security-review.md",
+    "specStandards": "references/spec-standards-review.md",
+    "mutationAuthority": "references/github-mutation-broker.md",
+    "mutationModes": "references/mutation-modes.md",
+    "publication": "references/comment-depth.md",
+    "fullWorkflowDetail": "references/full-review-pr.md",
+    "sharedRulesDetail": "references/shared-rules.md"
+  },
+  "neverSkipForTokenSavings": [
+    "exact-head binding",
+    "semantic propagation",
+    "required checks",
+    "effective rules",
+    "review policy",
+    "review threads",
+    "base/head freshness",
+    "mutation authority",
+    "final ship-gate recapture",
+    "final verdict publication verification"
+  ]
+}
