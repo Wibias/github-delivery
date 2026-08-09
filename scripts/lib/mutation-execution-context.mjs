@@ -4,12 +4,16 @@ import { readFileSync } from "node:fs";
 import {
   executeMutationRequest,
   planMutationRequest,
-} from "./github-mutation-broker.mjs";
+} from "./github-mutation-router.mjs";
 import { makeRedemptionRunner } from "./authority-execution.mjs";
 import { makeAuthorityRedeemer } from "./authority-host-client.mjs";
 
 const HIGH_ASSURANCE_ACTIONS = new Set([
   "push_code",
+  "create_pr",
+  "update_pr_body",
+  "create_issue",
+  "assign_issue",
   "resolve_thread",
   "close_linked_issue",
   "close_pr",
