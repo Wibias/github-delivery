@@ -1,6 +1,22 @@
 name: Repository Policy
 
 on:
+  pull_request:
+    paths:
+      - .github/repository-policy.json
+      - .github/workflows/repository-policy.yml
+      - scripts/verify-live-repository-policy.mjs
+      - scripts/lib/workflow-security.mjs
+      - tests/unit/workflow-security.test.mjs
+  push:
+    branches:
+      - main
+    paths:
+      - .github/repository-policy.json
+      - .github/workflows/repository-policy.yml
+      - scripts/verify-live-repository-policy.mjs
+      - scripts/lib/workflow-security.mjs
+      - tests/unit/workflow-security.test.mjs
   schedule:
     - cron: "17 */6 * * *"
   workflow_dispatch:
