@@ -80,8 +80,10 @@ internal static class SelfTest
     private static void ClassifierFixture()
     {
         using var merge = JsonDocument.Parse("{\"action\":\"merge_pr\",\"mutationMode\":\"maintainer\"}");
+        using var autonomousRetarget = JsonDocument.Parse("{\"action\":\"retarget_pr\",\"mutationMode\":\"autonomous\"}");
         using var comment = JsonDocument.Parse("{\"action\":\"post_comment\",\"mutationMode\":\"review\"}");
         Assert(MutationClassifier.RequiresWindowsHello(merge.RootElement), "merge must require Hello");
+        Assert(MutationClassifier.RequiresWindowsHello(autonomousRetarget.RootElement), "autonomous retarget must require Hello");
         Assert(!MutationClassifier.RequiresWindowsHello(comment.RootElement), "review comment must not require Hello");
     }
 
