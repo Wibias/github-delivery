@@ -7,8 +7,11 @@ function requiredString(value, code) {
 function strictRequiredChecks(snapshot = {}) {
   const rules = snapshot?.evidence?.activeRules;
   if (!Array.isArray(rules)) return false;
-  const rule = rules.find((row) => row?.type === "required_status_checks");
-  return rule?.parameters?.strict_required_status_checks_policy === true;
+  return rules.some(
+    (row) =>
+      row?.type === "required_status_checks" &&
+      row?.parameters?.strict_required_status_checks_policy === true,
+  );
 }
 
 function mergeQueueEnabled(snapshot = {}) {
