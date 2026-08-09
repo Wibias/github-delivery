@@ -165,3 +165,39 @@ test("namespaces structured wake blockers by stable key", () => {
     "wake:trusted_human_feedback_needs_code:review_comment:77",
   ]);
 });
+
+test("merge queue stays unknown when required-check workflow mapping is unverified", () => {
+  const result = combineShipGateResults(
+    input({
+      reviewPolicy: component("ready", {
+        mergeQueue: { enabled: true, inQueue: false, entry: null },
+        mergeGroupWorkflowCoverage: {
+          complete: true,
+          hasPullRequestTrigger: true,
+          hasMergeGroupTrigger: true,
+        },
+      }),
+    }),
+  );
+  assert.equal(result.decision, "unknown");
+  assert.ok(
+    result.unknowns.includes(
+      "reviewPolicy:merge_group_required_check_mapping_unverified",
+    ),
+  );
+});
+
+test("merge queue can be ready after exact required-check workflow mapping is proven", () => {
+  const result = combineShipGateResults(
+    input({
+      reviewPolicy: component("ready", {
+        mergeQueue: { enabled: true, inQueue: false, entry: null },
+        mergeGroupWorkflowCoverage: {
+          complete: true,
+          requiredCheckWorkflowMappingComplete: true,
+        },
+      }),
+    }),
+  );
+  assert.equal(result.decision, "ready");
+});
