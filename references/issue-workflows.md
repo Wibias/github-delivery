@@ -10,6 +10,14 @@ Policy modules:
 
 Detailed procedures for each workflow type. Read the relevant section when executing that workflow.
 
+## Issue publication action contract
+
+Use `create_issue` for a direct user request to create, file, or open a new GitHub issue. This is the canonical lifecycle action for ordinary issue publication.
+
+Use `create_follow_up_issue` only when the requested object is specifically a follow-up issue produced from an existing review/finding/workflow context. It is a distinct semantic action, not a fallback for direct issue creation and not evidence that `create_issue` is unsupported.
+
+The public mutation dispatch boundary is `scripts/github-mutate.mjs` → `scripts/lib/github-mutation-router.mjs`. Do not infer supported actions by inspecting only one backend broker. Routine issue work should use the documented workflow, action registry, router, and dry-run/execute entrypoint; inspect broker internals only when that public path fails or the task is explicitly debugging/auditing `github-delivery` itself.
+
 ## PRD Workflow
 
 Use when the user asks for a PRD or wants the current conversation turned into product requirements.
@@ -37,7 +45,8 @@ Use when converting a plan, PRD, spec, or issue into implementation tickets.
 3. Each slice must be independently verifiable and preferably demoable.
 4. Mark slices as `AFK` when an agent can implement them without human judgment; mark `HITL` when a design or product decision is still needed.
 5. Present the breakdown for approval before publishing unless the user already requested direct issue creation.
-6. Publish with this shape:
+6. Publish direct requested issues with `create_issue`. Use `create_follow_up_issue` only for an explicitly identified follow-up issue from the governing workflow.
+7. Publish with this shape:
    - Parent
    - What to build
    - Acceptance criteria
@@ -78,7 +87,7 @@ For each issue:
 2. Ask at most 2-3 short clarifying questions about expected behavior, actual behavior, reproduction, and consistency.
 3. Explore the relevant codebase area in the background to learn domain terms and behavior boundaries.
 4. Decide whether this is one issue or a breakdown.
-5. File issues directly when the report is clear enough AND issue-creation authority exists.
+5. File issues directly with `create_issue` when the report is clear enough AND issue-creation authority exists.
 6. Print issue URLs and ask whether there is another issue.
 
 Issue body for a single QA bug:

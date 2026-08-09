@@ -36,7 +36,7 @@ simplify preparation first, then enter the merge workflow.
 | ----------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
 | Create a PRD from conversation, repository context, or an idea                                        | `references/issue-workflows.md` → PRD Workflow     |
 | Break a PRD, plan, spec, or issue into implementation issues                                          | `references/issue-workflows.md` → Issue Breakdown  |
-| Create GitHub issue(s) from a clear request or verified finding                                       | `references/issue-workflows.md` → Issue Breakdown  |
+| Create GitHub issue(s) from a clear request or verified finding                                       | `references/issue-workflows.md` → Issue Breakdown (`create_issue`) |
 | Triage issue(s), labels, state, readiness, or rejection                                               | `references/issue-workflows.md` → Triage Workflow  |
 | Run QA intake or file reproducible conversational bug reports                                         | `references/issue-workflows.md` → QA Intake        |
 | Create a refactor request, RFC, or verified tiny-commit plan                                          | `references/issue-workflows.md` → Refactor Plan    |
@@ -131,9 +131,11 @@ GitHub write, and require final evidence for final claims.
 - Merge-ready paths run their required Bug + Security + Spec + Standards review
   and **proactive contract verification**; passing bots/checks alone is not
   sufficient. See `references/policy/reviews.md` and focused review methods.
-- Network-visible GitHub writes go through the mutation broker and are expected-
-  head/idempotency bound where applicable. Caller booleans are policy assertions,
-  not trusted provenance. See `references/policy/mutation.md`.
+- GitHub writes use `scripts/github-mutate.mjs` → `scripts/lib/github-mutation-router.mjs`;
+  router + action registry are the public dispatch/action-discovery boundary. Do
+  not infer capabilities from one backend or inspect brokers in routine runs
+  unless that entrypoint fails or the task audits/debugs this skill. See
+  `references/policy/mutation.md`.
 - Never use bare force, never silently discard unrelated work, and honor the PR
   ownership/fork-write boundary. See `references/policy/git.md`.
 - Stacks merge bottom-up and every surviving child is revalidated. See
