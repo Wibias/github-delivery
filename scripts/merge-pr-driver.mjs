@@ -10,8 +10,9 @@
  *     [--expected-head SHA] [--thank-comment BODY] [--skip-thanks]
  *
  * Dry-run (default) prints the full plan and the exact commands that would run.
- * --execute performs the writes through the broker only after the gate is
- * ready on the pinned head. Never merges when blocked or head-mismatched.
+ * --execute performs the writes through the canonical authority-aware broker
+ * context only after the gate is ready on the pinned head. Never merges when
+ * blocked, unauthorised, or head-mismatched.
  */
 import { spawnSync } from "node:child_process";
 import { appendFileSync, realpathSync } from "node:fs";
@@ -29,9 +30,9 @@ import { evaluateBaseHealthSnapshot } from "./lib/base-health-policy.mjs";
 import { combineShipGateResults } from "./lib/ship-gate-policy.mjs";
 import { mutationProfile, normalizeMutationMode } from "./lib/mutation-policy.mjs";
 import {
-  executeMutationRequest,
-  planMutationRequest,
-} from "./lib/github-mutation-broker.mjs";
+  executeMutationWithAuthority,
+  planMutationWithAuthority,
+} from "./lib/mutation-execution-context.mjs";
 import { evaluateHeadBranchCleanup } from "./lib/merge-branch-cleanup.mjs";
 
 const USAGE =
@@ -133,7 +134,8 @@ export function buildMergeRequest({ repo, pr, expectedHead, mergeMethod }) {
 export function executeMergeTransaction({
   mergeRequest,
   thankRequest = null,
-  executeRequest = (request) => executeMutationRequest({ request, execute: true }),
+  executeRequest = (request) =>
+    executeMutationWithAuthority({ request, execute: true }),
 } = {}) {
   if (!mergeRequest) throw new Error("merge_request_required");
   const receipts = [];
@@ -271,7 +273,7 @@ async function main() {
 
   const plans = requests.map(({ name, request }) => ({
     name,
-    plan: planMutationRequest(request),
+    plan: planMutationWithAuthority(request),
   }));
 
   const summary = {
@@ -294,6 +296,7 @@ async function main() {
       action: plan.action,
       command: plan.command,
       requestHash: plan.requestHash,
+      authority: plan.authority,
     })),
     executed: false,
   };
@@ -307,7 +310,7 @@ async function main() {
     mergeRequest,
     thankRequest,
     executeRequest(request) {
-      const receipt = executeMutationRequest({ request, execute: true });
+      const receipt = executeMutationWithAuthority({ request, execute: true });
       if (args.audit) {
         appendFileSync(args.audit, `${JSON.stringify(receipt)}\n`, "utf8");
       }
@@ -332,6 +335,8 @@ async function main() {
       status: receipt.status,
       observedHead: receipt.observedHead,
       verification: receipt.verification,
+      authority: receipt.authority,
+      redemption: receipt.redemption,
     })),
     cleanup: {
       action: cleanup.action,
