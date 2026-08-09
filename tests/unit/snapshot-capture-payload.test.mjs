@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   assembleSnapshotCapture,
   classifyBranchProtectionResponse,
+  snapshotBoundaryFingerprint,
   verifySnapshotBoundary,
 } from "../../scripts/lib/snapshot-capture-payload.mjs";
 
@@ -12,6 +13,12 @@ function collection(rows = []) {
 }
 
 test("assembles all evidence required by snapshot-backed gates", () => {
+  const boundary = {
+    headOid: "abc",
+    baseRefName: "main",
+    baseOid: "base123",
+    rulesFingerprint: snapshotBoundaryFingerprint([]),
+  };
   const result = assembleSnapshotCapture({
     prEvidence: {
       number: 7,
@@ -74,6 +81,7 @@ test("assembles all evidence required by snapshot-backed gates", () => {
       login: "Wibias",
       error: null,
     },
+    boundary,
   });
 
   assert.equal(result.sources.policyGraphql.required, true);
@@ -83,6 +91,7 @@ test("assembles all evidence required by snapshot-backed gates", () => {
   assert.equal(result.evidence.workflowCoverage.workflowFiles, 1);
   assert.equal(result.evidence.viewer.login, "Wibias");
   assert.deepEqual(result.evidence.codeowners.errors, []);
+  assert.deepEqual(result.evidence.captureBoundary, boundary);
 });
 
 test("marks a required policy source incomplete instead of manufacturing a complete snapshot", () => {
@@ -156,13 +165,93 @@ test("snapshot boundary rejects a base retarget during capture", () => {
   );
 });
 
-test("snapshot boundary accepts unchanged head and base", () => {
+test("snapshot boundary rejects a base commit that moved during capture", () => {
+  assert.throws(
+    () =>
+      verifySnapshotBoundary(
+        { headRefOid: "head-a", baseRefName: "main" },
+        { headRefOid: "head-a", baseRefName: "main" },
+        {
+          initialBaseOid: "base-a",
+          finalBaseOid: "base-b",
+          initialRules: collection(),
+          finalRules: collection(),
+        },
+      ),
+    /snapshot_base_oid_moved/,
+  );
+});
+
+test("snapshot boundary rejects effective rules that changed during capture", () => {
+  assert.throws(
+    () =>
+      verifySnapshotBoundary(
+        { headRefOid: "head-a", baseRefName: "main" },
+        { headRefOid: "head-a", baseRefName: "main" },
+        {
+          initialBaseOid: "base-a",
+          finalBaseOid: "base-a",
+          initialRules: collection([{ type: "pull_request" }]),
+          finalRules: collection([
+            { type: "pull_request" },
+            { type: "required_status_checks" },
+          ]),
+        },
+      ),
+    /snapshot_rules_moved/,
+  );
+});
+
+test("snapshot boundary rejects mutable PR policy state that changed", () => {
+  assert.throws(
+    () =>
+      verifySnapshotBoundary(
+        {
+          headRefOid: "head-a",
+          baseRefName: "main",
+          reviewDecision: "APPROVED",
+          updatedAt: "2026-08-09T00:00:00Z",
+        },
+        {
+          headRefOid: "head-a",
+          baseRefName: "main",
+          reviewDecision: "CHANGES_REQUESTED",
+          updatedAt: "2026-08-09T00:00:01Z",
+        },
+      ),
+    /snapshot_pr_state_moved/,
+  );
+});
+
+test("snapshot boundary accepts one unchanged state generation", () => {
+  const rules = collection([{ type: "pull_request", parameters: { required: true } }]);
   assert.deepEqual(
     verifySnapshotBoundary(
-      { headRefOid: "head-a", baseRefName: "main" },
-      { headRefOid: "head-a", baseRefName: "main" },
+      {
+        headRefOid: "head-a",
+        baseRefName: "main",
+        reviewDecision: "APPROVED",
+        updatedAt: "2026-08-09T00:00:00Z",
+      },
+      {
+        headRefOid: "head-a",
+        baseRefName: "main",
+        reviewDecision: "APPROVED",
+        updatedAt: "2026-08-09T00:00:00Z",
+      },
+      {
+        initialBaseOid: "base-a",
+        finalBaseOid: "base-a",
+        initialRules: rules,
+        finalRules: collection([{ parameters: { required: true }, type: "pull_request" }]),
+      },
     ),
-    { headOid: "head-a", baseRefName: "main" },
+    {
+      headOid: "head-a",
+      baseRefName: "main",
+      baseOid: "base-a",
+      rulesFingerprint: snapshotBoundaryFingerprint(rules.rows),
+    },
   );
 });
 
