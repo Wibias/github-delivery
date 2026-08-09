@@ -147,3 +147,14 @@ test("research workflow hands composed create-pr work off instead of looping", (
   assert.match(workflow, /Do \*\*not\*\* continue repository-wide call-site/);
   assert.match(workflow, /implementation discovery, \*\*not a reason to reopen research\*\*/);
 });
+
+test("entrypoint and README describe create-pr phases in forward-progress order", () => {
+  const skill = readFileSync("SKILL.md", "utf8");
+  const readme = readFileSync("README.md", "utf8");
+
+  assert.match(skill, /bounded preflight → implement → pre-open bug\/security gate/);
+  assert.match(skill, /post-implementation and pre-publication/);
+  assert.doesNotMatch(skill, /preflight \+ pre-open bug\/security gate\) first/);
+  assert.match(readme, /bounded \*\*research → implementation → pre-open review\*\* sequence/);
+  assert.doesNotMatch(readme, /pre-open bug\/security gate first/);
+});
