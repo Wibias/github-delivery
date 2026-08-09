@@ -6,6 +6,7 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 
 import { isBotLogin } from "../../scripts/review-threads.mjs";
+import { executeMutationRequest } from "../../scripts/lib/github-mutation-broker.mjs";
 import { mutationRequiresTrustedAuthority } from "../../scripts/lib/mutation-execution-context.mjs";
 import { authorizeMutation } from "../../scripts/lib/mutation-policy.mjs";
 
@@ -84,6 +85,41 @@ function run(extraArgs = []) {
       env: { ...process.env, PATH: "" },
     },
   );
+}
+
+function resolveRequest(overrides = {}) {
+  return {
+    schemaVersion: 1,
+    action: "resolve_thread",
+    mutationMode: "maintainer",
+    explicitInstruction: true,
+    repo: "acme/widgets",
+    pr: 32,
+    expectedHead: "abcdef1234567890",
+    threadId: "PRRT_target",
+    ...overrides,
+  };
+}
+
+function threadPayload({
+  repo = "acme/widgets",
+  pr = 32,
+  head = "abcdef1234567890",
+  threadId = "PRRT_target",
+  isResolved = false,
+  author = "coderabbitai[bot]",
+} = {}) {
+  return JSON.stringify({
+    data: {
+      node: {
+        id: threadId,
+        isResolved,
+        repository: { nameWithOwner: repo },
+        pullRequest: { number: pr, headRefOid: head },
+        comments: { nodes: [{ author: { login: author } }] },
+      },
+    },
+  });
 }
 
 test("read-only mode denies thread resolution before invoking GitHub", () => {
@@ -250,6 +286,142 @@ test("stale expected head cannot produce a resolution request", () => {
   } finally {
     rmSync(fixture.dir, { recursive: true, force: true });
   }
+});
+
+test("broker rejects a review thread that belongs to another PR before mutation", () => {
+  const calls = [];
+  assert.throws(
+    () =>
+      executeMutationRequest({
+        request: resolveRequest(),
+        execute: true,
+        runner(command, args) {
+          calls.push([command, ...args]);
+          if (args[0] === "pr" && args[1] === "view") {
+            return { status: 0, stdout: "abcdef1234567890\n", stderr: "" };
+          }
+          if (args[0] === "api" && args[1] === "graphql") {
+            return {
+              status: 0,
+              stdout: threadPayload({ pr: 99 }),
+              stderr: "",
+            };
+          }
+          throw new Error(`unexpected write: ${command} ${args.join(" ")}`);
+        },
+      }),
+    /review_thread_target_mismatch:pr/,
+  );
+  assert.equal(
+    calls.some((call) => call.some((arg) => String(arg).includes("resolveReviewThread"))),
+    false,
+  );
+});
+
+test("broker refuses resolve_bot_thread when the target is human-authored", () => {
+  const calls = [];
+  assert.throws(
+    () =>
+      executeMutationRequest({
+        request: resolveRequest({
+          action: "resolve_bot_thread",
+          mutationMode: "review",
+          explicitInstruction: false,
+        }),
+        execute: true,
+        runner(command, args) {
+          calls.push([command, ...args]);
+          if (args[0] === "pr" && args[1] === "view") {
+            return { status: 0, stdout: "abcdef1234567890\n", stderr: "" };
+          }
+          if (args[0] === "api" && args[1] === "graphql") {
+            return {
+              status: 0,
+              stdout: threadPayload({ author: "human-reviewer" }),
+              stderr: "",
+            };
+          }
+          throw new Error(`unexpected write: ${command} ${args.join(" ")}`);
+        },
+      }),
+    /resolve_bot_thread_target_not_bot/,
+  );
+  assert.equal(
+    calls.some((call) => call.some((arg) => String(arg).includes("resolveReviewThread"))),
+    false,
+  );
+});
+
+test("already-resolved thread returns already_applied without mutation", () => {
+  const calls = [];
+  const result = executeMutationRequest({
+    request: resolveRequest(),
+    execute: true,
+    runner(command, args) {
+      calls.push([command, ...args]);
+      if (args[0] === "pr" && args[1] === "view") {
+        return { status: 0, stdout: "abcdef1234567890\n", stderr: "" };
+      }
+      if (args[0] === "api" && args[1] === "graphql") {
+        return {
+          status: 0,
+          stdout: threadPayload({ isResolved: true }),
+          stderr: "",
+        };
+      }
+      throw new Error(`unexpected write: ${command} ${args.join(" ")}`);
+    },
+  });
+  assert.equal(result.status, "already_applied");
+  assert.equal(result.executed, false);
+  assert.equal(result.threadTarget.threadId, "PRRT_target");
+  assert.equal(
+    calls.some((call) => call.some((arg) => String(arg).includes("resolveReviewThread"))),
+    false,
+  );
+});
+
+test("successful thread resolution verifies the same exact thread postcondition", () => {
+  const calls = [];
+  let threadReads = 0;
+  const result = executeMutationRequest({
+    request: resolveRequest(),
+    execute: true,
+    runner(command, args) {
+      calls.push([command, ...args]);
+      if (args[0] === "pr" && args[1] === "view") {
+        return { status: 0, stdout: "abcdef1234567890\n", stderr: "" };
+      }
+      if (args[0] === "api" && args[1] === "graphql") {
+        const queryArg = args.find((arg) => String(arg).startsWith("query=")) || "";
+        if (queryArg.includes("resolveReviewThread")) {
+          return {
+            status: 0,
+            stdout: JSON.stringify({
+              data: { resolveReviewThread: { thread: { id: "PRRT_target", isResolved: true } } },
+            }),
+            stderr: "",
+          };
+        }
+        threadReads += 1;
+        return {
+          status: 0,
+          stdout: threadPayload({ isResolved: threadReads > 1 }),
+          stderr: "",
+        };
+      }
+      throw new Error(`unexpected command: ${command} ${args.join(" ")}`);
+    },
+  });
+  assert.equal(result.status, "succeeded");
+  assert.equal(result.threadTarget.threadId, "PRRT_target");
+  assert.equal(result.verification.threadId, "PRRT_target");
+  assert.equal(result.verification.isResolved, true);
+  assert.equal(threadReads, 2);
+  assert.equal(
+    calls.filter((call) => call.some((arg) => String(arg).includes("resolveReviewThread"))).length,
+    1,
+  );
 });
 
 test("isBotLogin recognizes bot logins and rejects humans", () => {
