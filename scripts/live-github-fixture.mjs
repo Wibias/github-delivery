@@ -11,7 +11,7 @@ import { buildFixturePlan, runFixtureScenario } from "./lib/live-github-fixture.
 function parseArgs(argv) {
   const args = { repo: null, runId: null, baseBranch: "main", disposition: "close", receipt: null };
   const positionals = [];
-  for (let i = 0; i < argv.length; i++) {
+  for (let i = 0; i < argv.length; i += 1) {
     const value = argv[i];
     if (value === "--run-id") args.runId = argv[++i];
     else if (value === "--base") args.baseBranch = argv[++i];
@@ -22,7 +22,8 @@ function parseArgs(argv) {
   }
   args.repo = positionals[0];
   args.runId ||= process.env.GITHUB_RUN_ID ? `gha-${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT || "1"}` : null;
-  if (!args.repo || !args.runId) throw new Error("Usage: node scripts/live-github-fixture.mjs OWNER/REPO --run-id ID [--base BRANCH] [--disposition close|merge] [--receipt FILE]");
+  if (!args.repo || !args.runId) throw new Error("Usage: node scripts/live-github-fixture.mjs OWNER/REPO --run-id ID [--base BRANCH] [--disposition close] [--receipt FILE]");
+  if (args.disposition !== "close") throw new Error("--disposition supports only close; merge requires a real trusted authority grant");
   return args;
 }
 
@@ -141,11 +142,6 @@ function adapter(tempRoot) {
       writeFileSync(path, JSON.stringify({ schemaVersion: 1, action: "change_draft_state", mutationMode: "maintainer", explicitInstruction: true, repo: plan.repo, pr: pr.number, expectedHead, ready: false }, null, 2));
       const result = run(process.execPath, ["scripts/github-mutate.mjs", "--request", path, "--execute"], { allowFailure: true });
       return { rejected: result.status !== 0 && /expected_head_mismatch/.test(`${result.stderr}\n${result.stdout}`) };
-    },
-    async mergePr(plan, pr) {
-      const path = join(tempRoot, "merge-request.json");
-      writeFileSync(path, JSON.stringify({ schemaVersion: 1, action: "merge_pr", mutationMode: "maintainer", explicitInstruction: true, repo: plan.repo, pr: pr.number, expectedHead: currentHead(plan.repo, pr.number), mergeMethod: "merge" }, null, 2));
-      run(process.execPath, ["scripts/github-mutate.mjs", "--request", path, "--execute"]);
     },
     async closePr(plan, pr) { run("gh", ["pr", "close", String(pr.number), "--repo", plan.repo]); },
     async closeIssue(plan, issue) { run("gh", ["issue", "close", String(issue.number), "--repo", plan.repo, "--reason", "completed"]); },
