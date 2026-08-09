@@ -4,6 +4,10 @@ import test from "node:test";
 import { planMutationRequest } from "../../scripts/lib/github-mutation-broker.mjs";
 import { executeMutationWithAuthority } from "../../scripts/lib/mutation-execution-context.mjs";
 import {
+  assertSameMergeBoundary,
+  mergeBoundaryForSnapshot,
+} from "../../scripts/lib/merge-boundary.mjs";
+import {
   buildGateOutput,
   buildMergeRequest,
   buildThankRequest,
@@ -64,6 +68,31 @@ function readySnapshot({ state = "OPEN", isDraft = false, authorLogin = "alice" 
   };
 }
 
+function boundarySnapshot({
+  baseOid = "b".repeat(40),
+  rulesFingerprint = "c".repeat(64),
+  strict = true,
+  mergeQueue = false,
+} = {}) {
+  const snapshot = readySnapshot();
+  snapshot.evidence.captureBoundary = {
+    headOid: HEAD,
+    baseRefName: "main",
+    baseOid,
+    rulesFingerprint,
+  };
+  snapshot.evidence.activeRules = strict
+    ? [
+        {
+          type: "required_status_checks",
+          parameters: { strict_required_status_checks_policy: true },
+        },
+      ]
+    : [];
+  snapshot.evidence.policy = { mergeQueue: { enabled: mergeQueue } };
+  return snapshot;
+}
+
 test("merge driver gate is ready for a clean open PR", () => {
   const gate = buildGateOutput(readySnapshot(), "maintainer");
   assert.equal(gate.ready, true);
@@ -80,6 +109,39 @@ test("merge driver gate blocks on required-check pending", () => {
   const gate = buildGateOutput(snapshot, "maintainer");
   assert.equal(gate.ready, false);
   assert.ok(gate.blockers.some((blocker) => blocker.includes("requiredChecks")));
+});
+
+test("merge boundary binds head, base oid, and active-rules fingerprint", () => {
+  const snapshot = boundarySnapshot();
+  assert.deepEqual(mergeBoundaryForSnapshot(snapshot), {
+    headOid: HEAD,
+    baseRefName: "main",
+    baseOid: "b".repeat(40),
+    rulesFingerprint: "c".repeat(64),
+    coherence: "strict_required_checks",
+  });
+});
+
+test("merge boundary refuses repositories without server-enforced base coherence", () => {
+  assert.throws(
+    () => mergeBoundaryForSnapshot(boundarySnapshot({ strict: false, mergeQueue: false })),
+    /merge_boundary_not_server_enforced/,
+  );
+});
+
+test("merge boundary rejects a base move after approval", () => {
+  const approved = mergeBoundaryForSnapshot(boundarySnapshot());
+  const moved = boundarySnapshot({ baseOid: "d".repeat(40) });
+  assert.throws(() => assertSameMergeBoundary(approved, moved), /merge_boundary_moved:baseOid/);
+});
+
+test("merge boundary rejects active-rules drift after approval", () => {
+  const approved = mergeBoundaryForSnapshot(boundarySnapshot());
+  const moved = boundarySnapshot({ rulesFingerprint: "e".repeat(64) });
+  assert.throws(
+    () => assertSameMergeBoundary(approved, moved),
+    /merge_boundary_moved:rulesFingerprint/,
+  );
 });
 
 test("merge driver buildThankRequest produces a remotely idempotent post_comment plan", () => {
