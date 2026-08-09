@@ -6,6 +6,7 @@ import {
   evaluateRequiredChecks,
   latestLiveChecks,
   normalizeRequiredChecks,
+  selectAuthoritativeCheckEvidence,
 } from "../../scripts/lib/required-checks-policy.mjs";
 
 function run(name, appId, conclusion, overrides = {}) {
@@ -196,4 +197,63 @@ test("known failures stay blocked when another source is incomplete", () => {
   });
   assert.equal(result.decision, "blocked");
   assert.equal(result.complete, false);
+});
+
+test("test merge evidence is authoritative when GitHub has emitted checks on it", () => {
+  const headOid = "a".repeat(40);
+  const testMergeOid = "b".repeat(40);
+  const selected = selectAuthoritativeCheckEvidence({
+    headOid,
+    testMergeOid,
+    headCheckRuns: [run("build", 11, "success")],
+    headStatuses: [],
+    testMergeCheckRuns: [run("build", 11, "failure")],
+    testMergeStatuses: [],
+    headEvidenceComplete: true,
+    testMergeEvidenceComplete: true,
+  });
+  assert.equal(selected.sha, testMergeOid);
+  assert.equal(selected.reason, "test_merge_has_status");
+  const result = evaluateRequiredChecks({
+    descriptors: [{ context: "build", appId: 11, sources: [] }],
+    checkRuns: selected.checkRuns,
+    statuses: selected.statuses,
+    evidenceComplete: selected.complete,
+    incompleteReasons: selected.incompleteReasons,
+  });
+  assert.equal(result.decision, "blocked");
+});
+
+test("head evidence is authoritative only when the test merge has no status evidence", () => {
+  const headOid = "a".repeat(40);
+  const selected = selectAuthoritativeCheckEvidence({
+    headOid,
+    testMergeOid: "b".repeat(40),
+    headCheckRuns: [run("build", 11, "success")],
+    headStatuses: [],
+    testMergeCheckRuns: [],
+    testMergeStatuses: [],
+    headEvidenceComplete: true,
+    testMergeEvidenceComplete: true,
+  });
+  assert.equal(selected.sha, headOid);
+  assert.equal(selected.reason, "test_merge_has_no_status");
+  assert.equal(selected.complete, true);
+});
+
+test("incomplete test merge evidence cannot silently fall back to the head", () => {
+  const selected = selectAuthoritativeCheckEvidence({
+    headOid: "a".repeat(40),
+    testMergeOid: "b".repeat(40),
+    headCheckRuns: [run("build", 11, "success")],
+    headStatuses: [],
+    testMergeCheckRuns: [],
+    testMergeStatuses: [],
+    headEvidenceComplete: true,
+    testMergeEvidenceComplete: false,
+  });
+  assert.equal(selected.complete, false);
+  assert.equal(selected.sha, "b".repeat(40));
+  assert.equal(selected.reason, "test_merge_evidence_incomplete");
+  assert.ok(selected.incompleteReasons.includes("test_merge_check_evidence_incomplete"));
 });

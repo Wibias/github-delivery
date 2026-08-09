@@ -29,6 +29,15 @@ try {
         maxAgeSeconds: args.maxAgeSeconds,
       });
   const output = evaluateRequiredChecksSnapshot(snapshot);
+  const authoritative = snapshot.evidence?.checks?.authoritative || null;
+  if (authoritative?.sha) {
+    output.sha = authoritative.sha;
+    output.authoritativeCheckSha = authoritative.sha;
+    output.authoritativeCheckReason = authoritative.reason || null;
+  } else {
+    output.authoritativeCheckSha = output.sha || snapshot.headOid || null;
+    output.authoritativeCheckReason = "legacy_head_snapshot";
+  }
   process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
   process.exitCode = output.decision === "ready" ? 0 : output.decision === "blocked" ? 1 : 2;
 } catch (error) {

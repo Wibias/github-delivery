@@ -86,6 +86,8 @@ export function verifySnapshotBoundary(
     finalBaseOid = null,
     initialRules = null,
     finalRules = null,
+    initialTestMergeOid = undefined,
+    finalTestMergeOid = undefined,
   } = {},
 ) {
   const initialHead = String(initialPr.headRefOid || "").toLowerCase();
@@ -122,6 +124,18 @@ export function verifySnapshotBoundary(
     baseOid = before;
   }
 
+  let testMergeOid;
+  if (initialTestMergeOid !== undefined || finalTestMergeOid !== undefined) {
+    const before = initialTestMergeOid ? String(initialTestMergeOid).toLowerCase() : null;
+    const after = finalTestMergeOid ? String(finalTestMergeOid).toLowerCase() : null;
+    if (before !== after) {
+      throw new Error(
+        `snapshot_test_merge_oid_moved: expected ${before || "missing"}, observed ${after || "missing"}`,
+      );
+    }
+    testMergeOid = before;
+  }
+
   let rulesFingerprint = null;
   if (initialRules !== null || finalRules !== null) {
     if (initialRules?.complete !== true || finalRules?.complete !== true) {
@@ -139,6 +153,7 @@ export function verifySnapshotBoundary(
     headOid: initialHead,
     baseRefName: initialBase,
     ...(baseOid ? { baseOid } : {}),
+    ...(testMergeOid ? { testMergeOid } : {}),
     ...(rulesFingerprint ? { rulesFingerprint } : {}),
   };
 }
@@ -159,6 +174,7 @@ export function assembleSnapshotCapture({
   workflowCoverage,
   viewer,
   boundary = null,
+  checkEvidence = null,
 } = {}) {
   const sources = {
     pr: { required: true, readable: true, complete: true, error: null },
@@ -219,6 +235,13 @@ export function assembleSnapshotCapture({
       checks: {
         checkRuns: checkRuns?.rows || [],
         statuses: statuses?.rows || [],
+        ...(checkEvidence
+          ? {
+              authoritative: checkEvidence.authoritative || null,
+              head: checkEvidence.head || null,
+              testMerge: checkEvidence.testMerge || null,
+            }
+          : {}),
       },
       feedback: {
         issueComments: issueComments?.rows || [],

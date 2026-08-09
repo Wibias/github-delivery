@@ -72,8 +72,8 @@ export function parseSnapshotGateArgs(
   ) {
     throw new Error(usage || "Usage: OWNER/REPO PR_NUMBER [--snapshot FILE]");
   }
-  if (snapshotPath && resolveId) {
-    throw new Error("--resolve cannot be used with --snapshot");
+  if (resolveId && resolveBot) {
+    throw new Error("--resolve and --resolve-bot are mutually exclusive");
   }
 
   return {

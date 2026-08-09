@@ -136,6 +136,9 @@ export function combineShipGateResults({
     repo: snapshot?.repo || null,
     pr: snapshot?.pr || null,
     headOid: snapshot?.headOid || null,
+    authoritativeCheckSha:
+      requiredChecks?.authoritativeCheckSha || requiredChecks?.sha || snapshot?.headOid || null,
+    authoritativeCheckReason: requiredChecks?.authoritativeCheckReason || null,
     url: snapshot?.evidence?.pullRequest?.url || null,
     mutationMode: mutationProfile?.mode || "read-only",
     mutationProfile: mutationProfile || null,
@@ -148,7 +151,11 @@ export function combineShipGateResults({
     unknowns: uniqueUnknowns,
     advisories,
     components: {
-      requiredChecks: componentSummary(requiredChecks),
+      requiredChecks: {
+        ...componentSummary(requiredChecks),
+        sha: requiredChecks?.authoritativeCheckSha || requiredChecks?.sha || null,
+        reason: requiredChecks?.authoritativeCheckReason || null,
+      },
       baseHealth: {
         ...componentSummary(baseHealth),
         baseOid: baseHealth?.baseOid || null,
