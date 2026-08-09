@@ -186,11 +186,17 @@ function requiredReviewerCount(environment) {
 }
 
 function repositoryMergeMethods(repository = {}) {
+  const fields = ["allow_merge_commit", "allow_squash_merge", "allow_rebase_merge"];
+  const complete = fields.every((field) => typeof repository[field] === "boolean");
   const methods = [];
   if (repository.allow_merge_commit === true) methods.push("merge");
   if (repository.allow_squash_merge === true) methods.push("squash");
   if (repository.allow_rebase_merge === true) methods.push("rebase");
-  return methods;
+  return { complete, methods };
+}
+
+function repositoryBooleanSetting(repository, field) {
+  return typeof repository?.[field] === "boolean" ? repository[field] : null;
 }
 
 function sameStringSet(a = [], b = []) {
@@ -305,18 +311,42 @@ export function evaluateLiveRepositoryPolicy({ policy, live } = {}) {
     );
   }
 
-  const observedRepoMergeMethods = repositoryMergeMethods(repository);
-  if (policy?.merge?.methods?.length && !sameStringSet(observedRepoMergeMethods, policy.merge.methods)) {
-    add(
-      "repository_merge_methods_mismatch",
-      `Repository merge methods ${observedRepoMergeMethods.join(", ") || "missing"} do not match ${policy.merge.methods.join(", ")}.`,
-    );
+  const observedRepoMerge = repositoryMergeMethods(repository);
+  if (policy?.merge?.methods?.length) {
+    if (!observedRepoMerge.complete) {
+      add(
+        "repository_merge_settings_unreadable",
+        "GitHub did not expose all repository merge-method settings to this verifier; refusing to infer disabled state from missing fields.",
+      );
+    } else if (!sameStringSet(observedRepoMerge.methods, policy.merge.methods)) {
+      add(
+        "repository_merge_methods_mismatch",
+        `Repository merge methods ${observedRepoMerge.methods.join(", ") || "none"} do not match ${policy.merge.methods.join(", ")}.`,
+      );
+    }
   }
-  if (policy?.merge?.updateBranch === true && repository.allow_update_branch !== true) {
-    add("update_branch_not_enabled", "Repository update-branch support is not enabled.");
+
+  if (policy?.merge?.updateBranch === true) {
+    const value = repositoryBooleanSetting(repository, "allow_update_branch");
+    if (value === null) {
+      add(
+        "update_branch_setting_unreadable",
+        "GitHub did not expose allow_update_branch to this verifier; the setting is unknown, not proven disabled.",
+      );
+    } else if (value !== true) {
+      add("update_branch_not_enabled", "Repository update-branch support is not enabled.");
+    }
   }
-  if (policy?.merge?.autoMerge === true && repository.allow_auto_merge !== true) {
-    add("auto_merge_not_enabled", "Repository auto-merge is not enabled.");
+  if (policy?.merge?.autoMerge === true) {
+    const value = repositoryBooleanSetting(repository, "allow_auto_merge");
+    if (value === null) {
+      add(
+        "auto_merge_setting_unreadable",
+        "GitHub did not expose allow_auto_merge to this verifier; the setting is unknown, not proven disabled.",
+      );
+    } else if (value !== true) {
+      add("auto_merge_not_enabled", "Repository auto-merge is not enabled.");
+    }
   }
 
   const expectedEnvironment = policy?.release?.environment;
@@ -356,7 +386,8 @@ export function evaluateLiveRepositoryPolicy({ policy, live } = {}) {
     observedRequiredCheckDescriptors: descriptors,
     missingRequiredChecks,
     wrongProducerChecks,
-    repositoryMergeMethods: observedRepoMergeMethods,
+    repositoryMergeMethods: observedRepoMerge.methods,
+    repositoryMergeSettingsComplete: observedRepoMerge.complete,
     releaseEnvironment: observedEnvironment || null,
     observedRequiredReviewers: observedReviewers,
     errors,
