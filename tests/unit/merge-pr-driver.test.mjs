@@ -227,7 +227,11 @@ test("merge transaction executes the merge before the social thank-you", () => {
     thankRequest: { action: "post_comment" },
     executeRequest(request) {
       calls.push(request.action);
-      return { action: request.action, status: "succeeded" };
+      return {
+        action: request.action,
+        status: "succeeded",
+        ...(request.action === "merge_pr" ? { outcome: "merged" } : {}),
+      };
     },
   });
   assert.deepEqual(calls, ["merge_pr", "post_comment"]);
