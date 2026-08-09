@@ -19,6 +19,8 @@ const NEGATED_MERGE_INTENT =
   /\b(?:do not|don't|dont|never|without)\s+(?:merge|merging|ship|shipping)\b/;
 const DELIBERATIVE_MERGE =
   /\b(?:should|can|could|would)\s+(?:i|we)\b[\s\S]*\b(?:merge|ship)\b|\b(?:why can't|why can’t|when should)\s+(?:i|we)\b[\s\S]*\b(?:merge|ship)\b|\b(?:what happens if|what if)\b[\s\S]*\b(?:merge|ship)\b|\bbefore\s+(?:i|we)\s+(?:merge|ship)\b/;
+const DEFERRED_MERGE_AUTHORITY =
+  /\b(?:merge|ship)\b[\s\S]*\b(?:only\s+)?(?:after|when|if)\s+(?:i|we)\s+(?:later\s+)?(?:confirm|approve|say\s+so|give\s+(?:you\s+)?(?:the\s+)?go-ahead)\b|\b(?:merge|ship)\b[\s\S]*\bafter\s+(?:asking|checking\s+with)\s+me\b|\b(?:ask|check\s+with)\s+me\s+(?:again\s+)?before\s+(?:you\s+)?(?:merge|ship)\b|\b(?:wait|hold)\s+(?:for\s+)?my\s+(?:confirmation|approval)\b/;
 const ASSISTANT_MERGE_REQUEST =
   /^(?:please\s+)?(?:merge|ship)\b|\b(?:and|then)\s+(?:please\s+)?(?:merge|ship)\b|\b(?:can|could|would|will)\s+you\s+(?:please\s+)?(?:merge|ship)\b|\b(?:i want|i need|i'd like|i would like)\s+you\s+to\s+(?:merge|ship)\b|\bgo ahead(?:\s+and)?\s+(?:merge|ship)\b/;
 const PR_REFERENCE = /\bpr\s*#?\d+\b/;
@@ -48,6 +50,7 @@ export function hasExplicitMergeIntent(prompt) {
   if (!MERGE_INTENT.test(candidate)) return false;
   if (NEGATED_MERGE_INTENT.test(candidate)) return false;
   if (DELIBERATIVE_MERGE.test(candidate)) return false;
+  if (DEFERRED_MERGE_AUTHORITY.test(candidate)) return false;
   return ASSISTANT_MERGE_REQUEST.test(candidate);
 }
 
