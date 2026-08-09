@@ -333,21 +333,33 @@ For a linear stack, repeat bottom → top.
 
 ## 6. Retarget a PR base
 
-First inspect the current base:
+First inspect and record the current PR head and base:
 
 ```powershell
-gh pr view $ChildNumber --json number,headRefName,baseRefName,url
+gh pr view $ChildNumber --json number,headRefOid,headRefName,baseRefName,url
 ```
 
-When an authorized base change is required, prefer the GitHub REST endpoint:
+A PR base edit is a network-visible GitHub mutation. Do not call a raw mutating
+`gh api` command from this workflow. Build an exact broker request instead:
 
-```powershell
-gh api "repos/$Owner/$Repo/pulls/$ChildNumber" `
-  -X PATCH `
-  -f base="$NewBase"
+```json
+{
+  "schemaVersion": 1,
+  "action": "retarget_pr",
+  "mutationMode": "maintainer",
+  "explicitInstruction": true,
+  "repo": "OWNER/REPO",
+  "pr": 123,
+  "expectedHead": "CURRENT_HEAD_SHA",
+  "expectedBase": "feature/parent",
+  "newBase": "main"
+}
 ```
 
-Read the PR back after mutation and verify `baseRefName`.
+Plan and execute that request only through `scripts/github-mutate.mjs`. The
+broker verifies the current head and old base before the PATCH, binds both bases
+to trusted authority when enabled, reads `baseRefName` back afterwards, and
+recognizes a safe retry when the requested target base is already applied.
 
 A base edit changes GitHub comparison topology; it does not prove that the
 child branch has been restacked correctly. Compare the resulting diff and
