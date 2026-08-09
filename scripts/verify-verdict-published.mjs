@@ -2,17 +2,19 @@
 /**
  * Verify one full-review run's verdict is actually published on the PR by the
  * authenticated publisher and carries durable trusted-authority provenance.
- * Exit 0 requires a trusted published verdict, a format-valid body, and an
- * authority grant that was valid for the exact comment scope when published.
+ * Live verification requires a trusted published verdict, a format-valid body,
+ * and an authority grant that was valid for the exact comment scope when
+ * published.
  *
  * Same-head anti-noise: when this run did not post because a completed
  * same-head verdict already covers the draft with no material delta, pass
  * `--allow-same-head-reuse` and optionally `--body-file` with the draft body.
  * Only verdicts owned by the authenticated publisher are eligible for reuse.
  *
- * `--publisher-login` and `--authority-public-key-file` are offline-fixture
- * overrides accepted only with `--comments-file`. Live verification resolves
- * the authenticated actor and configured authority trust material directly.
+ * `--comments-file` is an offline fixture mode. Existing format/publication
+ * fixtures may omit authority material; provenance is then explicitly marked
+ * unchecked and `trusted:false`. Security/provenance fixtures can opt into the
+ * real verifier with `--authority-public-key-file`.
  */
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -129,14 +131,16 @@ try {
   const mutationArgs = extractMutationModeArgs(process.argv.slice(2));
   const args = parseArgs(mutationArgs.argv);
   const mode = normalizeMutationMode(mutationArgs.mode);
-  const comments = args.commentsFile
+  const offlineFixture = Boolean(args.commentsFile);
+  const enforceProvenance = !offlineFixture || Boolean(args.authorityPublicKeyFile);
+  const comments = offlineFixture
     ? JSON.parse(readFileSync(args.commentsFile, "utf8"))
     : fetchPrConversationComments({ repo: args.repo, pr: args.pr });
   if (!Array.isArray(comments)) throw new Error("comments_payload_invalid");
-  const expectedPublisher = args.commentsFile
+  const expectedPublisher = offlineFixture
     ? args.publisherLogin || inferOfflinePublisher(comments)
     : fetchAuthenticatedPublisher();
-  const authorityVerifier = args.commentsFile
+  const authorityVerifier = offlineFixture
     ? args.authorityPublicKeyFile
       ? readFileSync(args.authorityPublicKeyFile, "utf8")
       : null
@@ -174,7 +178,7 @@ try {
   const format = verdict
     ? validateVerdictFormat({ body: verdict.body })
     : null;
-  const provenance = verdict && authorityVerifier
+  const provenance = verdict && enforceProvenance && authorityVerifier
     ? verifyReviewVerdictProvenance({
         comment: verdict,
         repo: args.repo,
@@ -182,15 +186,23 @@ try {
         head: args.head,
         authorityVerifier,
       })
-    : verdict
+    : verdict && enforceProvenance
       ? { valid: false, reason: "review_authority_verifier_missing" }
-      : null;
+      : verdict
+        ? {
+            valid: true,
+            trusted: false,
+            offlineFixture: true,
+            reason: "offline_fixture_provenance_not_checked",
+          }
+        : null;
   const complete = Boolean(verdict) && format?.valid === true && provenance?.valid === true;
+  const trusted = provenance?.valid === true && provenance?.offlineFixture !== true;
   const output = {
     schemaVersion: 5,
     kind: "github-delivery/verdict-publication-check",
     published: Boolean(verdict),
-    trusted: provenance?.valid === true,
+    trusted,
     reused,
     format,
     provenance,
