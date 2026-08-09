@@ -23,6 +23,19 @@ The user never needs to choose CLI flags. The agent derives the narrowest approp
 
 The profile is an upper bound, not a waiver. Draft/WIP gates, exact-text confirmation, linked-issue thanks, stack handling, thread ownership, expected-head checks, and workflow-specific requirements still apply.
 
+## Trusted authority at execution
+
+Mutation mode describes what a workflow may request. It is not, by itself, proof that a human granted the exact effect.
+
+Dry-run planning remains available with the normal mode rules so the agent can show the bounded operation before approval. At `--execute`, the mutation boundary additionally requires a scoped trusted authority grant when either condition is true:
+
+- the request uses `autonomous` mode; or
+- the action is high-assurance/destructive: `push_code`, `resolve_thread`, `close_linked_issue`, `close_pr`, `merge_pr`, `retarget_pr`, or `delete_head_branch`.
+
+The existing `GITHUB_DELIVERY_REQUIRE_TRUSTED_AUTHORITY=1` switch remains a stronger global policy and requires trusted authority for every executed mutation. In every strict case, the trusted grant must contain `scopeSha256`; a legacy resource-only signature is not enough.
+
+This keeps hostile repository text and model-selected mode inside the request layer. The actual high-impact write still needs an independently verified grant for the exact effect.
+
 ## Natural-language selection
 
 Examples:
@@ -32,9 +45,9 @@ Examples:
 - `review PR #32 and post the findings` → `review`
 - `fix PR #32 and make it merge ready` → `maintainer`
 - `merge PR #32` → `maintainer` with explicit authority for the merge workflow
-- `supersede PR #12 with #45` → `maintainer` with explicit authority for the `supersede_pr` action
+- `supersede PR #12 with #45` → `maintainer` with explicit authority for the close/comment actions
 - `maintainer overtake PR #32` → `maintainer` with explicit authority for the push/close/comment actions the overtake workflow needs
-- `watch and autonomously fix/merge PR #32` → `autonomous` only when the wording truly grants that scope
+- `watch and autonomously fix/merge PR #32` → `autonomous` only when the wording truly grants that scope; execution still requires a scoped trusted grant
 
 Do not ask users to run scripts. These mappings are agent behavior.
 
@@ -75,7 +88,7 @@ node scripts/github-mutate.mjs --request request.json
 node scripts/github-mutate.mjs --request request.json --execute --audit mutations.jsonl
 ```
 
-The first form is a dry run. The second executes and records a versioned receipt.
+The first form is a dry run. The second executes and records a versioned receipt. High-assurance execution requires a scoped trusted grant as described above.
 
 ## Denial reasons
 
@@ -83,5 +96,6 @@ The first form is a dry run. The second executes and records a versioned receipt
 - `explicit_instruction_required`: maintainer mode needs a direct instruction for the action
 - `exact_text_confirmation_required`: a human-facing reply needs exact-text confirmation
 - `unknown_action`: the requested mutation is not part of the policy schema
+- `trusted_authority_required:*`: execution requires independently verified scoped authority
 - `expected_head_mismatch`: the PR changed after the decision was made
 - request validation failures such as `idempotency_key_required`

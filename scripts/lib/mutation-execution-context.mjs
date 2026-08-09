@@ -8,6 +8,16 @@ import {
 import { makeRedemptionRunner } from "./authority-execution.mjs";
 import { makeAuthorityRedeemer } from "./authority-host-client.mjs";
 
+const HIGH_ASSURANCE_ACTIONS = new Set([
+  "push_code",
+  "resolve_thread",
+  "close_linked_issue",
+  "close_pr",
+  "merge_pr",
+  "retarget_pr",
+  "delete_head_branch",
+]);
+
 export function authorityVerifierConfiguration({
   env = process.env,
   readFile = readFileSync,
@@ -19,14 +29,24 @@ export function authorityVerifierConfiguration({
   return env.GITHUB_DELIVERY_AUTHORITY_PUBLIC_KEY || null;
 }
 
+export function mutationRequiresTrustedAuthority(request = {}) {
+  return (
+    String(request?.mutationMode || "").toLowerCase() === "autonomous" ||
+    HIGH_ASSURANCE_ACTIONS.has(String(request?.action || ""))
+  );
+}
+
 export function mutationAuthorityOptions({
+  request = {},
+  enforceHighAssurance = false,
   env = process.env,
   readFile = readFileSync,
 } = {}) {
   return {
     authorityPublicKey: authorityVerifierConfiguration({ env, readFile }),
     requireTrustedAuthority:
-      env.GITHUB_DELIVERY_REQUIRE_TRUSTED_AUTHORITY === "1",
+      env.GITHUB_DELIVERY_REQUIRE_TRUSTED_AUTHORITY === "1" ||
+      (enforceHighAssurance && mutationRequiresTrustedAuthority(request)),
   };
 }
 
@@ -54,7 +74,12 @@ export function planMutationWithAuthority(
   request,
   { env = process.env, readFile = readFileSync } = {},
 ) {
-  const options = mutationAuthorityOptions({ env, readFile });
+  const options = mutationAuthorityOptions({
+    request,
+    enforceHighAssurance: false,
+    env,
+    readFile,
+  });
   return planWithAuthorityOptions(request, options);
 }
 
@@ -66,7 +91,12 @@ export function executeMutationWithAuthority({
   readFile = readFileSync,
   redeemer = undefined,
 } = {}) {
-  const options = mutationAuthorityOptions({ env, readFile });
+  const options = mutationAuthorityOptions({
+    request,
+    enforceHighAssurance: execute === true,
+    env,
+    readFile,
+  });
   const planned = planWithAuthorityOptions(request, options);
   const pipeName = env.GITHUB_DELIVERY_AUTHORITY_PIPE || undefined;
   const resolvedRedeemer =
