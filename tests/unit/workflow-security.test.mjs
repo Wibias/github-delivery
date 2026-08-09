@@ -38,11 +38,56 @@ function desiredPolicy() {
       protectedTagPattern: "v*",
       requiredReviewers: 1,
     },
+    requiredChecksStrict: true,
+    requiredCheckIntegrationId: 15368,
     requiredChecks: [
       "Node 22 / ubuntu-latest",
       "Dependency Review",
       "CodeQL / Analyze (javascript-typescript)",
     ],
+  };
+}
+
+function matchingLive(policy = desiredPolicy()) {
+  return {
+    repository: {
+      default_branch: "main",
+      allow_merge_commit: true,
+      allow_squash_merge: false,
+      allow_rebase_merge: false,
+      allow_update_branch: true,
+      allow_auto_merge: true,
+    },
+    branch: { name: "main", protected: true },
+    activeRules: [
+      { type: "deletion" },
+      { type: "non_fast_forward" },
+      {
+        type: "pull_request",
+        parameters: {
+          required_approving_review_count: 0,
+          dismiss_stale_reviews_on_push: true,
+          required_review_thread_resolution: true,
+          allowed_merge_methods: ["merge"],
+        },
+      },
+      {
+        type: "required_status_checks",
+        parameters: {
+          strict_required_status_checks_policy: true,
+          required_status_checks: policy.requiredChecks.map((context) => ({
+            context,
+            integration_id: policy.requiredCheckIntegrationId,
+          })),
+        },
+      },
+    ],
+    releaseEnvironment: {
+      name: "release",
+      protection_rules: [
+        { type: "required_reviewers", reviewers: [{ reviewer: { login: "maintainer" } }] },
+      ],
+    },
   };
 }
 
@@ -109,47 +154,34 @@ test("desired repository policy is fail-closed", () => {
 });
 
 test("live policy drift detects an unprotected default branch and missing release reviewer", () => {
-  const report = evaluateLiveRepositoryPolicy({
-    policy: desiredPolicy(),
-    live: {
-      repository: { default_branch: "main" },
-      branch: { name: "main", protected: false },
-      activeRules: [],
-      releaseEnvironment: { name: "release", protection_rules: [] },
-    },
-  });
+  const live = matchingLive();
+  live.branch.protected = false;
+  live.releaseEnvironment.protection_rules = [];
+  const report = evaluateLiveRepositoryPolicy({ policy: desiredPolicy(), live });
   assert.equal(report.valid, false);
   assert.ok(report.errors.some((error) => error.code === "default_branch_unprotected"));
-  assert.ok(report.errors.some((error) => error.code === "active_rules_missing"));
   assert.ok(report.errors.some((error) => error.code === "release_reviewer_missing"));
 });
 
+test("live policy verifier reads conversation and stale-review controls from pull_request parameters", () => {
+  const live = matchingLive();
+  const pullRule = live.activeRules.find((rule) => rule.type === "pull_request");
+  pullRule.parameters.dismiss_stale_reviews_on_push = false;
+  const report = evaluateLiveRepositoryPolicy({ policy: desiredPolicy(), live });
+  assert.equal(report.observedPullRequestPolicy.conversationResolution, true);
+  assert.equal(report.observedPullRequestPolicy.dismissStaleApprovals, false);
+  assert.ok(report.errors.some((error) => error.code === "stale_approvals_not_enforced"));
+  assert.equal(
+    report.errors.some((error) => error.code === "conversation_resolution_rule_missing"),
+    false,
+  );
+});
+
 test("live policy drift reports missing required check contexts", () => {
-  const report = evaluateLiveRepositoryPolicy({
-    policy: desiredPolicy(),
-    live: {
-      repository: { default_branch: "main" },
-      branch: { name: "main", protected: true },
-      activeRules: [
-        { type: "pull_request" },
-        {
-          type: "required_status_checks",
-          parameters: {
-            required_status_checks: [
-              { context: "Node 22 / ubuntu-latest" },
-              { context: "Dependency Review" },
-            ],
-          },
-        },
-      ],
-      releaseEnvironment: {
-        name: "release",
-        protection_rules: [
-          { type: "required_reviewers", reviewers: [{ reviewer: { login: "maintainer" } }] },
-        ],
-      },
-    },
-  });
+  const live = matchingLive();
+  const statusRule = live.activeRules.find((rule) => rule.type === "required_status_checks");
+  statusRule.parameters.required_status_checks = statusRule.parameters.required_status_checks.slice(0, 2);
+  const report = evaluateLiveRepositoryPolicy({ policy: desiredPolicy(), live });
   assert.equal(report.valid, false);
   assert.deepEqual(report.missingRequiredChecks, [
     "CodeQL / Analyze (javascript-typescript)",
@@ -157,31 +189,42 @@ test("live policy drift reports missing required check contexts", () => {
   assert.ok(report.errors.some((error) => error.code === "required_checks_missing_live"));
 });
 
-test("live policy verifier accepts matching branch, rule and release evidence", () => {
+test("live policy verifier detects wrong required-check producer and non-strict policy", () => {
+  const live = matchingLive();
+  const statusRule = live.activeRules.find((rule) => rule.type === "required_status_checks");
+  statusRule.parameters.strict_required_status_checks_policy = false;
+  statusRule.parameters.required_status_checks[0].integration_id = 999;
+  const report = evaluateLiveRepositoryPolicy({ policy: desiredPolicy(), live });
+  assert.equal(report.valid, false);
+  assert.ok(report.errors.some((error) => error.code === "strict_required_checks_not_enforced"));
+  assert.ok(report.errors.some((error) => error.code === "required_check_producer_mismatch"));
+});
+
+test("live policy verifier detects branch and repository merge control drift", () => {
+  const live = matchingLive();
+  live.activeRules = live.activeRules.filter((rule) => !["deletion", "non_fast_forward"].includes(rule.type));
+  live.repository.allow_squash_merge = true;
+  live.repository.allow_update_branch = false;
+  live.repository.allow_auto_merge = false;
+  const report = evaluateLiveRepositoryPolicy({ policy: desiredPolicy(), live });
+  assert.equal(report.valid, false);
+  for (const code of [
+    "force_push_rule_missing",
+    "deletion_rule_missing",
+    "repository_merge_methods_mismatch",
+    "update_branch_not_enabled",
+    "auto_merge_not_enabled",
+  ]) {
+    assert.ok(report.errors.some((error) => error.code === code), code);
+  }
+});
+
+test("live policy verifier accepts current GitHub rule shapes when every declared control matches", () => {
   const policy = desiredPolicy();
-  const report = evaluateLiveRepositoryPolicy({
-    policy,
-    live: {
-      repository: { default_branch: "main" },
-      branch: { name: "main", protected: true },
-      activeRules: [
-        { type: "pull_request" },
-        { type: "required_conversation_resolution" },
-        {
-          type: "required_status_checks",
-          parameters: {
-            required_status_checks: policy.requiredChecks.map((context) => ({ context })),
-          },
-        },
-      ],
-      releaseEnvironment: {
-        name: "release",
-        protection_rules: [
-          { type: "required_reviewers", reviewers: [{ reviewer: { login: "maintainer" } }] },
-        ],
-      },
-    },
-  });
+  const report = evaluateLiveRepositoryPolicy({ policy, live: matchingLive(policy) });
   assert.equal(report.valid, true, JSON.stringify(report.errors, null, 2));
   assert.deepEqual(report.missingRequiredChecks, []);
+  assert.deepEqual(report.wrongProducerChecks, []);
+  assert.equal(report.strictRequiredChecks, true);
+  assert.equal(report.observedPullRequestPolicy.conversationResolution, true);
 });
