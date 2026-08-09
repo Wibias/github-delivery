@@ -14,7 +14,7 @@ Speak naturally. `github-delivery` routes the request, gathers live evidence, ru
 </div>
 
 > [!IMPORTANT]
-> **Natural language is the public API.** You do not need to invoke the Node scripts yourself. The scripts, policy modules, authority layer, evaluators, and mutation broker are internal safety and evidence machinery.
+> **Natural language is the public API.** You do **not** need to invoke Node scripts yourself. The scripts, policy modules, authority layer, evaluators, and mutation broker are internal safety and evidence machinery.
 
 ## At a glance
 
@@ -282,6 +282,8 @@ Material change resets the settle window, and one final authoritative gate close
 
 ## Create-PR flow: bounded research, then forward progress
 
+Creating a linked PR uses a bounded **research → implementation → pre-open review** sequence before publication.
+
 Creating a PR follows this lifecycle:
 
 ```text
@@ -328,7 +330,7 @@ Active conflicts route through `references/resolve-conflicts.md` and are resolve
 
 ## Safe simplification
 
-Simplification is **explicit-only**. Its goal is lower cognitive load and safer maintenance, not fewer lines.
+Simplification is **explicit-only**. Its goal is lower cognitive load and safer maintenance. **Line count is never the goal**; fewer lines are acceptable only when behavior and clarity improve.
 
 A candidate must preserve APIs, errors, ordering, concurrency, side effects, persistence, compatibility, validation, authorization, security, CI/evidence boundaries, and other material behavior.
 
