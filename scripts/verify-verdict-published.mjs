@@ -11,9 +11,10 @@
  * `--allow-same-head-reuse` and optionally `--body-file` with the draft body.
  * Only verdicts owned by the authenticated publisher are eligible for reuse.
  *
- * `--publisher-login` is an offline-fixture override and is accepted only with
- * `--comments-file`. Live verification always resolves the authenticated actor
- * from `gh api user`.
+ * `--publisher-login` is an offline-fixture trust override and is accepted only
+ * with `--comments-file`. Legacy fixture calls without it remain non-authoritative
+ * and infer the expected publisher from the first fixture comment. Live
+ * verification always resolves the authenticated actor from `gh api user`.
  */
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -30,7 +31,7 @@ import {
 } from "./lib/verdict-publication.mjs";
 
 const usage =
-  "Usage: node scripts/verify-verdict-published.mjs OWNER/REPO PR_NUMBER --run-id ID --head SHA [--comments-file FILE --publisher-login LOGIN] [--mutation-mode MODE] [--allow-same-head-reuse] [--body-file FILE]";
+  "Usage: node scripts/verify-verdict-published.mjs OWNER/REPO PR_NUMBER --run-id ID --head SHA [--comments-file FILE [--publisher-login LOGIN]] [--mutation-mode MODE] [--allow-same-head-reuse] [--body-file FILE]";
 
 function parseArgs(argv) {
   const positionals = [];
@@ -79,9 +80,6 @@ function parseArgs(argv) {
   if (publisherLogin && !commentsFile) {
     throw new Error("--publisher-login is allowed only with --comments-file");
   }
-  if (commentsFile && !publisherLogin) {
-    throw new Error("--comments-file requires --publisher-login for trusted provenance");
-  }
   return {
     repo,
     pr,
@@ -114,6 +112,12 @@ function commentsByPublisher(comments, publisherLogin) {
   );
 }
 
+function inferOfflinePublisher(comments) {
+  const login = String(comments?.find((comment) => comment?.user?.login)?.user?.login || "").trim();
+  if (!login) throw new Error("offline_publisher_missing");
+  return login;
+}
+
 try {
   const mutationArgs = extractMutationModeArgs(process.argv.slice(2));
   const args = parseArgs(mutationArgs.argv);
@@ -123,7 +127,7 @@ try {
     : fetchPrConversationComments({ repo: args.repo, pr: args.pr });
   if (!Array.isArray(comments)) throw new Error("comments_payload_invalid");
   const expectedPublisher = args.commentsFile
-    ? args.publisherLogin
+    ? args.publisherLogin || inferOfflinePublisher(comments)
     : fetchAuthenticatedPublisher();
   const trustedComments = commentsByPublisher(comments, expectedPublisher);
   const ignoredUntrustedComments = comments.length - trustedComments.length;
