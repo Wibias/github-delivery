@@ -11,8 +11,8 @@
  *
  * Dry-run (default) prints the full plan and the exact commands that would run.
  * --execute performs the writes through the canonical authority-aware broker
- * context only after the gate is ready on the pinned head. Never merges when
- * blocked, unauthorised, or head-mismatched.
+ * context only after the gate is ready on the pinned head and the audited
+ * head/base/rules generation is recaptured immediately before the merge.
  */
 import { spawnSync } from "node:child_process";
 import { appendFileSync, realpathSync } from "node:fs";
@@ -34,6 +34,10 @@ import {
   planMutationWithAuthority,
 } from "./lib/mutation-execution-context.mjs";
 import { evaluateHeadBranchCleanup } from "./lib/merge-branch-cleanup.mjs";
+import {
+  assertSameMergeBoundary,
+  mergeBoundaryForSnapshot,
+} from "./lib/merge-boundary.mjs";
 
 const USAGE =
   "Usage: node scripts/merge-pr-driver.mjs OWNER/REPO N [--mode MODE] [--settle] [--merge-method METHOD] [--execute] [--audit FILE] [--expected-head SHA] [--thank-comment BODY] [--skip-thanks]";
@@ -212,6 +216,17 @@ async function settle({ repo, pr, mode, snapshot, totalMs = 60_000, pollMs = 20_
   return { ok: true, gate, snapshot };
 }
 
+export function verifyFinalMergeBoundary({ approvedBoundary, freshSnapshot, mode }) {
+  const freshGate = buildGateOutput(freshSnapshot, mode);
+  if (!freshGate.ready) {
+    throw new Error(
+      `final_gate_blocked:${(freshGate.blockers || freshGate.unknowns || []).join(",") || "unknown"}`,
+    );
+  }
+  const observedBoundary = assertSameMergeBoundary(approvedBoundary, freshSnapshot);
+  return { gate: freshGate, boundary: observedBoundary };
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const mode = normalizeMutationMode(args.mode);
@@ -247,6 +262,7 @@ async function main() {
     gate = settled.gate;
   }
 
+  const approvedBoundary = mergeBoundaryForSnapshot(snapshot);
   const expectedHead = snapshot.headOid;
   const mergeMethod =
     args.mergeMethod || detectMergeMethod(readRepositoryMergeCapabilities(args.repo));
@@ -283,6 +299,7 @@ async function main() {
     pr: args.pr,
     mode,
     headOid: expectedHead,
+    mergeBoundary: approvedBoundary,
     gate: {
       decision: gate.decision,
       ready: gate.ready,
@@ -305,6 +322,13 @@ async function main() {
     process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
     return;
   }
+
+  const freshSnapshot = captureLiveSnapshot({ repo: args.repo, pr: args.pr });
+  const finalBoundary = verifyFinalMergeBoundary({
+    approvedBoundary,
+    freshSnapshot,
+    mode,
+  });
 
   const receipts = executeMergeTransaction({
     mergeRequest,
@@ -329,6 +353,7 @@ async function main() {
   const final = {
     ...summary,
     executed: true,
+    finalBoundary,
     receipts: receipts.map(({ name, receipt }) => ({
       name,
       action: receipt.action,
@@ -349,7 +374,7 @@ async function main() {
 
 if (process.argv[1]) {
   const invokedPath = realpathSync(process.argv[1]);
-  if (import.meta.url === pathToFileURL(invokedPath).href) {
+  if (import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
     main().catch((error) => {
       console.error(String(error?.message || error));
       process.exit(2);
