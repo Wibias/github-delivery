@@ -1,13 +1,20 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
 
+import { runGitHubCommandWithRetry } from "./lib/github-retry.mjs";
 import {
   buildCredentialReport,
   parseCredentialArgs,
 } from "./lib/live-fixture-credential.mjs";
+import { verifyFixtureTargetIdentity } from "./lib/live-fixture-identity.mjs";
+
+function execute(command, args, options = {}) {
+  if (command === "gh") return runGitHubCommandWithRetry(command, args, { options });
+  return spawnSync(command, args, options);
+}
 
 function runGh(args) {
-  const result = spawnSync("gh", args, {
+  const result = execute("gh", args, {
     encoding: "utf8",
     maxBuffer: 20 * 1024 * 1024,
   });
@@ -36,12 +43,22 @@ function branchProtectionQuery() {
 }
 
 try {
-  const { repo, base } = parseCredentialArgs(process.argv.slice(2));
+  const { repo, base, sourceRepo, fixtureRepoId } = parseCredentialArgs(
+    process.argv.slice(2),
+  );
   if (!process.env.GH_TOKEN) {
     throw new Error(
       "missing_live_fixture_token: configure the LIVE_FIXTURE_TOKEN repository Actions secret",
     );
   }
+
+  verifyFixtureTargetIdentity({
+    sourceRepo,
+    fixtureRepo: repo,
+    expectedFixtureRepoId: fixtureRepoId,
+    baseBranch: base,
+    runner: execute,
+  });
 
   const [owner, name] = repo.split("/");
   const identity = runGh(["api", "user", "--jq", ".login"]);

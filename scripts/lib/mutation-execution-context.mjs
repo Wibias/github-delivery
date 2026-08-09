@@ -7,6 +7,7 @@ import {
 } from "./github-mutation-router.mjs";
 import { makeRedemptionRunner } from "./authority-execution.mjs";
 import { makeAuthorityRedeemer } from "./authority-host-client.mjs";
+import { isFullReviewVerdictBody } from "./review-verdict-marker.mjs";
 
 const HIGH_ASSURANCE_ACTIONS = new Set([
   "push_code",
@@ -14,6 +15,7 @@ const HIGH_ASSURANCE_ACTIONS = new Set([
   "update_pr_body",
   "create_issue",
   "assign_issue",
+  "reply_human_thread",
   "resolve_thread",
   "resolve_bot_thread",
   "close_linked_issue",
@@ -35,9 +37,11 @@ export function authorityVerifierConfiguration({
 }
 
 export function mutationRequiresTrustedAuthority(request = {}) {
+  const action = String(request?.action || "");
   return (
     String(request?.mutationMode || "").toLowerCase() === "autonomous" ||
-    HIGH_ASSURANCE_ACTIONS.has(String(request?.action || ""))
+    HIGH_ASSURANCE_ACTIONS.has(action) ||
+    (action === "post_comment" && isFullReviewVerdictBody(request?.body))
   );
 }
 

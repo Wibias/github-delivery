@@ -19,8 +19,9 @@ jobs:
     timeout-minutes: 35
     env:
       FIXTURE_REPOSITORY: ${{ vars.LIVE_FIXTURE_REPOSITORY }}
+      FIXTURE_REPOSITORY_ID: ${{ vars.LIVE_FIXTURE_REPOSITORY_ID }}
     steps:
-      - name: Validate dedicated fixture target
+      - name: Validate dedicated fixture target configuration
         shell: bash
         run: |
           set -euo pipefail
@@ -28,10 +29,15 @@ jobs:
             echo "LIVE_FIXTURE_REPOSITORY must name a dedicated OWNER/REPO fixture repository." >&2
             exit 1
           fi
+          if [[ -z "${FIXTURE_REPOSITORY_ID}" || ! "${FIXTURE_REPOSITORY_ID}" =~ ^[0-9]+$ ]]; then
+            echo "LIVE_FIXTURE_REPOSITORY_ID must be the immutable numeric repository id of the dedicated fixture repository." >&2
+            exit 1
+          fi
           if [[ "${FIXTURE_REPOSITORY,,}" == "${GITHUB_REPOSITORY,,}" ]]; then
             echo "LIVE_FIXTURE_REPOSITORY must be separate from GITHUB_REPOSITORY." >&2
             exit 1
           fi
+          echo "The target must also contain .github/github-delivery-live-fixture.json on main, bound to both source and fixture numeric repository ids."
 
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -53,7 +59,7 @@ jobs:
           tests/unit/live-fixture-cleanup.test.mjs
           tests/unit/live-fixture-credential.test.mjs
 
-      - name: Verify live fixture credential
+      - name: Verify live fixture credential and target identity
         id: credential
         env:
           GH_TOKEN: ${{ secrets.LIVE_FIXTURE_TOKEN }}
@@ -61,6 +67,8 @@ jobs:
           set -o pipefail
           node scripts/verify-live-fixture-token.mjs \
             "${FIXTURE_REPOSITORY}" \
+            --source-repo "${GITHUB_REPOSITORY}" \
+            --fixture-repo-id "${FIXTURE_REPOSITORY_ID}" \
             --base "main" \
             | tee live-fixture-credential.json
 
@@ -72,6 +80,7 @@ jobs:
           node scripts/live-github-fixture.mjs
           "${FIXTURE_REPOSITORY}"
           --source-repo "${GITHUB_REPOSITORY}"
+          --fixture-repo-id "${FIXTURE_REPOSITORY_ID}"
           --run-id "gha-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           --base "main"
           --disposition close
@@ -86,6 +95,7 @@ jobs:
           node scripts/cleanup-live-github-fixture.mjs
           "${FIXTURE_REPOSITORY}"
           --source-repo "${GITHUB_REPOSITORY}"
+          --fixture-repo-id "${FIXTURE_REPOSITORY_ID}"
           --run-id "gha-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           --base "main"
           --disposition close

@@ -16,6 +16,9 @@ internal static partial class ScopeCanonicalizer
     [GeneratedRegex("\\n\\n<!-- github-delivery:idempotency [0-9a-f]{64} -->\\s*$", RegexOptions.IgnoreCase)]
     private static partial Regex IdempotencyMarkerRegex();
 
+    [GeneratedRegex("\\n\\n<!-- github-delivery:review-authority mode:(?:read-only|review|maintainer|autonomous) key:[A-Za-z0-9_-]+ grant:gd1\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+ -->", RegexOptions.IgnoreCase)]
+    private static partial Regex ReviewAuthorityMarkerRegex();
+
     public static JsonObject BuildScope(JsonElement request)
     {
         if (request.ValueKind != JsonValueKind.Object)
@@ -228,7 +231,10 @@ internal static partial class ScopeCanonicalizer
         => Sha256(VisibleBody(RequiredString(request, "body")));
 
     private static string VisibleBody(string value)
-        => IdempotencyMarkerRegex().Replace(value, string.Empty);
+    {
+        var withoutIdempotency = IdempotencyMarkerRegex().Replace(value, string.Empty);
+        return ReviewAuthorityMarkerRegex().Replace(withoutIdempotency, string.Empty);
+    }
 
     internal static string Sha256(string value)
         => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();

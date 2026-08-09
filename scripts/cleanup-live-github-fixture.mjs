@@ -1,11 +1,13 @@
 #!/usr/bin/env node
-import { existsSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { existsSync, writeFileSync } from "node:fs";
 
+import { runGitHubCommandWithRetry } from "./lib/github-retry.mjs";
 import {
   buildInterruptedReceipt,
   cleanupFixtureResources,
 } from "./lib/live-fixture-cleanup.mjs";
+import { verifyFixtureTargetIdentity } from "./lib/live-fixture-identity.mjs";
 import { buildFixturePlan } from "./lib/live-github-fixture.mjs";
 import {
   allowSameRepositoryFixture,
@@ -18,6 +20,7 @@ function parseArgs(argv) {
   const args = {
     repo: null,
     sourceRepo: null,
+    fixtureRepoId: null,
     runId: null,
     baseBranch: "main",
     disposition: "close",
@@ -25,10 +28,11 @@ function parseArgs(argv) {
     cleanupReport: "live-fixture-cleanup.json",
   };
   const positionals = [];
-  for (let index = 0; index < argv.length; index++) {
+  for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];
     if (value === "--run-id") args.runId = argv[++index];
     else if (value === "--source-repo") args.sourceRepo = argv[++index];
+    else if (value === "--fixture-repo-id") args.fixtureRepoId = argv[++index];
     else if (value === "--base") args.baseBranch = argv[++index];
     else if (value === "--disposition") args.disposition = argv[++index];
     else if (value === "--receipt") args.receipt = argv[++index];
@@ -38,19 +42,26 @@ function parseArgs(argv) {
   }
   args.repo = positionals[0];
   args.sourceRepo ||= process.env.GITHUB_REPOSITORY || null;
+  args.fixtureRepoId ||= process.env.LIVE_FIXTURE_REPOSITORY_ID || null;
   args.runId ||= process.env.GITHUB_RUN_ID
     ? `gha-${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT || "1"}`
     : null;
-  if (!args.repo || !args.runId) {
+  if (!args.repo || !args.runId || !Number.isSafeInteger(Number(args.fixtureRepoId)) || Number(args.fixtureRepoId) <= 0) {
     throw new Error(
-      "Usage: node scripts/cleanup-live-github-fixture.mjs FIXTURE_OWNER/FIXTURE_REPO --run-id ID [--source-repo OWNER/REPO] [--base BRANCH] [--disposition close] [--receipt FILE] [--cleanup-report FILE]",
+      "Usage: node scripts/cleanup-live-github-fixture.mjs FIXTURE_OWNER/FIXTURE_REPO --fixture-repo-id ID --run-id ID [--source-repo OWNER/REPO] [--base BRANCH] [--disposition close] [--receipt FILE] [--cleanup-report FILE]",
     );
   }
+  args.fixtureRepoId = Number(args.fixtureRepoId);
   return args;
 }
 
+function execute(command, args, options = {}) {
+  if (command === "gh") return runGitHubCommandWithRetry(command, args, { options });
+  return spawnSync(command, args, options);
+}
+
 function run(command, args, { allowFailure = false } = {}) {
-  const result = spawnSync(command, args, {
+  const result = execute(command, args, {
     encoding: "utf8",
     maxBuffer: 20 * 1024 * 1024,
   });
@@ -184,6 +195,13 @@ try {
     sourceRepo,
     fixtureRepo: args.repo,
     allowSameRepository: allowSameRepositoryFixture(process.env),
+  });
+  verifyFixtureTargetIdentity({
+    sourceRepo: isolation.sourceRepo,
+    fixtureRepo: isolation.fixtureRepo,
+    expectedFixtureRepoId: args.fixtureRepoId,
+    baseBranch: args.baseBranch,
+    runner: execute,
   });
   const plan = buildFixturePlan({
     ...args,

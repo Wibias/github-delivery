@@ -39,6 +39,13 @@ jobs:
       - name: Run checks
         run: npm run check
 
+      - name: Verify architecture contracts
+        run: >-
+          node --test
+          tests/unit/mutation-action-registry.test.mjs
+          tests/unit/mutation-action-registry-broker.test.mjs
+          tests/unit/review-context-contract.test.mjs
+
       - name: Restore Windows authority host in locked mode
         if: runner.os == 'Windows'
         shell: pwsh
