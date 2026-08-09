@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  evaluateRequiredCheckWorkflowMapping,
+  workflowRunIdFromCheckRun,
+} from "../../scripts/lib/merge-group-workflow-coverage.mjs";
+import {
   assembleSnapshotCapture,
   classifyBranchProtectionResponse,
   snapshotBoundaryFingerprint,
@@ -72,6 +76,10 @@ test("assembles all evidence required by snapshot-backed gates", () => {
       workflowFiles: 1,
       hasPullRequestTrigger: true,
       hasMergeGroupTrigger: false,
+      requiredCheckWorkflowMappingComplete: true,
+      requiredGithubActionsCheckCount: 0,
+      mappings: [],
+      unmapped: [],
       warning: null,
       error: null,
     },
@@ -89,6 +97,7 @@ test("assembles all evidence required by snapshot-backed gates", () => {
   assert.equal(result.sources.viewer.complete, true);
   assert.equal(result.evidence.policy.mergeQueue.enabled, false);
   assert.equal(result.evidence.workflowCoverage.workflowFiles, 1);
+  assert.equal(result.evidence.workflowCoverage.requiredCheckWorkflowMappingComplete, true);
   assert.equal(result.evidence.viewer.login, "Wibias");
   assert.deepEqual(result.evidence.codeowners.errors, []);
   assert.deepEqual(result.evidence.captureBoundary, boundary);
@@ -285,4 +294,64 @@ test("branch protection response parses an authoritative protected branch payloa
   assert.equal(result.readable, true);
   assert.equal(result.complete, true);
   assert.equal(result.payload.required_status_checks.strict, true);
+});
+
+test("extracts GitHub Actions workflow run IDs from required check details URLs", () => {
+  assert.equal(
+    workflowRunIdFromCheckRun({
+      details_url: "https://github.com/acme/widgets/actions/runs/123456789/job/987",
+    }),
+    123456789,
+  );
+});
+
+test("exact required GitHub Actions check mapping is complete only when every producer workflow handles merge_group", () => {
+  const result = evaluateRequiredCheckWorkflowMapping({
+    descriptors: [
+      { context: "build", appId: 15368 },
+      { context: "lint", appId: 15368 },
+    ],
+    checkRuns: [
+      {
+        name: "build",
+        app: { id: 15368 },
+        details_url: "https://github.com/acme/widgets/actions/runs/100/job/1",
+      },
+      {
+        name: "lint",
+        app: { id: 15368 },
+        details_url: "https://github.com/acme/widgets/actions/runs/200/job/2",
+      },
+    ],
+    workflowRunPaths: {
+      100: ".github/workflows/ci.yml",
+      200: ".github/workflows/lint.yml",
+    },
+    workflowTexts: {
+      ".github/workflows/ci.yml": "on:\n  pull_request:\n  merge_group:\n",
+      ".github/workflows/lint.yml": "on:\n  pull_request:\n  merge_group:\n",
+    },
+  });
+  assert.equal(result.requiredCheckWorkflowMappingComplete, true);
+  assert.equal(result.mappings.length, 2);
+  assert.deepEqual(result.unmapped, []);
+});
+
+test("required GitHub Actions mapping fails closed when one producer lacks merge_group", () => {
+  const result = evaluateRequiredCheckWorkflowMapping({
+    descriptors: [{ context: "build", appId: 15368 }],
+    checkRuns: [
+      {
+        name: "build",
+        app: { id: 15368 },
+        details_url: "https://github.com/acme/widgets/actions/runs/100/job/1",
+      },
+    ],
+    workflowRunPaths: { 100: ".github/workflows/ci.yml" },
+    workflowTexts: {
+      ".github/workflows/ci.yml": "on:\n  pull_request:\n",
+    },
+  });
+  assert.equal(result.requiredCheckWorkflowMappingComplete, false);
+  assert.equal(result.unmapped[0].reason, "merge_group_trigger_missing");
 });
