@@ -216,14 +216,14 @@ test("trusted exact-text grants bind the approved human reply body", () => {
   const payload = grantPayload({
     action: "reply_human_thread",
     resource,
-    maxMutationMode: "review",
+    maxMutationMode: "maintainer",
     exactTextSha256: sha256(body),
   });
   const authorityGrant = signGrant(privateKey, payload);
   const request = {
     schemaVersion: 1,
     action: "reply_human_thread",
-    mutationMode: "review",
+    mutationMode: "maintainer",
     exactTextConfirmed: false,
     exactTextSha256: sha256(body),
     idempotencyKey: "reply-77",

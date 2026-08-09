@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { actionDefinition } from "./mutation-action-registry.mjs";
+import { stripReviewAuthorityMarker } from "./review-verdict-marker.mjs";
 
 const MUTATION_MODES = new Set(["read-only", "review", "maintainer", "autonomous"]);
 const IDEMPOTENCY_MARKER_RE = /\n\n<!-- github-delivery:idempotency [0-9a-f]{64} -->\s*$/i;
@@ -35,7 +36,8 @@ function positiveInteger(value, name) {
 }
 
 function visibleBody(value) {
-  return String(value ?? "").replace(IDEMPOTENCY_MARKER_RE, "");
+  const withoutIdempotency = String(value ?? "").replace(IDEMPOTENCY_MARKER_RE, "");
+  return stripReviewAuthorityMarker(withoutIdempotency);
 }
 
 function bodyHash(value) {

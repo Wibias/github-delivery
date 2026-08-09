@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 
 import { attachAuthorityGrants } from "./lib/authority-batch.mjs";
 import { authorizeBatchSync } from "./lib/authority-host-client.mjs";
+import { stampAuthorizedReviewVerdicts } from "./lib/review-verdict-marker.mjs";
 
 const usage = "Usage: node scripts/github-authorize.mjs --request FILE [--out FILE] [--pipe NAME]";
 
@@ -10,7 +11,7 @@ function parseArgs(argv) {
   let requestPath = null;
   let outPath = null;
   let pipeName = process.env.GITHUB_DELIVERY_AUTHORITY_PIPE || undefined;
-  for (let index = 0; index < argv.length; index++) {
+  for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];
     if (value === "--request") {
       requestPath = argv[++index];
@@ -42,7 +43,9 @@ try {
   const document = JSON.parse(readFileSync(args.requestPath, "utf8"));
   const operations = operationsFromDocument(document);
   const authorization = authorizeBatchSync(operations, { pipeName: args.pipeName });
-  const output = attachAuthorityGrants(operations, authorization);
+  const output = stampAuthorizedReviewVerdicts(
+    attachAuthorityGrants(operations, authorization),
+  );
   const json = `${JSON.stringify(output, null, 2)}\n`;
   if (args.outPath) writeFileSync(args.outPath, json, "utf8");
   else process.stdout.write(json);
