@@ -13,15 +13,19 @@ const IDENTITY_ARGS = [
   "12345",
 ];
 
+function parse(argv) {
+  return parseCredentialArgs(argv, {});
+}
+
 test("parses repository, source identity, target id, and optional base branch", () => {
-  assert.deepEqual(parseCredentialArgs(["acme/widget", ...IDENTITY_ARGS]), {
+  assert.deepEqual(parse(["acme/widget", ...IDENTITY_ARGS]), {
     repo: "acme/widget",
     base: "main",
     sourceRepo: "acme/source",
     fixtureRepoId: 12345,
   });
   assert.deepEqual(
-    parseCredentialArgs(["acme/widget", ...IDENTITY_ARGS, "--base", "dev"]),
+    parse(["acme/widget", ...IDENTITY_ARGS, "--base", "dev"]),
     {
       repo: "acme/widget",
       base: "dev",
@@ -32,22 +36,22 @@ test("parses repository, source identity, target id, and optional base branch", 
 });
 
 test("rejects malformed or incomplete credential verifier arguments", () => {
-  assert.throws(() => parseCredentialArgs([]), /OWNER\/REPO/);
-  assert.throws(() => parseCredentialArgs(["widget", ...IDENTITY_ARGS]), /OWNER\/REPO/);
-  assert.throws(() => parseCredentialArgs(["acme/widget", "--base"]), /--base/);
+  assert.throws(() => parse([]), /OWNER\/REPO/);
+  assert.throws(() => parse(["widget", ...IDENTITY_ARGS]), /OWNER\/REPO/);
+  assert.throws(() => parse(["acme/widget", "--base"]), /--base/);
   assert.throws(
-    () => parseCredentialArgs(["acme/widget", "--source-repo", "acme/source"]),
+    () => parse(["acme/widget", "--source-repo", "acme/source"]),
     /fixture-repo-id|Usage/,
   );
   assert.throws(
-    () => parseCredentialArgs(["acme/widget", "--fixture-repo-id", "123"]),
+    () => parse(["acme/widget", "--fixture-repo-id", "123"]),
     /source-repo|Usage/,
   );
   assert.throws(
-    () => parseCredentialArgs(["acme/widget", ...IDENTITY_ARGS.slice(0, -1), "nope"]),
+    () => parse(["acme/widget", ...IDENTITY_ARGS.slice(0, -1), "nope"]),
     /fixture-repo-id|Usage/,
   );
-  assert.throws(() => parseCredentialArgs(["acme/widget", ...IDENTITY_ARGS, "--wat"]), /Unknown option/);
+  assert.throws(() => parse(["acme/widget", ...IDENTITY_ARGS, "--wat"]), /Unknown option/);
 });
 
 test("builds a complete report only when every required read succeeds", () => {
