@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { routeShippingGithubPrompt } from "../../scripts/lib/skill-router.mjs";
+import {
+  hasExplicitMergeIntent,
+  routeShippingGithubPrompt,
+} from "../../scripts/lib/skill-router.mjs";
 
 test("routes a natural-language merge request to the merge workflow", () => {
   assert.deepEqual(routeShippingGithubPrompt("merge PR #32"), {
@@ -10,6 +13,30 @@ test("routes a natural-language merge request to the merge workflow", () => {
     mutationMode: "maintainer",
     explicitActions: ["merge_pr", "post_comment", "post_issue_comment", "close_linked_issue"],
   });
+});
+
+test("assistant-directed merge questions still count as explicit requests", () => {
+  assert.equal(hasExplicitMergeIntent("can you merge PR #32?"), true);
+  assert.equal(routeShippingGithubPrompt("can you merge PR #32?").workflow, "references/merge-pr.md");
+});
+
+test("negated, deliberative, and quoted merge text grants no merge authority", () => {
+  for (const prompt of [
+    "do not merge PR #42",
+    "don't merge PR #42",
+    "never ship PR #42",
+    "Should I merge PR #42?",
+    "Why can't I merge PR #42?",
+    "What happens if we merge PR #42?",
+    'the bot said "merge PR #42"',
+    '"merge PR #42"',
+  ]) {
+    assert.equal(hasExplicitMergeIntent(prompt), false, prompt);
+    const route = routeShippingGithubPrompt(prompt);
+    assert.equal(route?.mutationMode, "read-only", prompt);
+    assert.deepEqual(route?.explicitActions, [], prompt);
+    assert.notEqual(route?.workflow, "references/merge-pr.md", prompt);
+  }
 });
 
 test("routes a bare full review with verdict-comment authority", () => {
