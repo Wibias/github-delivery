@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 function asAppId(value) {
   const number = Number(value);
   return Number.isSafeInteger(number) && number >= 0 ? number : null;
@@ -43,6 +45,25 @@ function statusGate(row) {
   return "unknown";
 }
 
+function normalizedDiagnostic(value) {
+  return String(value || "")
+    .replace(/\u001b\[[0-9;]*m/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function diagnosticFingerprint(row, type) {
+  const diagnostic =
+    type === "check_run"
+      ? normalizedDiagnostic([row?.output?.summary, row?.output?.text].filter(Boolean).join("\n"))
+      : normalizedDiagnostic(row?.description);
+  if (diagnostic.length < 16) return null;
+  if (/^(?:process completed with exit code \d+|tests? failed|build failed)\.?$/i.test(diagnostic)) {
+    return null;
+  }
+  return createHash("sha256").update(diagnostic, "utf8").digest("hex");
+}
+
 function liveChecks({ checkRuns = [], statuses = [] } = {}) {
   const latest = new Map();
   for (const row of checkRuns) {
@@ -59,6 +80,7 @@ function liveChecks({ checkRuns = [], statuses = [] } = {}) {
         context: row.name,
         appId,
         gate: checkRunGate(row),
+        failureFingerprint: diagnosticFingerprint(row, "check_run"),
         raw: row,
       });
     }
@@ -74,6 +96,7 @@ function liveChecks({ checkRuns = [], statuses = [] } = {}) {
         context: row.context,
         appId: null,
         gate: statusGate(row),
+        failureFingerprint: diagnosticFingerprint(row, "status_context"),
         raw: row,
       });
     }
@@ -88,7 +111,16 @@ function publicCheck(row) {
     context: row.context,
     appId: row.appId,
     gate: row.gate,
+    failureFingerprint: row.failureFingerprint || null,
   };
+}
+
+function sameFailureEvidence(head, base) {
+  return Boolean(
+    head?.failureFingerprint &&
+      base?.failureFingerprint &&
+      head.failureFingerprint === base.failureFingerprint,
+  );
 }
 
 export function evaluateBaseHealthSnapshot(snapshot) {
@@ -112,13 +144,16 @@ export function evaluateBaseHealthSnapshot(snapshot) {
   const perCheckOrigins = [];
   for (const failure of headFailures) {
     const baseRow = baseByKey.get(failure.key);
+    const matchingFailure = baseRow?.gate === "fail" && sameFailureEvidence(failure, baseRow);
     const origin = !baseSourcesComplete
       ? "failure_origin_unknown"
-      : baseRow?.gate === "fail"
+      : matchingFailure
         ? "base_preexisting"
-        : baseRow && ["pending", "unknown"].includes(baseRow.gate)
+        : baseRow?.gate === "fail"
           ? "failure_origin_unknown"
-          : "pr_only";
+          : baseRow && ["pending", "unknown"].includes(baseRow.gate)
+            ? "failure_origin_unknown"
+            : "pr_only";
     perCheckOrigins.push({
       key: failure.key,
       name: failure.context || failure.key,
@@ -126,18 +161,24 @@ export function evaluateBaseHealthSnapshot(snapshot) {
       origin,
       baseGate: baseRow?.gate || null,
       baseSourcesComplete,
+      headFailureFingerprint: failure.failureFingerprint || null,
+      baseFailureFingerprint: baseRow?.failureFingerprint || null,
       reason: !baseSourcesComplete
         ? "base evidence incomplete — cannot classify"
-        : baseRow?.gate === "fail"
-          ? "same check fails on base tip"
-          : baseRow && ["pending", "unknown"].includes(baseRow.gate)
-            ? "base check is not conclusive (pending/unknown)"
-            : "base check passes — PR-introduced or infra (see ci-forensics)",
+        : matchingFailure
+          ? "same check and diagnostic fingerprint fail on base tip"
+          : baseRow?.gate === "fail"
+            ? "same check also fails on base, but failure identity is unproven"
+            : baseRow && ["pending", "unknown"].includes(baseRow.gate)
+              ? "base check is not conclusive (pending/unknown)"
+              : "base check passes — PR-introduced or infra (see ci-forensics)",
     });
     if (!baseSourcesComplete) {
       unknownFailures.push(publicCheck(failure));
-    } else if (baseRow?.gate === "fail") {
+    } else if (matchingFailure) {
       sharedFailures.push(publicCheck(failure));
+    } else if (baseRow?.gate === "fail") {
+      unknownFailures.push(publicCheck(failure));
     } else if (baseRow && ["pending", "unknown"].includes(baseRow.gate)) {
       unknownFailures.push(publicCheck(failure));
     } else {
@@ -195,7 +236,9 @@ export function evaluateBaseHealthSnapshot(snapshot) {
           ? "investigate"
           : "none",
     note: sharedFailures.length
-      ? "The same failing check is present on the base tip. It may block merging, but it does not automatically expand this PR's implementation scope."
-      : null,
+      ? "The same failing check and diagnostic fingerprint are present on the base tip. This supports a pre-existing origin without automatically expanding this PR's scope."
+      : unknownFailures.length && headFailures.length
+        ? "A check with the same name may also fail on the base, but check identity alone does not prove the same root cause."
+        : null,
   };
 }

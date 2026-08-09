@@ -49,7 +49,8 @@ test("baseFailingNames collects failing base check and status names", () => {
   assert.equal(names.has("lint"), true);
 });
 
-test("classify distinguishes base-preexisting from PR-or-unknown", () => {
-  assert.equal(classify("CI", true, new Set(["CI"])), "base_preexisting");
+test("classify treats a shared check name as common surface, not proven base root cause", () => {
+  assert.equal(classify("CI", true, new Set(["CI"])), "common_failing_check");
   assert.equal(classify("CI", true, new Set()), "pr_only_or_unknown");
+  assert.equal(classify("CI", false, new Set(["CI"])), "not_failing");
 });

@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
  * One-call CI forensics: for each failing required check on the PR head, fetch
- * the annotations and log tail, compare against the base SHA, and emit a
- * compact per-check origin verdict. Collapses the multi-turn "is this CI
- * failure mine or pre-existing?" investigation.
+ * annotations and a log tail, compare check presence against the base SHA, and
+ * emit a conservative per-check origin verdict. A shared check name is only a
+ * common failing surface; it is never by itself proof of the same root cause.
  *
  * Usage:
  *   node scripts/ci-forensics.mjs OWNER/REPO PR_NUMBER
@@ -92,7 +92,8 @@ export function baseFailingNames(baseChecks) {
 }
 
 export function classify(name, headFails, baseFailing) {
-  if (baseFailing.has(name)) return "base_preexisting";
+  if (!headFails) return "not_failing";
+  if (baseFailing.has(name)) return "common_failing_check";
   return "pr_only_or_unknown";
 }
 
@@ -132,6 +133,7 @@ async function main() {
       conclusion: row?.conclusion || null,
       origin,
       baseAlsoFails: baseFailing.has(name),
+      rootCauseProven: false,
       annotations: checkRunId ? annotationsFor(checkRunId, args.repo, args.annotations) : [],
       logTail: checkRunId ? logTailFor(checkRunId, args.repo, args.logLines) : null,
     };
@@ -157,10 +159,10 @@ async function main() {
   const out = [`# CI forensics: ${args.repo}#${args.pr} @ ${(snapshot.headOid || "").slice(0, 10)}`, `Base: ${summary.baseRefName} @ ${(summary.baseOid || "").slice(0, 10)}`, `Failing required checks: ${reports.length}`, ""];
   for (const report of reports) {
     out.push(`## ${report.name} — ${report.conclusion} (${report.origin})`);
-    if (report.baseAlsoFails) out.push("  Base also fails this check → pre-existing.");
-    else out.push("  Base passes this check → PR-introduced or infra.");
+    if (report.baseAlsoFails) out.push("  Base also fails this check. Root-cause identity is still unproven; compare diagnostics before calling it pre-existing.");
+    else out.push("  Base does not fail this check → PR-introduced or infrastructure remains possible.");
     if (report.annotations.length) {
-      out.push("  Annotations:");
+      out.push("  Head annotations:");
       for (const ann of report.annotations.slice(0, args.annotations)) {
         const loc = ann.path ? `${ann.path}:${ann.start_line || "?"}` : "(workflow)";
         out.push(`    [${ann.annotation_level}] ${loc}: ${String(ann.title || "").slice(0, 100)}`);
@@ -168,13 +170,13 @@ async function main() {
       }
     }
     if (report.logTail) {
-      out.push("  Log tail:");
+      out.push("  Head log tail:");
       for (const line of report.logTail.split("\n")) out.push(`    ${line}`);
     }
     out.push("");
   }
   process.stdout.write(`${out.join("\n")}\n`);
-  process.exitCode = reports.some((r) => r.origin === "pr_only_or_unknown" && r.annotations.length === 0) ? 2 : 0;
+  process.exitCode = reports.length ? 2 : 0;
 }
 
 if (process.argv[1]) {
