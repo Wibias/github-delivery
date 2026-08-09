@@ -455,18 +455,21 @@ test("full review owns a deterministic spec and standards method", () => {
   }
 });
 
-test("live fixture establishes Git credentials before pushing", () => {
+test("live fixture establishes Git credentials before pushing to the dedicated fixture remote", () => {
   const source = readFileSync(
     new URL("../../scripts/live-github-fixture.mjs", import.meta.url),
     "utf8",
   );
   const setup = source.indexOf('run("gh", ["auth", "setup-git"]);');
-  const push = source.indexOf('run("git", ["push", "origin"');
+  const remote = source.indexOf("const remote = ensureFixtureRemote(plan);");
+  const push = source.indexOf('run("git", ["push", remote');
   assert.ok(setup >= 0, "expected gh auth setup-git");
+  assert.ok(remote > setup, "fixture remote must be resolved after Git authentication is configured");
   assert.ok(
-    push > setup,
-    "Git authentication must be configured before the first push",
+    push > remote,
+    "Git authentication must be configured before the first dedicated fixture push",
   );
+  assert.doesNotMatch(source, /run\("git", \["push", "origin"/);
 });
 
 test("ship-gate snapshot does not request org-scoped reviewer identities through gh pr view", () => {

@@ -6,7 +6,7 @@ on:
     - cron: "23 4 * * 2"
 
 concurrency:
-  group: live-integration-${{ github.repository }}
+  group: live-integration-${{ github.repository }}-${{ vars.LIVE_FIXTURE_REPOSITORY }}
   cancel-in-progress: false
 
 permissions:
@@ -17,7 +17,22 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || vars.LIVE_FIXTURE_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    env:
+      FIXTURE_REPOSITORY: ${{ vars.LIVE_FIXTURE_REPOSITORY }}
     steps:
+      - name: Validate dedicated fixture target
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${FIXTURE_REPOSITORY}" ]]; then
+            echo "LIVE_FIXTURE_REPOSITORY must name a dedicated OWNER/REPO fixture repository." >&2
+            exit 1
+          fi
+          if [[ "${FIXTURE_REPOSITORY,,}" == "${GITHUB_REPOSITORY,,}" ]]; then
+            echo "LIVE_FIXTURE_REPOSITORY must be separate from GITHUB_REPOSITORY." >&2
+            exit 1
+          fi
+
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -34,6 +49,7 @@ jobs:
         run: >-
           node --test
           tests/unit/live-github-fixture.test.mjs
+          tests/unit/live-fixture-target.test.mjs
           tests/unit/live-fixture-cleanup.test.mjs
           tests/unit/live-fixture-credential.test.mjs
 
@@ -44,7 +60,7 @@ jobs:
         run: |
           set -o pipefail
           node scripts/verify-live-fixture-token.mjs \
-            "${GITHUB_REPOSITORY}" \
+            "${FIXTURE_REPOSITORY}" \
             --base "main" \
             | tee live-fixture-credential.json
 
@@ -54,7 +70,8 @@ jobs:
           GH_TOKEN: ${{ secrets.LIVE_FIXTURE_TOKEN }}
         run: >-
           node scripts/live-github-fixture.mjs
-          "${GITHUB_REPOSITORY}"
+          "${FIXTURE_REPOSITORY}"
+          --source-repo "${GITHUB_REPOSITORY}"
           --run-id "gha-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           --base "main"
           --disposition close
@@ -67,7 +84,8 @@ jobs:
           GH_TOKEN: ${{ secrets.LIVE_FIXTURE_TOKEN }}
         run: >-
           node scripts/cleanup-live-github-fixture.mjs
-          "${GITHUB_REPOSITORY}"
+          "${FIXTURE_REPOSITORY}"
+          --source-repo "${GITHUB_REPOSITORY}"
           --run-id "gha-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           --base "main"
           --disposition close

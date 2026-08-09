@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 
 import { classifyAuthority } from "./authority-grant.mjs";
+import { acquireAutonomousIdempotencyClaim } from "./autonomous-idempotency-claim.mjs";
 import { authorizeMutation } from "./mutation-policy.mjs";
 import { evaluateHeadBranchCleanup } from "./merge-branch-cleanup.mjs";
 import { classifyMergeOutcome, readMergeState } from "./merge-outcome.mjs";
@@ -763,6 +764,7 @@ export function executeMutationRequest({
       threadTarget,
       commentEditTarget,
       existingMutation: null,
+      idempotencyClaim: null,
       stdout: "",
       verification: mergeState,
     };
@@ -778,6 +780,7 @@ export function executeMutationRequest({
       threadTarget,
       commentEditTarget,
       existingMutation: null,
+      idempotencyClaim: null,
       stdout: "",
       verification: threadTarget,
     };
@@ -793,6 +796,7 @@ export function executeMutationRequest({
       threadTarget,
       commentEditTarget,
       existingMutation: null,
+      idempotencyClaim: null,
       stdout: "",
       verification: retargetState.observedBase,
     };
@@ -812,11 +816,16 @@ export function executeMutationRequest({
       threadTarget,
       commentEditTarget,
       existingMutation,
+      idempotencyClaim: null,
       stdout: "",
       verification: null,
     };
   }
 
+  const idempotencyClaim = acquireAutonomousIdempotencyClaim({
+    request: plan.request,
+    runner,
+  });
   const stdout = runOrThrow(runner, plan.command);
   const branchDeletion = verifyBranchDeleted({ request: plan.request, runner });
   let verification;
@@ -850,6 +859,7 @@ export function executeMutationRequest({
     threadTarget,
     commentEditTarget,
     existingMutation: null,
+    idempotencyClaim,
     stdout,
     verification,
   };

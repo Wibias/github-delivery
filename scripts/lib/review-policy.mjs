@@ -117,8 +117,12 @@ export function evaluateReviewPolicy({
     summarizeLatestOpinionatedReviews(latestOpinionatedReviews);
   const decision = String(reviewDecision || "").toUpperCase();
   const blockers = [];
+  const knownDecisions = new Set(["", "APPROVED", "CHANGES_REQUESTED", "REVIEW_REQUIRED"]);
 
   if (isDraft) blockers.push("draft");
+  if (!knownDecisions.has(decision)) {
+    blockers.push("review_decision_unknown");
+  }
   if (decision === "CHANGES_REQUESTED") {
     blockers.push("changes_requested");
   }

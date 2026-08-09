@@ -429,3 +429,88 @@ test("delete_head_branch execution is rejected before any process spawns", () =>
   );
   assert.equal(calls, 0);
 });
+
+function autonomousPostComment(overrides = {}) {
+  return {
+    schemaVersion: 1,
+    action: "post_comment",
+    mutationMode: "autonomous",
+    repo: "acme/widgets",
+    pr: 32,
+    expectedHead: "abcdef1234567890",
+    idempotencyKey: "same-key",
+    body: "Autonomous status update",
+    ...overrides,
+  };
+}
+
+test("autonomous social create acquires a remote idempotency claim before the visible effect", () => {
+  const calls = [];
+  let visibleEffects = 0;
+  const result = executeMutationRequest({
+    request: autonomousPostComment(),
+    execute: true,
+    runner(command, args) {
+      calls.push([command, ...args]);
+      if (args[0] === "pr" && args[1] === "view") {
+        return { status: 0, stdout: "abcdef1234567890\n", stderr: "" };
+      }
+      if (args[0] === "api" && String(args[1]).includes("/issues/32/comments")) {
+        return { status: 0, stdout: "[[]]", stderr: "" };
+      }
+      if (
+        args[0] === "api" &&
+        String(args[1]).endsWith("/git/refs") &&
+        args.includes("POST")
+      ) {
+        return { status: 0, stdout: JSON.stringify({ ref: "refs/github-delivery/idempotency/example" }), stderr: "" };
+      }
+      if (args[0] === "pr" && args[1] === "comment") {
+        visibleEffects += 1;
+        return { status: 0, stdout: "commented\n", stderr: "" };
+      }
+      throw new Error(`unexpected command: ${command} ${args.join(" ")}`);
+    },
+  });
+  const claimIndex = calls.findIndex(
+    (call) => call[1] === "api" && String(call[2]).endsWith("/git/refs") && call.includes("POST"),
+  );
+  const effectIndex = calls.findIndex((call) => call[1] === "pr" && call[2] === "comment");
+  assert.ok(claimIndex >= 0);
+  assert.ok(effectIndex > claimIndex);
+  assert.equal(visibleEffects, 1);
+  assert.equal(result.status, "succeeded");
+});
+
+test("a competing autonomous idempotency claim fails closed before any visible effect", () => {
+  let visibleEffects = 0;
+  assert.throws(
+    () =>
+      executeMutationRequest({
+        request: autonomousPostComment(),
+        execute: true,
+        runner(command, args) {
+          if (args[0] === "pr" && args[1] === "view") {
+            return { status: 0, stdout: "abcdef1234567890\n", stderr: "" };
+          }
+          if (args[0] === "api" && String(args[1]).includes("/issues/32/comments")) {
+            return { status: 0, stdout: "[[]]", stderr: "" };
+          }
+          if (
+            args[0] === "api" &&
+            String(args[1]).endsWith("/git/refs") &&
+            args.includes("POST")
+          ) {
+            return { status: 1, stdout: "", stderr: "HTTP 422: Reference already exists" };
+          }
+          if (args[0] === "pr" && args[1] === "comment") {
+            visibleEffects += 1;
+            return { status: 0, stdout: "commented\n", stderr: "" };
+          }
+          throw new Error(`unexpected command: ${command} ${args.join(" ")}`);
+        },
+      }),
+    /autonomous_idempotency_claim_conflict/,
+  );
+  assert.equal(visibleEffects, 0);
+});

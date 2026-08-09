@@ -1,17 +1,23 @@
 #!/usr/bin/env node
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { validateMutationBoundaryTree } from "./lib/mutation-boundary-security.mjs";
 import { validateRepositoryPolicy, validateWorkflowTree } from "./lib/workflow-security.mjs";
 
 const root = resolve(process.argv[2] || process.cwd());
 const workflowReport = validateWorkflowTree(root);
+const mutationBoundary = validateMutationBoundaryTree(root);
 const policy = JSON.parse(readFileSync(join(root, ".github", "repository-policy.json"), "utf8"));
 const policyErrors = validateRepositoryPolicy(policy);
 const report = {
   schemaVersion: 1,
   kind: "github-delivery/repository-security-report",
-  valid: workflowReport.valid && policyErrors.length === 0,
+  valid:
+    workflowReport.valid &&
+    mutationBoundary.valid &&
+    policyErrors.length === 0,
   workflows: workflowReport,
+  mutationBoundary,
   repositoryPolicy: { valid: policyErrors.length === 0, errors: policyErrors },
 };
 process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);

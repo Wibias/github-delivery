@@ -8,12 +8,19 @@ import { Buffer } from "node:buffer";
 import { spawnSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import {
+  evaluateRequiredCheckWorkflowMapping,
+  workflowRunIdFromCheckRun,
+} from "./lib/merge-group-workflow-coverage.mjs";
+import {
   assembleSnapshotCapture,
   classifyBranchProtectionResponse,
   verifySnapshotBoundary,
 } from "./lib/snapshot-capture-payload.mjs";
 import { collectPaginated } from "./lib/github-pagination.mjs";
-import { selectAuthoritativeCheckEvidence } from "./lib/required-checks-policy.mjs";
+import {
+  normalizeRequiredChecks,
+  selectAuthoritativeCheckEvidence,
+} from "./lib/required-checks-policy.mjs";
 import { createSnapshotEnvelope } from "./lib/snapshot-schema.mjs";
 
 function parseArgs(argv) {
@@ -443,7 +450,13 @@ function fetchTestMergeOid(owner, name, pr) {
   return oid || null;
 }
 
-function scanTargetWorkflows(owner, name, base, mergeQueueEnabled) {
+function scanTargetWorkflows(
+  owner,
+  name,
+  base,
+  mergeQueueEnabled,
+  { requiredChecks = [], authoritativeCheckRuns = [] } = {},
+) {
   const listing = ghOk([
     "api",
     `repos/${owner}/${name}/contents/.github/workflows?ref=${encodeURIComponent(base)}`,
@@ -457,6 +470,12 @@ function scanTargetWorkflows(owner, name, base, mergeQueueEnabled) {
         workflowFiles: 0,
         hasMergeGroupTrigger: false,
         hasPullRequestTrigger: false,
+        requiredCheckWorkflowMappingComplete: !mergeQueueEnabled && requiredChecks.length === 0,
+        requiredGithubActionsCheckCount: 0,
+        mappings: [],
+        unmapped: mergeQueueEnabled
+          ? [{ reason: "workflow_directory_missing" }]
+          : [],
         warning: mergeQueueEnabled
           ? "Merge queue is enabled, but the base has no workflow directory."
           : null,
@@ -470,6 +489,10 @@ function scanTargetWorkflows(owner, name, base, mergeQueueEnabled) {
       workflowFiles: 0,
       hasMergeGroupTrigger: null,
       hasPullRequestTrigger: null,
+      requiredCheckWorkflowMappingComplete: false,
+      requiredGithubActionsCheckCount: null,
+      mappings: [],
+      unmapped: [{ reason: "workflow_listing_unreadable" }],
       warning: null,
       error: listing.error || "workflow listing request failed",
     };
@@ -486,6 +509,10 @@ function scanTargetWorkflows(owner, name, base, mergeQueueEnabled) {
       workflowFiles: 0,
       hasMergeGroupTrigger: null,
       hasPullRequestTrigger: null,
+      requiredCheckWorkflowMappingComplete: false,
+      requiredGithubActionsCheckCount: null,
+      mappings: [],
+      unmapped: [{ reason: "workflow_listing_invalid_json" }],
       warning: null,
       error: "workflow listing returned invalid JSON",
     };
@@ -498,6 +525,10 @@ function scanTargetWorkflows(owner, name, base, mergeQueueEnabled) {
       workflowFiles: 0,
       hasMergeGroupTrigger: null,
       hasPullRequestTrigger: null,
+      requiredCheckWorkflowMappingComplete: false,
+      requiredGithubActionsCheckCount: null,
+      mappings: [],
+      unmapped: [{ reason: "workflow_listing_unexpected_payload" }],
       warning: null,
       error: "workflow listing returned an unexpected payload",
     };
@@ -508,6 +539,7 @@ function scanTargetWorkflows(owner, name, base, mergeQueueEnabled) {
   );
   let hasMergeGroupTrigger = false;
   let hasPullRequestTrigger = false;
+  const workflowTexts = {};
   for (const entry of files) {
     const response = ghOk([
       "api",
@@ -524,6 +556,10 @@ function scanTargetWorkflows(owner, name, base, mergeQueueEnabled) {
         workflowFiles: files.length,
         hasMergeGroupTrigger,
         hasPullRequestTrigger,
+        requiredCheckWorkflowMappingComplete: false,
+        requiredGithubActionsCheckCount: null,
+        mappings: [],
+        unmapped: [{ path: entry.path, reason: "workflow_source_unreadable" }],
         warning: null,
         error: response.error || `workflow ${entry.path} could not be read`,
       };
@@ -531,6 +567,7 @@ function scanTargetWorkflows(owner, name, base, mergeQueueEnabled) {
     try {
       const payload = JSON.parse(response.body);
       const text = Buffer.from(payload.content || "", "base64").toString("utf8");
+      workflowTexts[entry.path] = text;
       if (/\bmerge_group\b/.test(text)) hasMergeGroupTrigger = true;
       if (/\bpull_request(?:_target)?\b/.test(text)) {
         hasPullRequestTrigger = true;
@@ -543,11 +580,75 @@ function scanTargetWorkflows(owner, name, base, mergeQueueEnabled) {
         workflowFiles: files.length,
         hasMergeGroupTrigger,
         hasPullRequestTrigger,
+        requiredCheckWorkflowMappingComplete: false,
+        requiredGithubActionsCheckCount: null,
+        mappings: [],
+        unmapped: [{ path: entry.path, reason: "workflow_source_invalid_json" }],
         warning: null,
         error: `workflow ${entry.path} returned invalid JSON`,
       };
     }
   }
+
+  let mapping = {
+    requiredGithubActionsCheckCount: 0,
+    requiredCheckWorkflowMappingComplete: true,
+    mappings: [],
+    unmapped: [],
+  };
+  if (mergeQueueEnabled) {
+    const workflowRunPaths = {};
+    for (const row of authoritativeCheckRuns) {
+      const runId = workflowRunIdFromCheckRun(row);
+      if (!runId || workflowRunPaths[String(runId)]) continue;
+      const response = ghOk([
+        "api",
+        `repos/${owner}/${name}/actions/runs/${runId}`,
+      ]);
+      if (!response.ok) {
+        return {
+          readable: false,
+          complete: false,
+          scannedRef: base,
+          workflowFiles: files.length,
+          hasMergeGroupTrigger,
+          hasPullRequestTrigger,
+          requiredCheckWorkflowMappingComplete: false,
+          requiredGithubActionsCheckCount: null,
+          mappings: [],
+          unmapped: [{ runId, reason: "workflow_run_metadata_unreadable" }],
+          warning: null,
+          error: response.error || `workflow run ${runId} could not be read`,
+        };
+      }
+      try {
+        const payload = JSON.parse(response.body);
+        if (payload?.path) workflowRunPaths[String(runId)] = payload.path;
+      } catch {
+        return {
+          readable: false,
+          complete: false,
+          scannedRef: base,
+          workflowFiles: files.length,
+          hasMergeGroupTrigger,
+          hasPullRequestTrigger,
+          requiredCheckWorkflowMappingComplete: false,
+          requiredGithubActionsCheckCount: null,
+          mappings: [],
+          unmapped: [{ runId, reason: "workflow_run_metadata_invalid_json" }],
+          warning: null,
+          error: `workflow run ${runId} returned invalid JSON`,
+        };
+      }
+    }
+    mapping = evaluateRequiredCheckWorkflowMapping({
+      descriptors: requiredChecks,
+      checkRuns: authoritativeCheckRuns,
+      workflowRunPaths,
+      workflowTexts,
+    });
+  }
+
   return {
     readable: true,
     complete: true,
@@ -555,10 +656,13 @@ function scanTargetWorkflows(owner, name, base, mergeQueueEnabled) {
     workflowFiles: files.length,
     hasMergeGroupTrigger,
     hasPullRequestTrigger,
+    ...mapping,
     warning:
-      mergeQueueEnabled && !hasMergeGroupTrigger
-        ? "Merge queue enabled but no target-base workflow mentions merge_group; queue checks may stall."
-        : null,
+      mergeQueueEnabled && !mapping.requiredCheckWorkflowMappingComplete
+        ? "Merge queue enabled but one or more required GitHub Actions checks cannot be proven to come from workflows handling merge_group."
+        : mergeQueueEnabled && !hasMergeGroupTrigger
+          ? "Merge queue enabled but no target-base workflow mentions merge_group; queue checks may stall."
+          : null,
     error: null,
   };
 }
@@ -674,11 +778,20 @@ try {
   const policy = fetchPolicy(owner, name, pr);
   const branchProtection = fetchBranchProtection(owner, name, base);
   const codeowners = fetchCodeowners(owner, name, base);
+  const requiredChecks = normalizeRequiredChecks({
+    classicRequiredStatusChecks:
+      branchProtection?.payload?.required_status_checks || null,
+    activeRules: activeRules.rows || [],
+  }).descriptors;
   const workflowCoverage = scanTargetWorkflows(
     owner,
     name,
     base,
     policy.mergeQueue?.enabled === true,
+    {
+      requiredChecks,
+      authoritativeCheckRuns: selectedChecks.checkRuns || [],
+    },
   );
   const viewer = fetchViewer();
 

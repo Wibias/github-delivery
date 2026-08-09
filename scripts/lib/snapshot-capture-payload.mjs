@@ -278,6 +278,12 @@ export function assembleSnapshotCapture({
               workflowCoverage.hasPullRequestTrigger ?? null,
             hasMergeGroupTrigger:
               workflowCoverage.hasMergeGroupTrigger ?? null,
+            requiredCheckWorkflowMappingComplete:
+              workflowCoverage.requiredCheckWorkflowMappingComplete ?? null,
+            requiredGithubActionsCheckCount:
+              workflowCoverage.requiredGithubActionsCheckCount ?? null,
+            mappings: workflowCoverage.mappings || [],
+            unmapped: workflowCoverage.unmapped || [],
             warning: workflowCoverage.warning || null,
           }
         : null,

@@ -23,10 +23,22 @@ function safeSegment(value) {
   return String(value).replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
-export function buildFixturePlan({ repo, runId, baseBranch = "main", disposition = "close", prefix = "github-delivery-fixture" } = {}) {
+export function buildFixturePlan({
+  repo,
+  sourceRepo = null,
+  gitRemote = "origin",
+  runId,
+  baseBranch = "main",
+  disposition = "close",
+  prefix = "github-delivery-fixture",
+} = {}) {
   if (!REPO_RE.test(repo || "")) throw new Error("repo must be OWNER/REPO");
+  if (sourceRepo !== null && !REPO_RE.test(sourceRepo || "")) {
+    throw new Error("sourceRepo must be OWNER/REPO");
+  }
   if (!RUN_ID_RE.test(runId || "")) throw new Error("runId must be 3-64 safe characters");
   if (!/^[A-Za-z0-9._/-]+$/.test(baseBranch || "")) throw new Error("unsafe baseBranch");
+  if (!/^[A-Za-z0-9._-]+$/.test(gitRemote || "")) throw new Error("unsafe gitRemote");
   if (disposition !== "close") throw new Error("disposition must be close; merge fixtures require trusted authority and are not supported");
   const token = safeSegment(runId);
   const marker = `[github-delivery-fixture:${token}]`;
@@ -34,6 +46,8 @@ export function buildFixturePlan({ repo, runId, baseBranch = "main", disposition
     schemaVersion: 1,
     kind: "github-delivery/live-fixture-plan",
     repo,
+    sourceRepo,
+    gitRemote,
     runId: token,
     baseBranch,
     disposition: "close",
@@ -78,6 +92,7 @@ export function evaluateFixtureReceipt(plan, events) {
     schemaVersion: 1,
     kind: "github-delivery/live-fixture-receipt",
     repo: plan.repo,
+    sourceRepo: plan.sourceRepo || null,
     runId: plan.runId,
     disposition: plan.disposition,
     passed: problems.length === 0,

@@ -212,3 +212,13 @@ test("missing reviewDecision fails closed when reviews are required", () => {
 
   assert.ok(result.blockers.includes("review_decision_unknown"));
 });
+
+test("unknown future reviewDecision fails closed instead of becoming implicitly approved", () => {
+  const result = evaluateReviewPolicy({
+    reviewDecision: "FUTURE_GITHUB_REVIEW_STATE",
+    requiresApprovingReviews: true,
+    requiredApprovalCount: 1,
+  });
+
+  assert.ok(result.blockers.includes("review_decision_unknown"));
+});
