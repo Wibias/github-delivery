@@ -54,7 +54,7 @@ export function mergeReviewEvidenceForSnapshot(
       repo,
       pr,
       head,
-      publicKey: verifier,
+      authorityVerifier: verifier,
     });
     if (provenance.valid) trusted.push({ ...entry, provenance });
     else rejected.push(provenance.reason);
