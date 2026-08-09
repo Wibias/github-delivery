@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   hasExplicitMergeIntent,
+  issueCreationActionForPrompt,
   routeShippingGithubPrompt,
 } from "../../scripts/lib/skill-router.mjs";
 
@@ -45,6 +46,42 @@ test("merge discussion and status wording never grants merge authority", () => {
     assert.deepEqual(route?.explicitActions, [], prompt);
     assert.notEqual(route?.workflow, "references/merge-pr.md", prompt);
   }
+});
+
+test("routes direct issue publication to the lifecycle create_issue action", () => {
+  for (const prompt of [
+    "create an issue for this bug",
+    "create an issue on main repo for this error if there isn't one already",
+    "file a bug report for this provider error",
+  ]) {
+    assert.equal(issueCreationActionForPrompt(prompt), "create_issue", prompt);
+    assert.deepEqual(routeShippingGithubPrompt(prompt), {
+      skill: "github-delivery",
+      workflow: "references/issue-workflows.md",
+      mutationMode: "maintainer",
+      explicitActions: ["create_issue"],
+    });
+  }
+});
+
+test("routes explicit follow-up issue publication to create_follow_up_issue", () => {
+  const prompt = "open a follow-up issue for this review finding";
+  assert.equal(issueCreationActionForPrompt(prompt), "create_follow_up_issue");
+  assert.deepEqual(routeShippingGithubPrompt(prompt), {
+    skill: "github-delivery",
+    workflow: "references/issue-workflows.md",
+    mutationMode: "maintainer",
+    explicitActions: ["create_follow_up_issue"],
+  });
+});
+
+test("issue creation routing does not steal existing-issue or create-PR requests", () => {
+  assert.equal(issueCreationActionForPrompt("open issue #1176 and summarize it"), null);
+  assert.equal(issueCreationActionForPrompt("create a PR for issue #90"), null);
+  assert.equal(
+    routeShippingGithubPrompt("create a PR for issue #90").workflow,
+    "references/create-pr-for-issue.md",
+  );
 });
 
 test("routes a bare full review with verdict-comment authority", () => {
