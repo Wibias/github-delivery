@@ -51,7 +51,7 @@ Read `references/mutation-modes.md` and `references/github-mutation-broker.md` b
 4. Require decision `ready` on the current head SHA. A blocked or unknown result forbids merge.
 5. Require the PR not to be draft, WIP, held, conflicted, behind, or mid-stack.
 6. Confirm required CI, review policy, unresolved threads, feedback, base health, and merge queue state are clear.
-7. Confirm own bug, security, and spec/standards evidence exists this session, or obtain an explicit merge-anyway instruction after explaining the missing evidence.
+7. Require current-head Bug, Security, and Spec/Standards review evidence with valid review-verdict provenance. Missing review evidence is not waivable inside the merge workflow: run or complete the required review workflow on the current head before continuing.
 8. Confirm the branch was built and tested against the current base tip.
 9. Confirm valid adaptive-settle evidence exists for the unchanged PR and immediate-base heads. If it does not, run the adaptive settle from `references/shared-rules.md`: announce that green is provisional, choose 60 or 180 seconds from observed activity (**~30–60s for a docs/markdown-only head**), poll `ship-gate.mjs` every 20 seconds without a silent sleep longer than 30 seconds, reset on changes, and require the final gate to return `ready`.
 10. Immediately before the first mutation, rerun the authoritative gate and verify the recorded head/base generation is unchanged.
