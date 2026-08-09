@@ -27,7 +27,7 @@ export function buildFixturePlan({ repo, runId, baseBranch = "main", disposition
   if (!REPO_RE.test(repo || "")) throw new Error("repo must be OWNER/REPO");
   if (!RUN_ID_RE.test(runId || "")) throw new Error("runId must be 3-64 safe characters");
   if (!/^[A-Za-z0-9._/-]+$/.test(baseBranch || "")) throw new Error("unsafe baseBranch");
-  if (!new Set(["close", "merge"]).has(disposition)) throw new Error("disposition must be close or merge");
+  if (disposition !== "close") throw new Error("disposition must be close; merge fixtures require trusted authority and are not supported");
   const token = safeSegment(runId);
   const marker = `[github-delivery-fixture:${token}]`;
   return Object.freeze({
@@ -36,7 +36,7 @@ export function buildFixturePlan({ repo, runId, baseBranch = "main", disposition
     repo,
     runId: token,
     baseBranch,
-    disposition,
+    disposition: "close",
     marker,
     branch: `${safeSegment(prefix)}/${token}`,
     fixturePath: `.github-delivery-fixtures/${token}.json`,
@@ -128,9 +128,8 @@ export async function runFixtureScenario(adapter, options) {
     if (!stale.rejected) throw new Error("stale expected-head mutation unexpectedly succeeded");
     const finalGate = await adapter.evaluateGate(plan, pr);
     record("final_gate_observed", { decision: finalGate.decision });
-    if (plan.disposition === "merge") await adapter.mergePr(plan, pr);
-    else await adapter.closePr(plan, pr);
-    record("pr_disposed", { disposition: plan.disposition });
+    await adapter.closePr(plan, pr);
+    record("pr_disposed", { disposition: "close" });
     await adapter.closeIssue(plan, issue);
     record("issue_closed");
     await adapter.deleteBranch(plan);
