@@ -20,22 +20,28 @@ export function makeRedemptionRunner({
   if (typeof runner !== "function") throw new Error("authority_execution_runner_required");
 
   let redemptionReceipt = null;
-  let attempted = false;
+  let redemptionAttempted = false;
+  let writeAttempted = false;
 
   return {
     runner(command, args, options) {
-      if (sameCommand(command, args, plannedCommand) && !attempted) {
-        attempted = true;
+      const isPlannedWrite = sameCommand(command, args, plannedCommand);
+      if (isPlannedWrite && !redemptionAttempted) {
+        redemptionAttempted = true;
         redemptionReceipt = redeemAuthorityBeforeMutation({
           authority,
           authorityGrant,
           redeemer,
         });
       }
+      if (isPlannedWrite) writeAttempted = true;
       return runner(command, args, options);
     },
     redemption() {
       return redemptionReceipt ? structuredClone(redemptionReceipt) : null;
+    },
+    attempted() {
+      return writeAttempted;
     },
   };
 }
