@@ -36,7 +36,7 @@ simplify preparation first, then enter the merge workflow.
 | ----------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
 | Create a PRD from conversation, repository context, or an idea                                        | `references/issue-workflows.md` → PRD Workflow     |
 | Break a PRD, plan, spec, or issue into implementation issues                                          | `references/issue-workflows.md` → Issue Breakdown  |
-| Create GitHub issue(s) from a clear request or verified finding                                       | `references/issue-workflows.md` → Issue Breakdown  |
+| Create GitHub issue(s) from a clear request or verified finding                                       | `references/issue-workflows.md` → Issue Breakdown; direct publication action is `create_issue` |
 | Triage issue(s), labels, state, readiness, or rejection                                               | `references/issue-workflows.md` → Triage Workflow  |
 | Run QA intake or file reproducible conversational bug reports                                         | `references/issue-workflows.md` → QA Intake        |
 | Create a refactor request, RFC, or verified tiny-commit plan                                          | `references/issue-workflows.md` → Refactor Plan    |
@@ -71,6 +71,12 @@ simplify preparation first, then enter the merge workflow.
 If a request spans multiple rows, run them in lifecycle order and load only the
 current workflow bundle. Within `references/issue-workflows.md`, read only the
 selected workflow section plus companions it explicitly names.
+
+For issue publication, direct user requests such as `create an issue for this bug`
+route to `create_issue`. `create_follow_up_issue` is reserved for a specifically
+identified follow-up issue from an existing review/finding/workflow context; it
+must never be substituted just because one backend broker file does not contain
+`create_issue`.
 
 For **full review + simplify**, `references/full-review-pr.md` remains
 authoritative and composes simplification before the final verdict. For a
@@ -131,9 +137,14 @@ GitHub write, and require final evidence for final claims.
 - Merge-ready paths run their required Bug + Security + Spec + Standards review
   and **proactive contract verification**; passing bots/checks alone is not
   sufficient. See `references/policy/reviews.md` and focused review methods.
-- Network-visible GitHub writes go through the mutation broker and are expected-
-  head/idempotency bound where applicable. Caller booleans are policy assertions,
-  not trusted provenance. See `references/policy/mutation.md`.
+- Network-visible GitHub writes go through `scripts/github-mutate.mjs` and
+  `scripts/lib/github-mutation-router.mjs`, which is the public dispatch boundary
+  over lifecycle and legacy/social brokers. Use the action registry/router rather
+  than reverse-engineering one backend to discover capabilities. Routine workflow
+  execution must not inspect broker internals unless the documented entrypoint
+  fails or the task is explicitly debugging/auditing `github-delivery`. Writes are
+  expected-head/idempotency bound where applicable. Caller booleans are policy
+  assertions, not trusted provenance. See `references/policy/mutation.md`.
 - Never use bare force, never silently discard unrelated work, and honor the PR
   ownership/fork-write boundary. See `references/policy/git.md`.
 - Stacks merge bottom-up and every surviving child is revalidated. See
