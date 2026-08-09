@@ -138,21 +138,41 @@ export function validateRepositoryPolicy(policy) {
   if (policy?.release?.environment !== "release") add("release_environment_required", "Release environment must be named release");
   if (policy?.release?.protectedTagPattern !== "v*") add("release_tag_pattern_invalid", "Release tags must use v*");
   if (!Number.isInteger(policy?.release?.requiredReviewers) || policy.release.requiredReviewers < 1) add("release_reviewer_required", "Release environment needs at least one reviewer");
+  if (policy?.requiredChecksStrict !== true) add("strict_required_checks_required", "Required checks must use strict branch synchronization.");
+  if (!Number.isInteger(policy?.requiredCheckIntegrationId) || policy.requiredCheckIntegrationId <= 0) add("required_check_integration_invalid", "Required checks must declare the expected GitHub App integration ID.");
   if (!Array.isArray(policy?.requiredChecks) || policy.requiredChecks.length < 3) add("required_checks_incomplete", "At least CI, Dependency Review, and CodeQL must be required");
   return errors;
 }
 
-function requiredCheckContexts(activeRules) {
-  const contexts = new Set();
-  for (const rule of activeRules || []) {
-    if (rule?.type !== "required_status_checks") continue;
-    const checks = rule?.parameters?.required_status_checks || rule?.parameters?.checks || [];
-    for (const check of checks) {
-      const context = typeof check === "string" ? check : check?.context;
-      if (context) contexts.add(String(context));
-    }
-  }
-  return contexts;
+function pullRequestRule(activeRules) {
+  return (activeRules || []).find((rule) => rule?.type === "pull_request") || null;
+}
+
+function requiredStatusRule(activeRules) {
+  return (activeRules || []).find((rule) => rule?.type === "required_status_checks") || null;
+}
+
+function requiredCheckDescriptors(activeRules) {
+  const rule = requiredStatusRule(activeRules);
+  const rows =
+    rule?.parameters?.required_status_checks ||
+    rule?.parameters?.checks ||
+    rule?.parameters?.contexts ||
+    [];
+  return rows
+    .map((check) =>
+      typeof check === "string"
+        ? { context: check, integrationId: null }
+        : {
+            context: check?.context ? String(check.context) : null,
+            integrationId: Number.isInteger(check?.integration_id)
+              ? check.integration_id
+              : Number.isInteger(check?.app_id)
+                ? check.app_id
+                : null,
+          },
+    )
+    .filter((check) => check.context);
 }
 
 function requiredReviewerCount(environment) {
@@ -165,6 +185,20 @@ function requiredReviewerCount(environment) {
   return count;
 }
 
+function repositoryMergeMethods(repository = {}) {
+  const methods = [];
+  if (repository.allow_merge_commit === true) methods.push("merge");
+  if (repository.allow_squash_merge === true) methods.push("squash");
+  if (repository.allow_rebase_merge === true) methods.push("rebase");
+  return methods;
+}
+
+function sameStringSet(a = [], b = []) {
+  const left = [...new Set(a.map(String))].sort();
+  const right = [...new Set(b.map(String))].sort();
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
 export function evaluateLiveRepositoryPolicy({ policy, live } = {}) {
   const errors = [];
   const add = (code, detail) => errors.push({ code, detail });
@@ -174,7 +208,8 @@ export function evaluateLiveRepositoryPolicy({ policy, live } = {}) {
   }
 
   const expectedBranch = policy?.defaultBranch;
-  const observedBranch = live?.repository?.default_branch;
+  const repository = live?.repository || {};
+  const observedBranch = repository.default_branch;
   if (!observedBranch || observedBranch !== expectedBranch) {
     add(
       "default_branch_mismatch",
@@ -189,22 +224,62 @@ export function evaluateLiveRepositoryPolicy({ policy, live } = {}) {
   if (!activeRules.length) {
     add("active_rules_missing", `No active GitHub rules apply to ${expectedBranch || "the default branch"}.`);
   }
-  if (policy?.pullRequests?.required === true && !activeRules.some((rule) => rule?.type === "pull_request")) {
+
+  const prRule = pullRequestRule(activeRules);
+  const prParameters = prRule?.parameters || {};
+  if (policy?.pullRequests?.required === true && !prRule) {
     add("pull_request_rule_missing", "No active pull-request rule enforces the declared PR requirement.");
   }
   if (
     policy?.pullRequests?.conversationResolution === true &&
-    !activeRules.some((rule) =>
-      ["required_conversation_resolution", "required_review_thread_resolution"].includes(rule?.type),
-    )
+    prParameters.required_review_thread_resolution !== true
   ) {
     add(
       "conversation_resolution_rule_missing",
-      "No active conversation/review-thread resolution rule enforces the declared policy.",
+      "The active pull-request rule does not require review-thread resolution.",
+    );
+  }
+  if (
+    policy?.pullRequests?.dismissStaleApprovals === true &&
+    prParameters.dismiss_stale_reviews_on_push !== true
+  ) {
+    add(
+      "stale_approvals_not_enforced",
+      "The active pull-request rule does not dismiss stale approvals after a push.",
     );
   }
 
-  const observedChecks = requiredCheckContexts(activeRules);
+  const observedRuleMergeMethods = Array.isArray(prParameters.allowed_merge_methods)
+    ? prParameters.allowed_merge_methods
+    : [];
+  if (
+    policy?.merge?.methods?.length &&
+    !sameStringSet(observedRuleMergeMethods, policy.merge.methods)
+  ) {
+    add(
+      "ruleset_merge_methods_mismatch",
+      `Ruleset merge methods ${observedRuleMergeMethods.join(", ") || "missing"} do not match ${policy.merge.methods.join(", ")}.`,
+    );
+  }
+
+  if (policy?.branch?.allowForcePushes === false && !activeRules.some((rule) => rule?.type === "non_fast_forward")) {
+    add("force_push_rule_missing", "No active non-fast-forward rule blocks force pushes.");
+  }
+  if (policy?.branch?.allowDeletions === false && !activeRules.some((rule) => rule?.type === "deletion")) {
+    add("deletion_rule_missing", "No active deletion rule protects the default branch.");
+  }
+
+  const statusRule = requiredStatusRule(activeRules);
+  const statusParameters = statusRule?.parameters || {};
+  if (
+    policy?.requiredChecksStrict === true &&
+    statusParameters.strict_required_status_checks_policy !== true
+  ) {
+    add("strict_required_checks_not_enforced", "Required status checks are not configured as strict.");
+  }
+
+  const descriptors = requiredCheckDescriptors(activeRules);
+  const observedChecks = new Set(descriptors.map((row) => row.context));
   const missingRequiredChecks = (policy?.requiredChecks || [])
     .filter((context) => !observedChecks.has(context))
     .sort();
@@ -213,6 +288,35 @@ export function evaluateLiveRepositoryPolicy({ policy, live } = {}) {
       "required_checks_missing_live",
       `Live GitHub rules are missing required checks: ${missingRequiredChecks.join(", ")}`,
     );
+  }
+  const expectedIntegrationId = policy?.requiredCheckIntegrationId;
+  const wrongProducerChecks = descriptors
+    .filter(
+      (descriptor) =>
+        (policy?.requiredChecks || []).includes(descriptor.context) &&
+        descriptor.integrationId !== expectedIntegrationId,
+    )
+    .map((descriptor) => descriptor.context)
+    .sort();
+  if (wrongProducerChecks.length) {
+    add(
+      "required_check_producer_mismatch",
+      `Required checks are not bound to integration ${expectedIntegrationId}: ${wrongProducerChecks.join(", ")}`,
+    );
+  }
+
+  const observedRepoMergeMethods = repositoryMergeMethods(repository);
+  if (policy?.merge?.methods?.length && !sameStringSet(observedRepoMergeMethods, policy.merge.methods)) {
+    add(
+      "repository_merge_methods_mismatch",
+      `Repository merge methods ${observedRepoMergeMethods.join(", ") || "missing"} do not match ${policy.merge.methods.join(", ")}.`,
+    );
+  }
+  if (policy?.merge?.updateBranch === true && repository.allow_update_branch !== true) {
+    add("update_branch_not_enabled", "Repository update-branch support is not enabled.");
+  }
+  if (policy?.merge?.autoMerge === true && repository.allow_auto_merge !== true) {
+    add("auto_merge_not_enabled", "Repository auto-merge is not enabled.");
   }
 
   const expectedEnvironment = policy?.release?.environment;
@@ -239,8 +343,20 @@ export function evaluateLiveRepositoryPolicy({ policy, live } = {}) {
     defaultBranch: observedBranch || null,
     protected: live?.branch?.protected === true,
     activeRuleTypes: activeRules.map((rule) => rule?.type).filter(Boolean),
+    observedPullRequestPolicy: prRule
+      ? {
+          dismissStaleApprovals: prParameters.dismiss_stale_reviews_on_push === true,
+          conversationResolution: prParameters.required_review_thread_resolution === true,
+          allowedMergeMethods: observedRuleMergeMethods,
+        }
+      : null,
+    strictRequiredChecks:
+      statusParameters.strict_required_status_checks_policy === true,
     observedRequiredChecks: [...observedChecks].sort(),
+    observedRequiredCheckDescriptors: descriptors,
     missingRequiredChecks,
+    wrongProducerChecks,
+    repositoryMergeMethods: observedRepoMergeMethods,
     releaseEnvironment: observedEnvironment || null,
     observedRequiredReviewers: observedReviewers,
     errors,

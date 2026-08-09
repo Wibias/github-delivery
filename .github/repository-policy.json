@@ -21,6 +21,8 @@
     "protectedTagPattern": "v*",
     "requiredReviewers": 1
   },
+  "requiredChecksStrict": true,
+  "requiredCheckIntegrationId": 15368,
   "requiredChecks": [
     "Node 22 / ubuntu-latest",
     "Node 22 / windows-latest",
