@@ -1,6 +1,8 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
+import { workflowSecurityFacts } from "./workflow-yaml-security.mjs";
+
 const PINNED_ACTION = /^[^\s@]+@[0-9a-f]{40}$/;
 const WRITE_ALLOWLIST = new Map([
   [".github/workflows/release.yml", new Set(["contents", "id-token", "attestations"])],
@@ -22,42 +24,89 @@ function workflowFiles(root) {
     .map((name) => join(directory, name));
 }
 
-function lineNumber(source, index) {
-  return source.slice(0, index).split("\n").length;
-}
-
 function error(code, path, line, detail) {
   return { code, path, line, detail };
 }
 
 export function validateWorkflowFile(path, source) {
   path = posix(path);
-  source = source.replace(/\r\n?/g, "\n");
   const errors = [];
-  if (/^\s*pull_request_target\s*:/m.test(source)) {
-    errors.push(error("pull_request_target_forbidden", path, lineNumber(source, source.search(/^\s*pull_request_target\s*:/m)), "Use pull_request with read-only permissions."));
+  const facts = workflowSecurityFacts(source);
+
+  for (const parseError of facts.parseErrors) {
+    errors.push(
+      error(
+        "workflow_yaml_unsupported",
+        path,
+        parseError.line,
+        `Security validation cannot safely interpret this YAML construct: ${parseError.code}.`,
+      ),
+    );
   }
-  if (!/^permissions:\s*(?:\n|$)/m.test(source) && !/^permissions:\s*read-all\s*$/m.test(source)) {
-    errors.push(error("permissions_missing", path, 1, "Declare top-level permissions explicitly."));
+  for (const line of facts.pullRequestTargetLines) {
+    errors.push(
+      error(
+        "pull_request_target_forbidden",
+        path,
+        line,
+        "Use pull_request with read-only permissions.",
+      ),
+    );
   }
-  if (/^\s*permissions:\s*write-all\s*$/m.test(source)) {
-    errors.push(error("write_all_forbidden", path, lineNumber(source, source.search(/^\s*permissions:\s*write-all\s*$/m)), "write-all is forbidden."));
+  if (!facts.topLevelPermissions.length) {
+    errors.push(
+      error(
+        "permissions_missing",
+        path,
+        1,
+        "Declare top-level permissions explicitly.",
+      ),
+    );
   }
-  for (const match of source.matchAll(/uses:\s+([^\s#]+)/g)) {
-    if (!PINNED_ACTION.test(match[1])) {
-      errors.push(error("action_not_pinned", path, lineNumber(source, match.index), `Pin ${match[1]} to a 40-character commit SHA.`));
-    }
-  }
-  for (const match of source.matchAll(/uses:\s+actions\/checkout@[0-9a-f]{40}[^\n]*\n((?:\s+[^\n]*\n){0,8})/g)) {
-    if (!/persist-credentials:\s*false/.test(match[1])) {
-      errors.push(error("checkout_credentials_not_disabled", path, lineNumber(source, match.index), "Set checkout persist-credentials to false."));
-    }
-  }
+
   const allowedWrites = WRITE_ALLOWLIST.get(path) || new Set();
-  for (const match of source.matchAll(/^\s{0,8}([a-z-]+):\s*write\s*$/gm)) {
-    const permission = match[1];
-    if (!allowedWrites.has(permission)) {
-      errors.push(error("write_permission_not_allowed", path, lineNumber(source, match.index), `${permission}: write is not approved for this workflow.`));
+  for (const write of facts.permissionWrites) {
+    if (write.writeAll) {
+      errors.push(
+        error("write_all_forbidden", path, write.line, "write-all is forbidden."),
+      );
+      continue;
+    }
+    if (!allowedWrites.has(write.permission)) {
+      errors.push(
+        error(
+          "write_permission_not_allowed",
+          path,
+          write.line,
+          `${write.permission}: write is not approved for this workflow.`,
+        ),
+      );
+    }
+  }
+
+  for (const use of facts.uses) {
+    if (!PINNED_ACTION.test(use.value)) {
+      errors.push(
+        error(
+          "action_not_pinned",
+          path,
+          use.line,
+          `Pin ${use.value} to a 40-character commit SHA.`,
+        ),
+      );
+    }
+    if (
+      /^actions\/checkout@[0-9a-f]{40}$/i.test(use.value) &&
+      !use.checkoutPersistCredentialsFalse
+    ) {
+      errors.push(
+        error(
+          "checkout_credentials_not_disabled",
+          path,
+          use.line,
+          "Set checkout persist-credentials to false.",
+        ),
+      );
     }
   }
   return errors;
