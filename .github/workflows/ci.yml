@@ -39,28 +39,13 @@ jobs:
       - name: Run checks
         run: npm run check
 
-      - name: Regenerate Windows authority-host lock hashes from fresh NuGet cache
+      - name: Restore Windows authority host in locked mode
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $Project = 'authority-host/windows/GitHubDeliveryAuthority/GitHubDeliveryAuthority.csproj'
-          $Lock = 'authority-host/windows/GitHubDeliveryAuthority/packages.lock.json'
-          dotnet nuget locals global-packages --clear
+          dotnet restore $Project --locked-mode
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          dotnet restore $Project --force-evaluate
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $json = Get-Content $Lock -Raw | ConvertFrom-Json
-          $deps = $json.dependencies.'net8.0-windows10.0.22000'
-          @(
-            'SQLitePCLRaw.bundle_e_sqlite3',
-            'SQLitePCLRaw.core',
-            'SQLitePCLRaw.lib.e_sqlite3',
-            'SQLitePCLRaw.provider.e_sqlite3'
-          ) | ForEach-Object {
-            $name = $_
-            $hash = $deps.$name.contentHash
-            Write-Host "::warning title=NuGet lock hash::$name=$hash"
-          }
 
       - name: Build Windows authority host
         if: runner.os == 'Windows'
