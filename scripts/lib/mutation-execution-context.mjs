@@ -7,6 +7,7 @@ import {
 } from "./github-mutation-router.mjs";
 import { makeRedemptionRunner } from "./authority-execution.mjs";
 import { makeAuthorityRedeemer } from "./authority-host-client.mjs";
+import { classifyMergeOutcome, readMergeState } from "./merge-outcome.mjs";
 import { isFullReviewVerdictBody } from "./review-verdict-marker.mjs";
 
 const HIGH_ASSURANCE_ACTIONS = new Set([
@@ -92,6 +93,27 @@ export function planMutationWithAuthority(
   return planWithAuthorityOptions(request, options);
 }
 
+export function reconcileAttemptedMerge({ planned, runner } = {}) {
+  if (planned?.action !== "merge_pr") return null;
+  const verification = readMergeState({ request: planned.request, runner });
+  const outcome = classifyMergeOutcome(verification);
+  if (!outcome) return null;
+  return {
+    ...planned,
+    executed: true,
+    status: "reconciled_after_error",
+    outcome,
+    observedHead: verification.headRefOid,
+    observedBase: null,
+    threadTarget: null,
+    commentEditTarget: null,
+    existingMutation: null,
+    idempotencyClaim: null,
+    stdout: "",
+    verification,
+  };
+}
+
 export function executeMutationWithAuthority({
   request,
   execute = false,
@@ -121,14 +143,42 @@ export function executeMutationWithAuthority({
     redeemer: resolvedRedeemer,
     runner,
   });
-  const receipt = executeMutationRequest({
-    request,
-    execute,
-    runner: execution.runner,
-    ...options,
-  });
-  return {
-    ...receipt,
-    redemption: execution.redemption(),
-  };
+
+  try {
+    const receipt = executeMutationRequest({
+      request,
+      execute,
+      runner: execution.runner,
+      ...options,
+    });
+    return {
+      ...receipt,
+      redemption: execution.redemption(),
+    };
+  } catch (error) {
+    if (execute === true && request?.action === "merge_pr" && execution.attempted()) {
+      try {
+        const reconciled = reconcileAttemptedMerge({
+          planned,
+          runner: execution.runner,
+        });
+        if (reconciled) {
+          return {
+            ...reconciled,
+            redemption: execution.redemption(),
+          };
+        }
+      } catch (reconciliationError) {
+        throw new AggregateError(
+          [error, reconciliationError],
+          "merge_outcome_unknown_after_write_attempt",
+        );
+      }
+      throw new AggregateError(
+        [error],
+        "merge_outcome_unknown_after_write_attempt",
+      );
+    }
+    throw error;
+  }
 }
