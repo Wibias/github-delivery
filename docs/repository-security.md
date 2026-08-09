@@ -11,8 +11,10 @@ Apply `.github/repository-policy.json` to `main`:
 - reject force pushes and branch deletion
 - allow merge commits only
 - enable **Update branch** and auto-merge
-- require the six Node CI jobs, Dependency Review, and CodeQL
+- require the six Node 22/24 CI jobs, Dependency Review, and both CodeQL analyses
 - keep bypass access limited to emergency administrators
+
+Do not require the separate path-filtered Architecture Contracts workflow as a branch rule. Its safety-critical tests also run inside every required Node 22/24 matrix job, avoiding permanently expected checks when the focused workflow is skipped by path.
 
 Do not require Scorecard as a pull-request check because it runs on `main`, schedules, and branch-protection changes rather than on every PR.
 
@@ -36,7 +38,20 @@ Legacy Ed25519 `gd1` verification remains available through `GITHUB_DELIVERY_AUT
 
 Trusted grants bind repository, action, mutation mode, concrete resource identifiers, expected PR head where applicable, exact effect parameters such as merge method/reviewer set, and SHA-256 hashes of human-visible text. New grants may additionally require one-time redemption immediately before the exact GitHub write.
 
-Set `GITHUB_DELIVERY_REQUIRE_TRUSTED_AUTHORITY=1` only in a deployment where a trusted issuer actually supplies valid grants. Strict mode remains opt-in.
+Some actions are high-assurance even without global strict mode. In particular:
+
+- human-thread reply execution requires exact outgoing text plus trusted scoped authority;
+- full-review verdict publication is a high-assurance `post_comment` special case and requires trusted scoped authority;
+- a format-valid same-actor `[GD]` verdict without durable authority provenance is not accepted as merge-review evidence; and
+- destructive actions continue to require the trusted-authority boundary defined by the mutation registry/policy.
+
+Set `GITHUB_DELIVERY_REQUIRE_TRUSTED_AUTHORITY=1` only in a deployment where a trusted issuer actually supplies valid grants. Strict mode remains opt-in and extends trusted-authority enforcement to every executed broker mutation; it is not required to make the built-in high-assurance cases high-assurance.
+
+## Durable full-review verdict provenance
+
+`scripts/github-authorize.mjs` stamps an authorized full-review verdict request with a hidden `github-delivery:review-authority` marker carrying the scoped grant while preserving the human-visible verdict hash.
+
+`scripts/verify-verdict-published.mjs` requires both valid verdict format and valid historical trusted-authority provenance. The grant is re-verified at the GitHub comment creation time and must satisfy the protected review-verdict authority contract, including exact scope and one-time redemption semantics. A generic comment that merely copies the `[GD]` verdict format does not satisfy merge-review evidence.
 
 ## Local Windows issuer
 
@@ -44,7 +59,7 @@ Set `GITHUB_DELIVERY_REQUIRE_TRUSTED_AUTHORITY=1` only in a deployment where a t
 
 - per-user WinForms tray host;
 - repository allowlist that starts empty/default-deny;
-- Windows Hello approval for maintainer/destructive batches;
+- Windows Hello approval for protected/high-assurance batches, including maintainer mode, destructive actions, human-thread replies, and format-recognized full-review verdicts;
 - one Hello approval may cover one finite precomputed batch, but each mutation receives a separate exact-scope grant;
 - non-exportable ECDSA P-256 key persisted by Microsoft Platform Crypto Provider;
 - public-key trust store with `kid`-based active/retiring/retired rotation;
