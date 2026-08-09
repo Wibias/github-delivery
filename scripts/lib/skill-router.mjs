@@ -27,6 +27,11 @@ const PR_REFERENCE = /\bpr\s*#?\d+\b/;
 const FULL_REVIEW_REQUEST = /\b(full review|review .* for real bugs|usefulness verdict)\b/;
 const FIX_REVIEW_REQUEST =
   /\b(fix|address)\b[\s\S]*(review|coderabbit|codex|comment|feedback)/;
+const ISSUE_CREATE_REQUEST =
+  /\b(?:create|file)\b[\s\S]{0,120}\b(?:issue|issues|ticket|tickets|bug report|bug reports)\b|\bopen\s+(?:a|an|new)\b[\s\S]{0,80}\b(?:issue|ticket|bug report)\b/;
+const FOLLOW_UP_ISSUE_REQUEST = /\bfollow[- ]?up\s+(?:issue|ticket)\b/;
+const CREATE_PR_FOR_ISSUE_REQUEST =
+  /\b(?:create|open)\b[\s\S]*\b(?:pr|pull request)\b[\s\S]*\b(?:issue|#\d+)\b/;
 
 function prepareAndMergeActions(text) {
   const actions = ["merge_pr", "post_comment", "post_issue_comment", "close_linked_issue"];
@@ -52,6 +57,20 @@ export function hasExplicitMergeIntent(prompt) {
   if (DELIBERATIVE_MERGE.test(candidate)) return false;
   if (DEFERRED_MERGE_AUTHORITY.test(candidate)) return false;
   return ASSISTANT_MERGE_REQUEST.test(candidate);
+}
+
+export function issueCreationActionForPrompt(prompt) {
+  const text = normalized(prompt);
+  if (
+    !text ||
+    CREATE_PR_FOR_ISSUE_REQUEST.test(text) ||
+    !ISSUE_CREATE_REQUEST.test(text)
+  ) {
+    return null;
+  }
+  return FOLLOW_UP_ISSUE_REQUEST.test(text)
+    ? "create_follow_up_issue"
+    : "create_issue";
 }
 
 function isPrepareAndMergeRequest(text) {
@@ -170,6 +189,13 @@ export function routeShippingGithubPrompt(prompt) {
 
   if (/\b(research|investigate)\b[\s\S]*\b(issue|issues|#\d+)\b/.test(text)) {
     return result("references/research-issue.md", "review");
+  }
+
+  const issueCreationAction = issueCreationActionForPrompt(text);
+  if (issueCreationAction) {
+    return result("references/issue-workflows.md", "maintainer", [
+      issueCreationAction,
+    ]);
   }
 
   if (
