@@ -400,7 +400,7 @@ See [`docs/live-integration.md`](docs/live-integration.md) and [`docs/live-githu
 | `scripts/lib/live-fixture-identity.mjs` | Bind live lifecycle tests to the immutable opted-in fixture target |
 | `scripts/live-github-fixture.mjs` | Exercise the real GitHub lifecycle |
 | `scripts/build-dist.mjs` | Build deterministic versioned skill bundles |
-| `scripts/prepare-release.mjs` | Verify release identity, checks,ums, SBOM, notes and provenance subjects |
+| `scripts/prepare-release.mjs` | Verify release identity, checksums, SBOM, notes and provenance subjects |
 
 The architecture intentionally uses **progressive disclosure**: a routed workflow loads the policy kernel plus only the modules it declares, instead of dumping every rule into every agent turn. Architecture validation ensures this context reduction does not remove required safety contracts.
 
