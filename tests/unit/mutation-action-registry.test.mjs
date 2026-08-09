@@ -55,6 +55,19 @@ test("mutation action registry is internally complete", () => {
   assert.equal(actionDefinition("supersede_pr").enabled, false);
 });
 
+test("direct issue creation and follow-up issue creation remain distinct actions", () => {
+  const direct = actionDefinition("create_issue");
+  const followUp = actionDefinition("create_follow_up_issue");
+
+  assert.equal(direct.issueCreationKind, "direct");
+  assert.equal(direct.route, "lifecycle");
+  assert.equal(direct.minimumMode, "maintainer");
+
+  assert.equal(followUp.issueCreationKind, "follow_up");
+  assert.equal(followUp.route, "legacy");
+  assert.equal(followUp.minimumMode, "maintainer");
+});
+
 test("mutation policy exposes exactly the enabled registry actions", () => {
   const profile = mutationProfile("autonomous");
   assert.deepEqual(Object.keys(profile.actions).sort(), enabledActionNames().sort());
