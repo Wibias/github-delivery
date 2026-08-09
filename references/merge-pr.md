@@ -21,7 +21,9 @@ The user speaks naturally. `merge PR #32` must load this workflow through `SKILL
 
 ## Goal
 
-Merge PR `#N` after readiness checks, comment why it is useful, thank the PR author when appropriate, then thank and close linked issues. Every visible GitHub write must pass through `scripts/github-mutate.mjs`; bare `gh pr merge`, direct issue comments, and direct issue closure are forbidden.
+Merge PR `#N` only after readiness checks pass on the current head. After GitHub confirms the merge, post the useful/thanks comment when appropriate, then thank and close complete linked issues. Every visible GitHub write must pass through `scripts/github-mutate.mjs`; bare `gh pr merge`, direct issue comments, and direct issue closure are forbidden.
+
+A success-looking social write must never precede the state transition it describes. The merge happens first; the merge thank-you happens only after the merge succeeds.
 
 ## Mutation mode
 
@@ -51,34 +53,41 @@ Read `references/mutation-modes.md` and `references/github-mutation-broker.md` b
 6. Confirm required CI, review policy, unresolved threads, feedback, base health, and merge queue state are clear.
 7. Confirm own bug, security, and spec/standards evidence exists this session, or obtain an explicit merge-anyway instruction after explaining the missing evidence.
 8. Confirm the branch was built and tested against the current base tip.
-9. Confirm valid adaptive-settle evidence exists for the unchanged PR and immediate-base heads. If it does not, run the adaptive settle from `references/shared-rules.md`: announce that green is provisional, choose 60 or 180 seconds from the observed activity (**~30–60s for a docs/markdown-only head**), poll `ship-gate.mjs` every 20 seconds without a silent sleep longer than 30 seconds, reset on changes, and require the final gate to return `ready`.
-10. Immediately before the first mutation, rerun the authoritative gate and verify both recorded heads are unchanged.
+9. Confirm valid adaptive-settle evidence exists for the unchanged PR and immediate-base heads. If it does not, run the adaptive settle from `references/shared-rules.md`: announce that green is provisional, choose 60 or 180 seconds from observed activity (**~30–60s for a docs/markdown-only head**), poll `ship-gate.mjs` every 20 seconds without a silent sleep longer than 30 seconds, reset on changes, and require the final gate to return `ready`.
+10. Immediately before the first mutation, rerun the authoritative gate and verify the recorded head/base generation is unchanged.
 11. Resolve linked issues through both GitHub closing references and body keywords.
 12. Select the repository’s normal merge method. Do not silently squash when trailers or history matter.
 
 ## Internal mutation sequence
 
-Run the **merge driver** — it chains the gate, settle, broker requests, and cleanup decision into one call so the agent reviews one plan and confirms execution instead of hand-rolling each write:
+Run the **merge driver**. It chains the gate, settle, broker requests, and cleanup decision into one call so the agent reviews one plan instead of hand-rolling writes:
 
 ```bash
 node "<github-delivery>/scripts/merge-pr-driver.mjs" OWNER/REPO N --mode maintainer --settle
 ```
 
-The dry-run (no `--execute`) prints the ship-gate decision, the exact `post_comment` and `merge_pr` commands (with `--match-head-commit` head pinning), and the merge method. The agent **writes only the thanks-comment prose** (via `--thank-comment` or by editing the default) — every other step is scripted. Only when the plan is correct and the user's merge request is explicit, run:
+The dry-run (no `--execute`) prints the ship-gate decision, the exact merge and post-merge comment plans, the pinned head, and merge method. The agent may provide the post-merge thank-you prose via `--thank-comment`. Only when the plan is correct and the user's merge request is explicit, run:
 
 ```bash
 node "<github-delivery>/scripts/merge-pr-driver.mjs" OWNER/REPO N --mode maintainer --settle --thank-comment "<why-it-helps prose>" --execute --audit github-delivery-pr-N-mutations.jsonl
 ```
 
-`--execute` performs the writes through the broker only after the gate is `ready` on the pinned head, and appends every receipt to the audit file. A blocked gate, moved head, draft, or already-merged PR is a hard stop with a structured reason — never bypass.
+`--execute` performs writes through the authority-aware broker only after the gate is `ready` on the pinned head. A blocked gate, moved head, draft, already-merged PR, or authority failure is a hard stop.
 
-The driver covers:
+### Driver transaction order
 
-- **Pre-merge PR comment** — idempotent `post_comment` (`idempotencyKey: merge-thanks-pr-N`) with the thanks/why-it-helps body; thanks the author only when they are not the authenticated user; use the **Merge thanks** shape from `references/comment-depth.md`; keep GitHub `@mentions` bare and never backticked.
-- **Merge** — `merge_pr` with `--match-head-commit` head pinning (a moved head is a hard stop requiring a fresh gate run); the driver re-reads the head before mutation and verifies the merge receipt.
-- **Linked issue comments and closure** — still a judgment step the agent performs after the driver (see below).
+The order is mandatory:
 
-### 3. Linked issue comments and closure
+1. **Merge** — execute `merge_pr` with `--match-head-commit` head pinning.
+2. **Verify merge success** — the merge receipt/read-back must confirm that GitHub accepted the merge.
+3. **Post-merge PR thank-you** — only after step 2 succeeds, execute the idempotent `post_comment` (`idempotencyKey: merge-thanks-pr-N`). Use the **Merge thanks** shape from `references/comment-depth.md`; thank the author only when appropriate; keep GitHub `@mentions` bare and never backticked.
+4. **Linked issue comments and closure** — perform the judgment-dependent issue close-out below.
+
+If the merge fails or returns an unresolved outcome, do **not** post a success-looking “merged” comment. Reconcile remote state first.
+
+The post-merge comment is independently idempotent. A retry after a lost comment response must reuse the existing marker-backed comment instead of creating a duplicate.
+
+### Linked issue comments and closure
 
 For every linked or fixed issue:
 
@@ -95,28 +104,32 @@ Auto-close does not replace the required issue comment.
 <!-- assertion: multi-pr-full-ceremony -->
 <!-- /assertion-anchors -->
 
-### 4. Cleanup
+### Cleanup
 
-- Confirm the PR is actually merged, not merely queued (the driver verifies the merge receipt; also confirm every required issue comment exists and complete issues are closed).
-- The driver reports the owner-scoped branch-cleanup decision via `evaluateHeadBranchCleanup`. When the decision is `delete`, run broker action `delete_head_branch` through `scripts/github-mutate.mjs` (or let the driver's cleanup plan drive it in a later iteration).
+- Confirm the PR is actually merged, not merely queued, before any success claim or post-merge thanks.
+- Confirm every required issue comment exists and complete issues are closed.
+- The driver reports the owner-scoped branch-cleanup decision via `evaluateHeadBranchCleanup`. When the decision is `delete`, run broker action `delete_head_branch` through `scripts/github-mutate.mjs`.
 - Report one explicit status line (`branch deleted: …`, `branch kept: head owned by @other`, `branch kept: protected shared branch`, or `branch kept: user requested keep`).
-- Delete only when the head owner matches the authenticated actor. This applies to **same-repo and fork PRs**; fork heads delete from the head fork repo.
+- Delete only when the head owner matches the authenticated actor. This applies to same-repo and fork PRs; fork heads delete from the head fork repo.
 - Retarget stack children before deleting a stack parent branch.
 - Hand off versioning or worktree cleanup to the appropriate skill.
 
 ## Failure handling
 
-- Broker denial: report its structured reason; perform no bypass write.
-- Expected-head mismatch: rerun the full gate and adaptive settle on the new head and immediate-base head.
+- Broker/authority denial: report its structured reason; perform no bypass write.
+- Expected-head or snapshot-generation mismatch: rerun the full gate and adaptive settle on the new generation.
+- Merge failure: do not post the merge-success comment.
+- Lost/unknown merge response: read the PR state before retrying; if GitHub already reports merged, continue with the missing post-merge steps only.
+- Lost/unknown comment response: rely on the marker-backed idempotency lookup before posting again.
 - Partial ceremony: continue only the missing idempotent step; do not duplicate completed comments.
 - Mutation command failure: include the action, receipt or plan hash, and error; never claim success.
 - Verification mismatch: treat the mutation as unresolved until repository state confirms it.
 
 ## Done when
 
-- the authoritative gate was ready on the merged head;
-- the pre-merge why/comment was posted through the broker;
-- the broker receipt verifies the PR merged;
+- the authoritative gate was ready on the head that GitHub merged;
+- the broker receipt/read-back verifies the PR merged;
+- only after merge success, the post-merge why/thanks comment exists through the broker;
 - every linked issue received its required comment;
 - complete linked issues are closed;
 - cleanup is done or explicitly deferred;

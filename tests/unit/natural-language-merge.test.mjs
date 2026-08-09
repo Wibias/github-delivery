@@ -27,6 +27,17 @@ test("the merge workflow uses the driver + mutation broker instead of a bare mer
   assert.doesNotMatch(merge, /^\s*gh pr merge\b/m);
 });
 
+test("merge documentation requires merge before the success-looking thank-you", () => {
+  const merge = read("references/merge-pr.md");
+  assert.match(merge, /Driver transaction order/);
+  assert.match(merge, /1\. \*\*Merge\*\*/);
+  assert.match(merge, /2\. \*\*Verify merge success\*\*/);
+  assert.match(merge, /3\. \*\*Post-merge PR thank-you\*\*/);
+  assert.match(merge, /do \*\*not\*\* post a success-looking/i);
+  assert.doesNotMatch(merge, /\*\*Pre-merge PR comment\*\*/);
+  assert.doesNotMatch(merge, /pre-merge why\/comment was posted/i);
+});
+
 test("the README presents natural language as the public API", () => {
   const readme = read("README.md");
   assert.match(readme, /merge PR #32/);
