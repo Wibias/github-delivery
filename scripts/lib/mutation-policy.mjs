@@ -23,6 +23,7 @@ const ACTIONS = [
   "close_pr",
   "supersede_pr",
   "merge_pr",
+  "retarget_pr",
   "delete_head_branch",
   "create_follow_up_issue",
   "post_resolution_record",
@@ -77,6 +78,7 @@ function buildProfile(mode) {
         "close_pr",
         "supersede_pr",
         "merge_pr",
+        "retarget_pr",
         "delete_head_branch",
         "create_follow_up_issue",
       ],
@@ -92,6 +94,7 @@ function buildProfile(mode) {
       "close_pr",
       "supersede_pr",
       "merge_pr",
+      "retarget_pr",
       "delete_head_branch",
       "create_follow_up_issue",
     ]);
