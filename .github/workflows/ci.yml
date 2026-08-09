@@ -39,12 +39,24 @@ jobs:
       - name: Run checks
         run: npm run check
 
+      - name: Generate Windows authority-host lock file
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $Project = 'authority-host/windows/GitHubDeliveryAuthority/GitHubDeliveryAuthority.csproj'
+          $Lock = 'authority-host/windows/GitHubDeliveryAuthority/packages.lock.json'
+          dotnet restore $Project --use-lock-file
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Write-Host '---BEGIN PACKAGES LOCK---'
+          Get-Content $Lock
+          Write-Host '---END PACKAGES LOCK---'
+
       - name: Build Windows authority host
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Continue'
-          & dotnet build authority-host/windows/GitHubDeliveryAuthority/GitHubDeliveryAuthority.csproj --configuration Release 2>&1 |
+          & dotnet build authority-host/windows/GitHubDeliveryAuthority/GitHubDeliveryAuthority.csproj --configuration Release --no-restore 2>&1 |
             Tee-Object -FilePath authority-host-build.log
           $exitCode = $LASTEXITCODE
           if ($exitCode -ne 0) {

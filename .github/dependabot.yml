@@ -17,3 +17,12 @@ updates:
       time: "04:30"
       timezone: Europe/Berlin
     open-pull-requests-limit: 10
+
+  - package-ecosystem: nuget
+    directory: "/authority-host/windows/GitHubDeliveryAuthority"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "05:00"
+      timezone: Europe/Berlin
+    open-pull-requests-limit: 5
