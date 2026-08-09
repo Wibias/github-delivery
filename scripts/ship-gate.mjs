@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 /**
- * Produce one authoritative ship decision from one evidence snapshot.
+ * Produce one authoritative ship decision from live evidence.
+ * Replayed snapshot files are integrity-checked diagnostic evidence and can
+ * never produce an authoritative ready result.
  * Usage: node scripts/ship-gate.mjs OWNER/REPO PR_NUMBER [--snapshot FILE]
  */
 import { captureLiveSnapshot } from "./lib/live-snapshot.mjs";
@@ -40,13 +42,15 @@ try {
       );
     }
   }
-  const snapshot = args.snapshotPath
+  const replay = Boolean(args.snapshotPath);
+  const snapshot = replay
     ? readValidatedSnapshot({
         path: args.snapshotPath,
         repo: args.repo,
         pr: args.pr,
         expectedHead: args.expectedHead,
         maxAgeSeconds: args.maxAgeSeconds,
+        requireIntegrity: true,
       })
     : captureLiveSnapshot({
         repo: args.repo,
@@ -65,6 +69,19 @@ try {
     codeowners: evaluateCodeownersSnapshot(snapshot),
   });
   output.workflow = args.workflow;
+  output.evidenceMode = replay ? "snapshot_replay" : "live_capture";
+  output.authoritative = !replay;
+  if (replay && output.ready) {
+    output.replayDecision = output.decision;
+    output.decision = "unknown";
+    output.ready = false;
+    output.blocked = false;
+    output.unknown = true;
+    output.complete = false;
+    output.unknowns = [
+      ...new Set([...(output.unknowns || []), "snapshot_replay_not_authoritative"]),
+    ];
+  }
 
   process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
   process.exitCode = output.ready ? 0 : output.blocked ? 1 : 2;
