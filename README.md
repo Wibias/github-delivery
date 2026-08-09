@@ -181,7 +181,7 @@ Base updates, scoped code pushes, and simplification edits are performed only wh
 
 ## Review depth: more than "the checks are green"
 
-A merge-ready or full-review path does not outsource judgment to CI or bots.
+A merge-ready or full-review path does not outsource judgment to CI or bots. The `blocking` scope rule is a binding readiness contract: a scope component marked blocking cannot be silently skipped, treated as advisory, or reported clean without its required evidence.
 
 ### Multidimensional review
 
@@ -276,7 +276,9 @@ Once the authoritative gate first becomes ready, the workflow visibly settles on
 - authoritative gate re-check every **20 seconds**;
 - no single blocking sleep longer than **30 seconds**.
 
-Material change resets the settle window, and one final authoritative gate closes the decision.
+Polling uses short bounded waits so new evidence can be observed without one long blocking sleep. Material change resets the settle window, and one final authoritative gate closes the decision.
+
+There is no path to a positive readiness, publication, or merge claim without one fresh final gate.
 
 ---
 
@@ -398,7 +400,7 @@ See [`docs/live-integration.md`](docs/live-integration.md) and [`docs/live-githu
 | `scripts/lib/live-fixture-identity.mjs` | Bind live lifecycle tests to the immutable opted-in fixture target |
 | `scripts/live-github-fixture.mjs` | Exercise the real GitHub lifecycle |
 | `scripts/build-dist.mjs` | Build deterministic versioned skill bundles |
-| `scripts/prepare-release.mjs` | Verify release identity, checksums, SBOM, notes and provenance subjects |
+| `scripts/prepare-release.mjs` | Verify release identity, checks,ums, SBOM, notes and provenance subjects |
 
 The architecture intentionally uses **progressive disclosure**: a routed workflow loads the policy kernel plus only the modules it declares, instead of dumping every rule into every agent turn. Architecture validation ensures this context reduction does not remove required safety contracts.
 
