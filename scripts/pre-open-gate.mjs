@@ -12,33 +12,44 @@ function usageError() {
 export function evaluate(plan, evidence = null) {
   const bugScope = projectBugScope(plan);
   const securityScope = projectSecurityScope(plan);
-  const blockers = [
+  const implementationDiffPresent = Number(plan?.fileCount || 0) > 0;
+  const scopeBlockers = [
     ...bugScope.requiredLenses.map((id) => `bug:requiredLenses:${id}`),
     ...securityScope.requiredSurfaces.map((id) => `security:requiredSurfaces:${id}`),
   ];
-  const complete = plan.complete && bugScope.complete && securityScope.complete;
+  const complete = implementationDiffPresent && plan.complete && bugScope.complete && securityScope.complete;
   const lensMap = evidence?.lenses ?? {};
   const surfaceMap = evidence?.surfaces ?? {};
   const clearedByEvidence = [];
-  const remainingBlockers = blockers.filter((blocker) => {
+  const remainingScopeBlockers = scopeBlockers.filter((blocker) => {
     const [axis, , id] = blocker.split(":");
     const cleared = axis === "bug" ? evidenceClears(lensMap, id) : evidenceClears(surfaceMap, id);
     if (cleared) clearedByEvidence.push(blocker);
     return !cleared;
   });
-  const decision = !complete ? "unknown" : remainingBlockers.length ? "blocked" : "ready";
+  const blockers = implementationDiffPresent
+    ? remainingScopeBlockers
+    : ["workflow:implementation_missing"];
+  const decision = !implementationDiffPresent
+    ? "blocked"
+    : !complete
+      ? "unknown"
+      : blockers.length
+        ? "blocked"
+        : "ready";
   return {
     bugScope,
     securityScope,
-    blockers: remainingBlockers,
+    blockers,
     clearedByEvidence,
     decision,
     complete,
+    implementationDiffPresent,
     evidenceApplied: Boolean(evidence),
   };
 }
 
-function report({ repo, baseRef, headRef, headRefOid, bugScope, securityScope, blockers, clearedByEvidence, decision, complete, evidenceApplied }) {
+function report({ repo, baseRef, headRef, headRefOid, bugScope, securityScope, blockers, clearedByEvidence, decision, complete, implementationDiffPresent, evidenceApplied }) {
   return {
     schemaVersion: 1,
     kind: "github-delivery/pre-open-gate",
@@ -48,15 +59,17 @@ function report({ repo, baseRef, headRef, headRefOid, bugScope, securityScope, b
     headRefOid,
     decision,
     complete,
+    implementationDiffPresent,
     evidenceApplied,
     bugScope,
     securityScope,
     blockers,
     clearedByEvidence,
     instructions: [
+      "workflow:implementation_missing: this pre-open gate requires a non-empty candidate implementation diff; implement first, then rerun the gate before publication.",
       "decision=blocked: complete every remaining required bug lens and security surface on this branch diff (with --evidence-file), fix Confirmed High/Critical findings, then rerun before opening the PR.",
       "decision=unknown: restore complete branch evidence (fetch base, checkout head) and rerun; never open a PR from an incomplete diff.",
-      "decision=ready: the branch diff has no required bug/security scope, or every required lens/surface carries valid done/n-a evidence; you may proceed to open the PR.",
+      "decision=ready: the non-empty candidate branch diff has no required bug/security scope, or every required lens/surface carries valid done/n-a evidence; you may proceed to open the PR.",
     ],
   };
 }
@@ -115,7 +128,12 @@ function selfTest() {
   if (out.decision !== "blocked" || !out.blockers.some((b) => b.startsWith("bug:requiredLenses:"))) {
     throw new Error("self-test failed: expected blocked with bug lenses");
   }
-  process.stdout.write(JSON.stringify({ ok: true, decision: out.decision, blockers: out.blockers }, null, 2) + "\n");
+  const emptyPlan = planReviewScope({ repo: "acme/widget", pr: null, headRefOid: "base", files: [] });
+  const emptyOut = report({ repo: emptyPlan.repo, baseRef: "dev", headRef: "feat/empty", headRefOid: emptyPlan.headRefOid, ...evaluate(emptyPlan) });
+  if (emptyOut.decision !== "blocked" || !emptyOut.blockers.includes("workflow:implementation_missing")) {
+    throw new Error("self-test failed: expected empty candidate diff to block as implementation_missing");
+  }
+  process.stdout.write(JSON.stringify({ ok: true, decision: out.decision, blockers: out.blockers, emptyDecision: emptyOut.decision }, null, 2) + "\n");
 }
 
 async function main() {
