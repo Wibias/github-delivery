@@ -3,6 +3,7 @@ import { join, relative, resolve } from "node:path";
 
 const APPROVED_MUTATION_FILES = new Set([
   "scripts/lib/github-mutation-broker.mjs",
+  "scripts/lib/autonomous-idempotency-claim.mjs",
   "scripts/lib/lifecycle-mutations.mjs",
   "scripts/lib/mutation-boundary-security.mjs",
   "scripts/live-github-fixture.mjs",
