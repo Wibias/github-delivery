@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { classifyAuthority } from "./authority-grant.mjs";
 import { authorizeMutation } from "./mutation-policy.mjs";
 import { evaluateHeadBranchCleanup } from "./merge-branch-cleanup.mjs";
+import { classifyMergeOutcome, readMergeState } from "./merge-outcome.mjs";
 
 const PR_ACTIONS = new Set([
   "post_review",
@@ -540,16 +541,7 @@ function verifyBranchDeleted({ request, runner }) {
 function verificationCommand(request) {
   switch (request.action) {
     case "merge_pr":
-      return [
-        "gh",
-        "pr",
-        "view",
-        String(request.pr),
-        "--repo",
-        request.repo,
-        "--json",
-        "state,mergedAt,headRefOid",
-      ];
+      return null;
     case "retarget_pr":
       return [
         "gh",
@@ -751,18 +743,36 @@ export function executeMutationRequest({
     authorityClockSkewSeconds,
   });
   if (!execute) {
-    return { ...plan, executed: false, status: "dry_run" };
+    return { ...plan, executed: false, status: "dry_run", outcome: null };
   }
 
   const observedHead = verifyHead({ request: plan.request, runner });
   const threadTarget = verifyReviewThreadTarget({ request: plan.request, runner });
   const retargetState = verifyRetargetBase({ request: plan.request, runner });
   const commentEditTarget = verifyOwnCommentTarget({ request: plan.request, runner });
+  const mergeState = readMergeState({ request: plan.request, runner });
+  const preMergeOutcome = classifyMergeOutcome(mergeState);
+  if (preMergeOutcome) {
+    return {
+      ...plan,
+      executed: false,
+      status: "already_applied",
+      outcome: preMergeOutcome === "merged" ? "already_merged" : preMergeOutcome,
+      observedHead,
+      observedBase: retargetState?.observedBase ?? null,
+      threadTarget,
+      commentEditTarget,
+      existingMutation: null,
+      stdout: "",
+      verification: mergeState,
+    };
+  }
   if (threadTarget?.isResolved) {
     return {
       ...plan,
       executed: false,
       status: "already_applied",
+      outcome: null,
       observedHead,
       observedBase: retargetState?.observedBase ?? null,
       threadTarget,
@@ -777,6 +787,7 @@ export function executeMutationRequest({
       ...plan,
       executed: false,
       status: "already_applied",
+      outcome: null,
       observedHead,
       observedBase: retargetState.observedBase,
       threadTarget,
@@ -795,6 +806,7 @@ export function executeMutationRequest({
       ...plan,
       executed: false,
       status: "already_applied",
+      outcome: null,
       observedHead,
       observedBase: retargetState?.observedBase ?? null,
       threadTarget,
@@ -808,7 +820,12 @@ export function executeMutationRequest({
   const stdout = runOrThrow(runner, plan.command);
   const branchDeletion = verifyBranchDeleted({ request: plan.request, runner });
   let verification;
-  if (REVIEW_THREAD_ACTIONS.has(plan.request.action)) {
+  let outcome = null;
+  if (plan.request.action === "merge_pr") {
+    verification = readMergeState({ request: plan.request, runner });
+    outcome = classifyMergeOutcome(verification);
+    if (!outcome) throw new Error("merge_outcome_unverified");
+  } else if (REVIEW_THREAD_ACTIONS.has(plan.request.action)) {
     verification = verifyReviewThreadTarget({ request: plan.request, runner });
     if (verification.isResolved !== true) {
       throw new Error("review_thread_resolution_verification_failed");
@@ -827,6 +844,7 @@ export function executeMutationRequest({
     ...plan,
     executed: true,
     status: "succeeded",
+    outcome,
     observedHead,
     observedBase: retargetState?.observedBase ?? null,
     threadTarget,
