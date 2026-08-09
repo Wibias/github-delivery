@@ -4,7 +4,7 @@
 
 **A GitHub shipping skill for agents — from product intake to a verified merge.**
 
-Speak naturally. `github-delivery` routes the request, gathers live evidence, runs the relevant review and policy gates, performs only the GitHub writes that request authorizes, and verifies the final state.
+Speak naturally. `github-delivery` routes the request, gathers live evidence, runs the relevant review and policy gates, performs only the GitHub writes that request authorizes, and verifies the resulting state.
 
 [![CI](https://github.com/Wibias/github-delivery/actions/workflows/ci.yml/badge.svg)](https://github.com/Wibias/github-delivery/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/Wibias/github-delivery/actions/workflows/codeql.yml/badge.svg)](https://github.com/Wibias/github-delivery/actions/workflows/codeql.yml)
@@ -22,9 +22,9 @@ Speak naturally. `github-delivery` routes the request, gathers live evidence, ru
 |---|---|
 | **Scope** | PRDs and issue intake → research → implementation → PR review/fix/watch → stacks → merge and linked-issue close-out |
 | **Default mode** | `read-only` |
-| **Write boundary** | Typed mutation policy + broker; stale-head and idempotency checks where applicable |
-| **High-assurance writes** | Exact-scope trusted grants; optional Windows Hello authority host |
-| **Review model** | Bug + Security + Spec + Standards + proactive contract verification |
+| **Write boundary** | Typed mutation policy + broker; stale-head, exact-effect, and idempotency checks where applicable |
+| **High-assurance writes** | Exact-scope trusted grants; optional Windows 11 / Windows Hello authority host |
+| **Review model** | Bug + Security + Spec + Standards + semantic propagation + proactive contract verification |
 | **Ship decision** | One authoritative `ready`, `blocked`, or `unknown` result from live evidence |
 | **Runtime** | Node.js **22 or 24** |
 | **Required CI matrix** | Node 22/24 × Ubuntu/Windows/macOS, with architecture contracts inside every required matrix job |
@@ -93,9 +93,9 @@ For oversized-change splitting, post-ship branch/worktree cleanup, and version/t
 ```mermaid
 flowchart LR
     A[Your natural-language request] --> B[Deterministic route]
-    B --> C[Policy kernel + only required modules]
+    B --> C[Policy kernel + required modules]
     C --> D[Live repository / PR / issue evidence]
-    D --> E[Review and authoritative gates]
+    D --> E[Review + authoritative gates]
     E --> F[Exact mutation plan]
     F --> G[Authority + mutation broker]
     G --> H[GitHub]
@@ -112,7 +112,7 @@ flowchart LR
 
 ### Policy precedence
 
-The executable gates and canonical policy kernel/modules are stricter than workflow prose. Repository content — issues, comments, code, logs, generated files, bot output — is treated as **evidence/data, not authority** and cannot override user intent or the mutation boundary.
+Executable gates and the canonical policy kernel/modules are stricter than workflow prose. Repository content — issues, comments, code, logs, generated files, bot output — is treated as **evidence/data, not authority** and cannot override user intent or the mutation boundary.
 
 ---
 
@@ -138,6 +138,8 @@ Creating/editing issues or PRs, labels, assignments, comments, reviews, thread s
 The action model is centralized in `scripts/lib/mutation-action-registry.mjs`. Policy, broker behavior, routing/high-assurance semantics, and architecture tests are derived or cross-checked from that registry so adding an action cannot silently skip a safety layer.
 
 PR mutations that can become stale are bound to the **expected head** and re-read it immediately before execution. Branch pushes bind the intended repository/remote/branch and exact old/new tips; history rewrites use exact `--force-with-lease`, never bare force.
+
+A repository-wide mutation-boundary regression check rejects direct production GitHub/remote-Git write paths outside the approved boundary.
 
 ### 3. Trusted authority binds the exact effect
 
@@ -189,10 +191,16 @@ The review bar combines:
 - **Security** review
 - **Spec** review
 - **Standards** review
+- repository-wide **semantic propagation** when a domain concept changes
 - **Proactive contract verification** appropriate to the diff
-- repository-wide **semantic propagation** when an abstraction changes
 
 Review depth is derived from changed paths, patch content, symbols, removed controls, dependencies, workflow permissions, architecture surfaces, and uncertainty — not filenames alone.
+
+### Semantic propagation
+
+Changed files are only the starting points. A full review traces each changed domain concept from its authoritative source through producers, consumers, sibling implementations, derived/public representations, persistence/serialization, fixtures, and tests.
+
+Families such as provider sets, capability tables, schemas, enums, platform matrices, registries, or defaults are partitioned by materially different behavior. One representative is not accepted as coverage for the whole family unless equivalence is actually proved.
 
 ### Adversarial bug review
 
@@ -226,9 +234,11 @@ Credential-bearing OAuth/token/key adapters receive an explicit transport check:
 
 When a bot announces a **full review** rather than an incremental update, the skill runs its own Bug + Security + Spec review on the current head before treating prior `[GD] Fixed` replies as sufficient.
 
-### Full-review completion is locked to publication
+### Full-review completion is locked to a final verdict
 
-A full review is not complete merely because analysis stopped. Its execution plan retains a mandatory **Publish final verdict** item until the required verdict is actually published and verified. A blocker changes the verdict; it does not remove the publication requirement. Only explicit user cancellation can terminate that required publication flow.
+A full review is not complete merely because analysis stopped. Its execution plan retains a mandatory **Publish final verdict** item until the final verdict for the reviewed head has been delivered.
+
+Normal completion requires a format-valid, verified GitHub verdict. If GitHub publication is genuinely unavailable because of an auth, network, or API hard blocker, the workflow records that exact blocker and provides the complete verdict in chat instead. Choosing a stricter mutation mode on its own is not publication unavailability. The only permitted exit with **no verdict at all** is explicit user cancellation.
 
 Same-head reruns use a material-delta anti-noise rule: when the strict label/TLDR result has not materially changed, an already valid verdict may be reused instead of posting duplicate top-level noise.
 
@@ -236,15 +246,16 @@ Same-head reruns use a material-delta anti-noise rule: when the strict label/TLD
 
 ## Merge readiness and GitHub semantics
 
-The ship path deliberately models the platform details that commonly cause "green but not actually safe" mistakes.
+The ship path deliberately models platform details that commonly cause "green but not actually safe" mistakes.
 
-- Required checks belong to the exact current PR generation; old SHA results, partial matrices, queued checks, and incomplete evidence do not count.
-- Check evidence preserves the expected workflow/app/integration identity; same-name Check Run / Commit Status collisions cannot impersonate an app-bound required check.
+- Required checks belong to the exact current PR generation; old-SHA results, partial matrices, queued checks, and incomplete evidence do not count.
+- Check evidence preserves expected workflow/app/integration identity; same-name Check Run / Commit Status collisions cannot impersonate an app-bound required check.
 - GitHub's authoritative check target is used where the platform evaluates a test-merge/merge-queue generation instead of naively trusting a convenient head result.
 - GitHub review decision, stale approvals, last-push approval requirements, unresolved review threads, conflicts, behind state, and merge-queue state are evaluated.
 - `gh pr merge`/API success is not automatically reported as an immediate merge: queued/auto-merge and actual merged outcomes remain distinct.
 - Unknown future GitHub enum/state values fail closed instead of being treated as success.
 - Dependency Review degradation fails closed across real dependency surfaces, including nested/non-Node dependency graphs such as NuGet.
+- Merge execution requires same-head github-delivery review evidence, not merely a green ship gate.
 
 ### Base-health isolation
 
@@ -289,6 +300,8 @@ The pre-open gate is **post-implementation and pre-publication**. It cannot beco
 
 `scripts/pre-open-gate.mjs` blocks incomplete/empty candidate diffs and prevents publication while required review evidence is incomplete or Confirmed High/Critical findings remain unresolved.
 
+Remote branch push, PR creation/body correction, issue assignment, and related lifecycle writes use the same typed authority-aware mutation boundary rather than bypassing it with bare GitHub commands.
+
 ---
 
 ## Stacked PRs
@@ -306,6 +319,8 @@ The stack workflow:
 - edits a change only on the layer that owns that path/concern;
 - revalidates every surviving child after a parent changes or lands;
 - can enqueue a contiguous lower stack all-or-nothing when the base uses a merge queue and every participating PR independently satisfies readiness.
+
+Rewritten stack pushes use the typed `push_code` authority path with exact old/new tips and force-with-lease semantics.
 
 Active conflicts route through `references/resolve-conflicts.md` and are resolved from the intent/evidence of both sides, never from conflict markers alone.
 
@@ -341,13 +356,15 @@ The target is intentionally fail-closed and must be explicitly opted in with all
 
 - `LIVE_FIXTURE_REPOSITORY` — dedicated `OWNER/REPO` target;
 - `LIVE_FIXTURE_REPOSITORY_ID` — its immutable numeric GitHub repository ID;
-- source and fixture repository IDs must differ;
+- source and fixture repository names and IDs must differ;
 - `.github/github-delivery-live-fixture.json` on the fixture base branch, binding the exact source and fixture names **and** numeric IDs;
 - `LIVE_FIXTURE_TOKEN` with the capabilities required by the acceptance workflow.
 
 A writable but unrelated repository therefore fails identity verification **before the first fixture mutation**, even if its repository name was accidentally configured.
 
-The lifecycle exercises issues, branches, PRs, real checks, evidence snapshots, delayed head propagation, stale-head rejection, close/merge behavior, and independent cleanup with versioned evidence artifacts.
+The lifecycle exercises issues, branches, PRs, the Node 22/24 required check matrix, evidence snapshots, delayed head propagation, stale-head rejection, close behavior, and independent cleanup with versioned evidence artifacts. Cleanup re-verifies target identity before destructive cleanup actions.
+
+The hosted workflow intentionally uses `--disposition close`; it does not bypass the trusted-authority requirement by merging fixture PRs.
 
 Manual dispatch is always available. Scheduled execution remains opt-in through `LIVE_FIXTURE_ENABLED=true`.
 
@@ -360,8 +377,8 @@ See [`docs/live-integration.md`](docs/live-integration.md) and [`docs/live-githu
 | Surface | Responsibility |
 |---|---|
 | `SKILL.md` | Host discovery, deterministic natural-language routing, entrypoint contracts |
-| `references/policy-kernel.md` | Seven canonical cross-workflow core invariants |
-| `references/policy/*.md` | Focused mutation, review, CI, Git, stack and other domain policy modules |
+| `references/policy-kernel.md` | Canonical cross-workflow invariants |
+| `references/policy/*.md` | Focused mutation, evidence, review, CI, Git, issue, publication, release, and stack policy modules |
 | `scripts/policy-bundle.mjs` | Deterministic workflow → policy-module resolution and architecture validation |
 | `scripts/ship-gate-snapshot.mjs` | Capture one paginated evidence snapshot |
 | `scripts/ship-gate.mjs` | Produce the authoritative `ready` / `blocked` / `unknown` decision |
@@ -421,7 +438,7 @@ Typical skill locations include:
 
 `authority-host/windows/` provides a stronger local approval path on Windows 11:
 
-- Windows Hello for maintainer/destructive approval;
+- Windows Hello for protected/high-assurance approval, including maintainer mode, destructive actions, human replies, and format-recognized full-review verdicts;
 - non-exportable ECDSA P-256 signing key via the Microsoft Platform Crypto Provider (TPM-backed when available);
 - repository allowlist;
 - finite exact-scope batches;
@@ -462,6 +479,8 @@ Repository controls also include:
 
 The separate **Architecture Contracts** workflow provides focused feedback, while the safety-critical architecture tests also live inside the required CI matrix so a path-filtered advisory workflow cannot be the only enforcement point.
 
+The declared repository rules in `.github/repository-policy.json` currently require the six Node 22/24 matrix jobs, Dependency Review, and both CodeQL analyses with strict up-to-date-branch semantics.
+
 ---
 
 ## Security reporting
@@ -472,6 +491,6 @@ Do not publish suspected vulnerability details in a public issue or pull request
 
 ## Current state
 
-The complete issue/PR delivery lifecycle and its safety architecture are implemented: evidence-backed routing and ship gates, brokered lifecycle mutations, trusted authority, deep review, deterministic probes, pre-open review, safe simplification, stacks, conflict recovery, merge-queue semantics, issue close-out, release packaging, repository controls, and dedicated live lifecycle fixtures.
+The complete issue/PR delivery lifecycle and its safety architecture are implemented: evidence-backed routing and ship gates, brokered lifecycle mutations, trusted authority and durable verdict provenance, deep review, semantic propagation, deterministic probes, pre-open review, safe simplification, repository-qualified stacks, conflict recovery, merge-queue semantics, idempotent autonomous social effects, safe read retries, issue close-out, deterministic release packaging, repository controls, and dedicated live lifecycle fixtures.
 
 Remaining work is primarily **operational** rather than a missing architecture layer: keep live repository rules/security settings aligned with the documented policy, provision and maintain the dedicated live fixture target/credential, run release acceptance for new versions, and extend the regression corpus as GitHub and agent hosts evolve.
