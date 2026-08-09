@@ -103,6 +103,14 @@ export function authorityScopeForRequest(request = {}) {
         mergeMethod: normalizeMergeMethod(request.mergeMethod),
       };
 
+    case "retarget_pr":
+      return {
+        ...scope,
+        ...prScope(request),
+        expectedBase: exactString(request.expectedBase, "expected_base"),
+        newBase: exactString(request.newBase, "new_base"),
+      };
+
     case "post_comment":
     case "post_resolution_record":
     case "post_review":
