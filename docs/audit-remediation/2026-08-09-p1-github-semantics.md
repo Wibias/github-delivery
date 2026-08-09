@@ -14,17 +14,27 @@ This PR owns the next three audit findings in order:
 
 ## Acceptance
 
-- [ ] App-bound required check + same-name failing commit status is blocked.
-- [ ] App-bound required check + same-name pending/unknown commit status does not report ready.
-- [ ] Merge mutation returns a typed outcome: `merged`, `queued`, `auto_merge_enabled`, `already_merged`, or failure.
-- [ ] Post-merge social/cleanup operations run only for actual `merged`/`already_merged` outcomes.
-- [ ] A successful merge CLI exit with `mergedAt == null` is not treated as merged.
-- [ ] Dependency-review fallback detects supported non-Node dependency manifests/lockfiles.
-- [ ] This repository's `.csproj` / `packages.lock.json` make action failure fail closed rather than `dependency_free_degraded_pass`.
-- [ ] Focused regression tests are added before each implementation change.
-- [ ] Full repository validation passes on Node 22/24 across Linux, macOS and Windows.
-- [ ] Dependency Review and CodeQL pass.
+- [x] App-bound required check + same-name failing commit status is blocked.
+- [x] App-bound required check + same-name pending/unknown commit status does not report ready.
+- [x] Merge mutation returns a typed outcome: `merged`, `queued`, `auto_merge_enabled`, `already_merged`, or failure.
+- [x] Post-merge social/cleanup operations run only for actual `merged`/`already_merged` outcomes.
+- [x] A successful merge CLI exit with `mergedAt == null` is not treated as merged.
+- [x] Dependency-review fallback detects supported non-Node dependency manifests/lockfiles recursively.
+- [x] This repository's nested `.csproj` / `packages.lock.json` make action failure fail closed rather than `dependency_free_degraded_pass`.
+- [x] Focused regression tests were added before each implementation change and observed RED before the fix.
+- [x] Full repository validation passes on Node 22/24 across Linux, macOS and Windows.
+- [x] Dependency Review and CodeQL pass.
+
+## Final verification
+
+Final implementation head before this documentation-only completion commit: `eff07f3f7d6c78ac4951ea025fb6196c7b9bbb8e`.
+
+At that head:
+
+- CI run 547: success across all six Node/OS matrix jobs.
+- Dependency Review run 372: success.
+- CodeQL run 495: success for JavaScript/TypeScript and C#.
 
 ## Ordering
 
-Implement and verify the items exactly in the order above so a later fix cannot mask an earlier regression.
+The three findings were implemented and verified in the order above so a later fix could not mask an earlier regression.
