@@ -111,7 +111,7 @@ export function routeShippingGithubPrompt(prompt) {
     )
   ) {
     return result("references/supersede-pr.md", "maintainer", [
-      "supersede_pr",
+      "close_pr",
       "post_comment",
     ]);
   }
