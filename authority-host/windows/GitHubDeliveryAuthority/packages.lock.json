@@ -24,7 +24,7 @@
         "type": "Direct",
         "requested": "[2.1.12, )",
         "resolved": "2.1.12",
-        "contentHash": "YIS75gd/Q4tPOduT245SB41hxHyQIoa2JMKaejr4FZeG6WRV6x8T5mFe9CtgSog4Spdfk2ECRLvGFQbfTxmPvQ==",
+        "contentHash": "mAgscpQMLw5/nfA1Q5oJVAT29yROUo1ifZGbbTpx/lwZpSxMUGoYbKfmvdm8oXER+RzxqBmmQzeBEVKfeHv2nw==",
         "dependencies": {
           "SQLitePCLRaw.lib.e_sqlite3": "2.1.12",
           "SQLitePCLRaw.provider.e_sqlite3": "2.1.12"
@@ -33,7 +33,7 @@
       "SQLitePCLRaw.core": {
         "type": "Transitive",
         "resolved": "2.1.12",
-        "contentHash": "fRq7MW1ZQf0cVeWU3op8yaQLDhdTQfjSpT3Q7xVvHte8tv7TsLF+n95akPRztyVviOcPwy1Ch8D9NJqn2C8ulg==",
+        "contentHash": "ETpNw9DY3ckWLgRRAeCHj+GKOuPi61aeczkXhgHexUvqoZBAYg8RYESE2J7O1M7+o6QbdSEZwrw9bfqztUVWXg==",
         "dependencies": {
           "System.Memory": "4.5.3"
         }
@@ -41,12 +41,12 @@
       "SQLitePCLRaw.lib.e_sqlite3": {
         "type": "Transitive",
         "resolved": "2.1.12",
-        "contentHash": "Yllqq74GlAJSmpexozSHCsHV6xGBcEZZUlaJ/CmbiDZ5lnhOUimjhvrLMQZ5evTnD2mQccA5mH/HP2vA6kukxg=="
+        "contentHash": "fWi8Dbknuhgg72fWinIdjXVaqO1hHL4YBBwVLnr7e1c9TAZwJ0QE38j9syW1hwx6HaqEVTwI+O07WPdZn8Rp0w=="
       },
       "SQLitePCLRaw.provider.e_sqlite3": {
         "type": "Transitive",
         "resolved": "2.1.12",
-        "contentHash": "FFA0HYfve9GiJ61bZWhnJhDdFzMSDtyP7G1akJq6J6uQ2qPiCOAM1O/aM8YGUTp4RvHNzfgMZ5MdP9eopYfHmw==",
+        "contentHash": "W3oH4XIfCzFrgUSDKHhN6N+dgzA5YHOR2VxX8GB6Qy7CyrJJgxPEG8NirgYWlPQC5P2jz2knSsexWu4tDUL33g==",
         "dependencies": {
           "SQLitePCLRaw.core": "2.1.12"
         }
