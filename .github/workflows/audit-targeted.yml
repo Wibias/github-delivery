@@ -1,0 +1,41 @@
+name: Audit Targeted
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  authority-tests:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: verdict-publication
+            file: tests/unit/verdict-publication.test.mjs
+          - name: verdict-provenance
+            file: tests/unit/verdict-provenance.test.mjs
+          - name: mutation-policy
+            file: tests/unit/mutation-policy.test.mjs
+          - name: authority-grant
+            file: tests/unit/authority-grant.test.mjs
+          - name: mutation-docs
+            file: tests/unit/mutation-modes-docs.test.mjs
+          - name: mutation-broker
+            file: tests/unit/github-mutation-broker.test.mjs
+          - name: merge-driver
+            file: tests/unit/merge-pr-driver.test.mjs
+          - name: action-registry
+            file: tests/unit/mutation-action-registry.test.mjs
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: node --test ${{ matrix.file }}
