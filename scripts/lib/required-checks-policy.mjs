@@ -276,14 +276,20 @@ export function evaluateRequiredChecks({
   const live = latestLiveChecks({ checkRuns, statuses });
   const configured = descriptors.map((descriptor) => {
     const sameContext = live.filter((row) => row.context === descriptor.context);
-    const matches = sameContext.filter((row) => {
-      if (descriptor.appId === null) return true;
-      return row.type === "check_run" && row.appId === descriptor.appId;
-    });
+    const appMatches = sameContext.filter(
+      (row) => row.type === "check_run" && row.appId === descriptor.appId,
+    );
+    const statusMatches = sameContext.filter((row) => row.type === "status_context");
     const sourceIdentityUnverifiable =
       descriptor.appId !== null &&
-      matches.length === 0 &&
-      sameContext.some((row) => row.type === "status_context");
+      appMatches.length === 0 &&
+      statusMatches.length > 0;
+    const matches =
+      descriptor.appId === null
+        ? sameContext
+        : appMatches.length > 0
+          ? [...appMatches, ...statusMatches]
+          : appMatches;
     return {
       ...descriptor,
       gate: sourceIdentityUnverifiable ? "unknown" : combinedGate(matches),
