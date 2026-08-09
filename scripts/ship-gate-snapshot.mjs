@@ -13,6 +13,7 @@ import {
   verifySnapshotBoundary,
 } from "./lib/snapshot-capture-payload.mjs";
 import { collectPaginated } from "./lib/github-pagination.mjs";
+import { selectAuthoritativeCheckEvidence } from "./lib/required-checks-policy.mjs";
 import { createSnapshotEnvelope } from "./lib/snapshot-schema.mjs";
 
 function parseArgs(argv) {
@@ -81,6 +82,22 @@ function restCollection(path, label, unwrap = (payload) => payload) {
       ]);
     },
   });
+}
+
+function emptyCollection() {
+  return { readable: true, complete: true, pages: 0, rows: [], error: null };
+}
+
+function selectedCollection(rows, selected, label) {
+  return {
+    readable: selected.complete === true,
+    complete: selected.complete === true,
+    pages: null,
+    rows: rows || [],
+    error: selected.complete
+      ? null
+      : `${label} authoritative evidence incomplete: ${selected.incompleteReasons.join(", ")}`,
+  };
 }
 
 function reviewThreads(owner, name, pr) {
@@ -420,6 +437,12 @@ function fetchBranchOid(owner, name, base) {
   return oid;
 }
 
+function fetchTestMergeOid(owner, name, pr) {
+  const payload = ghJson(["api", `repos/${owner}/${name}/pulls/${pr}`]);
+  const oid = String(payload?.merge_commit_sha || "").trim().toLowerCase();
+  return oid || null;
+}
+
 function scanTargetWorkflows(owner, name, base, mergeQueueEnabled) {
   const listing = ghOk([
     "api",
@@ -582,6 +605,7 @@ try {
   const base = prEvidence.baseRefName;
   const headOid = prEvidence.headRefOid;
   const baseOid = fetchBranchOid(owner, name, base);
+  const testMergeOid = fetchTestMergeOid(owner, name, pr);
 
   const changedFiles = restCollection(
     `repos/${owner}/${name}/pulls/${pr}/files`,
@@ -591,13 +615,47 @@ try {
     `repos/${owner}/${name}/rules/branches/${encodeURIComponent(base)}`,
     "active rules",
   );
-  const checkRuns = restCollection(
+  const headCheckRuns = restCollection(
     `repos/${owner}/${name}/commits/${headOid}/check-runs`,
-    "check runs",
+    "head check runs",
     (payload) => payload?.check_runs,
   );
-  const statuses = restCollection(
+  const headStatuses = restCollection(
     `repos/${owner}/${name}/commits/${headOid}/statuses`,
+    "head commit statuses",
+  );
+  const testMergeCheckRuns = testMergeOid
+    ? restCollection(
+        `repos/${owner}/${name}/commits/${testMergeOid}/check-runs`,
+        "test merge check runs",
+        (payload) => payload?.check_runs,
+      )
+    : emptyCollection();
+  const testMergeStatuses = testMergeOid
+    ? restCollection(
+        `repos/${owner}/${name}/commits/${testMergeOid}/statuses`,
+        "test merge commit statuses",
+      )
+    : emptyCollection();
+  const selectedChecks = selectAuthoritativeCheckEvidence({
+    headOid,
+    testMergeOid,
+    headCheckRuns: headCheckRuns.rows,
+    headStatuses: headStatuses.rows,
+    testMergeCheckRuns: testMergeCheckRuns.rows,
+    testMergeStatuses: testMergeStatuses.rows,
+    headEvidenceComplete: headCheckRuns.complete && headStatuses.complete,
+    testMergeEvidenceComplete:
+      testMergeCheckRuns.complete && testMergeStatuses.complete,
+  });
+  const checkRuns = selectedCollection(
+    selectedChecks.checkRuns,
+    selectedChecks,
+    "check runs",
+  );
+  const statuses = selectedCollection(
+    selectedChecks.statuses,
+    selectedChecks,
     "commit statuses",
   );
   const issueComments = restCollection(
@@ -629,6 +687,7 @@ try {
     "final active rules",
   );
   const finalBaseOid = fetchBranchOid(owner, name, base);
+  const finalTestMergeOid = fetchTestMergeOid(owner, name, pr);
   const finalPrEvidence = ghJson([
     "pr",
     "view",
@@ -643,6 +702,8 @@ try {
     finalBaseOid,
     initialRules: activeRules,
     finalRules: finalActiveRules,
+    initialTestMergeOid: testMergeOid,
+    finalTestMergeOid,
   });
 
   const capture = assembleSnapshotCapture({
@@ -661,6 +722,28 @@ try {
     workflowCoverage,
     viewer,
     boundary,
+    checkEvidence: {
+      authoritative: {
+        sha: selectedChecks.sha,
+        reason: selectedChecks.reason,
+        complete: selectedChecks.complete,
+        incompleteReasons: selectedChecks.incompleteReasons,
+      },
+      head: {
+        sha: headOid,
+        complete: headCheckRuns.complete && headStatuses.complete,
+        checkRuns: headCheckRuns.rows,
+        statuses: headStatuses.rows,
+      },
+      testMerge: testMergeOid
+        ? {
+            sha: testMergeOid,
+            complete: testMergeCheckRuns.complete && testMergeStatuses.complete,
+            checkRuns: testMergeCheckRuns.rows,
+            statuses: testMergeStatuses.rows,
+          }
+        : null,
+    },
   });
 
   const snapshot = createSnapshotEnvelope({
