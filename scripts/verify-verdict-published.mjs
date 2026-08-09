@@ -1,21 +1,22 @@
 #!/usr/bin/env node
 /**
- * Verify one full-review run's verdict is actually published on the PR.
- * Exit 0 requires both a published verdict and a format-valid verdict body:
+ * Verify one full-review run's verdict is actually published on the PR by the
+ * authenticated publisher.
+ * Exit 0 requires both a trusted published verdict and a format-valid body:
  * strict `## [GD] Verdict: <label>` heading, `### TLDR` with the required
  * bullets, and the full verdict inside a `<details>` dropdown.
  *
- * Same-head anti-noise (PR #1066): when this run did not post because a
- * completed same-head verdict already covers the draft with no material
- * delta, pass `--allow-same-head-reuse` and optionally `--body-file` with the
- * draft body. Exit 0 then reports `reused: true` against the existing
- * completed same-head comment.
+ * Same-head anti-noise: when this run did not post because a completed
+ * same-head verdict already covers the draft with no material delta, pass
+ * `--allow-same-head-reuse` and optionally `--body-file` with the draft body.
+ * Only verdicts owned by the authenticated publisher are eligible for reuse.
  *
- * Usage:
- *   node scripts/verify-verdict-published.mjs OWNER/REPO PR_NUMBER \
- *     --run-id fr-... --head SHA [--comments-file FILE] [--mutation-mode MODE] \
- *     [--allow-same-head-reuse] [--body-file FILE]
+ * `--publisher-login` is an offline-fixture trust override and is accepted only
+ * with `--comments-file`. Legacy fixture calls without it remain non-authoritative
+ * and infer the expected publisher from the first fixture comment. Live
+ * verification always resolves the authenticated actor from `gh api user`.
  */
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
 import {
@@ -30,13 +31,14 @@ import {
 } from "./lib/verdict-publication.mjs";
 
 const usage =
-  "Usage: node scripts/verify-verdict-published.mjs OWNER/REPO PR_NUMBER --run-id ID --head SHA [--comments-file FILE] [--mutation-mode MODE] [--allow-same-head-reuse] [--body-file FILE]";
+  "Usage: node scripts/verify-verdict-published.mjs OWNER/REPO PR_NUMBER --run-id ID --head SHA [--comments-file FILE [--publisher-login LOGIN]] [--mutation-mode MODE] [--allow-same-head-reuse] [--body-file FILE]";
 
 function parseArgs(argv) {
   const positionals = [];
   let runId = null;
   let head = null;
   let commentsFile = null;
+  let publisherLogin = null;
   let bodyFile = null;
   let allowSameHeadReuse = false;
   for (let index = 0; index < argv.length; index += 1) {
@@ -50,6 +52,9 @@ function parseArgs(argv) {
     } else if (value === "--comments-file") {
       commentsFile = argv[++index];
       if (!commentsFile) throw new Error("--comments-file requires a path");
+    } else if (value === "--publisher-login") {
+      publisherLogin = argv[++index];
+      if (!publisherLogin) throw new Error("--publisher-login requires a login");
     } else if (value === "--body-file") {
       bodyFile = argv[++index];
       if (!bodyFile) throw new Error("--body-file requires a path");
@@ -72,7 +77,45 @@ function parseArgs(argv) {
     throw new Error(usage);
   }
   if (!runId || !head) throw new Error(usage);
-  return { repo, pr, runId, head, commentsFile, bodyFile, allowSameHeadReuse };
+  if (publisherLogin && !commentsFile) {
+    throw new Error("--publisher-login is allowed only with --comments-file");
+  }
+  return {
+    repo,
+    pr,
+    runId,
+    head,
+    commentsFile,
+    publisherLogin,
+    bodyFile,
+    allowSameHeadReuse,
+  };
+}
+
+function fetchAuthenticatedPublisher() {
+  const result = spawnSync("gh", ["api", "user", "--jq", ".login"], {
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024,
+  });
+  if (result.status !== 0) {
+    const detail = String(result.stderr || result.stdout || "").trim();
+    throw new Error(detail || "authenticated_publisher_unavailable");
+  }
+  const login = String(result.stdout || "").trim();
+  if (!login) throw new Error("authenticated_publisher_missing");
+  return login;
+}
+
+function commentsByPublisher(comments, publisherLogin) {
+  return (comments || []).filter(
+    (comment) => String(comment?.user?.login || "") === publisherLogin,
+  );
+}
+
+function inferOfflinePublisher(comments) {
+  const login = String(comments?.find((comment) => comment?.user?.login)?.user?.login || "").trim();
+  if (!login) throw new Error("offline_publisher_missing");
+  return login;
 }
 
 try {
@@ -82,8 +125,15 @@ try {
   const comments = args.commentsFile
     ? JSON.parse(readFileSync(args.commentsFile, "utf8"))
     : fetchPrConversationComments({ repo: args.repo, pr: args.pr });
+  if (!Array.isArray(comments)) throw new Error("comments_payload_invalid");
+  const expectedPublisher = args.commentsFile
+    ? args.publisherLogin || inferOfflinePublisher(comments)
+    : fetchAuthenticatedPublisher();
+  const trustedComments = commentsByPublisher(comments, expectedPublisher);
+  const ignoredUntrustedComments = comments.length - trustedComments.length;
+
   let verdict = findVerdictPublication({
-    comments,
+    comments: trustedComments,
     runId: args.runId,
     head: args.head,
   });
@@ -95,7 +145,7 @@ try {
       : null;
     if (draftBody) {
       reusePlan = planVerdictPublication({
-        comments,
+        comments: trustedComments,
         runId: args.runId,
         head: args.head,
         body: draftBody,
@@ -113,7 +163,7 @@ try {
     ? validateVerdictFormat({ body: verdict.body })
     : null;
   const output = {
-    schemaVersion: 3,
+    schemaVersion: 4,
     kind: "github-delivery/verdict-publication-check",
     published: Boolean(verdict),
     reused,
@@ -126,6 +176,8 @@ try {
     verdictCommentId: verdict?.id ?? null,
     url: verdict?.html_url ?? null,
     author: verdict?.user?.login ?? null,
+    expectedPublisher,
+    ignoredUntrustedComments,
     reusedFromRunId: reusePlan?.reusedFromRunId ?? null,
     planAction: reusePlan?.action ?? null,
     reason: verdict
