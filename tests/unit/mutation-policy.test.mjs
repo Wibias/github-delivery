@@ -5,6 +5,7 @@ import {
   idempotencyMarker,
   planMutationRequest,
 } from "../../scripts/lib/github-mutation-broker.mjs";
+import { mutationRequiresTrustedAuthority } from "../../scripts/lib/mutation-execution-context.mjs";
 import {
   authorizeMutation,
   extractMutationModeArgs,
@@ -23,6 +24,45 @@ test("review can publish reviews and resolve bot threads but not human threads",
   assert.equal(profile.actions.post_review.allowed, true);
   assert.equal(profile.actions.resolve_thread.allowed, false);
   assert.equal(profile.actions.resolve_bot_thread.allowed, true);
+  assert.equal(profile.actions.reply_human_thread.allowed, false);
+});
+
+test("maintainer human replies still require exact-text confirmation", () => {
+  const denied = authorizeMutation({
+    mode: "maintainer",
+    action: "reply_human_thread",
+  });
+  const allowed = authorizeMutation({
+    mode: "maintainer",
+    action: "reply_human_thread",
+    exactTextConfirmed: true,
+  });
+  assert.equal(denied.reason, "exact_text_confirmation_required");
+  assert.equal(allowed.allowed, true);
+});
+
+test("full-review verdict comments require trusted authority while ordinary review comments do not", () => {
+  const base = {
+    action: "post_comment",
+    mutationMode: "review",
+    repo: "acme/widgets",
+    pr: 32,
+    expectedHead: "abcdef1234567890",
+  };
+  assert.equal(
+    mutationRequiresTrustedAuthority({ ...base, body: "ordinary review note" }),
+    false,
+  );
+  assert.equal(
+    mutationRequiresTrustedAuthority({
+      ...base,
+      body: [
+        "## [GD] Verdict: approve-comment",
+        "<!-- github-delivery:full-review-verdict run:fr-32 head:abcdef1234567890 -->",
+      ].join("\n"),
+    }),
+    true,
+  );
 });
 
 test("maintainer mutations require explicit instruction", () => {
