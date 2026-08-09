@@ -24,6 +24,7 @@ const WRITE_GROUP_VERBS = {
 
 const GH_COMMAND_RE = /["']gh["']\s*,\s*(?:\[\s*)?["']([a-z-]+)["']\s*,\s*["']([a-z-]+)["']/g;
 const GH_API_RE = /["']gh["']\s*,\s*(?:\[\s*)?["']api["'][\s\S]{0,1800}/g;
+const GH_GRAPHQL_INVOCATION_RE = /["']gh["']\s*,\s*(?:\[\s*)?["']api["']\s*,\s*["']graphql["']/i;
 const MUTATING_METHOD_RE = /(?:["']--method["']\s*,\s*["'](?:POST|PATCH|PUT|DELETE)["']|["']-X["']\s*,\s*["'](?:POST|PATCH|PUT|DELETE)["']|["']--method=(?:POST|PATCH|PUT|DELETE)["'])/i;
 const GRAPHQL_MUTATION_RE = /\bmutation\s*(?:\([^)]*\))?\s*\{/i;
 const GIT_PUSH_RE = /["']git["']\s*,\s*(?:\[\s*)?["']push["']/g;
@@ -53,6 +54,10 @@ function productionScripts(root) {
 
 function error(path, code, message) {
   return { path, code, message };
+}
+
+function hasError(errors, code) {
+  return errors.some((item) => item.code === code);
 }
 
 export function validateMutationBoundarySource(path, source) {
@@ -96,6 +101,20 @@ export function validateMutationBoundarySource(path, source) {
         ),
       );
     }
+  }
+
+  if (
+    !hasError(errors, "direct_graphql_mutation") &&
+    GH_GRAPHQL_INVOCATION_RE.test(source) &&
+    GRAPHQL_MUTATION_RE.test(source)
+  ) {
+    errors.push(
+      error(
+        path,
+        "direct_graphql_mutation",
+        "GitHub GraphQL mutations must route through the mutation broker.",
+      ),
+    );
   }
 
   GIT_PUSH_RE.lastIndex = 0;
