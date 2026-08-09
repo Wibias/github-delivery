@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 function collectionSource(collection, required = true) {
   return {
     required,
@@ -10,6 +12,32 @@ function collectionSource(collection, required = true) {
 
 function isExplicitNotFound(error) {
   return /(?:HTTP\s+404|\b404\b|Not Found)/i.test(String(error || ""));
+}
+
+function canonicalJson(value) {
+  if (value === null || typeof value === "string" || typeof value === "boolean") {
+    return JSON.stringify(value);
+  }
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) throw new Error("snapshot_boundary_number_invalid");
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => canonicalJson(item)).join(",")}]`;
+  }
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value)
+      .filter(([, item]) => item !== undefined)
+      .sort(([a], [b]) => a.localeCompare(b));
+    return `{${entries
+      .map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`)
+      .join(",")}}`;
+  }
+  throw new Error("snapshot_boundary_value_invalid");
+}
+
+export function snapshotBoundaryFingerprint(value) {
+  return createHash("sha256").update(canonicalJson(value), "utf8").digest("hex");
 }
 
 export function classifyBranchProtectionResponse(response = {}) {
@@ -50,7 +78,16 @@ export function classifyBranchProtectionResponse(response = {}) {
   };
 }
 
-export function verifySnapshotBoundary(initialPr = {}, finalPr = {}) {
+export function verifySnapshotBoundary(
+  initialPr = {},
+  finalPr = {},
+  {
+    initialBaseOid = null,
+    finalBaseOid = null,
+    initialRules = null,
+    finalRules = null,
+  } = {},
+) {
   const initialHead = String(initialPr.headRefOid || "").toLowerCase();
   const finalHead = String(finalPr.headRefOid || "").toLowerCase();
   if (!initialHead || !finalHead || initialHead !== finalHead) {
@@ -65,7 +102,45 @@ export function verifySnapshotBoundary(initialPr = {}, finalPr = {}) {
       `snapshot_base_moved: expected ${initialBase || "missing"}, observed ${finalBase || "missing"}`,
     );
   }
-  return { headOid: initialHead, baseRefName: initialBase };
+
+  for (const field of ["reviewDecision", "mergeStateStatus", "mergeable", "isDraft", "updatedAt"]) {
+    const before = initialPr[field];
+    const after = finalPr[field];
+    if (before !== undefined && after !== undefined && before !== after) {
+      throw new Error(`snapshot_pr_state_moved:${field}`);
+    }
+  }
+
+  let baseOid = null;
+  if (initialBaseOid !== null || finalBaseOid !== null) {
+    const before = String(initialBaseOid || "").toLowerCase();
+    const after = String(finalBaseOid || "").toLowerCase();
+    if (!before || !after) throw new Error("snapshot_base_oid_missing");
+    if (before !== after) {
+      throw new Error(`snapshot_base_oid_moved: expected ${before}, observed ${after}`);
+    }
+    baseOid = before;
+  }
+
+  let rulesFingerprint = null;
+  if (initialRules !== null || finalRules !== null) {
+    if (initialRules?.complete !== true || finalRules?.complete !== true) {
+      throw new Error("snapshot_rules_boundary_incomplete");
+    }
+    const before = snapshotBoundaryFingerprint(initialRules.rows || []);
+    const after = snapshotBoundaryFingerprint(finalRules.rows || []);
+    if (before !== after) {
+      throw new Error(`snapshot_rules_moved: expected ${before}, observed ${after}`);
+    }
+    rulesFingerprint = before;
+  }
+
+  return {
+    headOid: initialHead,
+    baseRefName: initialBase,
+    ...(baseOid ? { baseOid } : {}),
+    ...(rulesFingerprint ? { rulesFingerprint } : {}),
+  };
 }
 
 export function assembleSnapshotCapture({
@@ -83,6 +158,7 @@ export function assembleSnapshotCapture({
   policy,
   workflowCoverage,
   viewer,
+  boundary = null,
 } = {}) {
   const sources = {
     pr: { required: true, readable: true, complete: true, error: null },
@@ -136,6 +212,7 @@ export function assembleSnapshotCapture({
     sources,
     evidence: {
       pullRequest: prEvidence,
+      captureBoundary: boundary,
       changedFiles: changedFiles?.rows || [],
       branchProtection: branchProtection?.payload ?? null,
       activeRules: activeRules?.rows || [],
