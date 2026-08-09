@@ -162,3 +162,89 @@ test("merge transaction posts thanks only after an actual merged outcome", () =>
   assert.deepEqual(calls, ["merge_pr", "post_comment"]);
   assert.deepEqual(receipts.map((item) => item.name), ["merge", "post_merge_thanks"]);
 });
+
+test("retry after crash between merge and thanks completes the missing social effect once", () => {
+  let merged = false;
+  let crashOnce = true;
+  let thankEffects = 0;
+  const executeRequest = (request) => {
+    if (request.action === "merge_pr") {
+      if (merged) {
+        return { action: "merge_pr", status: "already_applied", outcome: "already_merged" };
+      }
+      merged = true;
+      return { action: "merge_pr", status: "succeeded", outcome: "merged" };
+    }
+    if (crashOnce) {
+      crashOnce = false;
+      throw new Error("process_crash_before_thanks");
+    }
+    thankEffects += 1;
+    return { action: "post_comment", status: "succeeded" };
+  };
+
+  assert.throws(
+    () =>
+      executeMergeTransaction({
+        mergeRequest: { action: "merge_pr" },
+        thankRequest: { action: "post_comment" },
+        executeRequest,
+      }),
+    /process_crash_before_thanks/,
+  );
+  assert.equal(merged, true);
+  assert.equal(thankEffects, 0);
+
+  const retry = executeMergeTransaction({
+    mergeRequest: { action: "merge_pr" },
+    thankRequest: { action: "post_comment" },
+    executeRequest,
+  });
+  assert.equal(thankEffects, 1);
+  assert.deepEqual(retry.map((item) => item.name), ["merge", "post_merge_thanks"]);
+});
+
+test("retry after remote thanks write but lost receipt does not duplicate the social effect", () => {
+  let merged = false;
+  let remoteThankExists = false;
+  let crashAfterRemoteWrite = true;
+  let thankEffects = 0;
+  const executeRequest = (request) => {
+    if (request.action === "merge_pr") {
+      if (merged) {
+        return { action: "merge_pr", status: "already_applied", outcome: "already_merged" };
+      }
+      merged = true;
+      return { action: "merge_pr", status: "succeeded", outcome: "merged" };
+    }
+    if (remoteThankExists) {
+      return { action: "post_comment", status: "already_applied" };
+    }
+    remoteThankExists = true;
+    thankEffects += 1;
+    if (crashAfterRemoteWrite) {
+      crashAfterRemoteWrite = false;
+      throw new Error("process_crash_after_remote_thanks");
+    }
+    return { action: "post_comment", status: "succeeded" };
+  };
+
+  assert.throws(
+    () =>
+      executeMergeTransaction({
+        mergeRequest: { action: "merge_pr" },
+        thankRequest: { action: "post_comment" },
+        executeRequest,
+      }),
+    /process_crash_after_remote_thanks/,
+  );
+  assert.equal(thankEffects, 1);
+
+  const retry = executeMergeTransaction({
+    mergeRequest: { action: "merge_pr" },
+    thankRequest: { action: "post_comment" },
+    executeRequest,
+  });
+  assert.equal(thankEffects, 1);
+  assert.equal(retry[1].receipt.status, "already_applied");
+});
