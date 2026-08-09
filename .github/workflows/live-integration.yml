@@ -2,15 +2,6 @@ name: Live Integration
 
 on:
   workflow_dispatch:
-    inputs:
-      disposition:
-        description: Final fixture PR action
-        required: true
-        default: close
-        type: choice
-        options:
-          - close
-          - merge
   schedule:
     - cron: "23 4 * * 2"
 
@@ -61,13 +52,12 @@ jobs:
         timeout-minutes: 20
         env:
           GH_TOKEN: ${{ secrets.LIVE_FIXTURE_TOKEN }}
-          DISPOSITION: ${{ inputs.disposition || 'close' }}
         run: >-
           node scripts/live-github-fixture.mjs
           "${GITHUB_REPOSITORY}"
           --run-id "gha-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           --base "main"
-          --disposition "${DISPOSITION}"
+          --disposition close
           --receipt live-fixture-receipt.json
 
       - name: Clean up fixture resources
@@ -75,13 +65,12 @@ jobs:
         timeout-minutes: 5
         env:
           GH_TOKEN: ${{ secrets.LIVE_FIXTURE_TOKEN }}
-          DISPOSITION: ${{ inputs.disposition || 'close' }}
         run: >-
           node scripts/cleanup-live-github-fixture.mjs
           "${GITHUB_REPOSITORY}"
           --run-id "gha-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           --base "main"
-          --disposition "${DISPOSITION}"
+          --disposition close
           --receipt live-fixture-receipt.json
           --cleanup-report live-fixture-cleanup.json
 
