@@ -7,11 +7,20 @@ const CAPABILITIES = [
   "branchProtectionGraphql",
 ];
 
+function positiveInteger(value, code) {
+  const number = Number(value);
+  if (!Number.isSafeInteger(number) || number <= 0) {
+    throw new Error(`${code}_invalid`);
+  }
+  return number;
+}
+
 export function parseCredentialArgs(argv, env = process.env) {
   const positionals = [];
   let base = "main";
   let sourceRepo = env.GITHUB_REPOSITORY || null;
   let fixtureRepoId = env.LIVE_FIXTURE_REPOSITORY_ID || null;
+  let installationId = env.LIVE_FIXTURE_INSTALLATION_ID || null;
 
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];
@@ -31,6 +40,11 @@ export function parseCredentialArgs(argv, env = process.env) {
       if (!fixtureRepoId || fixtureRepoId.startsWith("--")) {
         throw new Error("--fixture-repo-id requires an integer repository id");
       }
+    } else if (value === "--installation-id") {
+      installationId = argv[++index];
+      if (!installationId || installationId.startsWith("--")) {
+        throw new Error("--installation-id requires an integer installation id");
+      }
     } else if (value.startsWith("--")) {
       throw new Error(`Unknown option: ${value}`);
     } else {
@@ -39,15 +53,18 @@ export function parseCredentialArgs(argv, env = process.env) {
   }
 
   const numericFixtureRepoId = Number(fixtureRepoId);
+  const numericInstallationId = Number(installationId);
   if (
     positionals.length !== 1 ||
     !positionals[0]?.includes("/") ||
     !sourceRepo?.includes("/") ||
     !Number.isSafeInteger(numericFixtureRepoId) ||
-    numericFixtureRepoId <= 0
+    numericFixtureRepoId <= 0 ||
+    !Number.isSafeInteger(numericInstallationId) ||
+    numericInstallationId <= 0
   ) {
     throw new Error(
-      "Usage: node scripts/verify-live-fixture-token.mjs OWNER/REPO --source-repo OWNER/REPO --fixture-repo-id ID [--base BRANCH]",
+      "Usage: node scripts/verify-live-fixture-token.mjs OWNER/REPO --source-repo OWNER/REPO --fixture-repo-id ID --installation-id ID [--base BRANCH]",
     );
   }
 
@@ -56,10 +73,52 @@ export function parseCredentialArgs(argv, env = process.env) {
     base,
     sourceRepo,
     fixtureRepoId: numericFixtureRepoId,
+    installationId: numericInstallationId,
   };
 }
 
-export function buildCredentialReport({ repo, base, login, probes = {} } = {}) {
+export function evaluateInstallationRepositoryScope({
+  installationId,
+  fixtureRepoId,
+  payload,
+} = {}) {
+  installationId = positiveInteger(installationId, "installation_id");
+  fixtureRepoId = positiveInteger(fixtureRepoId, "fixture_repo_id");
+  const totalCount = Number(payload?.total_count);
+  const repositories = Array.isArray(payload?.repositories)
+    ? payload.repositories
+    : [];
+  const repositoryIds = repositories
+    .map((repository) => Number(repository?.id))
+    .filter((id) => Number.isSafeInteger(id) && id > 0);
+  const repositoryNames = repositories
+    .map((repository) => String(repository?.full_name || ""))
+    .filter(Boolean);
+  const valid =
+    Number.isSafeInteger(totalCount) &&
+    totalCount === 1 &&
+    repositories.length === 1 &&
+    repositoryIds.length === 1 &&
+    repositoryIds[0] === fixtureRepoId;
+  return {
+    valid,
+    installationId,
+    totalCount: Number.isSafeInteger(totalCount) ? totalCount : null,
+    repositoryIds,
+    repositoryNames,
+    reason: valid
+      ? null
+      : `fixture_installation_scope_invalid: expected only repository ${fixtureRepoId}`,
+  };
+}
+
+export function buildCredentialReport({
+  repo,
+  base,
+  login,
+  probes = {},
+  repositoryScope = null,
+} = {}) {
   const failures = [];
   const capabilities = {};
 
@@ -75,14 +134,34 @@ export function buildCredentialReport({ repo, base, login, probes = {} } = {}) {
     }
   }
 
+  const scopeValid = repositoryScope?.valid === true;
+  if (!scopeValid) {
+    failures.push({
+      capability: "repositoryScope",
+      error: String(
+        repositoryScope?.reason ||
+          "fixture_installation_scope_unverified",
+      ),
+    });
+  }
+
   return {
     schemaVersion: 1,
     kind: "github-delivery/live-fixture-credential-report",
     repo,
     base,
     login: login || null,
+    installationId: repositoryScope?.installationId || null,
     valid: Boolean(login) && failures.length === 0,
     capabilities,
+    repositoryScope: repositoryScope
+      ? {
+          valid: scopeValid,
+          totalCount: repositoryScope.totalCount,
+          repositoryIds: repositoryScope.repositoryIds || [],
+          repositoryNames: repositoryScope.repositoryNames || [],
+        }
+      : { valid: false, totalCount: null, repositoryIds: [], repositoryNames: [] },
     failures,
   };
 }
