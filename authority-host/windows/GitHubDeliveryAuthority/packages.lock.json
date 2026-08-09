@@ -21,33 +21,34 @@
         }
       },
       "SQLitePCLRaw.bundle_e_sqlite3": {
-        "type": "Transitive",
-        "resolved": "2.1.6",
-        "contentHash": "BmAf6XWt4TqtowmiWe4/5rRot6GerAeklmOPfviOvwLoF5WwgxcJHAxZtySuyW9r9w+HLILnm8VfJFLCUJYW8A==",
+        "type": "Direct",
+        "requested": "[2.1.12, )",
+        "resolved": "2.1.12",
+        "contentHash": "YIS75gd/Q4tPOduT245SB41hxHyQIoa2JMKaejr4FZeG6WRV6x8T5mFe9CtgSog4Spdfk2ECRLvGFQbfTxmPvQ==",
         "dependencies": {
-          "SQLitePCLRaw.lib.e_sqlite3": "2.1.6",
-          "SQLitePCLRaw.provider.e_sqlite3": "2.1.6"
+          "SQLitePCLRaw.lib.e_sqlite3": "2.1.12",
+          "SQLitePCLRaw.provider.e_sqlite3": "2.1.12"
         }
       },
       "SQLitePCLRaw.core": {
         "type": "Transitive",
-        "resolved": "2.1.6",
-        "contentHash": "wO6v9GeMx9CUngAet8hbO7xdm+M42p1XeJq47ogyRoYSvNSp0NGLI+MgC0bhrMk9C17MTVFlLiN6ylyExLCc5w==",
+        "resolved": "2.1.12",
+        "contentHash": "fRq7MW1ZQf0cVeWU3op8yaQLDhdTQfjSpT3Q7xVvHte8tv7TsLF+n95akPRztyVviOcPwy1Ch8D9NJqn2C8ulg==",
         "dependencies": {
           "System.Memory": "4.5.3"
         }
       },
       "SQLitePCLRaw.lib.e_sqlite3": {
         "type": "Transitive",
-        "resolved": "2.1.6",
-        "contentHash": "2ObJJLkIUIxRpOUlZNGuD4rICpBnrBR5anjyfUFQep4hMOIeqW+XGQYzrNmHSVz5xSWZ3klSbh7sFR6UyDj68Q=="
+        "resolved": "2.1.12",
+        "contentHash": "Yllqq74GlAJSmpexozSHCsHV6xGBcEZZUlaJ/CmbiDZ5lnhOUimjhvrLMQZ5evTnD2mQccA5mH/HP2vA6kukxg=="
       },
       "SQLitePCLRaw.provider.e_sqlite3": {
         "type": "Transitive",
-        "resolved": "2.1.6",
-        "contentHash": "PQ2Oq3yepLY4P7ll145P3xtx2bX8xF4PzaKPRpw9jZlKvfe4LE/saAV82inND9usn1XRpmxXk7Lal3MTI+6CNg==",
+        "resolved": "2.1.12",
+        "contentHash": "FFA0HYfve9GiJ61bZWhnJhDdFzMSDtyP7G1akJq6J6uQ2qPiCOAM1O/aM8YGUTp4RvHNzfgMZ5MdP9eopYfHmw==",
         "dependencies": {
-          "SQLitePCLRaw.core": "2.1.6"
+          "SQLitePCLRaw.core": "2.1.12"
         }
       },
       "System.Memory": {
