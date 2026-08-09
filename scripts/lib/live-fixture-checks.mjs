@@ -1,10 +1,10 @@
 export const DEFAULT_EXPECTED_CHECKS = Object.freeze([
-  { workflow: "CI", name: "Node 20 / ubuntu-latest" },
-  { workflow: "CI", name: "Node 20 / windows-latest" },
-  { workflow: "CI", name: "Node 20 / macos-latest" },
   { workflow: "CI", name: "Node 22 / ubuntu-latest" },
   { workflow: "CI", name: "Node 22 / windows-latest" },
   { workflow: "CI", name: "Node 22 / macos-latest" },
+  { workflow: "CI", name: "Node 24 / ubuntu-latest" },
+  { workflow: "CI", name: "Node 24 / windows-latest" },
+  { workflow: "CI", name: "Node 24 / macos-latest" },
   { workflow: "Dependency Review" },
   { workflow: "CodeQL" },
 ]);
