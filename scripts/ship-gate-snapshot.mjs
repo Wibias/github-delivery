@@ -405,6 +405,21 @@ function fetchBranchProtection(owner, name, base) {
   );
 }
 
+function fetchBranchOid(owner, name, base) {
+  const response = ghOk([
+    "api",
+    `repos/${owner}/${name}/branches/${encodeURIComponent(base)}`,
+    "--jq",
+    ".commit.sha",
+  ]);
+  if (!response.ok) {
+    throw new Error(response.error || `base branch ${base} could not be read`);
+  }
+  const oid = response.body.trim().toLowerCase();
+  if (!oid) throw new Error(`base branch ${base} returned an empty commit SHA`);
+  return oid;
+}
+
 function scanTargetWorkflows(owner, name, base, mergeQueueEnabled) {
   const listing = ghOk([
     "api",
@@ -556,7 +571,7 @@ try {
     "--repo",
     repo,
     "--json",
-    "number,title,state,isDraft,url,baseRefName,headRefOid,mergeStateStatus,mergeable,reviewDecision,commits,author",
+    "number,title,state,isDraft,url,updatedAt,baseRefName,headRefOid,mergeStateStatus,mergeable,reviewDecision,commits,author",
   ]);
   const reviewRequests = restCollection(
     `repos/${owner}/${name}/pulls/${pr}/requested_reviewers`,
@@ -566,6 +581,7 @@ try {
   prEvidence.reviewRequests = reviewRequests.rows || [];
   const base = prEvidence.baseRefName;
   const headOid = prEvidence.headRefOid;
+  const baseOid = fetchBranchOid(owner, name, base);
 
   const changedFiles = restCollection(
     `repos/${owner}/${name}/pulls/${pr}/files`,
@@ -608,6 +624,11 @@ try {
   );
   const viewer = fetchViewer();
 
+  const finalActiveRules = restCollection(
+    `repos/${owner}/${name}/rules/branches/${encodeURIComponent(base)}`,
+    "final active rules",
+  );
+  const finalBaseOid = fetchBranchOid(owner, name, base);
   const finalPrEvidence = ghJson([
     "pr",
     "view",
@@ -615,9 +636,14 @@ try {
     "--repo",
     repo,
     "--json",
-    "baseRefName,headRefOid",
+    "baseRefName,headRefOid,reviewDecision,mergeStateStatus,mergeable,isDraft,updatedAt",
   ]);
-  verifySnapshotBoundary(prEvidence, finalPrEvidence);
+  const boundary = verifySnapshotBoundary(prEvidence, finalPrEvidence, {
+    initialBaseOid: baseOid,
+    finalBaseOid,
+    initialRules: activeRules,
+    finalRules: finalActiveRules,
+  });
 
   const capture = assembleSnapshotCapture({
     prEvidence,
@@ -634,6 +660,7 @@ try {
     policy,
     workflowCoverage,
     viewer,
+    boundary,
   });
 
   const snapshot = createSnapshotEnvelope({
