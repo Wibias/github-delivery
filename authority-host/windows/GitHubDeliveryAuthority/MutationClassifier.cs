@@ -6,6 +6,7 @@ internal static class MutationClassifier
 {
     private static readonly HashSet<string> DestructiveActions = new(StringComparer.Ordinal)
     {
+        "push_code",
         "resolve_thread",
         "change_draft_state",
         "request_reviewers",
