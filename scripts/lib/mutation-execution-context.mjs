@@ -30,14 +30,32 @@ export function mutationAuthorityOptions({
   };
 }
 
+export function assertScopedTrustedAuthority(
+  authority,
+  { requireTrustedAuthority = false } = {},
+) {
+  if (
+    requireTrustedAuthority &&
+    authority?.verified === true &&
+    !authority?.claims?.scopeSha256
+  ) {
+    throw new Error("trusted_authority_required:scope_hash_missing");
+  }
+  return authority;
+}
+
+function planWithAuthorityOptions(request, options) {
+  const planned = planMutationRequest(request, options);
+  assertScopedTrustedAuthority(planned.authority, options);
+  return planned;
+}
+
 export function planMutationWithAuthority(
   request,
   { env = process.env, readFile = readFileSync } = {},
 ) {
-  return planMutationRequest(
-    request,
-    mutationAuthorityOptions({ env, readFile }),
-  );
+  const options = mutationAuthorityOptions({ env, readFile });
+  return planWithAuthorityOptions(request, options);
 }
 
 export function executeMutationWithAuthority({
@@ -49,7 +67,7 @@ export function executeMutationWithAuthority({
   redeemer = undefined,
 } = {}) {
   const options = mutationAuthorityOptions({ env, readFile });
-  const planned = planMutationRequest(request, options);
+  const planned = planWithAuthorityOptions(request, options);
   const pipeName = env.GITHUB_DELIVERY_AUTHORITY_PIPE || undefined;
   const resolvedRedeemer =
     redeemer === undefined
