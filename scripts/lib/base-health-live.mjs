@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { collectPaginated } from "./github-pagination.mjs";
+import { snapshotIntegritySha256 } from "./snapshot-schema.mjs";
 
 function defaultRunGh(args) {
   const result = spawnSync("gh", args, {
@@ -54,6 +55,20 @@ export function enrichSnapshotWithBaseHealth(
     }
   }
 
+  const expectedBaseOid = String(
+    snapshot?.evidence?.captureBoundary?.baseOid || "",
+  ).toLowerCase();
+  const observedBaseOid = String(baseOid || "").toLowerCase();
+  if (
+    expectedBaseOid &&
+    observedBaseOid &&
+    expectedBaseOid !== observedBaseOid
+  ) {
+    throw new Error(
+      `base_health_boundary_mismatch: expected ${expectedBaseOid}, observed ${observedBaseOid}`,
+    );
+  }
+
   const unavailable = (label) => ({
     readable: false,
     complete: false,
@@ -77,7 +92,7 @@ export function enrichSnapshotWithBaseHealth(
       })
     : unavailable("base commit statuses");
 
-  return {
+  const enriched = {
     ...snapshot,
     sources: {
       ...(snapshot?.sources || {}),
@@ -113,5 +128,11 @@ export function enrichSnapshotWithBaseHealth(
         },
       },
     },
+  };
+  const integritySha256 = snapshotIntegritySha256(enriched);
+  return {
+    ...enriched,
+    snapshotId: integritySha256,
+    integritySha256,
   };
 }
