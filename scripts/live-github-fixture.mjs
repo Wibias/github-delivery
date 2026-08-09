@@ -1,11 +1,13 @@
 #!/usr/bin/env node
+import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { spawnSync } from "node:child_process";
+import { runGitHubCommandWithRetry } from "./lib/github-retry.mjs";
 import { waitForExpectedChecks } from "./lib/live-fixture-checks.mjs";
 import { parseFixtureGateResult } from "./lib/live-fixture-gate-result.mjs";
 import { waitForObservedHead } from "./lib/live-fixture-head.mjs";
+import { verifyFixtureTargetIdentity } from "./lib/live-fixture-identity.mjs";
 import { buildFixturePlan, runFixtureScenario } from "./lib/live-github-fixture.mjs";
 import {
   allowSameRepositoryFixture,
@@ -18,6 +20,7 @@ function parseArgs(argv) {
   const args = {
     repo: null,
     sourceRepo: null,
+    fixtureRepoId: null,
     runId: null,
     baseBranch: "main",
     disposition: "close",
@@ -28,6 +31,7 @@ function parseArgs(argv) {
     const value = argv[i];
     if (value === "--run-id") args.runId = argv[++i];
     else if (value === "--source-repo") args.sourceRepo = argv[++i];
+    else if (value === "--fixture-repo-id") args.fixtureRepoId = argv[++i];
     else if (value === "--base") args.baseBranch = argv[++i];
     else if (value === "--disposition") args.disposition = argv[++i];
     else if (value === "--receipt") args.receipt = argv[++i];
@@ -36,22 +40,31 @@ function parseArgs(argv) {
   }
   args.repo = positionals[0];
   args.sourceRepo ||= process.env.GITHUB_REPOSITORY || null;
+  args.fixtureRepoId ||= process.env.LIVE_FIXTURE_REPOSITORY_ID || null;
   args.runId ||= process.env.GITHUB_RUN_ID
     ? `gha-${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT || "1"}`
     : null;
-  if (!args.repo || !args.runId) {
+  if (!args.repo || !args.runId || !Number.isSafeInteger(Number(args.fixtureRepoId)) || Number(args.fixtureRepoId) <= 0) {
     throw new Error(
-      "Usage: node scripts/live-github-fixture.mjs FIXTURE_OWNER/FIXTURE_REPO --run-id ID [--source-repo OWNER/REPO] [--base BRANCH] [--disposition close] [--receipt FILE]",
+      "Usage: node scripts/live-github-fixture.mjs FIXTURE_OWNER/FIXTURE_REPO --fixture-repo-id ID --run-id ID [--source-repo OWNER/REPO] [--base BRANCH] [--disposition close] [--receipt FILE]",
     );
   }
+  args.fixtureRepoId = Number(args.fixtureRepoId);
   if (args.disposition !== "close") {
     throw new Error("--disposition supports only close; merge requires a real trusted authority grant");
   }
   return args;
 }
 
+function execute(command, args, options = {}) {
+  if (command === "gh") {
+    return runGitHubCommandWithRetry(command, args, { options });
+  }
+  return spawnSync(command, args, options);
+}
+
 function run(command, args, { allowFailure = false } = {}) {
-  const result = spawnSync(command, args, {
+  const result = execute(command, args, {
     encoding: "utf8",
     maxBuffer: 50 * 1024 * 1024,
   });
@@ -384,6 +397,13 @@ try {
     sourceRepo,
     fixtureRepo: parsedArgs.repo,
     allowSameRepository: allowSameRepositoryFixture(process.env),
+  });
+  verifyFixtureTargetIdentity({
+    sourceRepo: isolation.sourceRepo,
+    fixtureRepo: isolation.fixtureRepo,
+    expectedFixtureRepoId: parsedArgs.fixtureRepoId,
+    baseBranch: parsedArgs.baseBranch,
+    runner: execute,
   });
   const plan = buildFixturePlan({
     ...parsedArgs,

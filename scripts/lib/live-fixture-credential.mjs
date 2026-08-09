@@ -7,11 +7,13 @@ const CAPABILITIES = [
   "branchProtectionGraphql",
 ];
 
-export function parseCredentialArgs(argv) {
+export function parseCredentialArgs(argv, env = process.env) {
   const positionals = [];
   let base = "main";
+  let sourceRepo = env.GITHUB_REPOSITORY || null;
+  let fixtureRepoId = env.LIVE_FIXTURE_REPOSITORY_ID || null;
 
-  for (let index = 0; index < argv.length; index++) {
+  for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];
     if (value === "--base") {
       const next = argv[++index];
@@ -19,6 +21,16 @@ export function parseCredentialArgs(argv) {
         throw new Error("--base requires a branch name");
       }
       base = next;
+    } else if (value === "--source-repo") {
+      sourceRepo = argv[++index];
+      if (!sourceRepo || sourceRepo.startsWith("--")) {
+        throw new Error("--source-repo requires OWNER/REPO");
+      }
+    } else if (value === "--fixture-repo-id") {
+      fixtureRepoId = argv[++index];
+      if (!fixtureRepoId || fixtureRepoId.startsWith("--")) {
+        throw new Error("--fixture-repo-id requires an integer repository id");
+      }
     } else if (value.startsWith("--")) {
       throw new Error(`Unknown option: ${value}`);
     } else {
@@ -26,13 +38,25 @@ export function parseCredentialArgs(argv) {
     }
   }
 
-  if (positionals.length !== 1 || !positionals[0]?.includes("/")) {
+  const numericFixtureRepoId = Number(fixtureRepoId);
+  if (
+    positionals.length !== 1 ||
+    !positionals[0]?.includes("/") ||
+    !sourceRepo?.includes("/") ||
+    !Number.isSafeInteger(numericFixtureRepoId) ||
+    numericFixtureRepoId <= 0
+  ) {
     throw new Error(
-      "Usage: node scripts/verify-live-fixture-token.mjs OWNER/REPO [--base BRANCH]",
+      "Usage: node scripts/verify-live-fixture-token.mjs OWNER/REPO --source-repo OWNER/REPO --fixture-repo-id ID [--base BRANCH]",
     );
   }
 
-  return { repo: positionals[0], base };
+  return {
+    repo: positionals[0],
+    base,
+    sourceRepo,
+    fixtureRepoId: numericFixtureRepoId,
+  };
 }
 
 export function buildCredentialReport({ repo, base, login, probes = {} } = {}) {
