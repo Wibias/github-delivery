@@ -1,192 +1,414 @@
+<div align="center">
+
 # github-delivery
 
-A GitHub shipping skill for agents. You speak naturally; the agent loads the skill, selects the workflow, runs the evidence and policy scripts internally, and performs only the GitHub writes authorized by that request.
+**A GitHub shipping skill for agents — from product intake to a verified merge.**
+
+Speak naturally. `github-delivery` routes the request, gathers live evidence, runs the relevant review and policy gates, performs only the GitHub writes that request authorizes, and verifies the final state.
+
+[![CI](https://github.com/Wibias/github-delivery/actions/workflows/ci.yml/badge.svg)](https://github.com/Wibias/github-delivery/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/Wibias/github-delivery/actions/workflows/codeql.yml/badge.svg)](https://github.com/Wibias/github-delivery/actions/workflows/codeql.yml)
+![Node.js 22 or 24](https://img.shields.io/badge/Node.js-22%20%7C%2024-339933?logo=node.js&logoColor=white)
+![License MIT](https://img.shields.io/badge/license-MIT-blue.svg)
+
+</div>
+
+> [!IMPORTANT]
+> **Natural language is the public API.** You do not need to invoke the Node scripts yourself. The scripts, policy modules, authority layer, evaluators, and mutation broker are internal safety and evidence machinery.
+
+## At a glance
+
+| | |
+|---|---|
+| **Scope** | PRDs and issue intake → research → implementation → PR review/fix/watch → stacks → merge and linked-issue close-out |
+| **Default mode** | `read-only` |
+| **Write boundary** | Typed mutation policy + broker; stale-head and idempotency checks where applicable |
+| **High-assurance writes** | Exact-scope trusted grants; optional Windows Hello authority host |
+| **Review model** | Bug + Security + Spec + Standards + proactive contract verification |
+| **Ship decision** | One authoritative `ready`, `blocked`, or `unknown` result from live evidence |
+| **Runtime** | Node.js **22 or 24** |
+| **Required CI matrix** | Node 22/24 × Ubuntu/Windows/macOS, with architecture contracts inside every required matrix job |
+| **Live lifecycle tests** | Dedicated, explicitly opted-in fixture repository bound by immutable repository identity |
+
+## Speak naturally
 
 ```text
 create a PRD for the onboarding flow
 break the roadmap into implementation issues
 triage the open issues in this repo
 run QA intake on the payment bug report
-plan a refactor of the storage layer
-merge PR #32
+research issue #90 on the latest development branch
+create a PR for issue #90
+
 what is left on PR #41?
+is PR #42 safe to merge?
+full review PR #42
 fix the review comments on PR #18 and make it merge ready
 watch PR #77 until it merges or needs me
-research issue #90 on the latest development branch
-full review PR #42
 simplify PR #42 without changing behavior
 full review PR #42 and simplify it safely
-supersede PR #12 with PR #45 (close the obsolete PR)
-the author is unresponsive — maintainer overtake PR #32 and finish it
-```
-
-You do **not** need to invoke Node scripts yourself. They are the skill’s internal safety and evidence machinery.
-
-## How natural-language routing works
-
-1. The agent host discovers `SKILL.md` from its frontmatter.
-2. The request is routed to one focused workflow under `references/`.
-3. The workflow runs runtime capability discovery and the authoritative ship gate.
-4. Read-only helpers explain blockers when needed.
-5. Every visible GitHub write passes through the mutation broker.
-6. Optional simplification runs only when explicitly requested and approved.
-7. The agent verifies the resulting repository state and reports it.
-
-Example:
-
-```text
+review PR #42, fix it, and merge it when green
 merge PR #32
+
+inspect this PR stack and tell me the safe merge order
+supersede PR #12 with PR #45
+maintainer overtake PR #32 and finish it
 ```
 
-routes to `references/merge-pr.md`, runs `scripts/ship-gate.mjs`, prepares guarded mutation requests, posts the pre-merge explanation, performs a head-pinned merge, handles linked issue comments and closure, and verifies cleanup.
+A question such as `is PR #42 safe to merge?` stays **read-only**. A destructive merge route is selected only from an actual merge instruction such as `merge PR #42` or `review PR #42 and merge it when green`.
 
-A combined request such as:
+---
+
+## What it can own
+
+| Area | Requests | Workflow |
+|---|---|---|
+| **Product / issue intake** | PRDs, breakdowns, triage, QA intake, refactor plans | `references/issue-workflows.md` |
+| **Agent-ready work** | Create/update a `ready-for-agent` contract | `references/agent-brief.md` |
+| **Rejected scope** | Record, match, reconsider, or remove an out-of-scope decision | `references/out-of-scope.md` |
+| **Issue research** | Research an issue on the latest development tip | `references/research-issue.md` |
+| **Create a linked PR** | Bounded research → implementation → pre-open review → PR | `references/create-pr-for-issue.md` |
+| **Make a PR merge-ready** | Fix humans/bots, own bug/security/spec work, validate | `references/fix-pr-bots.md` |
+| **Watch a PR** | Poll CI/reviews/gates until merged, closed, or blocked | `references/watch-pr.md` |
+| **Re-review** | Re-evaluate after new commits, humans, CodeRabbit/Codex, or other review evidence | `references/re-review-pr.md` |
+| **Full review** | Deep Bug + Security + Spec + Standards review and final verdict | `references/full-review-pr.md` |
+| **Bug review** | Evidence-ranked adversarial bug hunt | `references/bug-review.md` + `references/bug-hunt-method.md` |
+| **Security review** | Security surfaces, escalation chains, exploit-safe reporting | `references/security-review.md` |
+| **Spec / standards** | Contract, requirement, standards, docs and non-goal review | `references/spec-standards-review.md` |
+| **Safe simplification** | Behavior-preserving cleanup with approval and mandatory re-review | `references/simplify-pr.md` |
+| **Status** | What is left / why blocked / merge readiness | `references/status.md` |
+| **Prepare + merge** | Compound review/fix/simplify request that explicitly includes merge | `references/prepare-and-merge-pr.md` |
+| **Merge** | Final gate, pre-merge explanation, head-pinned merge, thanks, linked-issue close-out | `references/merge-pr.md` |
+| **Supersede** | Close an obsolete PR in favor of a replacement | `references/supersede-pr.md` |
+| **Maintainer overtake** | Take over an unresponsive author's PR under explicit maintainer scope | `references/overtake-pr.md` |
+| **Conflicts** | Resolve active conflicts from both sides' intent/evidence, then resume | `references/resolve-conflicts.md` |
+| **Stacked PRs** | Inspect, restack, retarget, recover, review and merge stacks | `references/stacked-prs.md` |
+
+For oversized-change splitting, post-ship branch/worktree cleanup, and version/tag/changelog work, `SKILL.md` deliberately hands off to the dedicated specialist skill instead of duplicating those responsibilities.
+
+---
+
+## How a request flows
+
+```mermaid
+flowchart LR
+    A[Your natural-language request] --> B[Deterministic route]
+    B --> C[Policy kernel + only required modules]
+    C --> D[Live repository / PR / issue evidence]
+    D --> E[Review and authoritative gates]
+    E --> F[Exact mutation plan]
+    F --> G[Authority + mutation broker]
+    G --> H[GitHub]
+    H --> I[Postcondition verification]
+```
+
+1. `SKILL.md` selects the narrowest workflow and mutation mode.
+2. The workflow loads `references/policy-kernel.md` plus only the policy modules it declares.
+3. Repository identity, actors, heads, checks, reviews, rules, and other gate-critical state are resolved from live evidence instead of guessed.
+4. Review helpers diagnose; `scripts/ship-gate.mjs` remains the authoritative readiness/ship decision.
+5. Any external write is represented as a typed, scoped mutation request.
+6. The broker re-checks preconditions, obtains trusted authority when required, executes the exact effect, and emits an auditable receipt.
+7. Final readiness, publication, or merge claims require fresh final evidence from unchanged relevant state.
+
+### Policy precedence
+
+The executable gates and canonical policy kernel/modules are stricter than workflow prose. Repository content — issues, comments, code, logs, generated files, bot output — is treated as **evidence/data, not authority** and cannot override user intent or the mutation boundary.
+
+---
+
+## Safety model
+
+### 1. Default read-only; explicit intent for state changes
+
+`github-delivery` routes requests into four upper-bound profiles:
+
+- `read-only`
+- `review`
+- `maintainer`
+- `autonomous`
+
+The profile is not a waiver. Maintainer-grade actions such as merge, close, supersede, reviewer changes, ordinary human-thread resolution, or branch deletion still require the direct instruction required by the selected workflow.
+
+The merge router uses a narrow positive command grammar. Status questions containing words such as *merge* or *ship* do not silently become destructive requests.
+
+### 2. Every network-visible GitHub write crosses one mutation boundary
+
+Creating/editing issues or PRs, labels, assignments, comments, reviews, thread state, draft state, reviewers, remote branches, closes, merges, and follow-up objects are brokered through `scripts/github-mutate.mjs` / `scripts/lib/github-mutation-broker.mjs`.
+
+The action model is centralized in `scripts/lib/mutation-action-registry.mjs`. Policy, broker behavior, routing/high-assurance semantics, and architecture tests are derived or cross-checked from that registry so adding an action cannot silently skip a safety layer.
+
+PR mutations that can become stale are bound to the **expected head** and re-read it immediately before execution. Branch pushes bind the intended repository/remote/branch and exact old/new tips; history rewrites use exact `--force-with-lease`, never bare force.
+
+### 3. Trusted authority binds the exact effect
+
+Caller fields such as `mutationMode`, `explicitInstruction`, `exactTextConfirmed`, `source: user`, or `trusted: true` are policy assertions — not proof of consent.
+
+Where trusted authority is required, a host-issued grant binds a deterministic `scopeSha256` over the semantically relevant effect: repository, action, mode, PR/head, merge method, targets, idempotency key, and hashes of human-visible text. Redemption-required grants are short-lived and one-time.
+
+#### Human-thread replies
+
+A human reply can be **planned** so its exact text is visible, but execution requires both:
+
+- exact-text confirmation bound to the outgoing body; and
+- trusted scoped authority.
+
+A caller-computed hash or boolean cannot authorize the reply by itself.
+
+#### Full-review verdict provenance
+
+A format-valid `[GD]` verdict posted by the authenticated GitHub actor is not automatically trusted merge evidence.
+
+Full-review publication is a high-assurance special case: `scripts/github-authorize.mjs` stamps durable hidden authority provenance onto the exact reviewed-head verdict request. `scripts/verify-verdict-published.mjs` verifies both the verdict format and the historical trusted-authority provenance at the comment's creation time. Same-actor lookalike verdicts without a valid scoped grant are rejected as merge-review evidence.
+
+### 4. Idempotent social writes and safe retries
+
+Durable social creates use stable idempotency keys plus remote read-before-write evidence. Autonomous same-key effects use a remote claim so competing workers cannot both publish the same durable effect.
+
+GitHub rate-limit retries are deliberately asymmetric:
+
+- only commands proven **read-only** may retry;
+- `Retry-After` and `X-RateLimit-Reset` are honored when present;
+- fallback backoff is bounded, with **3 attempts by default**;
+- GraphQL `mutation`, GitHub writes, and ambiguous API calls are **never blindly retried** after an unknown result.
+
+### 5. Ownership and foreign-PR boundary
+
+Base updates, scoped code pushes, and simplification edits are performed only when the workflow has the required ownership/write authority. Foreign PRs receive exact owner instructions unless the user explicitly enters the maintainer-overtake workflow.
+
+---
+
+## Review depth: more than "the checks are green"
+
+A merge-ready or full-review path does not outsource judgment to CI or bots.
+
+### Multidimensional review
+
+The review bar combines:
+
+- **Bug** review
+- **Security** review
+- **Spec** review
+- **Standards** review
+- **Proactive contract verification** appropriate to the diff
+- repository-wide **semantic propagation** when an abstraction changes
+
+Review depth is derived from changed paths, patch content, symbols, removed controls, dependencies, workflow permissions, architecture surfaces, and uncertainty — not filenames alone.
+
+### Adversarial bug review
+
+The bug axis uses a built-in **Finder → Challenger → Arbiter** method. Static-analysis leads and tool-free heuristics feed finding cards with explicit evidence and a Gate 0 impact bar. Coverage is reported honestly as `confirmed`, `dismissed`, `manual-review`, or `unreviewed`; partial coverage is never presented as clean.
+
+### Deterministic probes and machine-checkable coverage
+
+Known bug/security classes are named probes in `scripts/lib/probe-registry.mjs`.
+
+- Diff shape deterministically produces `requiredProbes`.
+- Offline scope fixtures pin the exact expected probe set.
+- Retained regression assertions are bound to documentation anchors.
+- Each required probe must emit `{ probeId, status, files?, reason? }` evidence.
+- `scripts/verify-probe-coverage.mjs` must accept that evidence before the axis can be considered complete.
+
+Dropping a trigger, probe tag, assertion anchor, or required application record is a CI failure rather than silent review drift.
+
+### Proactive contract verification
+
+Depending on the diff, the review actively checks contracts such as wiring, operator smoke behavior, test honesty, docs/non-goals, input shape, evidence semantics, scale/determinism, malformed-input handling, serialization budgets, recursive termination, and CLI/API payload completeness.
+
+Passing bots are necessary evidence when required, but are never sufficient proof by themselves.
+
+### Security-specific behavior
+
+Security review applies Gate 0 before a Confirmed finding and checks escalation chains before severity is assigned. Public output is redacted when exploit detail would be unsafe.
+
+Credential-bearing OAuth/token/key adapters receive an explicit transport check: destinations must be HTTPS; a shared validator that still permits an adapter to attach credentials to `http://` is not accepted.
+
+### Bot full-review signals
+
+When a bot announces a **full review** rather than an incremental update, the skill runs its own Bug + Security + Spec review on the current head before treating prior `[GD] Fixed` replies as sufficient.
+
+### Full-review completion is locked to publication
+
+A full review is not complete merely because analysis stopped. Its execution plan retains a mandatory **Publish final verdict** item until the required verdict is actually published and verified. A blocker changes the verdict; it does not remove the publication requirement. Only explicit user cancellation can terminate that required publication flow.
+
+Same-head reruns use a material-delta anti-noise rule: when the strict label/TLDR result has not materially changed, an already valid verdict may be reused instead of posting duplicate top-level noise.
+
+---
+
+## Merge readiness and GitHub semantics
+
+The ship path deliberately models the platform details that commonly cause "green but not actually safe" mistakes.
+
+- Required checks belong to the exact current PR generation; old SHA results, partial matrices, queued checks, and incomplete evidence do not count.
+- Check evidence preserves the expected workflow/app/integration identity; same-name Check Run / Commit Status collisions cannot impersonate an app-bound required check.
+- GitHub's authoritative check target is used where the platform evaluates a test-merge/merge-queue generation instead of naively trusting a convenient head result.
+- GitHub review decision, stale approvals, last-push approval requirements, unresolved review threads, conflicts, behind state, and merge-queue state are evaluated.
+- `gh pr merge`/API success is not automatically reported as an immediate merge: queued/auto-merge and actual merged outcomes remain distinct.
+- Unknown future GitHub enum/state values fail closed instead of being treated as success.
+- Dependency Review degradation fails closed across real dependency surfaces, including nested/non-Node dependency graphs such as NuGet.
+
+### Base-health isolation
+
+When a required check is red, the `baseHealth` component classifies the evidence as:
+
+- `fix_in_pr` — introduced by the PR;
+- `separate_follow_up` — reproduced on the base tip; or
+- `investigate` — origin is unknown.
+
+An unknown origin is a hard evidence stop. A base failure may still block shipping, but does not silently expand the implementation scope of the PR.
+
+### Adaptive settle before a positive final claim
+
+Once the authoritative gate first becomes ready, the workflow visibly settles on unchanged heads:
+
+- **60 seconds** by default;
+- **180 seconds** after a push, rebase, restack, force-with-lease, approval/thread change, or newly discovered workflow;
+- authoritative gate re-check every **20 seconds**;
+- no single blocking sleep longer than **30 seconds**.
+
+Material change resets the settle window, and one final authoritative gate closes the decision.
+
+---
+
+## Create-PR flow: bounded research, then forward progress
+
+Creating a PR follows this lifecycle:
 
 ```text
-full review PR #42 and simplify it safely
+bounded need-to-fix research
+        ↓
+implementation
+        ↓
+pre-open Bug + Security gate on the non-empty candidate diff
+        ↓
+publish linked PR
+        ↓
+normal merge-ready lifecycle
 ```
 
-routes through `references/full-review-pr.md`. The normal bug, security, standards, feedback, base-health, and CI review completes first. Worthwhile simplification candidates are then presented for explicit approval. Approved changes are validated, pushed, and followed automatically by a complete full review on the new head before the final verdict.
+The pre-open gate is **post-implementation and pre-publication**. It cannot become a research loop that prevents the first implementation commit. Completed issue research is reused when the relevant issue/development state has not changed.
 
-## Core guarantees
+`scripts/pre-open-gate.mjs` blocks incomplete/empty candidate diffs and prevents publication while required review evidence is incomplete or Confirmed High/Critical findings remain unresolved.
 
-- One evidence snapshot per decision.
-- One authoritative `ready`, `blocked`, or `unknown` result.
-- Required checks preserve app/integration identity and fail closed on incomplete evidence.
-- Base-health comparison distinguishes PR-only failures from failures already reproduced on the base tip.
-- Current review policy, stale approvals, last-push approval, merge queue state, and unresolved review threads are evaluated.
-- Trusted feedback requires feedback-specific resolution records.
-- CODEOWNERS mapping is advisory; GitHub’s enforced review decision remains authoritative.
-- Natural-language requests select the narrowest mutation mode: `read-only`, `review`, `maintainer`, or `autonomous`.
-- Human replies always require exact-text confirmation.
-- Base updates (push to latest dev) and simplification edits happen only on PRs authored by the authenticated user; foreign PRs receive the owner instructions in the verdict/status instead.
-- PR mutations re-check the expected head immediately before execution.
-- Merge operations are pinned with `--match-head-commit`.
-- Social writes require idempotency keys and produce versioned receipts.
-- Stacked PR topology is discovered from GitHub PR bases and managed inside the skill through `references/stacked-prs.md`; stacks restack bottom-up and merge bottom-up with revalidation after every parent lands. Restack work enables `rerere` (conflict memory), resolves the push remote via `remote.pushDefault` (never hardcodes `origin`), and gates review/readiness/merge on a parent-ancestor `needsRebase` preflight; changes are edited only on the layer that owns the path, and a merge-queue base may enqueue the contiguous lower stack all-or-nothing.
-- Issue lifecycle workflows cover PRDs, issue breakdown, triage, QA intake, refactor plans, `ready-for-agent` briefs, and persistent out-of-scope records.
-- Merge-ready and full-review claims require an adaptive visible-polling settle on unchanged heads: 60 seconds by default, 180 seconds after a push, rebase, restack, force-with-lease, or review/thread change, with the authoritative gate re-polled every 20 seconds.
-- Waiting on required CI or a rerun is **polling, never a single long blocking sleep**: re-check the run every ~1 minute and act the moment it finishes, fails, or restarts; a blocking `sleep`/`Start-Sleep` longer than 30 seconds is forbidden.
-- Active Git conflicts while updating or shipping a PR are resolved through `references/resolve-conflicts.md` from the intent and evidence of both sides, never from markers alone.
-- Review depth is derived from changed paths, patches, symbols, removed controls, dependencies, workflow permissions, and uncertainty rather than filenames alone.
-- Full-review execution plans end with a mandatory `Publish final verdict` item and cannot terminate while that item or any required prerequisite remains `pending` or `in_progress`.
-- Optional reviewers such as Cursor Bugbot cannot suppress the final verdict; unavailable reviewer evidence is recorded and the complementary review continues.
-- The bug axis runs a built-in adversarial **Finder → Challenger → Arbiter** trio (`references/bug-hunt-method.md`) with static-analysis leads (typecheck/lint/Semgrep/CodeQL when installed plus tool-free complexity/churn/marker heuristics), finding-card evidence, a Gate 0 impact bar, and honest coverage buckets (`confirmed` / `dismissed` / `manual-review` / `unreviewed`) — partial coverage is reported, never disguised as clean.
-- Security review applies Gate 0 before any Confirmed finding and checks A→B→C escalation chains before assigning severity.
-- OAuth / token / key provider reviews enforce **HTTPS-only destinations for credential-bearing adapters**: a shared `http(s)` baseUrl validator is not enough when an adapter attaches OAuth/API-key `Authorization` headers to a configured `http://` URL (CWE-319) — the validator and every sibling adapter building requests from `provider.baseUrl` are checked.
-- Bot full-review signals are acted on immediately: when a bot (e.g. `@coderabbit review`) announces a **full review** instead of an incremental one, the own bug + security + spec re-review on the current head runs first instead of settling on `[GD] Fixed` replies for a stale head.
-- Every retained regression assertion is **bound to a probe anchor** in the skill docs: `validate-evals.mjs` requires each `regression-cases.jsonl` assertion id to have a matching `<!-- assertion: … -->` marker inside one of the case's expected resources. Deleting or renaming a Must-probe rule in `references/` now fails the offline evals (assertion drift is a CI break, not a silent gap).
-- Probe routing is **deterministic and CI-verified**: each bug class is a named probe (`<!-- probe: … -->` in `bug-review.md` / `security-review.md`) whose trigger regexes live in `scripts/lib/probe-registry.mjs`; `planReviewScope` emits `requiredProbes` from the diff shape, and `tests/evals/scope-cases.jsonl` pins the exact probe set each CodeRabbit/Codex diff-shape class must route to. A trigger that stops firing, a probe whose tag is dropped, or a regression assertion moved off its probe's doc all fail the offline evals.
-- Review axes must emit **machine-checkable probe-application evidence**: before the bug or security axis is complete, the agent records `{ probeId, status, files?, reason? }` for every `requiredProbes[]` id and `scripts/verify-probe-coverage.mjs` must exit `0`. `clean`/`findings`/`n-a` statuses are enforced (n-a requires a concrete reason; findings requires reviewed files that are probe trigger files), so "we ran the probes" is verifiable, not asserted.
-- Creating a PR follows a bounded **research → implementation → pre-open review** sequence. `scripts/pre-open-gate.mjs` reviews the non-empty candidate implementation diff before publication: the PR is not opened until required bug lenses and security surfaces are reviewed and Confirmed High/Critical findings are fixed, and never opened from an incomplete diff.
+---
 
-- Full review traces every changed domain concept from its authoritative source through all producers, consumers, public or derived representations, materially distinct variants, and positive and negative tests.
-- Family-wide behavior cannot be approved from one representative test unless equivalence is proved; canonical and derived representations must be reconciled for every material behavior partition.
-- Simplification is explicit-only, requires explicit approval before mutation, and always preserves behavior and safety boundaries.
-- Line count is never a simplification success metric; **nothing worth simplifying** is a valid result.
-- Every changed simplification head receives focused validation, required repository gates, and a complete full review with simplification disabled.
-- Live lifecycle fixtures exercise GitHub issues, branches, PRs, checks, snapshots, delayed head propagation, stale-head rejection, and cleanup against the real platform.
+## Stacked PRs
 
-## Internal architecture
+Stack topology is discovered from live GitHub PR bases and qualified by repository/ref identity, so forks with identical branch names are not collapsed into one stack node.
 
-| Surface                            | Role                                                                     |
-| ---------------------------------- | ------------------------------------------------------------------------ |
-| `SKILL.md`                         | Host discovery, natural-language routing, hard policy                    |
-| `references/*.md`                  | Focused workflows and review standards                                   |
-| `scripts/ship-gate-snapshot.mjs`   | Capture one paginated evidence snapshot                                  |
-| `scripts/ship-gate.mjs`            | Produce one authoritative ship decision                                  |
-| `scripts/github-mutate.mjs`        | Dry-run and execute authorized GitHub writes                             |
-| `scripts/runtime-capabilities.mjs` | Discover host/tool capabilities and safe fallbacks                       |
-| `scripts/inspect-stack.mjs`        | Discover the PR stack graph and report the safe restack/merge order      |
-| `scripts/validate-evals.mjs`       | Execute offline routing + safety contracts; verify regression-assertion → probe-anchor binding and diff-shape → probe routing |
-| `scripts/verify-probe-coverage.mjs` | Verify the review emitted accepted probe-application evidence for every required probe |
-| `scripts/live-github-fixture.mjs`  | Exercise the real GitHub lifecycle with namespaced temporary resources   |
-| `scripts/review-scope.mjs`         | Produce one evidence-ranked bug and security review plan                 |
-| `scripts/pre-open-gate.mjs`        | Gate PR publication on bug + security scope for the implemented branch diff |
-| `scripts/build-dist.mjs`           | Build deterministic versioned skill bundles                              |
-| `scripts/prepare-release.mjs`      | Verify release identity, checksums, SBOM, notes, and provenance subjects |
+The stack workflow:
 
-## Mutation safety
+- restacks **bottom-up**;
+- merges **bottom-up**;
+- enables `git rerere` to reuse conflict resolutions across cascading restacks;
+- resolves the push remote through `remote.pushDefault` instead of hardcoding `origin`;
+- refuses to guess in ambiguous multi-remote repositories;
+- checks that each parent remote tip is an ancestor of its child before review/readiness/merge;
+- edits a change only on the layer that owns that path/concern;
+- revalidates every surviving child after a parent changes or lands;
+- can enqueue a contiguous lower stack all-or-nothing when the base uses a merge queue and every participating PR independently satisfies readiness.
 
-The public interface remains natural language. Internally, a workflow creates a versioned request such as:
+Active conflicts route through `references/resolve-conflicts.md` and are resolved from the intent/evidence of both sides, never from conflict markers alone.
 
-```json
-{
-  "schemaVersion": 1,
-  "action": "merge_pr",
-  "mutationMode": "maintainer",
-  "explicitInstruction": true,
-  "repo": "OWNER/REPO",
-  "pr": 32,
-  "expectedHead": "reviewed-head-sha",
-  "mergeMethod": "merge"
-}
-```
-
-The broker defaults to dry-run. Execution requires `--execute`, re-checks the PR head, and emits an auditable receipt. See `references/github-mutation-broker.md` and `references/mutation-modes.md`.
-
-## Workflows
-
-| Request                                                                   | Workflow                                                     |
-| ------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| Create a PRD from conversation or repository context                      | `references/issue-workflows.md` → PRD Workflow               |
-| Break a PRD, plan, spec, or issue into implementation issues              | `references/issue-workflows.md` → Issue Breakdown            |
-| Triage issue(s), labels, state, readiness, or rejection                   | `references/issue-workflows.md` → Triage Workflow            |
-| Run QA intake or file reproducible bug reports                            | `references/issue-workflows.md` → QA Intake                  |
-| Create a refactor request, RFC, or tiny-commit plan                       | `references/issue-workflows.md` → Refactor Plan              |
-| Write or update a `ready-for-agent` issue contract                        | `references/agent-brief.md`                                  |
-| Record, match, or remove a rejected enhancement decision                  | `references/out-of-scope.md`                                 |
-| Fix comments and make merge-ready                                         | `references/fix-pr-bots.md`                                  |
-| Watch or babysit a PR                                                     | `references/watch-pr.md`                                     |
-| Re-review after commits or reviews                                        | `references/re-review-pr.md`                                 |
-| Research an issue on development tip                                      | `references/research-issue.md`                               |
-| Create a linked PR for an issue (bounded preflight → implement → pre-open gate) | `references/create-pr-for-issue.md`                     |
-| Full bug, security, and standards review                                  | `references/full-review-pr.md`                               |
-| Bug review on a PR or branch (deep adversarial method)                    | `references/bug-review.md` + `references/bug-hunt-method.md` |
-| Credential-transport / OAuth-provider bug review                          | `references/bug-review.md` → probe: credential transport     |
-| Spec and Standards review on a PR                                         | `references/spec-standards-review.md`                        |
-| Simplify, clean up, or deduplicate a PR without behavior changes          | `references/simplify-pr.md`                                  |
-| Full review plus optional approved simplification and mandatory re-review | `references/full-review-pr.md` + `references/simplify-pr.md` |
-| Security review                                                           | `references/security-review.md`                              |
-| Status or merge-readiness                                                 | `references/status.md`                                       |
-| Merge with linked-issue close-out                                         | `references/merge-pr.md`                                     |
-| Supersede an obsolete PR with a replacement PR (close old, link new)      | `references/supersede-pr.md`                                 |
-| Maintainer overtake of an unresponsive author's PR                        | `references/overtake-pr.md`                                  |
-| Resolve an active Git conflict while updating or shipping a PR            | `references/resolve-conflicts.md`, then resume the workflow  |
-| Inspect, restack, retarget, recover, or merge stacked PRs                 | `references/stacked-prs.md`                                  |
+---
 
 ## Safe simplification
 
-The simplify workflow is deliberately conservative. Its goal is lower cognitive load and safer maintenance, not a smaller diff or fewer lines.
+Simplification is **explicit-only**. Its goal is lower cognitive load and safer maintenance, not fewer lines.
 
-It may propose high-confidence changes such as proven dead-code removal, clearer control flow, removal of valueless wrappers, genuine deduplication, or use of an equivalent repository-standard facility. It rejects changes that could alter APIs, errors, ordering, concurrency, side effects, UI, persistence, compatibility, validation, security, authorization, CI, evidence, or fail-closed behavior.
+A candidate must preserve APIs, errors, ordering, concurrency, side effects, persistence, compatibility, validation, authorization, security, CI/evidence boundaries, and other material behavior.
 
-The flow is:
+The flow is conservative:
 
-1. Finish concrete bug, security, standards, feedback, base, and CI work first.
-2. Produce a bounded candidate list with locations, preserved invariants, risk, and validation.
-3. Report **nothing worth simplifying** when no clear improvement exists.
-4. Require explicit approval before any simplification mutation.
-5. Apply only approved candidates and revert failed candidates individually.
-6. Run focused validation and all required repository gates.
-7. Push the new head and automatically run the complete full review again with simplification disabled.
-8. Issue the final verdict only from that post-simplification head.
+1. finish concrete bug/security/spec/feedback/base/CI work;
+2. propose a bounded candidate list with invariants, risk, and validation;
+3. allow **nothing worth simplifying** as a valid result;
+4. require explicit approval before mutation;
+5. apply only approved candidates;
+6. run focused validation and required repository gates;
+7. push the changed head;
+8. automatically run the complete full review again with simplification disabled;
+9. publish the final verdict only from that post-simplification head.
 
-There is no second continuation prompt after approval and no recursive simplification loop.
+There is no recursive simplification loop.
 
-## Security reporting
+---
 
-Do not disclose suspected vulnerabilities in public issues or pull requests. Use GitHub private vulnerability reporting as documented in [`SECURITY.md`](SECURITY.md). The policy defines what to include, acknowledgement and assessment expectations, remediation targets, and coordinated disclosure guidance.
+## Live GitHub lifecycle fixture
+
+The unit/eval suite proves deterministic contracts; **Live Integration** exercises the real GitHub lifecycle against a dedicated fixture repository.
+
+The target is intentionally fail-closed and must be explicitly opted in with all of the following:
+
+- `LIVE_FIXTURE_REPOSITORY` — dedicated `OWNER/REPO` target;
+- `LIVE_FIXTURE_REPOSITORY_ID` — its immutable numeric GitHub repository ID;
+- source and fixture repository IDs must differ;
+- `.github/github-delivery-live-fixture.json` on the fixture base branch, binding the exact source and fixture names **and** numeric IDs;
+- `LIVE_FIXTURE_TOKEN` with the capabilities required by the acceptance workflow.
+
+A writable but unrelated repository therefore fails identity verification **before the first fixture mutation**, even if its repository name was accidentally configured.
+
+The lifecycle exercises issues, branches, PRs, real checks, evidence snapshots, delayed head propagation, stale-head rejection, close/merge behavior, and independent cleanup with versioned evidence artifacts.
+
+Manual dispatch is always available. Scheduled execution remains opt-in through `LIVE_FIXTURE_ENABLED=true`.
+
+See [`docs/live-integration.md`](docs/live-integration.md) and [`docs/live-github-integration.md`](docs/live-github-integration.md).
+
+---
+
+## Internal architecture
+
+| Surface | Responsibility |
+|---|---|
+| `SKILL.md` | Host discovery, deterministic natural-language routing, entrypoint contracts |
+| `references/policy-kernel.md` | Seven canonical cross-workflow core invariants |
+| `references/policy/*.md` | Focused mutation, review, CI, Git, stack and other domain policy modules |
+| `scripts/policy-bundle.mjs` | Deterministic workflow → policy-module resolution and architecture validation |
+| `scripts/ship-gate-snapshot.mjs` | Capture one paginated evidence snapshot |
+| `scripts/ship-gate.mjs` | Produce the authoritative `ready` / `blocked` / `unknown` decision |
+| `scripts/lib/mutation-action-registry.mjs` | Central mutation action semantics and propagation contract |
+| `scripts/github-mutate.mjs` | Dry-run and execute authorized GitHub writes |
+| `scripts/lib/github-mutation-broker.mjs` | Typed executors, stale checks, idempotency and postconditions |
+| `scripts/github-authorize.mjs` | Attach exact-scope trusted authority grants and verdict provenance |
+| `authority-host/windows/` | Optional Windows 11 / Windows Hello local trusted-authority issuer |
+| `scripts/lib/github-retry.mjs` | Bounded retry policy for proven GitHub reads only |
+| `scripts/review-scope.mjs` | Evidence-ranked review scope and required probes |
+| `scripts/lib/probe-registry.mjs` | Deterministic diff-shape → named review-probe routing |
+| `scripts/verify-probe-coverage.mjs` | Machine-check required probe-application evidence |
+| `scripts/pre-open-gate.mjs` | Gate PR publication on the implemented candidate diff |
+| `scripts/inspect-stack.mjs` | Discover repository-qualified stack topology and safe order |
+| `scripts/lib/live-fixture-identity.mjs` | Bind live lifecycle tests to the immutable opted-in fixture target |
+| `scripts/live-github-fixture.mjs` | Exercise the real GitHub lifecycle |
+| `scripts/build-dist.mjs` | Build deterministic versioned skill bundles |
+| `scripts/prepare-release.mjs` | Verify release identity, checksums, SBOM, notes and provenance subjects |
+
+The architecture intentionally uses **progressive disclosure**: a routed workflow loads the policy kernel plus only the modules it declares, instead of dumping every rule into every agent turn. Architecture validation ensures this context reduction does not remove required safety contracts.
+
+---
 
 ## Installation
 
-Build a deterministic bundle with:
+### Requirements
+
+- **Node.js 22 or 24**
+- Git
+- GitHub network access
+- an authenticated GitHub CLI (`gh auth login`) **or** a host-provided brokered GitHub connector
+
+Build a deterministic bundle:
 
 ```bash
 npm run build:dist
 ```
 
-Install through the dry-run-first installer documented in `docs/installation.md`, or place the verified skill directory in a host skill path such as:
+Or verify reproducibility while building release artifacts:
+
+```bash
+npm run dist:check
+```
+
+The installer is dry-run first. Full install, upgrade, backup, restore, downgrade, force, and manual-install behavior is documented in [`INSTALL.md`](INSTALL.md).
+
+Typical skill locations include:
 
 ```text
 ~/.agents/skills/github-delivery
@@ -195,25 +417,61 @@ Install through the dry-run-first installer documented in `docs/installation.md`
 ~/.claude/skills/github-delivery
 ```
 
-Requirements:
+### Optional Windows authority host
 
-- Git
-- GitHub CLI authenticated with `gh auth login`
-- Node.js 20 or newer
-- Optional connected GitHub/Composio tools and host-specific review agents
+`authority-host/windows/` provides a stronger local approval path on Windows 11:
 
-## Development
+- Windows Hello for maintainer/destructive approval;
+- non-exportable ECDSA P-256 signing key via the Microsoft Platform Crypto Provider (TPM-backed when available);
+- repository allowlist;
+- finite exact-scope batches;
+- 60-second grants with one-time redemption;
+- current-user Named Pipe API — no arbitrary signing endpoint and no private key material exposed to the agent.
+
+It is optional and does **not** automatically enable global strict-authority mode. See [`authority-host/windows/README.md`](authority-host/windows/README.md).
+
+---
+
+## Development and repository controls
+
+Run the authoritative local suite:
 
 ```bash
 npm run check
 ```
 
-CI runs the complete suite on Node 20 and 22 across Ubuntu, Windows, and macOS. CodeQL, dependency review, workflow-policy validation, deterministic distribution checks, offline behavioral evaluations, documentation contracts, and focused unit tests are part of the repository controls.
+The required CI matrix runs **Node 22 and 24** on:
 
-Use the **Live Integration** workflow to exercise the real lifecycle. Scheduled execution is opt-in through `LIVE_FIXTURE_ENABLED=true`.
+- Ubuntu
+- Windows
+- macOS
 
-## Current status
+Every required matrix leg runs the normal repository checks **and** the architecture contract tests for mutation-action propagation and review-context integrity. Windows legs additionally restore/build the authority host in locked mode and run its self-test.
 
-The planned implementation roadmap is complete: evidence snapshots, authoritative ship decisions, base-health isolation, feedback resolution, guarded mutations, capability discovery, behavioral evaluations, deterministic packaging, provenance-backed releases, repository security controls, private vulnerability reporting, live GitHub integration fixtures, evidence-based review scoping, the issue lifecycle (PRDs, breakdowns, triage, QA intake, refactor plans, agent briefs, out-of-scope records), internal stacked-PR lifecycle with bottom-up merging and gh-stack-derived operational practices (rerere conflict memory, remote.pushDefault resolution, parent-ancestor needsRebase preflight, layer-ownership editing, merge-queue all-or-nothing lower-stack merge), conflict resolution, adaptive settle verification, spec and standards review, explicit behavior-preserving simplification with mandatory post-change full review, a pre-open bug + security gate for PR creation, HTTPS-only credential-transport enforcement for OAuth/key provider reviews, immediate own-review reaction to bot full-review signals, regression-assertion → probe-anchor binding, deterministic diff-shape → probe routing with scope-case fixtures, and machine-checkable probe-application evidence gated by `verify-probe-coverage.mjs` are implemented.
+Repository controls also include:
 
-Remaining work is operational rather than architectural: maintain the documented live repository rules, keep available GitHub security features enabled, run release acceptance for new versions, and extend the regression corpus as GitHub and agent hosts evolve.
+- CodeQL for JavaScript/TypeScript and C#;
+- Dependency Review;
+- repository/workflow policy validation;
+- deterministic distribution checks;
+- offline routing, regression and review-scope evaluations;
+- documentation/policy contracts;
+- mutation-boundary and architecture regression tests;
+- OpenSSF Scorecard;
+- release checksum/SBOM/provenance verification.
+
+The separate **Architecture Contracts** workflow provides focused feedback, while the safety-critical architecture tests also live inside the required CI matrix so a path-filtered advisory workflow cannot be the only enforcement point.
+
+---
+
+## Security reporting
+
+Do not publish suspected vulnerability details in a public issue or pull request. Use GitHub private vulnerability reporting as documented in [`SECURITY.md`](SECURITY.md).
+
+---
+
+## Current state
+
+The complete issue/PR delivery lifecycle and its safety architecture are implemented: evidence-backed routing and ship gates, brokered lifecycle mutations, trusted authority, deep review, deterministic probes, pre-open review, safe simplification, stacks, conflict recovery, merge-queue semantics, issue close-out, release packaging, repository controls, and dedicated live lifecycle fixtures.
+
+Remaining work is primarily **operational** rather than a missing architecture layer: keep live repository rules/security settings aligned with the documented policy, provision and maintain the dedicated live fixture target/credential, run release acceptance for new versions, and extend the regression corpus as GitHub and agent hosts evolve.
