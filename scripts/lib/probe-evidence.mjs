@@ -10,9 +10,8 @@
 //   - "clean": the probe was applied to every trigger file and nothing was found.
 //   - "findings": at least one concrete finding card; `files` lists the files
 //     reviewed (each must be a probe trigger file unless `files` is empty).
-//   - "n-a": the probe was intentionally not applied; `reason` is required and
-//     must explain why (e.g. "surface unchanged after re-review", "no OAuth
-//     surface in diff").
+//   - "n-a": permitted only when the deterministic scope has no trigger files;
+//     a required probe with trigger files cannot be downgraded by model prose.
 // - A probe is complete only when its evidence passes all checks here.
 //
 // "files" for "clean" is optional (a clean probe may record the files walked).
@@ -52,6 +51,9 @@ export function validateProbeEvidenceRecord(record, { triggerFiles = [], require
   }
   if (status === "n-a" && !isNonEmptyString(reason)) {
     errors.push({ code: "evidence_na_requires_reason", probeId });
+  }
+  if (status === "n-a" && required && triggerFiles.length > 0) {
+    errors.push({ code: "evidence_required_probe_cannot_be_na", probeId, triggerFiles });
   }
   if (status !== "n-a" && isNonEmptyString(reason)) {
     errors.push({ code: "evidence_unexpected_reason", probeId });
