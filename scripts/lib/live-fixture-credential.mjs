@@ -7,11 +7,11 @@ const CAPABILITIES = [
   "branchProtectionGraphql",
 ];
 
-export function parseCredentialArgs(argv) {
+export function parseCredentialArgs(argv, env = process.env) {
   const positionals = [];
   let base = "main";
-  let sourceRepo = process.env.GITHUB_REPOSITORY || null;
-  let fixtureRepoId = process.env.LIVE_FIXTURE_REPOSITORY_ID || null;
+  let sourceRepo = env.GITHUB_REPOSITORY || null;
+  let fixtureRepoId = env.LIVE_FIXTURE_REPOSITORY_ID || null;
 
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];
