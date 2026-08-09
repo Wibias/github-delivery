@@ -1,20 +1,18 @@
 #!/usr/bin/env node
 /**
  * Verify one full-review run's verdict is actually published on the PR by the
- * authenticated publisher.
- * Exit 0 requires both a trusted published verdict and a format-valid body:
- * strict `## [GD] Verdict: <label>` heading, `### TLDR` with the required
- * bullets, and the full verdict inside a `<details>` dropdown.
+ * authenticated publisher and carries durable trusted-authority provenance.
+ * Exit 0 requires a trusted published verdict, a format-valid body, and an
+ * authority grant that was valid for the exact comment scope when published.
  *
  * Same-head anti-noise: when this run did not post because a completed
  * same-head verdict already covers the draft with no material delta, pass
  * `--allow-same-head-reuse` and optionally `--body-file` with the draft body.
  * Only verdicts owned by the authenticated publisher are eligible for reuse.
  *
- * `--publisher-login` is an offline-fixture trust override and is accepted only
- * with `--comments-file`. Legacy fixture calls without it remain non-authoritative
- * and infer the expected publisher from the first fixture comment. Live
- * verification always resolves the authenticated actor from `gh api user`.
+ * `--publisher-login` and `--authority-public-key-file` are offline-fixture
+ * overrides accepted only with `--comments-file`. Live verification resolves
+ * the authenticated actor and configured authority trust material directly.
  */
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -23,6 +21,8 @@ import {
   extractMutationModeArgs,
   normalizeMutationMode,
 } from "./lib/mutation-policy.mjs";
+import { authorityVerifierConfiguration } from "./lib/mutation-execution-context.mjs";
+import { verifyReviewVerdictProvenance } from "./lib/review-verdict-provenance.mjs";
 import {
   fetchPrConversationComments,
   findVerdictPublication,
@@ -31,7 +31,7 @@ import {
 } from "./lib/verdict-publication.mjs";
 
 const usage =
-  "Usage: node scripts/verify-verdict-published.mjs OWNER/REPO PR_NUMBER --run-id ID --head SHA [--comments-file FILE [--publisher-login LOGIN]] [--mutation-mode MODE] [--allow-same-head-reuse] [--body-file FILE]";
+  "Usage: node scripts/verify-verdict-published.mjs OWNER/REPO PR_NUMBER --run-id ID --head SHA [--comments-file FILE [--publisher-login LOGIN] [--authority-public-key-file FILE]] [--mutation-mode MODE] [--allow-same-head-reuse] [--body-file FILE]";
 
 function parseArgs(argv) {
   const positionals = [];
@@ -39,6 +39,7 @@ function parseArgs(argv) {
   let head = null;
   let commentsFile = null;
   let publisherLogin = null;
+  let authorityPublicKeyFile = null;
   let bodyFile = null;
   let allowSameHeadReuse = false;
   for (let index = 0; index < argv.length; index += 1) {
@@ -55,6 +56,9 @@ function parseArgs(argv) {
     } else if (value === "--publisher-login") {
       publisherLogin = argv[++index];
       if (!publisherLogin) throw new Error("--publisher-login requires a login");
+    } else if (value === "--authority-public-key-file") {
+      authorityPublicKeyFile = argv[++index];
+      if (!authorityPublicKeyFile) throw new Error("--authority-public-key-file requires a path");
     } else if (value === "--body-file") {
       bodyFile = argv[++index];
       if (!bodyFile) throw new Error("--body-file requires a path");
@@ -77,8 +81,10 @@ function parseArgs(argv) {
     throw new Error(usage);
   }
   if (!runId || !head) throw new Error(usage);
-  if (publisherLogin && !commentsFile) {
-    throw new Error("--publisher-login is allowed only with --comments-file");
+  if ((publisherLogin || authorityPublicKeyFile) && !commentsFile) {
+    throw new Error(
+      "--publisher-login and --authority-public-key-file are allowed only with --comments-file",
+    );
   }
   return {
     repo,
@@ -87,6 +93,7 @@ function parseArgs(argv) {
     head,
     commentsFile,
     publisherLogin,
+    authorityPublicKeyFile,
     bodyFile,
     allowSameHeadReuse,
   };
@@ -129,6 +136,11 @@ try {
   const expectedPublisher = args.commentsFile
     ? args.publisherLogin || inferOfflinePublisher(comments)
     : fetchAuthenticatedPublisher();
+  const authorityVerifier = args.commentsFile
+    ? args.authorityPublicKeyFile
+      ? readFileSync(args.authorityPublicKeyFile, "utf8")
+      : null
+    : authorityVerifierConfiguration();
   const trustedComments = commentsByPublisher(comments, expectedPublisher);
   const ignoredUntrustedComments = comments.length - trustedComments.length;
 
@@ -162,12 +174,26 @@ try {
   const format = verdict
     ? validateVerdictFormat({ body: verdict.body })
     : null;
+  const provenance = verdict && authorityVerifier
+    ? verifyReviewVerdictProvenance({
+        comment: verdict,
+        repo: args.repo,
+        pr: args.pr,
+        head: args.head,
+        publicKey: authorityVerifier,
+      })
+    : verdict
+      ? { valid: false, reason: "review_authority_verifier_missing" }
+      : null;
+  const complete = Boolean(verdict) && format?.valid === true && provenance?.valid === true;
   const output = {
-    schemaVersion: 4,
+    schemaVersion: 5,
     kind: "github-delivery/verdict-publication-check",
     published: Boolean(verdict),
+    trusted: provenance?.valid === true,
     reused,
     format,
+    provenance,
     repo: args.repo,
     pr: args.pr,
     runId: args.runId,
@@ -180,16 +206,18 @@ try {
     ignoredUntrustedComments,
     reusedFromRunId: reusePlan?.reusedFromRunId ?? null,
     planAction: reusePlan?.action ?? null,
-    reason: verdict
-      ? format?.valid
-        ? reused
-          ? "reused_same_head_verdict"
-          : null
-        : "verdict_format_invalid"
-      : "verdict_not_published",
+    reason: !verdict
+      ? "verdict_not_published"
+      : !format?.valid
+        ? "verdict_format_invalid"
+        : !provenance?.valid
+          ? provenance?.reason || "verdict_authority_invalid"
+          : reused
+            ? "reused_same_head_verdict"
+            : null,
   };
   process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
-  process.exitCode = verdict && format?.valid ? 0 : 1;
+  process.exitCode = complete ? 0 : 1;
 } catch (error) {
   console.error(String(error?.message || error));
   process.exit(2);
