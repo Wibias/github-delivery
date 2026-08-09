@@ -81,10 +81,14 @@ internal static class SelfTest
     {
         using var merge = JsonDocument.Parse("{\"action\":\"merge_pr\",\"mutationMode\":\"maintainer\"}");
         using var autonomousRetarget = JsonDocument.Parse("{\"action\":\"retarget_pr\",\"mutationMode\":\"autonomous\"}");
-        using var comment = JsonDocument.Parse("{\"action\":\"post_comment\",\"mutationMode\":\"review\"}");
+        using var comment = JsonDocument.Parse("{\"action\":\"post_comment\",\"mutationMode\":\"review\",\"body\":\"ordinary note\"}");
+        using var verdict = JsonDocument.Parse("{\"action\":\"post_comment\",\"mutationMode\":\"review\",\"body\":\"## [GD] Verdict: approve-comment\\n<!-- github-delivery:full-review-verdict run:fr-1 head:abc -->\"}");
+        using var humanReply = JsonDocument.Parse("{\"action\":\"reply_human_thread\",\"mutationMode\":\"maintainer\"}");
         Assert(MutationClassifier.RequiresWindowsHello(merge.RootElement), "merge must require Hello");
         Assert(MutationClassifier.RequiresWindowsHello(autonomousRetarget.RootElement), "autonomous retarget must require Hello");
-        Assert(!MutationClassifier.RequiresWindowsHello(comment.RootElement), "review comment must not require Hello");
+        Assert(!MutationClassifier.RequiresWindowsHello(comment.RootElement), "ordinary review comment must not require Hello");
+        Assert(MutationClassifier.RequiresWindowsHello(verdict.RootElement), "full-review verdict must require Hello");
+        Assert(MutationClassifier.RequiresWindowsHello(humanReply.RootElement), "human reply must require Hello");
     }
 
     private static void Assert(bool condition, string message)

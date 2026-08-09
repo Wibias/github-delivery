@@ -20,7 +20,7 @@ const NEGATED_MERGE_INTENT =
 const DELIBERATIVE_MERGE =
   /\b(?:should|can|could|would)\s+(?:i|we)\b[\s\S]*\b(?:merge|ship)\b|\b(?:why can't|why can’t|when should)\s+(?:i|we)\b[\s\S]*\b(?:merge|ship)\b|\b(?:what happens if|what if)\b[\s\S]*\b(?:merge|ship)\b|\bbefore\s+(?:i|we)\s+(?:merge|ship)\b/;
 const ASSISTANT_MERGE_REQUEST =
-  /\b(?:please\s+)?(?:merge|ship)\b|\b(?:can|could|would|will)\s+you\b[\s\S]*\b(?:merge|ship)\b|\bgo ahead(?: and)?\s+(?:merge|ship)\b/;
+  /^(?:please\s+)?(?:merge|ship)\b|\b(?:and|then)\s+(?:please\s+)?(?:merge|ship)\b|\b(?:can|could|would|will)\s+you\s+(?:please\s+)?(?:merge|ship)\b|\b(?:i want|i need|i'd like|i would like)\s+you\s+to\s+(?:merge|ship)\b|\bgo ahead(?:\s+and)?\s+(?:merge|ship)\b/;
 const PR_REFERENCE = /\bpr\s*#?\d+\b/;
 const FULL_REVIEW_REQUEST = /\b(full review|review .* for real bugs|usefulness verdict)\b/;
 const FIX_REVIEW_REQUEST =

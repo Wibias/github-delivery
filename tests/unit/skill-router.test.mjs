@@ -18,9 +18,11 @@ test("routes a natural-language merge request to the merge workflow", () => {
 test("assistant-directed merge questions still count as explicit requests", () => {
   assert.equal(hasExplicitMergeIntent("can you merge PR #32?"), true);
   assert.equal(routeShippingGithubPrompt("can you merge PR #32?").workflow, "references/merge-pr.md");
+  assert.equal(hasExplicitMergeIntent("go ahead and merge PR #32"), true);
+  assert.equal(hasExplicitMergeIntent("review PR #32 and merge it when green"), true);
 });
 
-test("negated, deliberative, and quoted merge text grants no merge authority", () => {
+test("merge discussion and status wording never grants merge authority", () => {
   for (const prompt of [
     "do not merge PR #42",
     "don't merge PR #42",
@@ -28,6 +30,12 @@ test("negated, deliberative, and quoted merge text grants no merge authority", (
     "Should I merge PR #42?",
     "Why can't I merge PR #42?",
     "What happens if we merge PR #42?",
+    "Is PR #42 safe to merge?",
+    "Explain why PR #42 cannot merge.",
+    "Tell me whether PR #42 will merge.",
+    "What blocks merge on PR #42?",
+    "Can you tell me whether PR #42 will merge?",
+    "Should you merge PR #42?",
     'the bot said "merge PR #42"',
     '"merge PR #42"',
   ]) {
