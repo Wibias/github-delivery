@@ -57,6 +57,21 @@ function currentBranch() {
   }
 }
 
+function repositoryName(row, side) {
+  return (
+    row?.[`${side}RepoFullName`] ??
+    row?.[`${side}Repository`]?.nameWithOwner ??
+    row?.[side]?.repo?.full_name ??
+    row?.[side]?.repo?.nameWithOwner ??
+    null
+  );
+}
+
+export function stackRefKey(repoFullName, refName) {
+  if (!repoFullName || !refName) throw new Error("stack_ref_identity_incomplete");
+  return `${String(repoFullName).toLowerCase()}\u0000${String(refName)}`;
+}
+
 export function normalizePullPages(payload) {
   if (!Array.isArray(payload)) throw new Error("stack_pr_pages_invalid");
   const pages = payload.length && payload.every(Array.isArray) ? payload : [payload];
@@ -67,7 +82,16 @@ export function normalizePullPages(payload) {
       const number = Number(row?.number);
       const headRefName = row?.headRefName ?? row?.head?.ref;
       const baseRefName = row?.baseRefName ?? row?.base?.ref;
-      if (!Number.isInteger(number) || number <= 0 || !headRefName || !baseRefName) {
+      const headRepoFullName = repositoryName(row, "head");
+      const baseRepoFullName = repositoryName(row, "base");
+      if (
+        !Number.isInteger(number) ||
+        number <= 0 ||
+        !headRefName ||
+        !baseRefName ||
+        !headRepoFullName ||
+        !baseRepoFullName
+      ) {
         throw new Error("stack_pr_row_incomplete");
       }
       prs.push({
@@ -75,6 +99,8 @@ export function normalizePullPages(payload) {
         title: String(row?.title || ""),
         headRefName: String(headRefName),
         baseRefName: String(baseRefName),
+        headRepoFullName: String(headRepoFullName),
+        baseRepoFullName: String(baseRepoFullName),
         url: String(row?.url ?? row?.html_url ?? ""),
         isDraft: row?.isDraft === true || row?.draft === true,
         headRefOid: row?.headRefOid ?? row?.head?.sha ?? null,
@@ -109,21 +135,25 @@ export function buildGraph(prs) {
   const byHead = new Map();
   const children = new Map();
   for (const pr of prs) {
-    if (byHead.has(pr.headRefName)) {
-      throw new Error(`stack_duplicate_open_head:${pr.headRefName}`);
+    const headKey = stackRefKey(pr.headRepoFullName, pr.headRefName);
+    const baseKey = stackRefKey(pr.baseRepoFullName, pr.baseRefName);
+    if (byHead.has(headKey)) {
+      throw new Error(`stack_duplicate_open_head:${pr.headRepoFullName}:${pr.headRefName}`);
     }
-    byHead.set(pr.headRefName, pr);
-    if (!children.has(pr.baseRefName)) children.set(pr.baseRefName, []);
-    children.get(pr.baseRefName).push(pr);
+    byHead.set(headKey, pr);
+    if (!children.has(baseKey)) children.set(baseKey, []);
+    children.get(baseKey).push(pr);
   }
   return { byHead, children };
 }
 
 export function stackRoots(prs, trunkNames, children) {
-  const heads = new Set(prs.map((p) => p.headRefName));
+  const heads = new Set(
+    prs.map((pr) => stackRefKey(pr.headRepoFullName, pr.headRefName)),
+  );
   return prs.filter((pr) => {
     const baseIsTrunk = trunkNames.has(pr.baseRefName);
-    const baseIsOpenHead = heads.has(pr.baseRefName);
+    const baseIsOpenHead = heads.has(stackRefKey(pr.baseRepoFullName, pr.baseRefName));
     return baseIsTrunk || !baseIsOpenHead;
   });
 }
@@ -132,20 +162,32 @@ export function walkStack(root, children, acc = [], path = new Set()) {
   if (path.has(root.number)) throw new Error(`stack_cycle:${root.number}`);
   const nextPath = new Set(path).add(root.number);
   acc.push(root);
-  const kids = children.get(root.headRefName) || [];
+  const kids =
+    children.get(stackRefKey(root.headRepoFullName, root.headRefName)) || [];
   for (const kid of kids) walkStack(kid, children, acc, nextPath);
   return acc;
 }
 
-export function connectedFromHead(head, byHead, children) {
-  const start = byHead.get(head);
+function resolveFocusedHead(head, byHead, repoFullName = null) {
+  if (repoFullName) {
+    return byHead.get(stackRefKey(repoFullName, head)) || null;
+  }
+  const matches = [...byHead.values()].filter((pr) => pr.headRefName === head);
+  if (matches.length > 1) throw new Error(`stack_head_ambiguous:${head}`);
+  return matches[0] || null;
+}
+
+export function connectedFromHead(head, byHead, children, repoFullName = null) {
+  const start = resolveFocusedHead(head, byHead, repoFullName);
   if (!start) return null;
   let cursor = start;
   const seen = new Set();
-  while (byHead.has(cursor.baseRefName)) {
+  while (true) {
+    const parent = byHead.get(stackRefKey(cursor.baseRepoFullName, cursor.baseRefName));
+    if (!parent) break;
     if (seen.has(cursor.number)) throw new Error(`stack_cycle:${cursor.number}`);
     seen.add(cursor.number);
-    cursor = byHead.get(cursor.baseRefName);
+    cursor = parent;
   }
   return walkStack(cursor, children);
 }
@@ -156,7 +198,7 @@ function printStack(label, stack, trunk) {
   for (const pr of stack) {
     const draft = pr.isDraft ? " [draft]" : "";
     console.log(
-      `  #${pr.number}  ${pr.headRefName} → ${pr.baseRefName}  ${pr.title}${draft}`,
+      `  #${pr.number}  ${pr.headRepoFullName}:${pr.headRefName} → ${pr.baseRepoFullName}:${pr.baseRefName}  ${pr.title}${draft}`,
     );
     console.log(`    ${pr.url}`);
   }
@@ -171,7 +213,7 @@ function printStack(label, stack, trunk) {
   const bottom = stack[0];
   if (bottom && !trunk.has(bottom.baseRefName)) {
     console.log(
-      `Note: bottom base '${bottom.baseRefName}' is not trunk; confirm this is intentional.`,
+      `Note: bottom base '${bottom.baseRepoFullName}:${bottom.baseRefName}' is not trunk; confirm this is intentional.`,
     );
   }
   console.log("");
@@ -222,13 +264,13 @@ export function main(argv = process.argv.slice(2)) {
   let focusHead = args.head;
   if (!args.all && !focusHead) {
     const cur = currentBranch();
-    if (cur && byHead.has(cur)) focusHead = cur;
+    if (cur && byHead.has(stackRefKey(repoFullName, cur))) focusHead = cur;
   }
 
   if (focusHead) {
-    const stack = connectedFromHead(focusHead, byHead, children);
-    if (!stack) throw new Error(`No open PR with head '${focusHead}'. Use --all or pass a PR head branch.`);
-    printStack(`focused on ${focusHead}`, stack, trunk);
+    const stack = connectedFromHead(focusHead, byHead, children, repoFullName);
+    if (!stack) throw new Error(`No open PR with head '${repoFullName}:${focusHead}'. Use --all or pass a PR head branch.`);
+    printStack(`focused on ${repoFullName}:${focusHead}`, stack, trunk);
     return 0;
   }
 
@@ -238,12 +280,12 @@ export function main(argv = process.argv.slice(2)) {
   const singles = stacks.filter((stack) => stack.length === 1);
 
   if (multi.length === 0) {
-    console.log("No multi-PR stacks detected (no open PR bases another open PR).");
+    console.log("No multi-PR stacks detected (no open PR bases another open PR in the same repository identity). ");
     console.log("Standalone open PRs (not a stack):");
     for (const stack of singles) {
       const pr = stack[0];
       console.log(
-        `  #${pr.number}  ${pr.headRefName} → ${pr.baseRefName}  ${pr.title}  ${pr.url}`,
+        `  #${pr.number}  ${pr.headRepoFullName}:${pr.headRefName} → ${pr.baseRepoFullName}:${pr.baseRefName}  ${pr.title}  ${pr.url}`,
       );
     }
     return 0;
