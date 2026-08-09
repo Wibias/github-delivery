@@ -12,17 +12,11 @@ Policy modules:
 
 # Stacked Pull Requests
 
-Use this workflow for an **existing GitHub PR stack**: inspect its topology,
-review or update a member safely, restack after parent or trunk drift, retarget
-bases, recover a rewritten branch, or merge the stack bottom-up.
+Use this workflow for an **existing GitHub PR stack**: inspect topology, review or update a member safely, restack after parent/trunk drift, retarget bases, recover a rewritten branch, or merge bottom-up.
 
-`github-delivery` remains authoritative for the complete GitHub lifecycle.
-This reference owns only stack topology and stack-specific mutation order. The
-selected PR workflow still owns review depth, issue linkage, comments, CI,
-security, readiness, merge thanks, and close-out.
+`github-delivery` remains authoritative for the complete GitHub lifecycle. This reference owns stack topology and stack-specific mutation order. The selected PR workflow still owns review depth, issue linkage, comments, CI, security, readiness, merge thanks, and close-out.
 
-Do not use this workflow to split one oversized branch into a new stack; route
-that request to `split-to-prs`.
+Do not use this workflow to split one oversized branch into a new stack; route that request to `split-to-prs`.
 
 ## Core model
 
@@ -32,42 +26,29 @@ Treat open GitHub PR base links as the authoritative graph:
 PR headRefName → PR baseRefName
 ```
 
-A stack is a connected component in which at least one open PR targets another
-open PR's head branch.
+A stack is a connected component where at least one open PR targets another open PR's head branch. Prefer this graph over branch-name conventions or local ancestry.
 
-Prefer this graph over branch-name conventions or local ancestry. It remains
-usable after a parent squash-merge rewrites commits or deletes its branch.
-
-Terminology:
-
-- **bottom** — the lowest open PR, normally targeting repository trunk;
-- **parent** — the immediate PR base of a child;
-- **child** — an open PR whose base is another open PR's head;
-- **top** — the highest descendant in a linear chain;
-- **restack** — rewrite a child so its commits sit on its current intended
-  parent or trunk;
-- **retarget** — change a PR's GitHub base branch without rewriting its head.
+- **bottom** — lowest open PR, normally targeting trunk;
+- **parent** — immediate PR base of a child;
+- **child** — open PR whose base is another open PR's head;
+- **top** — highest descendant in a linear chain;
+- **restack** — rewrite a child onto its intended parent/trunk;
+- **retarget** — change the GitHub PR base without rewriting its head.
 
 ## Mutation authority
 
-Inspection is read-only.
+Inspection is read-only. Restacking, retargeting, recovering, body edits, rewritten pushes, closing empty PRs, or merging are mutations.
 
-Restacking, retargeting, recovering, editing stack body blocks, pushing rewritten
-heads, closing empty PRs, or merging are external or history mutations. Before
-the first mutation:
+Before the first mutation:
 
-1. select the active `github-delivery` mutation mode;
+1. select the active mutation mode;
 2. verify the requested action is authorized;
 3. show the complete bounded plan;
-4. identify every branch and PR that may change;
-5. identify all expected remote tips and local backup refs;
-6. stop if a required branch is unwritable.
+4. identify every branch/PR that may change;
+5. identify expected remote tips and backup refs;
+6. stop if any required branch is unwritable.
 
-Never mutate repository trunk or another protected/shared branch.
-
-Never use bare `--force`. A stack history rewrite may use
-`--force-with-lease` only under the narrow exception defined in
-`github-delivery/SKILL.md`.
+Never mutate trunk or another protected/shared branch. Never use bare `--force`; only the narrow `--force-with-lease` exception in `SKILL.md` is allowed.
 
 ## 1. State preflight
 
@@ -80,24 +61,16 @@ gh repo view --json nameWithOwner,defaultBranchRef `
   --jq '{repo:.nameWithOwner,trunk:.defaultBranchRef.name}'
 ```
 
-Also verify:
+Also verify repository identity, clean-enough Git state, detected default branch, named PR/branch existence, and writability of every branch that may be rewritten.
 
-- current directory is the intended repository;
-- GitHub remote and canonical repository are unambiguous;
-- no unrelated dirty worktree or index changes exist;
-- the default branch is detected rather than assumed;
-- the named PR or branch exists;
-- every branch that may be rewritten is local or can be created safely from its
-  expected remote tip.
+Enable conflict memory before restacking:
 
-**Conflict memory (rerere):** before any restack work, enable
-`git config rerere.enabled true` (and prefer `rerere.autoUpdate false` so you
-review each replay). Rebase conflicts are then remembered across cascading
-restacks, so a conflict resolved on one child does not need re-resolving on
-every branch above it.
+```powershell
+git config rerere.enabled true
+git config rerere.autoUpdate false
+```
 
-**Remote resolution (multi-remote safety):** never hardcode `origin`. Resolve
-the push remote once:
+Resolve the push remote once. Never hardcode `origin`:
 
 ```powershell
 $PushRemote = git config --get remote.pushDefault
@@ -110,20 +83,17 @@ if (-not $PushRemote) {
 }
 ```
 
-Use `$PushRemote` everywhere a push/fetch target is needed (restack push, branch
-cleanup, backport). On a single-remote repo this is `origin`; on multi-remote
-repos it refuses to guess.
+Use `$PushRemote` for every fetch, remote-tip read, ancestry check, rebase remote-tracking ref, lease, and push.
 
-**needsRebase preflight (before review / readiness / merge):** for each child,
-the parent's current remote tip must be an **ancestor** of the child:
+Before review/readiness/merge, each child's current parent remote tip must be an ancestor:
 
 ```powershell
+git fetch $PushRemote
 git merge-base --is-ancestor "$PushRemote/$Parent" "refs/heads/$Child"
 if ($LASTEXITCODE -ne 0) { throw "Child $Child is behind its parent; restack first." }
 ```
 
-A child whose parent tip is not an ancestor shows a stale diff (parent commits
-missing) — never review, declare ready, or merge it in that state.
+A stale child diff is never review-ready or merge-ready.
 
 <!-- assertion-anchors -->
 <!-- assertion: state-check-first -->
@@ -132,55 +102,42 @@ missing) — never review, declare ready, or merge it in that state.
 <!-- assertion: needs-rebase-ancestor-preflight -->
 <!-- /assertion-anchors -->
 
-If authentication, repository identity, branch writability, or Git state is
-unclear, stop with the exact blocker. Do not claim stack state from partial
-evidence.
+If authentication, repository identity, branch writability, or Git state is unclear, stop with the exact blocker. Do not claim stack state from partial evidence.
 
 ## 2. Inspect the complete stack
 
-Read all open PRs:
+Use the bundled inspector as the source of truth:
 
 ```powershell
-$Pulls = gh pr list --state open --limit 100 `
-  --json number,title,headRefName,baseRefName,url,isDraft,headRefOid
+node "<github-delivery>/scripts/inspect-stack.mjs" --all
 ```
 
-Build a graph where every PR is:
+For a named head:
+
+```powershell
+node "<github-delivery>/scripts/inspect-stack.mjs" --head $HeadBranch
+```
+
+The inspector collects **all** open PRs with paginated GitHub REST calls (`gh api --paginate --slurp`). It does not use a fixed `gh pr list --limit N` ceiling. It fails closed on malformed/incomplete rows, duplicate open head branches, cycles, or unreadable GitHub evidence and prints `Topology complete: yes` only after full pagination succeeds.
+
+Do not reconstruct an authoritative mutation graph from a capped PR list. If complete pagination cannot be proven, topology is unknown and mutation stops.
+
+The graph uses:
 
 ```text
 headRefName → baseRefName
 ```
 
-Select the connected component in this order:
+Select the connected component by user-named PR/head, then current branch when it is an open PR head, otherwise inspect all non-trivial stacks.
 
-1. user-named PR number or head branch;
-2. current branch, when it is an open PR head;
-3. otherwise every non-trivial connected stack.
+Reject/report ambiguous shapes:
 
-Walk upward while the current PR base is another open PR head. Then walk
-downward through every open child.
-
-Reject or explicitly report ambiguous shapes:
-
-- one child with multiple apparent parents;
 - cycles;
 - duplicate open PR heads;
 - branching stacks when the requested operation assumes a linear chain;
-- a bottom PR whose base is neither trunk nor an explicitly intended integration
-  branch.
+- bottom PR base that is neither trunk nor an explicitly intended integration branch.
 
-Report:
-
-```text
-Stack (bottom → top)
-  #N  head → base  title  URL
-Merge order: #bottom → … → #top
-Shape: linear | branching | ambiguous
-Depth: N
-```
-
-Depth above three is not forbidden, but warn that review and restack risk rises.
-Recommend landing the lower portion first when that reduces risk.
+Report bottom→top order, shape, depth, and merge order. Depth above three is allowed but should trigger a risk warning.
 
 <!-- assertion-anchors -->
 <!-- assertion: gh-pr-list-used -->
@@ -191,29 +148,16 @@ Recommend landing the lower portion first when that reduces risk.
 
 ### Review view
 
-For each PR in the stack:
+For each PR:
 
 - review its primary delta against its immediate parent;
-- verify the cumulative repository state at that level;
-- distinguish defects introduced by this PR from defects inherited from a
-  parent;
-- do not demand that every child independently include parent changes in its
-  own diff;
-- do not declare a child merge-ready while its required parent state is
-  unknown, blocked, or changing.
+- verify cumulative repository state at that layer;
+- distinguish defects introduced by the layer from inherited defects;
+- never declare a child ready while required parent state is unknown, blocked, stale, or changing.
 
 ### Layer-ownership editing
 
-Each change belongs to the **layer that owns the path**. Before editing:
-
-1. Check out the branch whose PR should carry the change — run
-   `gh stack view` / inspect `git log --all -- <path>` when ownership is
-   unclear.
-2. Never commit a lower layer's concern on the current top branch; the diff
-   would be attributed to the wrong PR layer.
-3. After editing the owner, rebase every branch above it (bottom → top) so the
-   upstack diffs still contain only their own delta, then return to the
-   previous branch.
+Each change belongs to the layer that owns the path. Before editing, check out the owning branch. Never put a lower-layer fix on the top branch. After editing a lower layer, rebase every descendant bottom→top and return to the previous branch.
 
 <!-- assertion-anchors -->
 <!-- assertion: layer-ownership-edit -->
@@ -223,77 +167,48 @@ Each change belongs to the **layer that owns the path**. Before editing:
 
 ### Inspect only
 
-Do not mutate. Return topology, merge order, current bases, drift, and blockers.
+No mutation. Return complete topology, merge order, bases, drift, and blockers.
 
 ### Parent gained commits
 
-Restack descendants bottom → top so each child rebases onto the updated immediate
-parent.
+Restack descendants bottom→top.
 
-### Trunk moved while the stack remains open
+### Trunk moved
 
-Restack the bottom PR onto current trunk first, then each child onto its updated
-parent.
+Restack the bottom onto current trunk, then each child onto its updated parent.
 
-### Parent merged into trunk
+### Parent merged
 
-Check whether GitHub retargeted each immediate child. If not, retarget it to the
-intended surviving base. Then restack the child against that base before treating
-its new diff as authoritative.
+Check GitHub's child retarget result. If needed, broker the base retarget to the intended surviving base, then restack before treating the new diff as authoritative.
 
 ### Recover a bad restack
 
-Restore only the affected non-trunk branch from a recorded backup ref. Use
-reflog or destructive reset only with explicit user approval when no verified
-backup exists.
+Prefer a recorded backup ref. Use reflog or destructive reset only with explicit user approval when no verified backup exists.
 
 ### Merge stack
 
-Merge bottom-up, one PR at a time. Never merge a middle or top PR while its base
-still represents an unlanded parent unless the user explicitly requests a
-non-trunk integration outcome and the repository policy supports it.
+Merge bottom-up. Never merge a middle/top PR while its base still represents an unlanded parent unless the user explicitly requests a supported non-trunk integration outcome.
 
 ## 4. Restack plan and backups
 
-Before rewriting, record the current local and remote tips.
-
-Example:
+Record current local/remote tips before every rewrite:
 
 ```powershell
-$Child = "feature/child"
-$Parent = "feature/parent"
 $Timestamp = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-
 git fetch $PushRemote
-
 $LocalTip = git rev-parse "refs/heads/$Child"
 $RemoteTip = git ls-remote --heads $PushRemote "refs/heads/$Child" |
   ForEach-Object { ($_ -split '\s+')[0] }
-
-if (-not $RemoteTip) {
-  throw "Remote branch $PushRemote/$Child was not found."
-}
-
+if (-not $RemoteTip) { throw "Remote branch $PushRemote/$Child was not found." }
 $BackupRef = "refs/backup/$Child-$Timestamp"
 git update-ref $BackupRef $LocalTip
 ```
 
-The mutation plan must list:
-
-```text
-Branch:       <child>
-Old local:    <sha>
-Expected remote: <sha>
-New parent:   <parent or trunk>
-Backup:       refs/backup/<branch>-<timestamp>
-Push:         force-with-lease only
-```
-
-Create a backup ref for every branch whose tip may be lost.
+Plan must identify branch, old local tip, expected remote tip, new parent, backup ref, and lease-pinned push. Create a backup ref for every branch whose tip may be lost.
 
 ## 5. Restack execution
 
-Fetch immediately before each rewrite.
+Fetch immediately before each rewrite:
 
 ```powershell
 git fetch $PushRemote
@@ -301,46 +216,35 @@ git switch $Child
 git rebase "$PushRemote/$Parent"
 ```
 
-When conflicts occur, load `references/resolve-conflicts.md`. Resolve only the
-current PR's intended concern. If a valid resolution requires silently pulling
-in a sibling PR or changing the stack's conceptual ownership, stop: the stack
-shape or slice boundaries are wrong.
+On conflicts, load `references/resolve-conflicts.md`. Resolve only the current layer's intended concern. If resolution would pull in a sibling concern or change layer ownership, stop.
 
-After the rebase:
+After rebase:
 
-1. inspect the complete rewritten diff against the intended parent;
-2. run focused checks;
-3. run all checks required by the owning PR workflow;
-4. confirm the remote branch still equals the recorded expected tip;
-5. push only with lease.
+1. inspect the complete diff against intended parent;
+2. run focused and required checks;
+3. re-read the remote tip;
+4. refuse if it changed;
+5. push with an exact lease only.
 
 ```powershell
 $CurrentRemoteTip = git ls-remote --heads $PushRemote "refs/heads/$Child" |
   ForEach-Object { ($_ -split '\s+')[0] }
-
-if ($CurrentRemoteTip -ne $RemoteTip) {
-  throw "Remote tip changed; refusing rewritten push."
-}
-
+if ($CurrentRemoteTip -ne $RemoteTip) { throw "Remote tip changed; refusing rewritten push." }
 git push --force-with-lease="refs/heads/$Child`:$RemoteTip" `
   $PushRemote "HEAD:refs/heads/$Child"
 ```
 
-Stop on lease rejection. Never retry by weakening the lease or using bare
-`--force`.
-
-For a linear stack, repeat bottom → top.
+Stop on lease rejection. Never weaken the lease.
 
 ## 6. Retarget a PR base
 
-First inspect and record the current PR head and base:
+Read current head/base first:
 
 ```powershell
 gh pr view $ChildNumber --json number,headRefOid,headRefName,baseRefName,url
 ```
 
-A PR base edit is a network-visible GitHub mutation. Do not call a raw mutating
-`gh api` command from this workflow. Build an exact broker request instead:
+A PR base edit is a GitHub mutation. Never use a raw mutating `gh api` call from this workflow. Build a broker request:
 
 ```json
 {
@@ -356,74 +260,45 @@ A PR base edit is a network-visible GitHub mutation. Do not call a raw mutating
 }
 ```
 
-Plan and execute that request only through `scripts/github-mutate.mjs`. The
-broker verifies the current head and old base before the PATCH, binds both bases
-to trusted authority when enabled, reads `baseRefName` back afterwards, and
-recognizes a safe retry when the requested target base is already applied.
+Plan/execute through `scripts/github-mutate.mjs`. The broker verifies head and old base, binds both bases into trusted authority when enabled, verifies the new base, and recognizes an already-applied retry.
 
-A base edit changes GitHub comparison topology; it does not prove that the
-child branch has been restacked correctly. Compare the resulting diff and
-restack when needed.
+A retarget changes comparison topology; it does not prove the branch is restacked. Revalidate the diff and ancestry.
 
 ## 7. Parent merge and branch-deletion risk
 
-Before merging a parent, determine whether repository settings may delete its
-head branch and whether GitHub will preserve or close children.
+Before merging a parent:
 
-When deletion could strand children:
+1. identify immediate children from the **complete** topology;
+2. determine surviving bases;
+3. retarget where required before branch deletion;
+4. merge only through the normal merge workflow;
+5. confirm merged state;
+6. rerun the complete inspector;
+7. repair child bases/restack;
+8. rerun all gates on rewritten children.
 
-1. identify immediate open children;
-2. determine their intended surviving base;
-3. retarget them before the parent branch disappears when required;
-4. merge the parent only through the normal `github-delivery` merge workflow;
-5. confirm the parent is actually merged, not merely queued;
-6. re-inspect child bases;
-7. restack the next child onto the surviving base;
-8. rerun its full required gates.
-
-Do not retarget blindly. A premature base change may temporarily expose parent
-commits in the child diff; treat the diff as provisional until restacking is
-complete.
+Never retarget blindly; the diff is provisional until restacking completes.
 
 ## 8. Merge bottom-up
 
-For every level:
+For each level:
 
-1. Verify the current bottom PR targets trunk or the explicitly intended
-   integration branch.
-2. Run its ordinary `github-delivery` merge-ready workflow and obtain a current
-   authoritative `ship-gate.mjs` result.
-3. Merge through `references/merge-pr.md`, including thanks and linked-issue
-   handling.
-4. Confirm GitHub reports the PR as merged.
-5. Re-inspect the complete remaining stack.
-6. Verify or repair immediate child bases.
-7. Restack the next child onto its new intended base.
-8. Treat the child's rewritten head as new review evidence.
-9. Rerun required review, CI, approval, policy, and ship gates.
-10. Continue only when the next child independently reaches the normal merge
-    bar.
+1. verify bottom target is trunk/intended integration branch;
+2. obtain a current authoritative `ship-gate.mjs` ready result;
+3. merge through `references/merge-pr.md`;
+4. confirm merged state;
+5. rerun complete stack inspection;
+6. verify/repair immediate child bases;
+7. restack next child;
+8. treat rewritten head as new review evidence;
+9. rerun review, CI, approval, policy, and ship gates;
+10. continue only when the child independently reaches the normal merge bar.
 
-Never reuse a parent's readiness result for its child.
+Never reuse a parent's readiness result for a child.
 
-### Merge queue: all-or-nothing lower-stack merge
+### Merge queue
 
-When the base branch uses a **merge queue**, merging the contiguous lower
-portion of the stack as one all-or-nothing queue entry is a valid alternative
-to strict one-at-a-time bottom-up merging:
-
-- Check queue policy first (`scripts/pr-policy-gate.mjs` / `merge_group`
-  coverage). If the queue is enforced, enqueue the lower PRs together; the
-  queue processes them in order and each `merge_group` run revalidates the
-  combined head.
-- The merge-ready bar still applies **per PR before enqueue**: each PR in the
-  lower set needs its own current-head `ship-gate.mjs` `ready`, own reviews,
-  and clean threads — queuing does not waive readiness.
-- After the queue lands the set, re-inspect the remaining stack, restack the
-  next child onto the surviving base, and rerun its gates (same as bottom-up).
-- Never enqueue a child whose parent is not yet in the same queue entry unless
-  the queue's merge order provably keeps the parent ahead (the child would
-  otherwise evaluate against an unlanded base).
+When a merge queue is enforced, a contiguous lower portion may be queued together only when repository policy and `merge_group` coverage support that operation. Each PR still needs its own current-head readiness before enqueue. After queue landing, rerun complete topology inspection and revalidate surviving children.
 
 <!-- assertion-anchors -->
 <!-- assertion: queue-all-or-nothing-lower-stack -->
@@ -431,89 +306,43 @@ to strict one-at-a-time bottom-up merging:
 
 ### Empty child after parent lands
 
-If the child's authoritative diff becomes empty:
-
-- verify the intended behavior is already present on the surviving base;
-- verify no unique tests, migrations, docs, metadata, or generated outputs were
-  lost;
-- close the PR only with explicit authority;
-- leave a concise explanation and preserve linked-issue correctness.
+Verify intended behavior, tests, migrations, docs, metadata, and generated outputs are already represented on the surviving base. Close the empty PR only with explicit authority.
 
 ## 9. Review hygiene
 
-- Avoid unnecessary restacks during an active review round because rewritten
-  commits invalidate anchors and may stale approvals.
-- Do not request a broad final review of PR K while required parent PR K-1 is
-  still materially changing, unless the reviewer is explicitly reviewing only
-  K's delta.
+- Avoid unnecessary restacks during an active review round.
+- Do not request broad final review while a required parent is materially changing unless review is explicitly layer-only.
 - After every rewritten head, re-check stale approvals and last-push policy.
-- Never claim that GitHub's auto-retarget alone makes the child correct.
-- Never call the whole stack ready merely because every current CI check is
-  green; each node must satisfy the normal shipping bar on its current head.
+- Never claim GitHub auto-retarget alone makes a child correct.
+- Green CI alone never makes the whole stack ready.
 
 ## 10. Recovery
 
 Prefer a verified backup ref:
 
 ```powershell
-$Child = "feature/child"
-$BackupRef = "refs/backup/$Child-<timestamp>"
-
 git update-ref "refs/heads/$Child" $BackupRef
 git switch $Child
 ```
 
-Inspect the restored diff and expected remote tip before any push.
-
-If no backup exists, inspect:
-
-```powershell
-git reflog show $Child
-```
-
-Do not run `git reset --hard` or push a recovered tip without explicit user
-approval and a verified target SHA.
-
-Never recover by rewriting trunk.
-
-After recovery, re-inspect the stack and rerun the owning workflow's checks.
+If no backup exists, inspect reflog. Do not hard-reset or push a recovered tip without explicit approval and a verified target SHA. Never recover by rewriting trunk. Re-inspect the complete stack after recovery.
 
 ## 11. Optional stack links in PR bodies
 
-Only when requested or already established by repository convention, maintain a
-deterministic block between markers:
-
-```markdown
-<!-- stack:links:start -->
-
-### Stack
-
-- [x] #101
-- [ ] #102
-- [ ] **#103** 👈 current
-<!-- stack:links:end -->
-```
-
-- checked = merged;
-- bold plus arrow = current PR;
-- replace the existing marked block instead of appending duplicates;
-- editing PR bodies requires mutation authority;
-- read back every edited body.
+Only when requested or established by repository convention, maintain a deterministic marked block. Editing PR bodies requires mutation authority; replace the existing block and read it back after mutation.
 
 ## 12. Validation after every mutation
 
 After restack, retarget, recovery, body update, or parent merge:
 
-1. fetch current remote state;
-2. rebuild the complete PR-base graph;
-3. verify every remaining `baseRefName`;
-4. verify every rewritten remote head equals the pushed SHA;
-5. inspect each affected diff against its intended parent;
-6. rerun focused and required repository checks;
-7. re-check review threads, approvals, CODEOWNERS, draft state, and policies;
-8. run the authoritative `ship-gate.mjs` for every PR whose readiness is being
-   asserted;
-9. report divergence instead of claiming success.
+1. rerun the complete paginated stack inspector;
+2. verify every remaining `baseRefName`;
+3. verify every rewritten remote head equals the pushed SHA;
+4. inspect each affected diff against intended parent;
+5. rerun focused/required checks;
+6. re-check threads, approvals, CODEOWNERS, draft state, and policies;
+7. run authoritative `ship-gate.mjs` for every PR whose readiness is asserted;
+8. report divergence instead of claiming success.
 
 ## Output
 
@@ -524,7 +353,7 @@ Shape:       <linear | branching | ambiguous>
 Changed:     <branches / PR bases / bodies / none>
 Backups:     <refs created or none>
 Heads:       <old → new SHAs>
-Verification:<re-inspect, checks, gates>
+Verification:<complete topology, checks, gates>
 Blockers:    <exact unresolved evidence>
 Next:        <next safe stack action>
 ```
