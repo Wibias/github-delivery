@@ -21,7 +21,7 @@ function fixtureRoot() {
   writeFileSync(join(root, "SKILL.md"), "---\nname: github-delivery\ndescription: Merge and review GitHub pull requests.\n---\n\nRead `references/shared-rules.md`. Run `scripts/ship-gate.mjs`.\n");
   writeFileSync(join(root, "README.md"), "# github-delivery\r\n");
   writeFileSync(join(root, "LICENSE"), "MIT\n");
-  writeFileSync(join(root, "package.json"), JSON.stringify({ name: "github-delivery", version: "0.1.0", private: true, type: "module", engines: { node: ">=20" } }, null, 2) + "\n");
+  writeFileSync(join(root, "package.json"), JSON.stringify({ name: "github-delivery", version: "0.1.0", private: true, type: "module", engines: { node: "^22 || ^24" } }, null, 2) + "\n");
   writeFileSync(join(root, "references", "shared-rules.md"), "# Rules\r\n");
   writeFileSync(join(root, "scripts", "ship-gate.mjs"), "#!/usr/bin/env node\nconsole.log('ok');\n");
   writeFileSync(join(root, "scripts", "lib", "helper.mjs"), "export const ok = true;\n");
@@ -36,7 +36,8 @@ test("injects Agent Skills metadata from package version", () => {
   const source = "---\nname: github-delivery\ndescription: Merge PRs.\n---\n\nBody\n";
   const result = injectSkillMetadata(source, { version: "0.1.0" });
   assert.match(result, /license: MIT/);
-  assert.match(result, /compatibility: Requires Node\.js 20\+/);
+  assert.match(result, /compatibility: Requires Node\.js 22 or 24/);
+  assert.doesNotMatch(result, /Node\.js 20\+/);
   assert.match(result, /version: "0\.1\.0"/);
   assert.match(result, /repository: "https:\/\/github\.com\/Wibias\/github-delivery"/);
   assert.equal((result.match(/^---$/gm) || []).length, 2);
