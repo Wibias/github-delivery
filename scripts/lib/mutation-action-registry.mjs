@@ -17,7 +17,7 @@ const DEFINITIONS = [
   { action: "push_code", enabled: true, mutation: true, route: "lifecycle", minimumMode: "maintainer", highAssurance: true, authorityScopeKind: "push_code" },
   { action: "create_pr", enabled: true, mutation: true, route: "lifecycle", minimumMode: "maintainer", highAssurance: true, remoteIdempotentCreate: true, authorityScopeKind: "create_pr" },
   { action: "update_pr_body", enabled: true, mutation: true, route: "lifecycle", minimumMode: "maintainer", prBound: true, highAssurance: true, authorityScopeKind: "update_pr_body" },
-  { action: "create_issue", enabled: true, mutation: true, route: "lifecycle", minimumMode: "maintainer", highAssurance: true, remoteIdempotentCreate: true, authorityScopeKind: "create_issue" },
+  { action: "create_issue", enabled: true, mutation: true, route: "lifecycle", minimumMode: "maintainer", highAssurance: true, remoteIdempotentCreate: true, issueCreationKind: "direct", authorityScopeKind: "create_issue" },
   { action: "assign_issue", enabled: true, mutation: true, route: "lifecycle", minimumMode: "maintainer", highAssurance: true, authorityScopeKind: "assign_issue" },
   { action: "resolve_thread", enabled: true, mutation: true, route: "legacy", minimumMode: "maintainer", prBound: true, reviewThread: true, highAssurance: true, authorityScopeKind: "resolve_thread" },
   { action: "resolve_bot_thread", enabled: true, mutation: true, route: "legacy", minimumMode: "review", prBound: true, reviewThread: true, highAssurance: true, authorityScopeKind: "resolve_thread" },
@@ -28,7 +28,7 @@ const DEFINITIONS = [
   { action: "merge_pr", enabled: true, mutation: true, route: "legacy", minimumMode: "maintainer", prBound: true, destructive: true, highAssurance: true, authorityScopeKind: "merge_pr" },
   { action: "retarget_pr", enabled: true, mutation: true, route: "legacy", minimumMode: "maintainer", prBound: true, highAssurance: true, authorityScopeKind: "retarget_pr" },
   { action: "delete_head_branch", enabled: true, mutation: true, route: "legacy", minimumMode: "maintainer", cleanup: true, destructive: true, highAssurance: true, authorityScopeKind: "delete_head_branch" },
-  { action: "create_follow_up_issue", enabled: true, mutation: true, route: "legacy", minimumMode: "review", social: true, remoteIdempotentCreate: true, authorityScopeKind: "create_issue" },
+  { action: "create_follow_up_issue", enabled: true, mutation: true, route: "legacy", minimumMode: "maintainer", social: true, remoteIdempotentCreate: true, issueCreationKind: "follow_up", authorityScopeKind: "create_issue" },
   { action: "post_resolution_record", enabled: true, mutation: true, route: "legacy", minimumMode: "review", prBound: true, social: true, remoteIdempotentCreate: true, authorityScopeKind: "pr_body_social" },
   {
     action: "supersede_pr",
@@ -56,6 +56,7 @@ const REGISTRY = new Map(
       destructive: false,
       highAssurance: false,
       humanReply: false,
+      issueCreationKind: null,
       ...definition,
     }),
   ]),
@@ -133,6 +134,18 @@ export function validateMutationActionRegistry() {
     if (definition.reviewThread && !definition.prBound) {
       errors.push(`review_thread_not_pr_bound:${definition.action}`);
     }
+    if (
+      definition.issueCreationKind !== null &&
+      !["direct", "follow_up"].includes(definition.issueCreationKind)
+    ) {
+      errors.push(`issue_creation_kind_invalid:${definition.action}`);
+    }
+  }
+  if (REGISTRY.get("create_issue")?.issueCreationKind !== "direct") {
+    errors.push("create_issue_kind_invalid");
+  }
+  if (REGISTRY.get("create_follow_up_issue")?.issueCreationKind !== "follow_up") {
+    errors.push("create_follow_up_issue_kind_invalid");
   }
   return { valid: errors.length === 0, errors };
 }
