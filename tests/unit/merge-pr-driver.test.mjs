@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { planMutationRequest } from "../../scripts/lib/github-mutation-broker.mjs";
+import { executeMutationWithAuthority } from "../../scripts/lib/mutation-execution-context.mjs";
 import {
   buildGateOutput,
   buildMergeRequest,
@@ -123,6 +124,30 @@ test("merge driver buildMergeRequest pins the head with --match-head-commit", ()
     "--match-head-commit",
     HEAD,
   ]);
+});
+
+test("canonical merge execution fails closed when trusted authority is required", () => {
+  const request = buildMergeRequest({
+    repo: "acme/widget",
+    pr: 42,
+    expectedHead: HEAD,
+    mergeMethod: "merge",
+  });
+  let spawned = false;
+  assert.throws(
+    () =>
+      executeMutationWithAuthority({
+        request,
+        execute: true,
+        env: { GITHUB_DELIVERY_REQUIRE_TRUSTED_AUTHORITY: "1" },
+        runner() {
+          spawned = true;
+          return { status: 0, stdout: "", stderr: "" };
+        },
+      }),
+    /trusted_authority_required/,
+  );
+  assert.equal(spawned, false);
 });
 
 test("merge driver defaults to merge commits and builds a post-merge thanks body", () => {
