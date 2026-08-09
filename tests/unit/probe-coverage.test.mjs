@@ -54,13 +54,14 @@ test("accepts findings evidence with files on trigger files", () => {
   assert.equal(JSON.parse(result.stdout).valid, true);
 });
 
-test("accepts n-a evidence with a reason", () => {
+test("rejects n-a evidence for a deterministically required probe", () => {
   const result = runVerify(oauthScope(), {
     "credential-transport": { status: "n-a", reason: "baseUrl validator already enforces https for every credential-bearing adapter" },
     "secrets-scan": { status: "clean", files: ["src/client.ts"] },
   });
-  assert.equal(result.status, 0, result.stdout);
-  assert.equal(JSON.parse(result.stdout).valid, true);
+  assert.equal(result.status, 1, result.stdout);
+  const report = JSON.parse(result.stdout);
+  assert.ok(report.errors.some((e) => e.code === "evidence_required_probe_cannot_be_na"));
 });
 
 test("fails when a required probe has no evidence", () => {
