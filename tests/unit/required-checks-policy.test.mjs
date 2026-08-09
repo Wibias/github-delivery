@@ -257,3 +257,25 @@ test("incomplete test merge evidence cannot silently fall back to the head", () 
   assert.equal(selected.reason, "test_merge_evidence_incomplete");
   assert.ok(selected.incompleteReasons.includes("test_merge_check_evidence_incomplete"));
 });
+
+test("an app-bound green check run is blocked by a same-name failing commit status", () => {
+  const result = evaluateRequiredChecks({
+    descriptors: [{ context: "build", appId: 11, sources: ["ruleset"] }],
+    checkRuns: [run("build", 11, "success")],
+    statuses: [status("build", "failure")],
+  });
+  assert.equal(result.decision, "blocked");
+  assert.equal(result.requiredStatus[0].gate, "fail");
+  assert.equal(result.requiredStatus[0].sourceIdentityUnverifiable, false);
+  assert.equal(result.requiredStatus[0].matches.length, 2);
+});
+
+test("an app-bound green check run is blocked by a same-name pending commit status", () => {
+  const result = evaluateRequiredChecks({
+    descriptors: [{ context: "build", appId: 11, sources: ["ruleset"] }],
+    checkRuns: [run("build", 11, "success")],
+    statuses: [status("build", "pending")],
+  });
+  assert.equal(result.decision, "blocked");
+  assert.equal(result.requiredStatus[0].gate, "pending");
+});

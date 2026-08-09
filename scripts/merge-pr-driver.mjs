@@ -130,6 +130,10 @@ export function buildMergeRequest({ repo, pr, expectedHead, mergeMethod }) {
   };
 }
 
+export function isFinalMergeOutcome(receipt) {
+  return receipt?.outcome === "merged" || receipt?.outcome === "already_merged";
+}
+
 export function executeMergeTransaction({
   mergeRequest,
   thankRequest = null,
@@ -139,6 +143,7 @@ export function executeMergeTransaction({
   const receipts = [];
   const mergeReceipt = executeRequest(mergeRequest);
   receipts.push({ name: "merge", receipt: mergeReceipt });
+  if (!isFinalMergeOutcome(mergeReceipt)) return receipts;
   if (thankRequest) {
     const thankReceipt = executeRequest(thankRequest);
     receipts.push({ name: "post_merge_thanks", receipt: thankReceipt });
@@ -343,7 +348,7 @@ async function main() {
     actorLogin: process.env.GH_ACTOR_LOGIN || null,
     headOwnerLogin: null,
     headRefName: null,
-    isMerged: merged?.status === "succeeded",
+    isMerged: isFinalMergeOutcome(merged),
   });
 
   const final = {
@@ -354,6 +359,7 @@ async function main() {
       name,
       action: receipt.action,
       status: receipt.status,
+      outcome: receipt.outcome ?? null,
       observedHead: receipt.observedHead,
       verification: receipt.verification,
       authority: receipt.authority,
