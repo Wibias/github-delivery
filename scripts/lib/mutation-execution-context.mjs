@@ -15,6 +15,7 @@ const HIGH_ASSURANCE_ACTIONS = new Set([
   "create_issue",
   "assign_issue",
   "resolve_thread",
+  "resolve_bot_thread",
   "close_linked_issue",
   "close_pr",
   "merge_pr",
