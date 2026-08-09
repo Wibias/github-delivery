@@ -2,6 +2,11 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 
 import { classifyAuthority } from "./authority-grant.mjs";
+import {
+  exactIdempotencyRecordMatches,
+  markerCandidates,
+  readAuthenticatedActor,
+} from "./idempotency-receipt.mjs";
 import { authorizeMutation } from "./mutation-policy.mjs";
 import {
   lifecycleCommandFor,
@@ -118,7 +123,12 @@ function findExistingCreate({ request, runner }) {
   const rows = parsePages(
     runOrThrow(runner, ["gh", "api", lookupPath(request), "--paginate", "--slurp"]),
   );
-  const row = rows.find((entry) => String(entry?.body || "").includes(marker));
+  const candidates = markerCandidates(rows, marker);
+  if (!candidates.length) return null;
+  const actorLogin = readAuthenticatedActor(runner);
+  const row = candidates.find((entry) =>
+    exactIdempotencyRecordMatches({ record: entry, request, actorLogin }),
+  );
   if (!row) return null;
   return {
     id: row.id ?? null,
@@ -226,7 +236,7 @@ export function executeLifecycleMutationRequest({
   let verification = verifyLifecycleMutation({ request: plan.request, runner });
   if (IDEMPOTENT_CREATES.has(plan.action)) {
     verification = findExistingCreate({ request: plan.request, runner });
-    if (!verification) throw new Error(`${plan.action}_verification_failed:idempotency_marker_missing`);
+    if (!verification) throw new Error(`${plan.action}_verification_failed:idempotency_receipt_mismatch`);
   }
   return {
     ...plan,
