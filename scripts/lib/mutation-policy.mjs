@@ -65,9 +65,11 @@ function buildProfile(mode) {
       "reply_bot_thread",
       "resolve_bot_thread",
     ]);
+    // Human replies may be planned in review mode, but execution is a trusted
+    // high-assurance action bound to the exact approved body.
+    allow(profile, ["reply_human_thread"], { exactText: true });
   }
   if (["maintainer", "autonomous"].includes(mode)) {
-    allow(profile, ["reply_human_thread"], { exactText: true });
     allow(profile, ["push_code", "post_resolution_record"]);
   }
   if (mode === "maintainer") {
