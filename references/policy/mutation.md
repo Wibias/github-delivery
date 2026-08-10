@@ -30,7 +30,9 @@ Social create operations require a stable idempotency key and remote read-before
 
 Network-visible GitHub writes owned by this skill go through `scripts/github-mutate.mjs`, which dispatches through `scripts/lib/github-mutation-router.mjs` to the lifecycle or legacy/social broker. Do not run ad-hoc bare `gh` mutation commands, and do not infer the supported action set by reading only one backend broker. Local Git writes remain subject to `GD-GIT-*`.
 
-Routine workflow execution treats the CLI + router + `scripts/lib/mutation-action-registry.mjs` as the public mutation contract. Inspect backend broker implementation only when the documented entrypoint fails or the task is explicitly debugging/auditing `github-delivery` itself.
+Routine execution uses `node scripts/github-mutate.mjs --request <file> --execute`. The entrypoint accepts one exact mutation or an ordered mutation document and owns routine authority acquisition, exact-head refresh before approval, grant attachment, verifier configuration, and redemption setup before the existing broker executes each write. Do not invoke `scripts/github-authorize.mjs` separately during routine workflows; keep that tool for explicit/manual authorization flows and debugging the authority boundary itself.
+
+Routine workflow execution treats the CLI + router + `scripts/lib/mutation-action-registry.mjs` as the public mutation contract. Inspect backend broker implementation only when the documented entrypoint actually fails or the task is explicitly debugging/auditing `github-delivery` itself. An entrypoint failure should be surfaced directly before inspecting internals; do not pre-emptively reverse-engineer broker implementation.
 
 For issue publication, `create_issue` is the canonical action for a direct request to create/file/open a new issue. `create_follow_up_issue` is reserved for a specifically identified follow-up issue from an existing review/finding/workflow context; it is never a fallback merely because `create_issue` is not visible in the legacy/social broker.
 
