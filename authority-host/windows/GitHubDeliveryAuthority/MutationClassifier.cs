@@ -40,6 +40,7 @@ internal static class MutationClassifier
             ? modeValue.GetString() ?? "read-only"
             : "read-only";
         return string.Equals(mode, "maintainer", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(mode, "autonomous", StringComparison.OrdinalIgnoreCase)
             || DestructiveActions.Contains(action)
             || SocialActions.Contains(action);
     }
