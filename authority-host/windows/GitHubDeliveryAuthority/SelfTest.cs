@@ -16,6 +16,7 @@ internal static class SelfTest
             GrantFixture();
             LedgerFixture();
             ClassifierFixture();
+            BusyGateFixture();
             HelloFailureFixture();
             HelloReadinessFixture();
             SetupRoutingFixture();
@@ -101,6 +102,39 @@ internal static class SelfTest
         Assert(MutationClassifier.RequiresWindowsHello(review.RootElement), "review publication must require independent Hello approval");
         Assert(MutationClassifier.RequiresWindowsHello(botReply.RootElement), "bot reply must require independent Hello approval");
         Assert(MutationClassifier.RequiresWindowsHello(humanReply.RootElement), "human reply must require Hello");
+    }
+
+    private static void BusyGateFixture()
+    {
+        var store = new StateStore(Path.Combine(Path.GetTempPath(), $"github-delivery-authority-busy-{Guid.NewGuid():N}", "authority.db"));
+        try
+        {
+            var server = new AuthorityPipeServer(
+                new AuthorityService(
+                    store,
+                    null!,
+                    new ApprovalCoordinator(SynchronizationContext.Current ?? new WindowsFormsSynchronizationContext())));
+            var first = server.RunSerializedAuthorizeAsync(async () =>
+            {
+                await Task.Delay(50).ConfigureAwait(false);
+                return "first-ok";
+            });
+            try
+            {
+                var second = server.RunSerializedAuthorizeAsync(async () => throw new Exception("must not run"));
+                second.GetAwaiter().GetResult();
+                throw new Exception("second concurrent authorize unexpectedly succeeded");
+            }
+            catch (AuthorityException error) when (error.Code == "authority_host_busy")
+            {
+            }
+            var result = first.GetAwaiter().GetResult();
+            Assert((string)result == "first-ok", "serialized authorize result mismatch");
+        }
+        finally
+        {
+            store.Dispose();
+        }
     }
 
     private static void HelloFailureFixture()

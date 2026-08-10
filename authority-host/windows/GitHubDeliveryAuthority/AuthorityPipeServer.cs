@@ -10,10 +10,12 @@ internal sealed class AuthorityPipeServer : IAsyncDisposable
     public const string Protocol = "github-delivery-authority/1";
     public const string DefaultPipeName = "github-delivery-authority-v1";
     private const int MaxFrameBytes = 256 * 1024;
+    private const int MaxConcurrentClients = 8;
     private readonly string _pipeName;
     private readonly AuthorityService _service;
     private readonly CancellationTokenSource _stop = new();
     private Task? _loop;
+    private readonly SemaphoreSlim _authorizeGate = new(1, 1);
 
     public AuthorityPipeServer(AuthorityService service, string pipeName = DefaultPipeName)
     {
@@ -38,7 +40,7 @@ internal sealed class AuthorityPipeServer : IAsyncDisposable
             await using var pipe = new NamedPipeServerStream(
                 _pipeName,
                 PipeDirection.InOut,
-                8,
+                MaxConcurrentClients,
                 PipeTransmissionMode.Byte,
                 PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly,
                 4096,
@@ -79,7 +81,7 @@ internal sealed class AuthorityPipeServer : IAsyncDisposable
             object result = method switch
             {
                 "status" => _service.Status(),
-                "authorizeBatch" => await _service.AuthorizeBatchAsync(parameters).ConfigureAwait(false),
+                "authorizeBatch" => await RunAuthorizeBatchAsync(parameters, cancellationToken).ConfigureAwait(false),
                 "redeemGrant" => _service.RedeemGrant(parameters),
                 _ => throw new AuthorityException("authority_method_not_allowed"),
             };
@@ -92,6 +94,32 @@ internal sealed class AuthorityPipeServer : IAsyncDisposable
         catch
         {
             await WriteResponseAsync(pipe, id, false, null, "authority_internal_error", cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async Task<object> RunAuthorizeBatchAsync(JsonElement parameters, CancellationToken cancellationToken)
+        => await RunSerializedAuthorizeAsync(
+            () => _service.AuthorizeBatchAsync(parameters),
+            cancellationToken).ConfigureAwait(false);
+
+    internal async Task<object> RunSerializedAuthorizeAsync(
+        Func<Task<object>> operation,
+        CancellationToken cancellationToken = default)
+    {
+        // Only one approval prompt can be shown at a time. A concurrent caller
+        // gets a distinct busy error instead of blocking on the UI thread or
+        // silently waiting behind an unseen Windows Hello prompt.
+        if (!await _authorizeGate.WaitAsync(0, cancellationToken).ConfigureAwait(false))
+        {
+            throw new AuthorityException("authority_host_busy");
+        }
+        try
+        {
+            return await operation().ConfigureAwait(false);
+        }
+        finally
+        {
+            _authorizeGate.Release();
         }
     }
 
@@ -171,5 +199,6 @@ internal sealed class AuthorityPipeServer : IAsyncDisposable
             try { await _loop.ConfigureAwait(false); } catch (OperationCanceledException) { }
         }
         _stop.Dispose();
+        _authorizeGate.Dispose();
     }
 }

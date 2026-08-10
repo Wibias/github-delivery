@@ -62,6 +62,23 @@ The agent-facing Named Pipe exposes only:
 
 Administrative operations remain tray-UI-only and require Windows Hello.
 
+### Concurrency and prompt visibility
+
+The approval dialog is foreground-visible by design: it is created `TopMost`,
+activates itself when shown, and flashes the taskbar until the user approves or
+cancels. It must not silently open behind other windows, because an unseen
+Windows Hello prompt would leave an in-flight authorize call hanging without any
+authorized output.
+
+Only one approval prompt can be shown at a time. The pipe server accepts
+concurrent clients, but `authorizeBatch` is serialized through a gate: a second
+concurrent `authorizeBatch` call receives a distinct `authority_host_busy`
+error instead of blocking on the UI thread or silently waiting behind an
+unseen prompt. `status` and `redeemGrant` remain available while an approval is
+pending. The Node client retries `authorizeBatch` on `authority_host_busy`
+with backoff up to a configurable deadline, so a caller that races a pending
+Hello prompt waits for it to finish rather than failing immediately.
+
 ## Authorization policy
 
 Installing the issuer does not change existing compatibility mode.
