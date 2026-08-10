@@ -36,6 +36,24 @@ jobs:
           node-version: ${{ matrix.node }}
           package-manager-cache: false
 
+      - name: Probe unit tests
+        run: npm test
+
+      - name: Probe repository security
+        run: npm run security:repo
+
+      - name: Probe distribution reproducibility
+        run: npm run dist:check
+
+      - name: Probe offline evals
+        run: npm run evals:offline
+
+      - name: Probe policy architecture
+        run: node scripts/policy-bundle.mjs --validate
+
+      - name: Probe pre-open self-test
+        run: node scripts/pre-open-gate.mjs --self-test
+
       - name: Run checks
         run: npm run check
 
