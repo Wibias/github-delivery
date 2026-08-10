@@ -36,43 +36,48 @@ jobs:
           node-version: ${{ matrix.node }}
           package-manager-cache: false
 
-      - name: Probe mutation document executor tests
+      - name: Probe final roadmap acceptance
         continue-on-error: true
-        run: node --test tests/unit/mutation-document-execution.test.mjs
+        run: node --test tests/unit/final-roadmap-acceptance.test.mjs
 
-      - name: Probe authority runtime defaults tests
+      - name: Probe mutation modes docs
         continue-on-error: true
-        run: node --test tests/unit/authority-runtime-defaults.test.mjs
+        run: node --test tests/unit/mutation-modes-docs.test.mjs
 
-      - name: Probe token-efficient workflow contract tests
+      - name: Probe mutation policy
         continue-on-error: true
-        run: node --test tests/unit/token-efficient-workflow-contract.test.mjs
+        run: node --test tests/unit/mutation-policy.test.mjs tests/unit/mutation-policy-cli.test.mjs
 
-      - name: Probe github-mutate entrypoint tests
+      - name: Probe policy contracts
         continue-on-error: true
-        run: node --test tests/unit/github-mutate-entrypoint.test.mjs
+        run: node --test tests/unit/policy-architecture.test.mjs tests/unit/policy-bundle.test.mjs
 
-      - name: Probe mutation execution context tests
+      - name: Probe bare GitHub mentions
         continue-on-error: true
-        run: node --test tests/unit/mutation-execution-context.test.mjs
+        run: node --test tests/unit/bare-github-mentions.test.mjs
+
+      - name: Probe distribution contracts
+        continue-on-error: true
+        run: node --test tests/unit/distribution.test.mjs tests/unit/distribution-authority-host.test.mjs
+
+      - name: Probe review contracts
+        continue-on-error: true
+        run: node --test tests/unit/review-context-contract.test.mjs tests/unit/simplify-review-contract.test.mjs
+
+      - name: Probe router contracts
+        continue-on-error: true
+        run: node --test tests/unit/skill-router.test.mjs tests/unit/create-pr-local-route.test.mjs
+
+      - name: Probe workflow security contracts
+        continue-on-error: true
+        run: node --test tests/unit/workflow-security.test.mjs tests/unit/mutation-boundary-security.test.mjs
+
+      - name: Probe broker contracts
+        continue-on-error: true
+        run: node --test tests/unit/github-mutation-broker.test.mjs tests/unit/mutation-action-registry-broker.test.mjs
 
       - name: Probe unit tests
         run: npm test
-
-      - name: Probe repository security
-        run: npm run security:repo
-
-      - name: Probe distribution reproducibility
-        run: npm run dist:check
-
-      - name: Probe offline evals
-        run: npm run evals:offline
-
-      - name: Probe policy architecture
-        run: node scripts/policy-bundle.mjs --validate
-
-      - name: Probe pre-open self-test
-        run: node scripts/pre-open-gate.mjs --self-test
 
       - name: Run checks
         run: npm run check
