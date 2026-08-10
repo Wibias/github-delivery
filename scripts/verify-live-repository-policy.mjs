@@ -27,6 +27,14 @@ function ghJson(path) {
   return runGhJson(["api", path], path);
 }
 
+function ghJsonPaginated(path) {
+  const pages = runGhJson(["api", path, "--paginate", "--slurp"], path);
+  if (!Array.isArray(pages) || pages.some((page) => !Array.isArray(page))) {
+    throw new Error(`github_paginated_payload_invalid:${path}`);
+  }
+  return pages.flat();
+}
+
 function ghRepositoryMergeSettings(repo) {
   const [owner, name] = repo.split("/");
   const query = `
@@ -118,12 +126,9 @@ function main(argv) {
   const defaultBranch = repository.default_branch;
   if (!defaultBranch) throw new Error("default_branch_missing");
   const branch = ghJson(`repos/${repo}/branches/${encodeURIComponent(defaultBranch)}`);
-  const activeRules = ghJson(
-    `repos/${repo}/rules/branches/${encodeURIComponent(defaultBranch)}`,
+  const activeRules = ghJsonPaginated(
+    `repos/${repo}/rules/branches/${encodeURIComponent(defaultBranch)}?per_page=100`,
   );
-  if (!Array.isArray(activeRules)) {
-    throw new Error("active_rules_payload_invalid");
-  }
   const activeRulesets = fetchActiveRulesets(repo, activeRules);
   const releaseEnvironment = ghJson(
     `repos/${repo}/environments/${encodeURIComponent(policy.release.environment)}`,
