@@ -30,7 +30,7 @@ internal sealed class SetupDialog : Form
         {
             Text = "Set up GitHub Delivery Authority",
             AutoSize = true,
-            Font = new Font(SystemFonts.MessageBoxFont.FontFamily, 14, FontStyle.Bold),
+            Font = new Font(SystemFonts.MessageBoxFont?.FontFamily ?? FontFamily.GenericSansSerif, 14, FontStyle.Bold),
         };
         var intro = new Label
         {
