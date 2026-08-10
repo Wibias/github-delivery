@@ -2,8 +2,20 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
+import { actionNamesWhere } from "../../scripts/lib/mutation-action-registry.mjs";
+
 function read(path) {
   return readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
+}
+
+function documentedHighAssuranceActions(reference) {
+  const match = reference.match(
+    /<!-- high-assurance-actions:start -->([\s\S]*?)<!-- high-assurance-actions:end -->/,
+  );
+  assert.ok(match, "high-assurance action documentation block is missing");
+  return [...match[1].matchAll(/^\s*-\s+`([^`]+)`\s*$/gm)]
+    .map((row) => row[1])
+    .sort();
 }
 
 test("skill defaults to read-only and names every mutation profile", () => {
@@ -23,6 +35,14 @@ test("mutation mode reference keeps human replies and full-review verdicts trust
   assert.match(reference, /trusted authority required/);
   assert.match(reference, /generic `post_comment`[\s\S]*never satisfies merge review evidence/i);
   assert.match(reference, /profile is an upper bound, not a waiver/);
+});
+
+test("documented high-assurance actions exactly match the executable registry", () => {
+  const reference = read("references/mutation-modes.md");
+  const documented = documentedHighAssuranceActions(reference);
+  const executable = actionNamesWhere("highAssurance", true).sort();
+  assert.deepEqual(documented, executable);
+  assert.equal(new Set(documented).size, documented.length, "documented actions must be unique");
 });
 
 test("bare full review selects review mode with verdict authority", () => {

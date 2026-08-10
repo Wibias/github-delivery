@@ -30,9 +30,35 @@ Mutation mode describes what a workflow may request. It is not, by itself, proof
 
 Dry-run planning remains available with the normal mode rules so the agent can show the bounded operation before approval. At `--execute`, the mutation boundary additionally requires a scoped trusted authority grant when any condition is true:
 
-- the request uses `autonomous` mode;
-- the action is high-assurance/destructive: `push_code`, `reply_human_thread`, `resolve_thread`, `resolve_bot_thread`, `close_linked_issue`, `close_pr`, `merge_pr`, `retarget_pr`, or `delete_head_branch`; or
-- a `post_comment` body is a format-recognized full-review verdict (`## [GD] Verdict:` plus the `github-delivery:full-review-verdict` run/head marker).
+- the request uses `autonomous` mode; or
+- the action is marked `highAssurance` in `scripts/lib/mutation-action-registry.mjs`.
+
+The canonical enabled high-assurance action set is listed below. CI verifies exact set equality against the executable registry. Do not maintain a second informal subset elsewhere.
+
+<!-- high-assurance-actions:start -->
+- `assign_issue`
+- `change_draft_state`
+- `close_linked_issue`
+- `close_pr`
+- `create_follow_up_issue`
+- `create_issue`
+- `create_pr`
+- `delete_head_branch`
+- `edit_own_comment`
+- `merge_pr`
+- `post_comment`
+- `post_issue_comment`
+- `post_resolution_record`
+- `post_review`
+- `push_code`
+- `reply_bot_thread`
+- `reply_human_thread`
+- `request_reviewers`
+- `resolve_bot_thread`
+- `resolve_thread`
+- `retarget_pr`
+- `update_pr_body`
+<!-- high-assurance-actions:end -->
 
 The existing `GITHUB_DELIVERY_REQUIRE_TRUSTED_AUTHORITY=1` switch remains a stronger global policy and requires trusted authority for every executed mutation. In every strict case, the trusted grant must contain `scopeSha256`; a legacy resource-only signature is not enough.
 
