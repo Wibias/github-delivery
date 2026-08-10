@@ -22,6 +22,10 @@ import {
   selectAuthoritativeCheckEvidence,
 } from "./lib/required-checks-policy.mjs";
 import { createSnapshotEnvelope } from "./lib/snapshot-schema.mjs";
+import {
+  attachRepositoryPermissions,
+  feedbackPermissionLogins,
+} from "./lib/feedback-authority.mjs";
 
 function parseArgs(argv) {
   const positionals = [];
@@ -105,6 +109,63 @@ function selectedCollection(rows, selected, label) {
       ? null
       : `${label} authoritative evidence incomplete: ${selected.incompleteReasons.join(", ")}`,
   };
+}
+
+function markFeedbackAuthorityIncomplete(collection, error) {
+  return {
+    ...collection,
+    complete: false,
+    error: collection?.error ? `${collection.error}; ${error}` : error,
+  };
+}
+
+function enrichFeedbackAuthority(owner, name, collections) {
+  const permissionsByLogin = {};
+  for (const login of feedbackPermissionLogins(collections)) {
+    const response = ghOk([
+      "api",
+      `repos/${owner}/${name}/collaborators/${encodeURIComponent(login)}/permission`,
+    ]);
+    if (!response.ok) {
+      if (isNotFound(response.error)) {
+        permissionsByLogin[login] = "none";
+        continue;
+      }
+      const error = `feedback_repository_permission_unreadable:${login}:${response.error || "request failed"}`;
+      return collections.map((collection) =>
+        markFeedbackAuthorityIncomplete(
+          attachRepositoryPermissions(collection, permissionsByLogin),
+          error,
+        ),
+      );
+    }
+    let payload;
+    try {
+      payload = JSON.parse(response.body || "null");
+    } catch {
+      const error = `feedback_repository_permission_invalid_json:${login}`;
+      return collections.map((collection) =>
+        markFeedbackAuthorityIncomplete(
+          attachRepositoryPermissions(collection, permissionsByLogin),
+          error,
+        ),
+      );
+    }
+    const permission = String(payload?.permission || "").toLowerCase();
+    if (!new Set(["admin", "write", "maintain", "read", "triage", "none"]).has(permission)) {
+      const error = `feedback_repository_permission_invalid:${login}:${permission || "missing"}`;
+      return collections.map((collection) =>
+        markFeedbackAuthorityIncomplete(
+          attachRepositoryPermissions(collection, permissionsByLogin),
+          error,
+        ),
+      );
+    }
+    permissionsByLogin[login] = permission;
+  }
+  return collections.map((collection) =>
+    attachRepositoryPermissions(collection, permissionsByLogin),
+  );
 }
 
 function reviewThreads(owner, name, pr) {
@@ -762,17 +823,22 @@ try {
     selectedChecks,
     "commit statuses",
   );
-  const issueComments = restCollection(
+  let issueComments = restCollection(
     `repos/${owner}/${name}/issues/${pr}/comments`,
     "issue comments",
   );
-  const reviewComments = restCollection(
+  let reviewComments = restCollection(
     `repos/${owner}/${name}/pulls/${pr}/comments`,
     "review comments",
   );
-  const reviews = restCollection(
+  let reviews = restCollection(
     `repos/${owner}/${name}/pulls/${pr}/reviews`,
     "review submissions",
+  );
+  [issueComments, reviewComments, reviews] = enrichFeedbackAuthority(
+    owner,
+    name,
+    [issueComments, reviewComments, reviews],
   );
   const threads = reviewThreads(owner, name, pr);
   const policy = fetchPolicy(owner, name, pr);
