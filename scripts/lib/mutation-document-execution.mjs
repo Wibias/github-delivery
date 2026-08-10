@@ -5,6 +5,7 @@ import {
   authorityRuntimeEnvironment,
   executeMutationWithAuthority,
   mutationRequiresTrustedAuthority,
+  planMutationWithAuthority,
 } from "./mutation-execution-context.mjs";
 import { stampAuthorizedReviewVerdicts } from "./review-verdict-marker.mjs";
 import { boundedSpawnSync } from "./subprocess-policy.mjs";
@@ -62,6 +63,7 @@ function resolvedDependencies(overrides = {}) {
     authorityRuntimeEnvironment,
     executeMutationWithAuthority,
     mutationRequiresTrustedAuthority,
+    planMutationWithAuthority,
     stampAuthorizedReviewVerdicts,
     ...overrides,
   };
@@ -81,6 +83,13 @@ export function executeMutationDocument({
   const requests = normalized.requests;
 
   if (execute) {
+    for (const request of requests) {
+      deps.planMutationWithAuthority(request, {
+        env: effectiveEnv,
+        readFile,
+      });
+    }
+
     const approvalIndexes = [];
     for (let index = 0; index < requests.length; index += 1) {
       if (
