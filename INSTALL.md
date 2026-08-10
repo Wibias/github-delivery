@@ -62,9 +62,19 @@ Extract an archive and copy the resulting `github-delivery` directory into the h
 
 ## Optional Windows authority host
 
-The optional Windows 11 authority host turns a local Windows Hello approval into short-lived, exact-scope trusted grants for high-assurance mutations. It is not required for ordinary installation and does not automatically enable global strict-authority enforcement.
+The optional Windows 11 authority host turns local Windows Hello approvals into short-lived, exact-scope trusted grants for high-assurance mutations. It is not required for ordinary installation and does not automatically enable global strict-authority enforcement.
 
-See [`authority-host/windows/README.md`](authority-host/windows/README.md) for requirements and installation.
+Install it from the repository root with:
+
+```powershell
+.\authority-host\windows\install.ps1
+```
+
+The installer requires Windows 11 build 22000 or newer and a .NET 8 SDK, then opens a **guided setup**. That flow checks Windows Hello readiness, runs a real verification test, asks for the first trusted repository, and requires a fresh Hello approval before the repository is allowlisted.
+
+A **Windows Hello PIN** is sufficient. Biometric hardware is not required when a Hello PIN is available. If Hello is missing or not configured, the setup UI can take you to **Settings > Accounts > Sign-in options** and let you check readiness again.
+
+See [`authority-host/windows/README.md`](authority-host/windows/README.md) for the full prerequisite, recovery, upgrade, and security behavior.
 
 ## Uninstall
 

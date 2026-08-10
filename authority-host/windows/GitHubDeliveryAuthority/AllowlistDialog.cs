@@ -74,12 +74,28 @@ internal sealed class AllowlistDialog : Form
     {
         var verification = await HelloVerifier.VerifyAsync(Handle, message);
         if (verification.Verified) return true;
-        MessageBox.Show(
+
+        var failure = verification.FailureMessage ?? "Windows Hello verification did not succeed.";
+        if (!verification.CanOpenSignInOptions)
+        {
+            MessageBox.Show(this, failure, "Windows Hello required", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return false;
+        }
+
+        var choice = MessageBox.Show(
             this,
-            verification.FailureMessage ?? "Windows Hello verification did not succeed.",
+            $"{failure}\n\nOpen Windows sign-in options now?",
             "Windows Hello required",
-            MessageBoxButtons.OK,
+            MessageBoxButtons.YesNo,
             MessageBoxIcon.Warning);
+        if (choice == DialogResult.Yes)
+        {
+            var result = WindowsSettings.OpenSignInOptions();
+            if (!result.Opened)
+            {
+                MessageBox.Show(this, result.Error ?? "Windows sign-in options could not be opened.", "Windows Settings", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
         return false;
     }
 
