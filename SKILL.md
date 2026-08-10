@@ -132,11 +132,13 @@ GitHub write, and require final evidence for final claims.
 - Merge-ready paths run their required Bug + Security + Spec + Standards review
   and **proactive contract verification**; passing bots/checks alone is not
   sufficient. See `references/policy/reviews.md` and focused review methods.
-- GitHub writes use `scripts/github-mutate.mjs` → `scripts/lib/github-mutation-router.mjs`;
-  router + action registry are the public dispatch/action-discovery boundary. Do
-  not infer capabilities from one backend or inspect brokers in routine runs
-  unless that entrypoint fails or the task audits/debugs this skill. See
-  `references/policy/mutation.md`.
+- GitHub writes use `node scripts/github-mutate.mjs --request <file> --execute`.
+  The CLI owns routine single/batch authority acquisition and dispatch through
+  `scripts/lib/github-mutation-router.mjs`; router + action registry remain the
+  public action-discovery boundary. **Do not invoke `scripts/github-authorize.mjs` separately**
+  during routine workflows, infer capabilities from one backend, or inspect brokers
+  unless the public entrypoint actually fails or the task audits/debugs this skill.
+  See `references/policy/mutation.md`.
 - Never use bare force, never silently discard unrelated work, and honor the PR
   ownership/fork-write boundary. See `references/policy/git.md`.
 - Stacks merge bottom-up and every surviving child is revalidated. See
