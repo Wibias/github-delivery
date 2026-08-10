@@ -16,10 +16,10 @@ internal sealed class ApprovalCoordinator
         _dispatcher = null;
     }
 
-    public Task<bool> ApproveBatchAsync(BatchApproval approval)
+    public Task<ApprovalDecision> ApproveBatchAsync(BatchApproval approval)
     {
         var dispatcher = _dispatcher ?? throw new InvalidOperationException("authority_ui_dispatcher_unavailable");
-        var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var completion = new TaskCompletionSource<ApprovalDecision>(TaskCreationOptions.RunContinuationsAsynchronously);
         if (!dispatcher.TryEnqueue(async () =>
         {
             try
@@ -27,8 +27,14 @@ internal sealed class ApprovalCoordinator
                 var window = new ApprovalWindow(
                     approval.Summaries,
                     $"Approve {approval.Operations.Count} exact GitHub mutation(s) for {approval.Repo}",
-                    approval.Repo);
-                completion.TrySetResult(await window.ShowAsync());
+                    approval.Repo,
+                    approval.Branch);
+                var decision = await window.ShowAsync();
+                if (decision.BranchLeaseMinutes is int minutes && (minutes < 1 || minutes > 5))
+                {
+                    throw new AuthorityException("branch_lease_minutes_invalid");
+                }
+                completion.TrySetResult(decision);
             }
             catch (Exception error) { completion.TrySetException(error); }
         })) completion.TrySetException(new InvalidOperationException("authority_ui_dispatch_failed"));
@@ -44,7 +50,7 @@ internal sealed class ApprovalCoordinator
             try
             {
                 var window = new ApprovalWindow(new[] { action }, action);
-                completion.TrySetResult(await window.ShowAsync());
+                completion.TrySetResult((await window.ShowAsync()).Approved);
             }
             catch (Exception error) { completion.TrySetException(error); }
         })) completion.TrySetException(new InvalidOperationException("authority_ui_dispatch_failed"));
