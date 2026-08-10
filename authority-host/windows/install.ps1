@@ -28,7 +28,7 @@ if (-not ($installedSdks | Where-Object { $_ -match '^8\.' })) {
 }
 
 try {
-    & $dotnet.Source publish $project -c Release -r win-x64 --self-contained false -o $publish
+    & $dotnet.Source publish $project -c Release -r win-x64 --self-contained true -o $publish
     if ($LASTEXITCODE -ne 0) {
         throw "dotnet publish failed with exit code $LASTEXITCODE."
     }

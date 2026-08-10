@@ -1,5 +1,6 @@
-// GitHub commit SHAs are 40 hex characters. The broker treats expectedHead as
-// an opaque string, so accept any full hex string of at least 40 characters.
+// GitHub commit SHAs are 40 hex characters today. Keep the existing >=40
+// compatibility so this pre-approval binding does not assume a forever-SHA1
+// repository format.
 const SHA_RE = /^[0-9a-f]{40,}$/i;
 
 function positiveInteger(value, name) {
@@ -12,8 +13,8 @@ function positiveInteger(value, name) {
 
 /**
  * Actions whose grant scope binds a PR `expectedHead`. For these, the
- * authorize step refreshes the live head before asking for approval so the
- * user approves the exact current head instead of a stale one.
+ * authorize step refreshes both the live head and live head branch before
+ * asking for approval so the signed scope can bind the exact branch too.
  */
 const PR_HEAD_SCOPED_ACTIONS = new Set([
   "post_review",
@@ -51,29 +52,39 @@ function fetchLiveHead({ request, runner }) {
     "--repo",
     String(request.repo),
     "--json",
-    "headRefOid",
-    "--jq",
-    ".headRefOid",
+    "headRefOid,headRefName",
   ]);
   if (typeof output !== "string") {
     throw new Error("authority_head_refresh_invalid_output");
   }
-  const head = output.trim();
+
+  let parsed;
+  try {
+    parsed = JSON.parse(output);
+  } catch {
+    throw new Error("authority_head_refresh_invalid_output");
+  }
+
+  const head = typeof parsed?.headRefOid === "string" ? parsed.headRefOid.trim() : "";
   if (!SHA_RE.test(head)) {
     throw new Error("authority_head_refresh_invalid_head");
   }
-  return head;
+  const branch = typeof parsed?.headRefName === "string" ? parsed.headRefName.trim() : "";
+  if (!branch) {
+    throw new Error("authority_head_refresh_invalid_branch");
+  }
+  return { head, branch };
 }
 
 /**
- * Refresh the `expectedHead` of every PR-scoped operation against the live
- * GitHub head before the authorization prompt. Operations without a PR head
- * binding are returned unchanged. A failed read fails closed before any
- * approval prompt.
+ * Refresh the `expectedHead` and bind `authorityBranch` for every PR-scoped
+ * operation against live GitHub state before the authorization prompt.
+ * Operations without a PR head binding are returned unchanged. A failed read
+ * fails closed before any approval prompt.
  *
- * Returns `{ requests, refreshed }` where `refreshed` is an array of
- * `{ index, pr, repo, from, to }` entries for every operation whose expected
- * head was updated.
+ * Returns `{ requests, refreshed }` where `refreshed` contains only operations
+ * whose expected head moved. Branch identity is nevertheless bound to every
+ * PR-scoped output request.
  */
 export function refreshExpectedHeads({
   requests = [],
@@ -87,18 +98,20 @@ export function refreshExpectedHeads({
     const request = requests[index];
     if (!headRefreshCandidate(request)) continue;
     const observed = fetchLiveHead({ request, runner });
-    if (String(observed).toLowerCase() !== String(request.expectedHead).toLowerCase()) {
+    output[index] = {
+      ...output[index],
+      expectedHead: observed.head,
+      authorityBranch: observed.branch,
+    };
+    if (String(observed.head).toLowerCase() !== String(request.expectedHead).toLowerCase()) {
       refreshed.push({
         index,
         pr: request.pr,
         repo: request.repo,
         from: String(request.expectedHead),
-        to: observed,
+        to: observed.head,
+        branch: observed.branch,
       });
-      output[index] = {
-        ...output[index],
-        expectedHead: observed,
-      };
     }
   }
   return { requests: output, refreshed };

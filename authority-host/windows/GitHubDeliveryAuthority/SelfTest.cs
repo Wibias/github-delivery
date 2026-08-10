@@ -15,6 +15,7 @@ internal static class SelfTest
             ScopeFixture();
             GrantFixture();
             LedgerFixture();
+            BranchLeaseAndAuditFixture();
             ClassifierFixture();
             BusyGateFixture();
             HelloFailureFixture();
@@ -37,6 +38,16 @@ internal static class SelfTest
             """);
         var actual = ScopeCanonicalizer.ScopeSha256(document.RootElement);
         Assert(actual == ExpectedMergeScope, $"scope fixture mismatch: {actual}");
+
+        using var branchA = JsonDocument.Parse("""
+            {"schemaVersion":1,"action":"merge_pr","mutationMode":"maintainer","repo":"Wibias/github-delivery","pr":105,"expectedHead":"71ac000000000000000000000000000000000001","authorityBranch":"feature/a","mergeMethod":"merge"}
+            """);
+        using var branchB = JsonDocument.Parse("""
+            {"schemaVersion":1,"action":"merge_pr","mutationMode":"maintainer","repo":"Wibias/github-delivery","pr":105,"expectedHead":"71ac000000000000000000000000000000000001","authorityBranch":"feature/b","mergeMethod":"merge"}
+            """);
+        Assert(
+            ScopeCanonicalizer.ScopeSha256(branchA.RootElement) != ScopeCanonicalizer.ScopeSha256(branchB.RootElement),
+            "branch must change the exact authority scope");
     }
 
     private static void GrantFixture()
@@ -75,6 +86,56 @@ internal static class SelfTest
                 throw new Exception("second consumption unexpectedly succeeded");
             }
             catch (AuthorityException error) when (error.Code == "grant_already_consumed") { }
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch { }
+        }
+    }
+
+    private static void BranchLeaseAndAuditFixture()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"github-delivery-authority-lease-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        try
+        {
+            using var store = new StateStore(Path.Combine(root, "authority.db"));
+            const string repo = "Wibias/github-delivery";
+            const string branch = "feature/lease-test";
+            var now = 1_786_150_000L;
+
+            var lease = store.CreateBranchLease(repo, branch, now, 1);
+            Assert(store.TryGetActiveBranchLease(repo, branch, now + 1)?.LeaseId == lease.LeaseId, "branch lease exact scope missing");
+            Assert(store.TryGetActiveBranchLease(repo, "feature/other", now + 1) is null, "branch lease crossed branch scope");
+            Assert(store.TryGetActiveBranchLease("Other/repo", branch, now + 1) is null, "branch lease crossed repository scope");
+            Console.WriteLine("branch_lease_scope");
+
+            var used = store.TryUseActiveBranchLease(repo, branch, now + 2, 2);
+            Assert(used?.LeaseId == lease.LeaseId, "atomic branch lease use failed");
+            Assert(store.ListRecentAuditEvents().Any(entry => entry.EventType == "branch_lease_used" && entry.Branch == branch), "branch lease use was not audited atomically");
+            Console.WriteLine("branch_lease_atomic_use");
+
+            Assert(store.TryGetActiveBranchLease(repo, branch, now + 61) is null, "expired branch lease remained active");
+            Assert(store.RecordExpiredBranchLeases(now + 61) == 1, "expired branch lease was not audited");
+            Assert(store.RecordExpiredBranchLeases(now + 62) == 0, "expired branch lease audit duplicated");
+            Assert(
+                store.ListRecentAuditEvents().Any(entry =>
+                    entry.EventType == "branch_lease_expired" &&
+                    entry.Repo == repo &&
+                    entry.Branch == branch &&
+                    entry.CreatedAt == lease.ExpiresAt),
+                "branch lease expiry audit mismatch");
+            Console.WriteLine("branch_lease_expiry");
+
+            var revokeLease = store.CreateBranchLease(repo, "feature/revoke", now + 2, 5);
+            Assert(store.RevokeBranchLease(revokeLease.LeaseId, now + 3), "branch lease revocation failed");
+            Assert(store.TryGetActiveBranchLease(repo, "feature/revoke", now + 4) is null, "revoked branch lease remained active");
+            Console.WriteLine("branch_lease_revocation");
+
+            store.RecordAuditEvent("self_test_event", repo, branch, "ok", "metadata only", now + 5);
+            var events = store.ListRecentAuditEvents();
+            Assert(events.Any(entry => entry.EventType == "self_test_event" && entry.Repo == repo && entry.Branch == branch && entry.Outcome == "ok"), "audit event roundtrip failed");
+            Console.WriteLine("audit_event_roundtrip");
         }
         finally
         {
