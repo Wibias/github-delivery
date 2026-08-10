@@ -81,6 +81,8 @@ internal static class SelfTest
     {
         using var merge = JsonDocument.Parse("{\"action\":\"merge_pr\",\"mutationMode\":\"maintainer\"}");
         using var autonomousRetarget = JsonDocument.Parse("{\"action\":\"retarget_pr\",\"mutationMode\":\"autonomous\"}");
+        using var autonomousIssue = JsonDocument.Parse("{\"action\":\"create_issue\",\"mutationMode\":\"autonomous\"}");
+        using var autonomousPr = JsonDocument.Parse("{\"action\":\"create_pr\",\"mutationMode\":\"autonomous\"}");
         using var botThread = JsonDocument.Parse("{\"action\":\"resolve_bot_thread\",\"mutationMode\":\"review\"}");
         using var comment = JsonDocument.Parse("{\"action\":\"post_comment\",\"mutationMode\":\"review\",\"body\":\"ordinary note\"}");
         using var review = JsonDocument.Parse("{\"action\":\"post_review\",\"mutationMode\":\"review\",\"body\":\"review note\"}");
@@ -88,6 +90,8 @@ internal static class SelfTest
         using var humanReply = JsonDocument.Parse("{\"action\":\"reply_human_thread\",\"mutationMode\":\"review\"}");
         Assert(MutationClassifier.RequiresWindowsHello(merge.RootElement), "merge must require Hello");
         Assert(MutationClassifier.RequiresWindowsHello(autonomousRetarget.RootElement), "autonomous retarget must require Hello");
+        Assert(MutationClassifier.RequiresWindowsHello(autonomousIssue.RootElement), "autonomous issue creation must require Hello");
+        Assert(MutationClassifier.RequiresWindowsHello(autonomousPr.RootElement), "autonomous PR creation must require Hello");
         Assert(MutationClassifier.RequiresWindowsHello(botThread.RootElement), "bot thread resolution must require Hello even in review mode");
         Assert(MutationClassifier.RequiresWindowsHello(comment.RootElement), "ordinary review comment must require independent Hello approval");
         Assert(MutationClassifier.RequiresWindowsHello(review.RootElement), "review publication must require independent Hello approval");
