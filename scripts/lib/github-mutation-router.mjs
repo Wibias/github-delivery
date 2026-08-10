@@ -7,6 +7,7 @@ import {
   isLifecycleMutationAction,
   planLifecycleMutationRequest,
 } from "./github-lifecycle-mutation-broker.mjs";
+import { makeGitHubBodyTransportRunner } from "./github-body-transport.mjs";
 import { makeIdempotencyReceiptRunner } from "./idempotency-receipt-runner.mjs";
 import { boundedSpawnSync } from "./subprocess-policy.mjs";
 
@@ -17,10 +18,14 @@ export function planMutationRequest(request = {}, options = {}) {
 }
 
 export function executeMutationRequest(options = {}) {
+  const baseRunner =
+    typeof options.runner === "function" ? options.runner : boundedSpawnSync;
+  const bodySafeRunner = makeGitHubBodyTransportRunner(baseRunner);
+
   if (isLifecycleMutationAction(options?.request?.action)) {
     return executeLifecycleMutationRequest({
       ...options,
-      runner: typeof options.runner === "function" ? options.runner : boundedSpawnSync,
+      runner: bodySafeRunner,
     });
   }
 
@@ -28,11 +33,9 @@ export function executeMutationRequest(options = {}) {
   // legacy broker will use. The wrapped runner then removes forged marker hits
   // from the broker's remote read-before-write evidence.
   const planned = planLegacyMutationRequest(options?.request || {}, options);
-  const baseRunner =
-    typeof options.runner === "function" ? options.runner : boundedSpawnSync;
   const runner = makeIdempotencyReceiptRunner({
     request: planned.request,
-    runner: baseRunner,
+    runner: bodySafeRunner,
   });
   return executeLegacyMutationRequest({
     ...options,
