@@ -71,3 +71,18 @@ test("non-Windows runtimes do not invent authority configuration", () => {
   assert.equal(env.GITHUB_DELIVERY_AUTHORITY_PIPE, undefined);
   assert.equal(env.GITHUB_DELIVERY_AUTHORITY_TRUST_STORE, undefined);
 });
+
+test("explicit public key prevents standard trust-store discovery", () => {
+  const env = authorityRuntimeEnvironment({
+    env: {
+      LOCALAPPDATA: localAppData,
+      GITHUB_DELIVERY_AUTHORITY_PUBLIC_KEY: "legacy-public-key",
+    },
+    platform: "win32",
+    exists() {
+      throw new Error("explicit public key must not probe the default trust store");
+    },
+  });
+  assert.equal(env.GITHUB_DELIVERY_AUTHORITY_PUBLIC_KEY, "legacy-public-key");
+  assert.equal(env.GITHUB_DELIVERY_AUTHORITY_TRUST_STORE, undefined);
+});
