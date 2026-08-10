@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-import { spawnSync } from "node:child_process";
 import { appendFileSync, readFileSync } from "node:fs";
 
 import { runGitHubCommandWithRetry } from "./lib/github-retry.mjs";
 import { executeMutationWithAuthority } from "./lib/mutation-execution-context.mjs";
+import { boundedSpawnSync } from "./lib/subprocess-policy.mjs";
 
 const usage =
   "Usage: node scripts/github-mutate.mjs --request FILE [--execute] [--audit FILE]";
@@ -30,9 +30,12 @@ function parseArgs(argv) {
   return { requestPath, auditPath, execute };
 }
 
-function mutationRunner(command, argv, options) {
-  if (command !== "gh") return spawnSync(command, argv, options);
-  return runGitHubCommandWithRetry(command, argv, { options });
+export function mutationRunner(command, argv, options) {
+  if (command !== "gh") return boundedSpawnSync(command, argv, options);
+  return runGitHubCommandWithRetry(command, argv, {
+    options,
+    runner: boundedSpawnSync,
+  });
 }
 
 try {
