@@ -349,6 +349,46 @@ internal sealed class StateStore : IDisposable
         return leases;
     }
 
+    public int RecordExpiredBranchLeases(long now)
+    {
+        using var connection = Open();
+        using var transaction = connection.BeginTransaction(deferred: false);
+        var expired = new List<BranchLeaseRecord>();
+        using (var select = connection.CreateCommand())
+        {
+            select.Transaction = transaction;
+            select.CommandText = """
+                SELECT bl.lease_id,bl.repo,bl.branch,bl.created_at,bl.expires_at,bl.revoked_at
+                FROM branch_leases bl
+                WHERE bl.revoked_at IS NULL
+                  AND bl.expires_at <= $now
+                  AND NOT EXISTS (
+                    SELECT 1 FROM audit_events a
+                    WHERE a.event_type='branch_lease_expired'
+                      AND a.detail=('lease_id=' || bl.lease_id)
+                  )
+                ORDER BY bl.expires_at, bl.lease_id;
+                """;
+            select.Parameters.AddWithValue("$now", now);
+            using var reader = select.ExecuteReader();
+            while (reader.Read()) expired.Add(ReadBranchLease(reader));
+        }
+        foreach (var lease in expired)
+        {
+            InsertAuditEvent(
+                connection,
+                transaction,
+                "branch_lease_expired",
+                lease.Repo,
+                lease.Branch,
+                "expired",
+                $"lease_id={lease.LeaseId}",
+                lease.ExpiresAt);
+        }
+        transaction.Commit();
+        return expired.Count;
+    }
+
     public bool RevokeBranchLease(string leaseId, long now)
     {
         if (string.IsNullOrWhiteSpace(leaseId)) throw new AuthorityException("branch_lease_id_invalid");
