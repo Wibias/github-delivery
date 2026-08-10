@@ -73,6 +73,28 @@ internal sealed class StateStore : IDisposable
               consumed_at INTEGER NULL,
               UNIQUE(batch_id, batch_index)
             );
+            CREATE TABLE IF NOT EXISTS branch_leases (
+              lease_id TEXT PRIMARY KEY,
+              repo TEXT NOT NULL,
+              branch TEXT NOT NULL,
+              created_at INTEGER NOT NULL,
+              expires_at INTEGER NOT NULL,
+              revoked_at INTEGER NULL,
+              CHECK(expires_at > created_at)
+            );
+            CREATE INDEX IF NOT EXISTS branch_leases_scope
+              ON branch_leases(repo, branch, expires_at, revoked_at);
+            CREATE TABLE IF NOT EXISTS audit_events (
+              event_id TEXT PRIMARY KEY,
+              event_type TEXT NOT NULL,
+              repo TEXT NULL,
+              branch TEXT NULL,
+              outcome TEXT NOT NULL,
+              detail TEXT NULL,
+              created_at INTEGER NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS audit_events_created_at
+              ON audit_events(created_at DESC);
             """;
         command.ExecuteNonQuery();
     }
@@ -102,16 +124,22 @@ internal sealed class StateStore : IDisposable
     {
         ValidateRepo(repo);
         using var connection = Open();
-        using var command = connection.CreateCommand();
-        command.CommandText = """
-            INSERT INTO allowed_repositories(repo, enabled, updated_at)
-            VALUES($repo, $enabled, $now)
-            ON CONFLICT(repo) DO UPDATE SET enabled=excluded.enabled, updated_at=excluded.updated_at;
-            """;
-        command.Parameters.AddWithValue("$repo", repo);
-        command.Parameters.AddWithValue("$enabled", enabled ? 1 : 0);
-        command.Parameters.AddWithValue("$now", now);
-        command.ExecuteNonQuery();
+        using var transaction = connection.BeginTransaction();
+        using (var command = connection.CreateCommand())
+        {
+            command.Transaction = transaction;
+            command.CommandText = """
+                INSERT INTO allowed_repositories(repo, enabled, updated_at)
+                VALUES($repo, $enabled, $now)
+                ON CONFLICT(repo) DO UPDATE SET enabled=excluded.enabled, updated_at=excluded.updated_at;
+                """;
+            command.Parameters.AddWithValue("$repo", repo);
+            command.Parameters.AddWithValue("$enabled", enabled ? 1 : 0);
+            command.Parameters.AddWithValue("$now", now);
+            command.ExecuteNonQuery();
+        }
+        InsertAuditEvent(connection, transaction, "allowlist_changed", repo, null, enabled ? "enabled" : "disabled", null, now);
+        transaction.Commit();
     }
 
     public SigningKeyRecord? GetActiveSigningKey()
@@ -195,6 +223,151 @@ internal sealed class StateStore : IDisposable
         }
         transaction.Commit();
         return expired;
+    }
+
+    public BranchLeaseRecord CreateBranchLease(string repo, string branch, long now, int minutes)
+    {
+        ValidateRepo(repo);
+        branch = ValidateBranch(branch);
+        if (minutes is < 1 or > 5) throw new AuthorityException("branch_lease_minutes_invalid");
+        var lease = new BranchLeaseRecord(
+            Guid.NewGuid().ToString("N"),
+            repo,
+            branch,
+            now,
+            checked(now + (minutes * 60L)),
+            null);
+
+        using var connection = Open();
+        using var transaction = connection.BeginTransaction(deferred: false);
+        using (var revoke = connection.CreateCommand())
+        {
+            revoke.Transaction = transaction;
+            revoke.CommandText = """
+                UPDATE branch_leases
+                SET revoked_at=$now
+                WHERE lower(repo)=lower($repo) AND branch=$branch AND revoked_at IS NULL AND expires_at > $now;
+                """;
+            revoke.Parameters.AddWithValue("$now", now);
+            revoke.Parameters.AddWithValue("$repo", repo);
+            revoke.Parameters.AddWithValue("$branch", branch);
+            revoke.ExecuteNonQuery();
+        }
+        using (var insert = connection.CreateCommand())
+        {
+            insert.Transaction = transaction;
+            insert.CommandText = """
+                INSERT INTO branch_leases(lease_id,repo,branch,created_at,expires_at,revoked_at)
+                VALUES($id,$repo,$branch,$created,$expires,NULL);
+                """;
+            insert.Parameters.AddWithValue("$id", lease.LeaseId);
+            insert.Parameters.AddWithValue("$repo", lease.Repo);
+            insert.Parameters.AddWithValue("$branch", lease.Branch);
+            insert.Parameters.AddWithValue("$created", lease.CreatedAt);
+            insert.Parameters.AddWithValue("$expires", lease.ExpiresAt);
+            insert.ExecuteNonQuery();
+        }
+        InsertAuditEvent(connection, transaction, "branch_lease_created", repo, branch, "approved", $"expires_at={lease.ExpiresAt}", now);
+        transaction.Commit();
+        return lease;
+    }
+
+    public BranchLeaseRecord? TryGetActiveBranchLease(string repo, string branch, long now)
+    {
+        ValidateRepo(repo);
+        branch = ValidateBranch(branch);
+        using var connection = Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT lease_id,repo,branch,created_at,expires_at,revoked_at
+            FROM branch_leases
+            WHERE lower(repo)=lower($repo) AND branch=$branch AND revoked_at IS NULL AND expires_at > $now
+            ORDER BY expires_at DESC LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$repo", repo);
+        command.Parameters.AddWithValue("$branch", branch);
+        command.Parameters.AddWithValue("$now", now);
+        using var reader = command.ExecuteReader();
+        return reader.Read() ? ReadBranchLease(reader) : null;
+    }
+
+    public IReadOnlyList<BranchLeaseRecord> ListActiveBranchLeases(long now)
+    {
+        using var connection = Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT lease_id,repo,branch,created_at,expires_at,revoked_at
+            FROM branch_leases
+            WHERE revoked_at IS NULL AND expires_at > $now
+            ORDER BY expires_at ASC, lower(repo), branch;
+            """;
+        command.Parameters.AddWithValue("$now", now);
+        using var reader = command.ExecuteReader();
+        var leases = new List<BranchLeaseRecord>();
+        while (reader.Read()) leases.Add(ReadBranchLease(reader));
+        return leases;
+    }
+
+    public bool RevokeBranchLease(string leaseId, long now)
+    {
+        if (string.IsNullOrWhiteSpace(leaseId)) throw new AuthorityException("branch_lease_id_invalid");
+        using var connection = Open();
+        using var transaction = connection.BeginTransaction(deferred: false);
+        BranchLeaseRecord? lease = null;
+        using (var select = connection.CreateCommand())
+        {
+            select.Transaction = transaction;
+            select.CommandText = "SELECT lease_id,repo,branch,created_at,expires_at,revoked_at FROM branch_leases WHERE lease_id=$id LIMIT 1;";
+            select.Parameters.AddWithValue("$id", leaseId);
+            using var reader = select.ExecuteReader();
+            if (reader.Read()) lease = ReadBranchLease(reader);
+        }
+        if (lease is null || lease.RevokedAt is not null || lease.ExpiresAt <= now)
+        {
+            transaction.Rollback();
+            return false;
+        }
+        using (var update = connection.CreateCommand())
+        {
+            update.Transaction = transaction;
+            update.CommandText = "UPDATE branch_leases SET revoked_at=$now WHERE lease_id=$id AND revoked_at IS NULL;";
+            update.Parameters.AddWithValue("$now", now);
+            update.Parameters.AddWithValue("$id", leaseId);
+            if (update.ExecuteNonQuery() != 1) throw new AuthorityException("branch_lease_revoke_race");
+        }
+        InsertAuditEvent(connection, transaction, "branch_lease_revoked", lease.Repo, lease.Branch, "revoked", null, now);
+        transaction.Commit();
+        return true;
+    }
+
+    public void RecordAuditEvent(string eventType, string? repo, string? branch, string outcome, string? detail, long now)
+    {
+        if (string.IsNullOrWhiteSpace(eventType)) throw new AuthorityException("audit_event_type_invalid");
+        if (string.IsNullOrWhiteSpace(outcome)) throw new AuthorityException("audit_event_outcome_invalid");
+        if (repo is not null) ValidateRepo(repo);
+        if (branch is not null) branch = ValidateBranch(branch);
+        using var connection = Open();
+        using var transaction = connection.BeginTransaction();
+        InsertAuditEvent(connection, transaction, eventType, repo, branch, outcome, detail, now);
+        transaction.Commit();
+    }
+
+    public IReadOnlyList<AuditEventRecord> ListRecentAuditEvents(int limit = 50)
+    {
+        if (limit is < 1 or > 100) throw new AuthorityException("audit_event_limit_invalid");
+        using var connection = Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT event_id,event_type,repo,branch,outcome,detail,created_at
+            FROM audit_events
+            ORDER BY created_at DESC, event_id DESC
+            LIMIT $limit;
+            """;
+        command.Parameters.AddWithValue("$limit", limit);
+        using var reader = command.ExecuteReader();
+        var events = new List<AuditEventRecord>();
+        while (reader.Read()) events.Add(ReadAuditEvent(reader));
+        return events;
     }
 
     public void RecordApprovalAndGrants(
@@ -312,6 +485,32 @@ internal sealed class StateStore : IDisposable
         command.ExecuteNonQuery();
     }
 
+    private static void InsertAuditEvent(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string eventType,
+        string? repo,
+        string? branch,
+        string outcome,
+        string? detail,
+        long now)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            INSERT INTO audit_events(event_id,event_type,repo,branch,outcome,detail,created_at)
+            VALUES($id,$type,$repo,$branch,$outcome,$detail,$createdAt);
+            """;
+        command.Parameters.AddWithValue("$id", Guid.NewGuid().ToString("N"));
+        command.Parameters.AddWithValue("$type", eventType);
+        command.Parameters.AddWithValue("$repo", repo is null ? DBNull.Value : repo);
+        command.Parameters.AddWithValue("$branch", branch is null ? DBNull.Value : branch);
+        command.Parameters.AddWithValue("$outcome", outcome);
+        command.Parameters.AddWithValue("$detail", string.IsNullOrEmpty(detail) ? DBNull.Value : detail.Length <= 500 ? detail : detail[..500]);
+        command.Parameters.AddWithValue("$createdAt", now);
+        command.ExecuteNonQuery();
+    }
+
     private static SigningKeyRecord ReadKey(SqliteDataReader reader)
         => new(
             reader.GetString(0),
@@ -321,6 +520,25 @@ internal sealed class StateStore : IDisposable
             reader.GetInt64(4),
             reader.IsDBNull(5) ? null : reader.GetInt64(5));
 
+    private static BranchLeaseRecord ReadBranchLease(SqliteDataReader reader)
+        => new(
+            reader.GetString(0),
+            reader.GetString(1),
+            reader.GetString(2),
+            reader.GetInt64(3),
+            reader.GetInt64(4),
+            reader.IsDBNull(5) ? null : reader.GetInt64(5));
+
+    private static AuditEventRecord ReadAuditEvent(SqliteDataReader reader)
+        => new(
+            reader.GetString(0),
+            reader.GetString(1),
+            reader.IsDBNull(2) ? null : reader.GetString(2),
+            reader.IsDBNull(3) ? null : reader.GetString(3),
+            reader.GetString(4),
+            reader.IsDBNull(5) ? null : reader.GetString(5),
+            reader.GetInt64(6));
+
     private static void ValidateRepo(string repo)
     {
         var parts = repo.Split('/');
@@ -328,5 +546,15 @@ internal sealed class StateStore : IDisposable
         {
             throw new AuthorityException("repo_invalid");
         }
+    }
+
+    private static string ValidateBranch(string branch)
+    {
+        var value = branch?.Trim() ?? string.Empty;
+        if (value.Length == 0 || value.Length > 1024 || value.Any(char.IsControl))
+        {
+            throw new AuthorityException("branch_invalid");
+        }
+        return value;
     }
 }
