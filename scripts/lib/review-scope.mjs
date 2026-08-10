@@ -169,6 +169,20 @@ function normalizeFile(file) {
   };
 }
 
+export function assertCompletePrFileEnumeration(expectedCount, observedCount) {
+  const expected = Number(expectedCount);
+  const observed = Number(observedCount);
+  if (!Number.isSafeInteger(expected) || expected < 0) {
+    throw new Error("pr_changed_files_count_invalid");
+  }
+  if (!Number.isSafeInteger(observed) || observed < 0) {
+    throw new Error("pr_changed_files_observed_count_invalid");
+  }
+  if (expected !== observed) {
+    throw new Error(`pr_changed_files_incomplete: expected ${expected}, observed ${observed}`);
+  }
+}
+
 export function planReviewScope(input = {}) {
   const files = (input.files || []).map(normalizeFile).filter((file) => file.path);
   const evidence = new Map();
@@ -311,9 +325,11 @@ function gh(args) {
 }
 
 export function collectPrReviewInput(repo, pr) {
-  const meta = JSON.parse(gh(["pr", "view", String(pr), "--repo", repo, "--json", "url,baseRefName,headRefOid,headRefName"]));
+  const meta = JSON.parse(gh(["pr", "view", String(pr), "--repo", repo, "--json", "url,baseRefName,headRefOid,headRefName,changedFiles"]));
   const pages = JSON.parse(gh(["api", `repos/${repo}/pulls/${pr}/files?per_page=100`, "--method", "GET", "--paginate", "--slurp"]));
-  return { repo, pr, ...meta, files: pages.flat() };
+  const files = pages.flat();
+  assertCompletePrFileEnumeration(meta.changedFiles, files.length);
+  return { repo, pr, ...meta, files };
 }
 
 function git(args) {
