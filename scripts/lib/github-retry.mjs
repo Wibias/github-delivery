@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 const RATE_LIMIT_RE = /(?:HTTP\s+429|secondary rate limit|API rate limit exceeded|rate limit)/i;
 const RETRY_AFTER_RE = /retry-after\s*:?\s*(\d+)/i;
 const RESET_RE = /x-ratelimit-reset\s*:?\s*(\d+)/i;
+const DEFAULT_SECONDARY_DELAY_MS = 60_000;
 
 function methodFromArgs(args) {
   let method = null;
@@ -49,12 +50,20 @@ export function isReadOnlyGitHubCommand(command, args = []) {
 }
 
 export function classifyGitHubRateLimit(result = {}) {
-  if (result?.status === 0) return { rateLimited: false, delayMs: 0 };
+  if (result?.status === 0) {
+    return { rateLimited: false, delayMs: 0, source: null };
+  }
   const text = `${String(result?.stderr || "")}\n${String(result?.stdout || "")}`;
-  if (!RATE_LIMIT_RE.test(text)) return { rateLimited: false, delayMs: 0 };
+  if (!RATE_LIMIT_RE.test(text)) {
+    return { rateLimited: false, delayMs: 0, source: null };
+  }
   const retryAfter = text.match(RETRY_AFTER_RE);
   if (retryAfter) {
-    return { rateLimited: true, delayMs: Math.max(0, Number(retryAfter[1]) * 1000) };
+    return {
+      rateLimited: true,
+      delayMs: Math.max(0, Number(retryAfter[1]) * 1000),
+      source: "retry_after",
+    };
   }
   const reset = text.match(RESET_RE);
   if (reset) {
@@ -62,15 +71,22 @@ export function classifyGitHubRateLimit(result = {}) {
       rateLimited: true,
       resetEpochSeconds: Number(reset[1]),
       delayMs: null,
+      source: "rate_limit_reset",
     };
   }
-  return { rateLimited: true, delayMs: null };
+  return { rateLimited: true, delayMs: null, source: "secondary_fallback" };
 }
 
 function defaultSleep(ms) {
   if (ms <= 0) return;
   const wait = new Int32Array(new SharedArrayBuffer(4));
   Atomics.wait(wait, 0, 0, ms);
+}
+
+function fallbackDelayMs(attempt, random) {
+  const base = DEFAULT_SECONDARY_DELAY_MS * 2 ** Math.max(0, attempt - 1);
+  const positiveJitter = Math.floor(base * 0.25 * Math.max(0, Math.min(1, random())));
+  return base + positiveJitter;
 }
 
 export function runGitHubCommandWithRetry(
@@ -83,6 +99,7 @@ export function runGitHubCommandWithRetry(
     maxDelayMs = 60_000,
     now = () => Date.now(),
     sleep = defaultSleep,
+    random = Math.random,
   } = {},
 ) {
   const attempts = Math.max(1, Number(maxAttempts) || 1);
@@ -90,20 +107,35 @@ export function runGitHubCommandWithRetry(
   let result;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     result = runner(command, args, options);
-    if (result?.status === 0) return { ...result, githubDeliveryAttempts: attempt };
+    if (result?.status === 0) {
+      return { ...result, githubDeliveryAttempts: attempt };
+    }
     const rate = classifyGitHubRateLimit(result);
     if (!readOnly || !rate.rateLimited || attempt >= attempts) {
       return { ...result, githubDeliveryAttempts: attempt };
     }
+
     let delayMs;
     if (rate.delayMs !== null) {
       delayMs = rate.delayMs;
     } else if (rate.resetEpochSeconds) {
       delayMs = Math.max(0, rate.resetEpochSeconds * 1000 - now());
     } else {
-      delayMs = 1000 * 2 ** (attempt - 1);
+      delayMs = fallbackDelayMs(attempt, random);
     }
-    sleep(Math.min(maxDelayMs, delayMs));
+
+    // Never shorten a server-directed wait just to stay inside the synchronous
+    // retry budget. Returning the rate-limit result is safer than retrying early.
+    if (delayMs > maxDelayMs) {
+      return {
+        ...result,
+        githubDeliveryAttempts: attempt,
+        githubDeliveryRetryDeferredMs: delayMs,
+        githubDeliveryRetrySource: rate.source,
+      };
+    }
+
+    sleep(delayMs);
   }
   return result;
 }

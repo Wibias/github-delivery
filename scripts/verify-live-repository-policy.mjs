@@ -73,6 +73,36 @@ function ghRepositoryMergeSettings(repo) {
   };
 }
 
+function activeRulesetPath(repo, rule) {
+  const id = Number(rule?.ruleset_id);
+  const sourceType = String(rule?.ruleset_source_type || "");
+  const source = String(rule?.ruleset_source || "");
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    throw new Error("active_ruleset_id_missing");
+  }
+  if (sourceType === "Repository") {
+    return `repos/${repo}/rulesets/${id}`;
+  }
+  if (sourceType === "Organization" && source) {
+    return `orgs/${source}/rulesets/${id}`;
+  }
+  if (sourceType === "Enterprise" && source) {
+    return `enterprises/${source}/rulesets/${id}`;
+  }
+  throw new Error(
+    `active_ruleset_source_unsupported:${sourceType || "missing"}:${source || "missing"}:${id}`,
+  );
+}
+
+function fetchActiveRulesets(repo, activeRules) {
+  const paths = new Map();
+  for (const rule of activeRules || []) {
+    const path = activeRulesetPath(repo, rule);
+    paths.set(path, true);
+  }
+  return [...paths.keys()].sort().map((path) => ghJson(path));
+}
+
 function main(argv) {
   const [repo, rootArg] = argv;
   if (!repo?.includes("/") || argv.length > 2) throw new Error(USAGE);
@@ -91,13 +121,24 @@ function main(argv) {
   const activeRules = ghJson(
     `repos/${repo}/rules/branches/${encodeURIComponent(defaultBranch)}`,
   );
+  if (!Array.isArray(activeRules)) {
+    throw new Error("active_rules_payload_invalid");
+  }
+  const activeRulesets = fetchActiveRulesets(repo, activeRules);
   const releaseEnvironment = ghJson(
     `repos/${repo}/environments/${encodeURIComponent(policy.release.environment)}`,
   );
 
   const report = evaluateLiveRepositoryPolicy({
     policy,
-    live: { repository, branch, activeRules, releaseEnvironment },
+    live: {
+      repository,
+      branch,
+      activeRules,
+      activeRulesets,
+      activeRulesetsComplete: true,
+      releaseEnvironment,
+    },
   });
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
   if (!report.valid) process.exitCode = 1;

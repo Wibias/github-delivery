@@ -33,6 +33,7 @@ function desiredPolicy() {
       requireLinearHistory: false,
     },
     merge: { methods: ["merge"], updateBranch: true, autoMerge: true },
+    rulesets: { allowBypassActors: false },
     release: {
       environment: "release",
       protectedTagPattern: "v*",
@@ -80,6 +81,14 @@ function matchingLive(policy = desiredPolicy()) {
             integration_id: policy.requiredCheckIntegrationId,
           })),
         },
+      },
+    ],
+    activeRulesetsComplete: true,
+    activeRulesets: [
+      {
+        id: 1,
+        bypass_actors: [],
+        current_user_can_bypass: "never",
       },
     ],
     releaseEnvironment: {
@@ -153,6 +162,16 @@ test("desired repository policy is fail-closed", () => {
   assert.match(validateRepositoryPolicy(policy)[0].code, /merge_method/);
 });
 
+test("checked-in policy must explicitly forbid ruleset bypass actors", () => {
+  const policy = desiredPolicy();
+  delete policy.rulesets;
+  assert.ok(
+    validateRepositoryPolicy(policy).some(
+      (error) => error.code === "ruleset_bypass_policy_required",
+    ),
+  );
+});
+
 test("live policy drift detects an unprotected default branch and missing release reviewer", () => {
   const live = matchingLive();
   live.branch.protected = false;
@@ -200,6 +219,86 @@ test("live policy verifier detects wrong required-check producer and non-strict 
   assert.ok(report.errors.some((error) => error.code === "required_check_producer_mismatch"));
 });
 
+test("live policy verifier aggregates layered rules independent of API order", () => {
+  const policy = desiredPolicy();
+  const live = matchingLive(policy);
+  const descriptors = policy.requiredChecks.map((context) => ({
+    context,
+    integration_id: policy.requiredCheckIntegrationId,
+  }));
+  live.activeRules = [
+    { type: "deletion" },
+    { type: "non_fast_forward" },
+    {
+      type: "pull_request",
+      parameters: {
+        dismiss_stale_reviews_on_push: false,
+        required_review_thread_resolution: false,
+        allowed_merge_methods: ["merge", "squash"],
+      },
+    },
+    {
+      type: "required_status_checks",
+      parameters: {
+        strict_required_status_checks_policy: false,
+        required_status_checks: descriptors.slice(0, 1),
+      },
+    },
+    {
+      type: "pull_request",
+      parameters: {
+        dismiss_stale_reviews_on_push: true,
+        required_review_thread_resolution: true,
+        allowed_merge_methods: ["merge"],
+      },
+    },
+    {
+      type: "required_status_checks",
+      parameters: {
+        strict_required_status_checks_policy: true,
+        required_status_checks: descriptors.slice(1),
+      },
+    },
+  ];
+
+  const first = evaluateLiveRepositoryPolicy({ policy, live });
+  const second = evaluateLiveRepositoryPolicy({
+    policy,
+    live: { ...live, activeRules: [...live.activeRules].reverse() },
+  });
+
+  assert.equal(first.valid, true, JSON.stringify(first.errors));
+  assert.equal(second.valid, true, JSON.stringify(second.errors));
+  assert.deepEqual(second.observedPullRequestPolicy, first.observedPullRequestPolicy);
+  assert.deepEqual(second.observedRequiredChecks, first.observedRequiredChecks);
+  assert.equal(second.strictRequiredChecks, true);
+});
+
+test("live policy verifier fails when an active ruleset exposes a bypass", () => {
+  const live = matchingLive();
+  live.activeRulesets[0].bypass_actors = [
+    { actor_id: 42, actor_type: "Team", bypass_mode: "always" },
+  ];
+  live.activeRulesets[0].current_user_can_bypass = "always";
+  const report = evaluateLiveRepositoryPolicy({ policy: desiredPolicy(), live });
+
+  assert.equal(report.valid, false);
+  assert.ok(report.errors.some((error) => error.code === "ruleset_bypass_actor_present"));
+  assert.ok(report.errors.some((error) => error.code === "current_user_can_bypass_ruleset"));
+});
+
+test("live policy verifier fails closed when bypass evidence is incomplete", () => {
+  const live = matchingLive();
+  live.activeRulesetsComplete = false;
+  const report = evaluateLiveRepositoryPolicy({ policy: desiredPolicy(), live });
+  assert.equal(report.valid, false);
+  assert.ok(
+    report.errors.some(
+      (error) => error.code === "ruleset_bypass_evidence_incomplete",
+    ),
+  );
+});
+
 test("live policy verifier detects branch and repository merge control drift", () => {
   const live = matchingLive();
   live.activeRules = live.activeRules.filter((rule) => !["deletion", "non_fast_forward"].includes(rule.type));
@@ -227,4 +326,5 @@ test("live policy verifier accepts current GitHub rule shapes when every declare
   assert.deepEqual(report.wrongProducerChecks, []);
   assert.equal(report.strictRequiredChecks, true);
   assert.equal(report.observedPullRequestPolicy.conversationResolution, true);
+  assert.deepEqual(report.observedRulesetBypassActors, []);
 });
