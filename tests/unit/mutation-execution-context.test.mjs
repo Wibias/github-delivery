@@ -123,7 +123,7 @@ test("autonomous execution always requires trusted authority", () => {
   );
 });
 
-test("high-assurance maintainer lifecycle actions require trusted authority", () => {
+test("high-assurance lifecycle and social actions require trusted authority", () => {
   for (const action of [
     "push_code",
     "create_pr",
@@ -136,24 +136,25 @@ test("high-assurance maintainer lifecycle actions require trusted authority", ()
     "merge_pr",
     "retarget_pr",
     "delete_head_branch",
+    "post_review",
+    "post_comment",
+    "post_issue_comment",
+    "edit_own_comment",
+    "reply_bot_thread",
+    "reply_human_thread",
+    "create_follow_up_issue",
+    "post_resolution_record",
   ]) {
     assert.equal(
-      mutationRequiresTrustedAuthority({ mutationMode: "maintainer", action }),
+      mutationRequiresTrustedAuthority({ mutationMode: "review", action }),
       true,
       action,
     );
   }
-  assert.equal(
-    mutationRequiresTrustedAuthority({
-      mutationMode: "maintainer",
-      action: "post_comment",
-    }),
-    false,
-  );
 });
 
-test("high-assurance authority is enforced only at execution unless globally required", () => {
-  const request = { mutationMode: "maintainer", action: "merge_pr" };
+test("social-write authority is enforced at execution even in review mode", () => {
+  const request = { mutationMode: "review", action: "post_comment" };
   assert.equal(
     mutationAuthorityOptions({ request, enforceHighAssurance: false }).requireTrustedAuthority,
     false,
@@ -164,7 +165,7 @@ test("high-assurance authority is enforced only at execution unless globally req
   );
   assert.equal(
     mutationAuthorityOptions({
-      request: { mutationMode: "review", action: "post_comment" },
+      request,
       enforceHighAssurance: false,
       env: { GITHUB_DELIVERY_REQUIRE_TRUSTED_AUTHORITY: "1" },
     }).requireTrustedAuthority,
