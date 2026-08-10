@@ -7,7 +7,7 @@ const MODE_RANK = Object.freeze({
 
 const DEFINITIONS = [
   { action: "read_evidence", enabled: true, mutation: false, route: "local", minimumMode: "read-only", authorityScopeKind: null },
-  { action: "draft_text", enabled: true, mutation: false, route: "local", minimumMode: "review", authorityScopeKind: null },
+  { action: "draft_text", enabled: true, mutation: false, route: "local", minimumMode: "read-only", authorityScopeKind: null },
   { action: "post_review", enabled: true, mutation: true, route: "legacy", minimumMode: "review", prBound: true, social: true, remoteIdempotentCreate: true, authorityScopeKind: "pr_body_social" },
   { action: "post_comment", enabled: true, mutation: true, route: "legacy", minimumMode: "review", prBound: true, social: true, remoteIdempotentCreate: true, authorityScopeKind: "pr_body_social" },
   { action: "post_issue_comment", enabled: true, mutation: true, route: "legacy", minimumMode: "review", social: true, remoteIdempotentCreate: true, authorityScopeKind: "issue_comment" },
@@ -21,7 +21,7 @@ const DEFINITIONS = [
   { action: "assign_issue", enabled: true, mutation: true, route: "lifecycle", minimumMode: "maintainer", highAssurance: true, authorityScopeKind: "assign_issue" },
   { action: "resolve_thread", enabled: true, mutation: true, route: "legacy", minimumMode: "maintainer", prBound: true, reviewThread: true, highAssurance: true, authorityScopeKind: "resolve_thread" },
   { action: "resolve_bot_thread", enabled: true, mutation: true, route: "legacy", minimumMode: "review", prBound: true, reviewThread: true, highAssurance: true, authorityScopeKind: "resolve_thread" },
-  { action: "change_draft_state", enabled: true, mutation: true, route: "legacy", minimumMode: "review", prBound: true, authorityScopeKind: "change_draft_state" },
+  { action: "change_draft_state", enabled: true, mutation: true, route: "legacy", minimumMode: "maintainer", prBound: true, authorityScopeKind: "change_draft_state" },
   { action: "request_reviewers", enabled: true, mutation: true, route: "legacy", minimumMode: "maintainer", prBound: true, authorityScopeKind: "request_reviewers" },
   { action: "close_linked_issue", enabled: true, mutation: true, route: "legacy", minimumMode: "maintainer", destructive: true, highAssurance: true, authorityScopeKind: "close_linked_issue" },
   { action: "close_pr", enabled: true, mutation: true, route: "legacy", minimumMode: "maintainer", prBound: true, destructive: true, highAssurance: true, authorityScopeKind: "close_pr" },
@@ -29,7 +29,7 @@ const DEFINITIONS = [
   { action: "retarget_pr", enabled: true, mutation: true, route: "legacy", minimumMode: "maintainer", prBound: true, highAssurance: true, authorityScopeKind: "retarget_pr" },
   { action: "delete_head_branch", enabled: true, mutation: true, route: "legacy", minimumMode: "maintainer", cleanup: true, destructive: true, highAssurance: true, authorityScopeKind: "delete_head_branch" },
   { action: "create_follow_up_issue", enabled: true, mutation: true, route: "legacy", minimumMode: "maintainer", social: true, remoteIdempotentCreate: true, issueCreationKind: "follow_up", authorityScopeKind: "create_issue" },
-  { action: "post_resolution_record", enabled: true, mutation: true, route: "legacy", minimumMode: "review", prBound: true, social: true, remoteIdempotentCreate: true, authorityScopeKind: "pr_body_social" },
+  { action: "post_resolution_record", enabled: true, mutation: true, route: "legacy", minimumMode: "maintainer", prBound: true, social: true, remoteIdempotentCreate: true, authorityScopeKind: "pr_body_social" },
   {
     action: "supersede_pr",
     enabled: false,
