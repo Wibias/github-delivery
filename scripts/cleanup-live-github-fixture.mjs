@@ -111,6 +111,17 @@ function parseJson(result, context) {
   }
 }
 
+function paginatedRows(path, context) {
+  const pages = parseJson(
+    run("gh", ["api", path, "--paginate", "--slurp"]),
+    context,
+  );
+  if (!Array.isArray(pages) || pages.some((page) => !Array.isArray(page))) {
+    throw new Error(`${context}: invalid paginated JSON output`);
+  }
+  return pages.flat();
+}
+
 function exactResource(items, title) {
   return items.find((item) => item?.title === title) || null;
 }
@@ -118,39 +129,17 @@ function exactResource(items, title) {
 function adapter() {
   return {
     async findPr(plan) {
-      const rows = parseJson(
-        run("gh", [
-          "pr",
-          "list",
-          "--repo",
-          plan.repo,
-          "--state",
-          "all",
-          "--limit",
-          "100",
-          "--json",
-          "number,state,title",
-        ]),
+      const rows = paginatedRows(
+        `repos/${plan.repo}/pulls?state=all&per_page=100`,
         "unable to list fixture pull requests",
       );
       return exactResource(rows, plan.prTitle);
     },
     async findIssue(plan) {
-      const rows = parseJson(
-        run("gh", [
-          "issue",
-          "list",
-          "--repo",
-          plan.repo,
-          "--state",
-          "all",
-          "--limit",
-          "100",
-          "--json",
-          "number,state,title",
-        ]),
+      const rows = paginatedRows(
+        `repos/${plan.repo}/issues?state=all&per_page=100`,
         "unable to list fixture issues",
-      );
+      ).filter((item) => !item?.pull_request);
       return exactResource(rows, plan.issueTitle);
     },
     async branchExists(plan) {

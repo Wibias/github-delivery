@@ -16,6 +16,36 @@ test("routes a natural-language merge request to the merge workflow", () => {
   });
 });
 
+test("routes pull request synonyms the same as PR shorthand", () => {
+  assert.equal(
+    routeShippingGithubPrompt("merge pull request #32").workflow,
+    "references/merge-pr.md",
+  );
+  assert.equal(
+    routeShippingGithubPrompt("watch pull request #77 until it merges or needs me").workflow,
+    "references/watch-pr.md",
+  );
+  assert.equal(
+    routeShippingGithubPrompt("what is left on pull request #41?").workflow,
+    "references/status.md",
+  );
+  assert.equal(
+    routeShippingGithubPrompt("take over pull request #32").workflow,
+    "references/overtake-pr.md",
+  );
+});
+
+test("routes security phrase order variants identically", () => {
+  assert.equal(
+    routeShippingGithubPrompt("security review pull request #32").workflow,
+    "references/security-review.md",
+  );
+  assert.equal(
+    routeShippingGithubPrompt("review security on pull request #32").workflow,
+    "references/security-review.md",
+  );
+});
+
 test("assistant-directed merge questions still count as explicit requests", () => {
   assert.equal(hasExplicitMergeIntent("can you merge PR #32?"), true);
   assert.equal(routeShippingGithubPrompt("can you merge PR #32?").workflow, "references/merge-pr.md");

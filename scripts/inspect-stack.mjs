@@ -164,6 +164,11 @@ export function walkStack(root, children, acc = [], path = new Set()) {
   acc.push(root);
   const kids =
     children.get(stackRefKey(root.headRepoFullName, root.headRefName)) || [];
+  if (kids.length > 1) {
+    throw new Error(
+      `stack_branching:${root.number}:children=${kids.map((kid) => kid.number).sort((a, b) => a - b).join(",")}`,
+    );
+  }
   for (const kid of kids) walkStack(kid, children, acc, nextPath);
   return acc;
 }

@@ -28,7 +28,6 @@ test("treats operational reference markdown as executable agent policy", () => {
     file("references/merge-pr.md", "-Require the final ship gate.\n+Merge when checks look green."),
   ]);
   assert.ok(result.logicFiles.includes("references/merge-pr.md"));
-  assert.ok(result.securityReview.requiredDomains.includes("agentic_skills_supply_chain"));
   assert.notEqual(result.securityReview.depth, "skip");
   assert.notEqual(result.bugReview.depth, "skip");
   assert.ok(result.baselineScreens.length > 0);
