@@ -7,7 +7,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
-import path, { dirname, join, win32 as win32Path } from "node:path";
+import { posix as posixPath, win32 as win32Path } from "node:path";
 
 export const AUTHORITY_MODES = Object.freeze([
   "off",
@@ -57,10 +57,16 @@ export function userConfigPath({
     return win32Path.join(local, "github-delivery", "config.json");
   }
   if (platform === "darwin") {
-    return join(home, "Library", "Application Support", "github-delivery", "config.json");
+    return posixPath.join(
+      home,
+      "Library",
+      "Application Support",
+      "github-delivery",
+      "config.json",
+    );
   }
-  const configRoot = env.XDG_CONFIG_HOME || join(home, ".config");
-  return join(configRoot, "github-delivery", "config.json");
+  const configRoot = env.XDG_CONFIG_HOME || posixPath.join(home, ".config");
+  return posixPath.join(configRoot, "github-delivery", "config.json");
 }
 
 export function readUserConfig({
@@ -111,8 +117,8 @@ export function writeUserConfig(
 ) {
   const config = normalizeUserConfig(value);
   const filePath = configuredPath || userConfigPath({ platform, env, home });
-  const parent =
-    platform === "win32" ? win32Path.dirname(filePath) : dirname(filePath);
+  const pathApi = platform === "win32" ? win32Path : posixPath;
+  const parent = pathApi.dirname(filePath);
   const tempPath = `${filePath}.${randomSuffix}.tmp`;
 
   mkdir(parent, { recursive: true });
