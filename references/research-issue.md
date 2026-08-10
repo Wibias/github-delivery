@@ -44,8 +44,8 @@ Run for **each** issue (batch in parallel when independent). If **>3** issues: f
 
 1. **Fetch** — title, body, labels, state, author, assignees, linked PRs, timeline.
 2. **Restate the claim** — one sentence: what exact bug/feature/ask is this? Separate reporter’s theory from observable symptom.
-3. **Latest-dev check** — update/fetch the development branch tip. Search code + history for the behavior. Prefer a minimal repro/test on that tip when feasible; if not tested, say so and why.
-4. **Already fixed on development?** — cite commit SHA / merged PR if yes. Note if fixed on development but **not** on release/default. If so: follow shared **Backport / release branch** (ask once before opening a backport PR).
+3. **Latest-dev check** — update/fetch the development branch tip. Search code + history for the behavior. Prefer a minimal repro/test on that tip when feasible. When making a runtime claim, use `references/runtime-evidence.md`: bind the attempt to the exact development-tip SHA/environment and preserve trigger, expected vs actual observations, and evidence. `not-reproduced` is **not** proof of fixed/shipped; if not tested or the attempt is blocked/inconclusive, say so and why.
+4. **Already fixed on development?** — cite commit SHA / merged PR if yes. Runtime non-reproduction alone is insufficient for this verdict; pair it with concrete code/history/fix evidence. Note if fixed on development but **not** on release/default. If so: follow shared **Backport / release branch** (ask once before opening a backport PR).
 5. **Existing PR?** — `gh pr list --search` / issue timeline for open or recently merged PRs that fix or reference it. If open PR exists: link it; do not propose a second PR.
 6. **Duplicate / same issue?** — search open+closed issues by keywords/symptoms. If duplicate: link the canonical issue (prefer older or clearly maintained). Don’t claim duplicate without a link.
 7. **Security relevance** — classify from title, body, labels, and what the code path touches (not from vibes alone):
@@ -89,6 +89,8 @@ Prefix agent research comments with `[GD]`. Edit if updating; never a truncated 
 
 Also summarize the same table(s) to the user in chat. For multiple issues, one chat summary with a row per issue, plus per-issue GitHub comments.
 
+When runtime reproduction was attempted, include its state (`reproduced`, `not-reproduced`, `blocked/inconclusive`) and the exact head/environment at a concise level. Do not publicly dump sensitive logs, credentials, or exploit material.
+
 When any issue is **possible** or **likely** security: ask in chat with the wording above (review + post, redacted public / full detail in chat). Do not auto-start.
 
 When verdict is **Fixed on development, not released**: ask the backport question (shared rules). Do not open a backport unless they say yes.
@@ -101,6 +103,7 @@ Research may batch **comments**; it must **not** open PRs. Opening PRs is `creat
 
 - Every requested issue has verdict + priority + **security relevance** + evidence
 - Each has a research comment on GitHub
+- Runtime claims distinguish reproduced / not-reproduced / blocked-inconclusive and are head/environment-bound when an attempt was made
 - Security-review ask made when relevance is possible/likely
 - No PR opened unless also requested
 - No security review started unless the user said yes
