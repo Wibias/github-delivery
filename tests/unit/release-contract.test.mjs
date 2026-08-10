@@ -8,6 +8,7 @@ import test from "node:test";
 import {
   createSpdxSbom,
   validateReleaseContext,
+  validateReleaseSourceComparison,
   verifyDistribution,
   releaseNotesForVersion,
 } from "../../scripts/lib/release-contract.mjs";
@@ -49,6 +50,57 @@ test("manual workflow runs are always dry-run", () => {
   assert.deepEqual(validateReleaseContext({ eventName: "workflow_dispatch", ref: "refs/heads/main", version: "0.1.0" }), {
     version: "0.1.0", tag: "v0.1.0", publish: false,
   });
+});
+
+test("release source must be the comparison base and an ancestor of the default branch", () => {
+  const source = "a".repeat(40);
+  assert.deepEqual(
+    validateReleaseSourceComparison({
+      sourceCommit: source,
+      branch: "main",
+      comparison: {
+        status: "ahead",
+        base_commit: { sha: source },
+        merge_base_commit: { sha: source },
+      },
+    }),
+    {
+      valid: true,
+      sourceCommit: source,
+      branch: "main",
+      status: "ahead",
+      mergeBase: source,
+    },
+  );
+});
+
+test("release source rejects diverged and non-ancestor tag commits", () => {
+  const source = "a".repeat(40);
+  const other = "b".repeat(40);
+  assert.throws(
+    () => validateReleaseSourceComparison({
+      sourceCommit: source,
+      branch: "main",
+      comparison: {
+        status: "diverged",
+        base_commit: { sha: source },
+        merge_base_commit: { sha: other },
+      },
+    }),
+    /not an ancestor/,
+  );
+  assert.throws(
+    () => validateReleaseSourceComparison({
+      sourceCommit: source,
+      branch: "main",
+      comparison: {
+        status: "behind",
+        base_commit: { sha: source },
+        merge_base_commit: { sha: source },
+      },
+    }),
+    /not protected-main lineage/,
+  );
 });
 
 test("distribution verification binds version, source commit, and checksums", () => {
