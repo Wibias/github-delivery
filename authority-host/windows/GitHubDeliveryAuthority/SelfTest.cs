@@ -116,6 +116,15 @@ internal static class SelfTest
             Console.WriteLine("branch_lease_atomic_use");
 
             Assert(store.TryGetActiveBranchLease(repo, branch, now + 61) is null, "expired branch lease remained active");
+            Assert(store.RecordExpiredBranchLeases(now + 61) == 1, "expired branch lease was not audited");
+            Assert(store.RecordExpiredBranchLeases(now + 62) == 0, "expired branch lease audit duplicated");
+            Assert(
+                store.ListRecentAuditEvents().Any(entry =>
+                    entry.EventType == "branch_lease_expired" &&
+                    entry.Repo == repo &&
+                    entry.Branch == branch &&
+                    entry.CreatedAt == lease.ExpiresAt),
+                "branch lease expiry audit mismatch");
             Console.WriteLine("branch_lease_expiry");
 
             var revokeLease = store.CreateBranchLease(repo, "feature/revoke", now + 2, 5);
