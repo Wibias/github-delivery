@@ -32,8 +32,8 @@ test("merge workflow keeps broker architecture and bare mentions", () => {
 
 test("create-PR lifecycle has no executable bare GitHub or remote-Git mutation commands", () => {
   const source = read("references/create-pr-for-issue.md");
-  assert.match(source, /action": "push_code"/);
-  assert.match(source, /action": "create_pr"/);
+  assert.match(source, /broker action `push_code`/);
+  assert.match(source, /broker action `create_pr`/);
   assert.match(source, /broker action `update_pr_body`/);
   assert.match(source, /broker action `assign_issue`/);
   assert.doesNotMatch(source, /^\s*git\s+push\b/m);

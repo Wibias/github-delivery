@@ -1,24 +1,61 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { win32 as win32Path } from "node:path";
 
 import {
   executeMutationRequest,
   planMutationRequest,
 } from "./github-mutation-router.mjs";
 import { makeRedemptionRunner } from "./authority-execution.mjs";
-import { makeAuthorityRedeemer } from "./authority-host-client.mjs";
+import {
+  DEFAULT_AUTHORITY_PIPE,
+  makeAuthorityRedeemer,
+} from "./authority-host-client.mjs";
 import { classifyMergeOutcome, readMergeState } from "./merge-outcome.mjs";
 import { actionDefinition } from "./mutation-action-registry.mjs";
 import { boundedSpawnSync } from "./subprocess-policy.mjs";
 
+export function authorityRuntimeEnvironment({
+  env = process.env,
+  platform = process.platform,
+  exists = existsSync,
+} = {}) {
+  const resolved = { ...env };
+  if (platform !== "win32") return resolved;
+
+  if (!resolved.GITHUB_DELIVERY_AUTHORITY_PIPE) {
+    resolved.GITHUB_DELIVERY_AUTHORITY_PIPE = DEFAULT_AUTHORITY_PIPE;
+  }
+
+  if (
+    !resolved.GITHUB_DELIVERY_AUTHORITY_TRUST_STORE &&
+    !resolved.GITHUB_DELIVERY_AUTHORITY_PUBLIC_KEY &&
+    resolved.LOCALAPPDATA
+  ) {
+    const candidate = win32Path.join(
+      String(resolved.LOCALAPPDATA),
+      "GitHubDeliveryAuthority",
+      "trust-store.json",
+    );
+    if (exists(candidate)) {
+      resolved.GITHUB_DELIVERY_AUTHORITY_TRUST_STORE = candidate;
+    }
+  }
+
+  return resolved;
+}
+
 export function authorityVerifierConfiguration({
   env = process.env,
   readFile = readFileSync,
+  platform = process.platform,
+  exists = existsSync,
 } = {}) {
-  const trustStorePath = env.GITHUB_DELIVERY_AUTHORITY_TRUST_STORE;
+  const resolvedEnv = authorityRuntimeEnvironment({ env, platform, exists });
+  const trustStorePath = resolvedEnv.GITHUB_DELIVERY_AUTHORITY_TRUST_STORE;
   if (trustStorePath) {
     return JSON.parse(readFile(trustStorePath, "utf8"));
   }
-  return env.GITHUB_DELIVERY_AUTHORITY_PUBLIC_KEY || null;
+  return resolvedEnv.GITHUB_DELIVERY_AUTHORITY_PUBLIC_KEY || null;
 }
 
 export function mutationRequiresTrustedAuthority(request = {}) {
@@ -67,10 +104,11 @@ export function planMutationWithAuthority(
   request,
   { env = process.env, readFile = readFileSync } = {},
 ) {
+  const runtimeEnv = authorityRuntimeEnvironment({ env });
   const options = mutationAuthorityOptions({
     request,
     enforceHighAssurance: false,
-    env,
+    env: runtimeEnv,
     readFile,
   });
   return planWithAuthorityOptions(request, options);
@@ -105,14 +143,15 @@ export function executeMutationWithAuthority({
   readFile = readFileSync,
   redeemer = undefined,
 } = {}) {
+  const runtimeEnv = authorityRuntimeEnvironment({ env });
   const options = mutationAuthorityOptions({
     request,
     enforceHighAssurance: execute === true,
-    env,
+    env: runtimeEnv,
     readFile,
   });
   const planned = planWithAuthorityOptions(request, options);
-  const pipeName = env.GITHUB_DELIVERY_AUTHORITY_PIPE || undefined;
+  const pipeName = runtimeEnv.GITHUB_DELIVERY_AUTHORITY_PIPE || undefined;
   const resolvedRedeemer =
     redeemer === undefined
       ? pipeName
