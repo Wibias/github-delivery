@@ -1,4 +1,7 @@
-const TRUSTED = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
+import { repositoryPermissionCanMaintainFeedback } from "./feedback-authority.mjs";
+
+const DIRECT_TRUSTED = new Set(["OWNER"]);
+const PERMISSION_GATED = new Set(["MEMBER", "COLLABORATOR"]);
 const BOT_RE = /\[bot\]$/i;
 const LEGACY_AGENT_PREFIXES = [
   ["github", "delivery"].join("-"),
@@ -53,6 +56,8 @@ export function normalizeFeedback(raw, kind) {
     url: raw?.html_url || raw?.url || null,
     login: raw?.user?.login || raw?.author?.login || null,
     association: raw?.author_association || raw?.authorAssociation || null,
+    repositoryPermission:
+      raw?.repository_permission || raw?.repositoryPermission || null,
     createdAt: raw?.created_at || raw?.submitted_at || raw?.createdAt || null,
     body: raw?.body || "",
     path: raw?.path || null,
@@ -61,7 +66,13 @@ export function normalizeFeedback(raw, kind) {
 }
 
 export function isTrustedHumanFeedback(comment, { myLogin = null } = {}) {
-  if (!TRUSTED.has(comment?.association)) return false;
+  const association = String(comment?.association || "").toUpperCase();
+  if (!DIRECT_TRUSTED.has(association)) {
+    if (!PERMISSION_GATED.has(association)) return false;
+    if (!repositoryPermissionCanMaintainFeedback(comment?.repositoryPermission)) {
+      return false;
+    }
+  }
   if (
     !comment?.login ||
     BOT_RE.test(comment.login) ||
