@@ -21,12 +21,14 @@ internal sealed class AuthorityService
     public object Status()
     {
         var active = _store.GetActiveSigningKey();
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         return new
         {
             status = "ready",
             protocol = AuthorityPipeServer.Protocol,
             key = active is null ? null : new { kid = active.Kid, alg = "ES256", active.Status },
             allowedRepositories = _store.ListAllowedRepositories(),
+            activeBranchLeases = _store.ListActiveBranchLeases(now).Count,
         };
     }
 
@@ -51,6 +53,7 @@ internal sealed class AuthorityService
         var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         var expiresAt = checked(now + GrantTtlSeconds);
         var summaries = operations.Select((operation, index) => BuildSummary(index, operation, scopes[index])).ToArray();
+        var branch = BranchScope.Resolve(operations);
         var requiresHello = operations.Any(MutationClassifier.RequiresWindowsHello);
         var hasStandaloneExactHumanReply = operations.Any(MutationClassifier.RequiresExactHumanApproval) && !requiresHello;
         if (hasStandaloneExactHumanReply)
@@ -61,11 +64,37 @@ internal sealed class AuthorityService
         var approvalMethod = "host_policy";
         if (requiresHello)
         {
-            var approval = new BatchApproval(repo, batchId, batchHash, operations, summaries, expiresAt);
-            if (!await _approvals.ApproveBatchAsync(approval).ConfigureAwait(false)) throw new AuthorityException("user_denied");
-            approvalMethod = "windows_hello";
-            now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            expiresAt = checked(now + GrantTtlSeconds);
+            var activeLease = branch is null ? null : _store.TryGetActiveBranchLease(repo, branch, now);
+            if (activeLease is not null)
+            {
+                approvalMethod = "branch_lease";
+                _store.RecordAuditEvent(
+                    "branch_lease_used",
+                    repo,
+                    branch,
+                    "approved",
+                    $"lease_id={activeLease.LeaseId};operations={operations.Length}",
+                    now);
+            }
+            else
+            {
+                var approval = new BatchApproval(repo, batchId, batchHash, operations, summaries, expiresAt, branch);
+                var decision = await _approvals.ApproveBatchAsync(approval).ConfigureAwait(false);
+                if (!decision.Approved)
+                {
+                    _store.RecordAuditEvent("approval_denied", repo, branch, "denied", $"operations={operations.Length}", now);
+                    throw new AuthorityException("user_denied");
+                }
+                approvalMethod = "windows_hello";
+                now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+                expiresAt = checked(now + GrantTtlSeconds);
+                _store.RecordAuditEvent("approval_granted", repo, branch, "approved", $"operations={operations.Length}", now);
+                if (decision.BranchLeaseMinutes is int branchLeaseMinutes)
+                {
+                    if (branch is null) throw new AuthorityException("branch_lease_scope_required");
+                    _store.CreateBranchLease(repo, branch, now, branchLeaseMinutes);
+                }
+            }
         }
 
         var activeKey = _keys.EnsureActiveKey(now);
@@ -110,6 +139,13 @@ internal sealed class AuthorityService
         }
 
         _store.RecordApprovalAndGrants(approvalId, batchId, batchHash, repo, approvalMethod, now, expiresAt, ledger);
+        _store.RecordAuditEvent(
+            "authorization_issued",
+            repo,
+            branch,
+            "issued",
+            $"approval_method={approvalMethod};operations={operations.Length}",
+            now);
         return new
         {
             batchId,
@@ -132,6 +168,7 @@ internal sealed class AuthorityService
         if (!string.Equals(grant.ScopeSha256, requestedScope, StringComparison.Ordinal)) throw new AuthorityException("scope_mismatch");
         if (!_store.IsRepositoryAllowed(grant.Repo)) throw new AuthorityException("repo_not_allowed");
         var consumedAt = _store.ConsumeGrant(grant.Nonce, grant.Repo, requestedScope, now);
+        _store.RecordAuditEvent("grant_redeemed", grant.Repo, null, "consumed", $"action={grant.Action}", consumedAt);
         return new { status = "consumed", nonce = grant.Nonce, consumedAt };
     }
 
@@ -160,6 +197,7 @@ internal sealed class AuthorityService
             : operation.TryGetProperty("issue", out var issue) ? $"issue #{issue.GetInt32()}"
             : repo;
         var lines = new List<string> { $"{index + 1}. {action} — {target}", $"   repo: {repo}" };
+        if (operation.TryGetProperty("authorityBranch", out var branch) && branch.ValueKind == JsonValueKind.String) lines.Add($"   branch: {branch.GetString()}");
         if (operation.TryGetProperty("expectedHead", out var head) && head.ValueKind == JsonValueKind.String) lines.Add($"   head: {head.GetString()}");
         if (operation.TryGetProperty("mergeMethod", out var method) && method.ValueKind == JsonValueKind.String) lines.Add($"   merge method: {method.GetString()}");
         if (operation.TryGetProperty("body", out var body) && body.ValueKind == JsonValueKind.String)
