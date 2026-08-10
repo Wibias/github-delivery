@@ -9,6 +9,7 @@
   "scripts": {
     "test": "node --test \"tests/unit/*.test.mjs\"",
     "evals:offline": "node scripts/validate-evals.mjs",
+    "evals:behavioural:compare": "node scripts/compare-behavioural-evals.mjs",
     "build:dist": "node scripts/build-dist.mjs",
     "dist:check": "node scripts/build-dist.mjs --verify-reproducible",
     "check": "node scripts/check-syntax.mjs && node scripts/policy-bundle.mjs --validate && node scripts/pre-open-gate.mjs --self-test && npm run security:repo && npm run dist:check && npm run evals:offline && npm test",
