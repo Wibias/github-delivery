@@ -18,8 +18,9 @@ const REGISTRY = [
     ],
   },
   { id: "python", commands: [{ command: "python", args: ["--version"] }, { command: "python3", args: ["--version"] }] },
-  { id: "pyrit", commands: [{ command: "pyrit", args: ["--version"] }] },
+  { id: "pyrit", commands: [{ command: "pyrit_scan", args: ["--help"] }] },
   { id: "garak", commands: [{ command: "garak", args: ["--version"] }] },
+  { id: "human-review", commands: [{ command: "human-review", args: ["--help"] }] },
 ];
 
 function runner({ command, args }) {
