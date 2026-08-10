@@ -110,8 +110,8 @@ Work on the current PR head until the authoritative merge-ready bar is satisfied
 1. Keep the branch current with base and resolve conflicts safely. Every remote branch update uses `push_code`.
 2. Process current human/bot review feedback. Fix required findings on this diff or decline them with verified rationale under review policy.
 3. Required CI must be green on the authoritative current SHA. Use the CI helpers for diagnosis; they do not override `ship-gate.mjs`.
-4. Complete own bug, security, Spec + Standards, semantic/proactive contract, and relevant CODEOWNERS checks. Load detailed review references only for the axis currently being executed.
-5. Reconcile the PR description with the final head and update stale scope, validation, limitations, or linkage through `update_pr_body` when needed.
+4. Complete own bug, security, Spec + Standards, semantic propagation, proactive contract verification, and relevant CODEOWNERS checks. Load detailed review references only for the axis currently being executed.
+5. Reconcile the PR description with the final head and update stale scope, validation, limitations, or linkage through broker action `update_pr_body` when needed.
 6. Run the appropriate settle window, then re-read current reviews/checks/rules/base/head and run the authoritative final ship gate. If the head changes, invalidate head-bound evidence and revalidate.
 7. When ready, publish the merge-ready PR and linked-issue notifications through brokered actions. **Do not merge.**
 
