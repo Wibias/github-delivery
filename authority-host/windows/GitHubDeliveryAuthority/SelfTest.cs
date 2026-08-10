@@ -110,6 +110,11 @@ internal static class SelfTest
             Assert(store.TryGetActiveBranchLease("Other/repo", branch, now + 1) is null, "branch lease crossed repository scope");
             Console.WriteLine("branch_lease_scope");
 
+            var used = store.TryUseActiveBranchLease(repo, branch, now + 2, 2);
+            Assert(used?.LeaseId == lease.LeaseId, "atomic branch lease use failed");
+            Assert(store.ListRecentAuditEvents().Any(entry => entry.EventType == "branch_lease_used" && entry.Branch == branch), "branch lease use was not audited atomically");
+            Console.WriteLine("branch_lease_atomic_use");
+
             Assert(store.TryGetActiveBranchLease(repo, branch, now + 61) is null, "expired branch lease remained active");
             Console.WriteLine("branch_lease_expiry");
 
