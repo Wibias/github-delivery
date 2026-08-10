@@ -66,7 +66,7 @@ For `pull_request_target` or another privileged event context, prove which repos
 High-risk compositions include privileged base-repo tokens/secrets combined with:
 
 - checkout of the contributor-controlled PR head;
-- execution of scripts/actions from that head;
+- execution of contributor-controlled scripts or GitHub Actions code from that head;
 - loading agent instructions/config/tool definitions from that head;
 - feeding PR-controlled files/logs into an agent that has write/network/secret capabilities.
 
