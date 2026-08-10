@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import {
+  attachRepositoryPermissions,
+  feedbackPermissionLogins,
+} from "../../scripts/lib/feedback-authority.mjs";
 import { evaluateWakeSnapshot } from "../../scripts/lib/snapshot-evaluators.mjs";
 import {
   evaluateFeedbackResolutions,
@@ -12,7 +16,8 @@ import {
 function comment({
   id,
   login = "maintainer",
-  association = "MEMBER",
+  association = "OWNER",
+  repositoryPermission = null,
   createdAt,
   body,
   kind = "issue_comment",
@@ -22,6 +27,7 @@ function comment({
       id,
       user: { login },
       author_association: association,
+      repository_permission: repositoryPermission,
       created_at: createdAt,
       body,
       html_url: `https://example.test/comments/${id}`,
@@ -88,6 +94,52 @@ test("a valid exact record clears only the named feedback item", () => {
     ["review_comment:78"],
   );
   assert.deepEqual(result.diagnostics, []);
+});
+
+test("organization membership alone is not repository maintainer authority", () => {
+  const readOnlyMember = comment({
+    id: 801,
+    association: "MEMBER",
+    repositoryPermission: "read",
+    createdAt: "2026-08-01T00:00:00Z",
+    body: "Please change this implementation.",
+  });
+  const writeMember = comment({
+    id: 802,
+    association: "MEMBER",
+    repositoryPermission: "write",
+    createdAt: "2026-08-01T00:00:00Z",
+    body: "Please change this implementation.",
+  });
+  assert.deepEqual(
+    findUnaddressedFeedback({ feedback: [readOnlyMember], myLogin: "Wibias" }),
+    [],
+  );
+  assert.deepEqual(
+    findUnaddressedFeedback({ feedback: [writeMember], myLogin: "Wibias" }).map(
+      (item) => item.key,
+    ),
+    ["issue_comment:802"],
+  );
+});
+
+test("permission enrichment targets only association classes that need repository authority", () => {
+  const source = {
+    readable: true,
+    complete: true,
+    pages: 1,
+    error: null,
+    rows: [
+      { id: 1, user: { login: "reader" }, author_association: "MEMBER" },
+      { id: 2, user: { login: "owner" }, author_association: "OWNER" },
+      { id: 3, user: { login: "external" }, author_association: "CONTRIBUTOR" },
+    ],
+  };
+  assert.deepEqual(feedbackPermissionLogins([source]), ["reader"]);
+  const enriched = attachRepositoryPermissions(source, { reader: "read" });
+  assert.equal(enriched.rows[0].repository_permission, "read");
+  assert.equal(enriched.rows[1].repository_permission, undefined);
+  assert.equal(enriched.rows[2].repository_permission, undefined);
 });
 
 test("an unrelated later commit does not clear feedback without a record", () => {
@@ -250,6 +302,7 @@ test("snapshot wake evaluation exposes valid resolution evidence", () => {
             id: 77,
             user: { login: "maintainer" },
             author_association: "MEMBER",
+            repository_permission: "write",
             created_at: "2026-08-01T00:00:00Z",
             body: "Please add the missing regression test.",
           },
