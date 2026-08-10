@@ -1,7 +1,7 @@
 const SECURITY_BASELINES = ["authn", "authz", "secrets_config", "injection"];
 const BUG_BASELINES = ["silent_failures", "resource_leaks", "edge_cases"];
 const BUG_PROBES = new Set(["api-cli-wiring", "input-shape-evidence-semantics", "determinism-clocks-budgets", "recursion-termination", "cli-payload-completeness", "hot-path-scale", "malformed-input-robustness", "lock-error-propagation", "test-honesty", "ui-accessibility"]);
-const SECURITY_PROBES = new Set(["credential-transport", "secrets-scan", "removed-controls"]);
+const SECURITY_PROBES = new Set(["credential-transport", "secrets-scan", "removed-controls", "agentic-actions-taint"]);
 
 function packageManager(files) {
   const joined = files.join("\n");
