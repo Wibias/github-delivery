@@ -17,7 +17,7 @@ const BASELINE_UNIVERSAL_BYTES = 32_855 + 87_576;
 const REQUIRED_REDUCTION = 0.6;
 
 function bytes(value) {
-  return Buffer.byteLength(value, "utf8");
+  return Buffer.byteLength(String(value).replace(/\r\n?/g, "\n"), "utf8");
 }
 
 function readText(path) {
