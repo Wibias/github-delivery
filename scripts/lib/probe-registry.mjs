@@ -199,6 +199,25 @@ export const PROBE_REGISTRY = [
     ],
     assertions: ["removed-controls-leads"],
   },
+  {
+    id: "agentic-actions-taint",
+    axis: "security",
+    surface: "ci_actions",
+    triggers: [
+      /uses:\s*[^\n]*(?:anthropic|openai|codex|claude|gemini|mcp|agent|llm)/i,
+      /\$\{\{\s*github\.event\.(?:pull_request\.(?:title|body)|issue\.(?:title|body)|comment\.body|review\.body|head_commit\.message)/i,
+      /\bgh\s+(?:pr|issue|api)\b[^\n]*(?:body|comment|title)/i,
+      /\bpull_request_target\b/i,
+      /\b(?:prompt|instructions?|system_message|system-message)\b[^\n]*\$\{\{/i,
+      /\b(?:eval|exec|shell)\b[^\n]*(?:github\.event|\$\{\{)/i,
+    ],
+    assertions: [
+      "agentic-actions-source-sink-trace",
+      "agentic-actions-untrusted-metadata",
+      "agentic-actions-capability-boundary",
+      "agentic-actions-pr-target-checkout",
+    ],
+  },
 ];
 
 // Map from assertion id -> probe id, so the validator can find which probe a
