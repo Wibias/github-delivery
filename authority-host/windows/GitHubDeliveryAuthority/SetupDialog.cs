@@ -26,11 +26,15 @@ internal sealed class SetupDialog : Form
         MinimumSize = new Size(620, 390);
         StartPosition = FormStartPosition.CenterScreen;
 
+        var messageBoxFont = SystemFonts.MessageBoxFont;
+        var messageBoxFontFamily = messageBoxFont?.FontFamily ?? FontFamily.GenericSansSerif;
+        var messageBoxFontSize = messageBoxFont?.Size ?? 9F;
+
         var heading = new Label
         {
             Text = "Set up GitHub Delivery Authority",
             AutoSize = true,
-            Font = new Font(SystemFonts.MessageBoxFont?.FontFamily ?? FontFamily.GenericSansSerif, 14, FontStyle.Bold),
+            Font = new Font(messageBoxFontFamily, 14, FontStyle.Bold),
         };
         var intro = new Label
         {
@@ -38,9 +42,9 @@ internal sealed class SetupDialog : Form
             AutoSize = true,
             MaximumSize = new Size(620, 0),
         };
-        var helloHeading = new Label { Text = "1. Windows Hello readiness", AutoSize = true, Font = new Font(SystemFonts.MessageBoxFont, FontStyle.Bold) };
-        var verifyHeading = new Label { Text = "2. Test Windows Hello", AutoSize = true, Font = new Font(SystemFonts.MessageBoxFont, FontStyle.Bold) };
-        var repoHeading = new Label { Text = "3. Trust your first repository", AutoSize = true, Font = new Font(SystemFonts.MessageBoxFont, FontStyle.Bold) };
+        var helloHeading = new Label { Text = "1. Windows Hello readiness", AutoSize = true, Font = new Font(messageBoxFontFamily, messageBoxFontSize, FontStyle.Bold) };
+        var verifyHeading = new Label { Text = "2. Test Windows Hello", AutoSize = true, Font = new Font(messageBoxFontFamily, messageBoxFontSize, FontStyle.Bold) };
+        var repoHeading = new Label { Text = "3. Trust your first repository", AutoSize = true, Font = new Font(messageBoxFontFamily, messageBoxFontSize, FontStyle.Bold) };
         var repoHint = new Label { Text = "Repository (OWNER/REPO)", AutoSize = true };
 
         var readinessButtons = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.LeftToRight, WrapContents = false };
