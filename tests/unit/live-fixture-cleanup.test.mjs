@@ -111,17 +111,23 @@ test("workflow runs cancellation-safe cleanup before uploading both reports", ()
 
 test("workflow requires a dedicated fixture credential before mutation", () => {
   const source = readFileSync(new URL("../../.github/workflows/live-integration.yml", import.meta.url), "utf8");
+  const token = source.indexOf("name: Create fixture-scoped GitHub App token");
   const preflight = source.indexOf("name: Verify live fixture credential");
   const exercise = source.indexOf("name: Exercise live GitHub lifecycle");
   const cleanup = source.indexOf("name: Clean up fixture resources");
   const upload = source.indexOf("name: Upload lifecycle evidence");
 
-  assert.ok(preflight >= 0, "expected a credential preflight step");
+  assert.ok(token >= 0, "expected a fixture-scoped GitHub App token step");
+  assert.ok(token < preflight, "fixture token must be created before credential preflight");
   assert.ok(preflight < exercise, "credential preflight must run before fixture mutation");
-  assert.match(source.slice(preflight, exercise), /secrets\.LIVE_FIXTURE_TOKEN/);
-  assert.match(source.slice(exercise, cleanup), /GH_TOKEN:\s*\$\{\{\s*secrets\.LIVE_FIXTURE_TOKEN\s*\}\}/);
-  assert.match(source.slice(cleanup, upload), /GH_TOKEN:\s*\$\{\{\s*secrets\.LIVE_FIXTURE_TOKEN\s*\}\}/);
+  assert.match(source.slice(token, preflight), /private-key:\s*\$\{\{\s*secrets\.LIVE_FIXTURE_APP_PRIVATE_KEY\s*\}\}/);
+  assert.match(source.slice(token, preflight), /repositories:\s*\$\{\{\s*vars\.LIVE_FIXTURE_REPOSITORY\s*\}\}/);
+  assert.match(source.slice(preflight, exercise), /GH_TOKEN:\s*\$\{\{\s*steps\.fixture-app-token\.outputs\.token\s*\}\}/);
+  assert.match(source.slice(preflight, exercise), /--installation-id\s+"\$\{\{\s*steps\.fixture-app-token\.outputs\.installation-id\s*\}\}"/);
+  assert.match(source.slice(exercise, cleanup), /GH_TOKEN:\s*\$\{\{\s*steps\.fixture-app-token\.outputs\.token\s*\}\}/);
+  assert.match(source.slice(cleanup, upload), /GH_TOKEN:\s*\$\{\{\s*steps\.fixture-app-token\.outputs\.token\s*\}\}/);
   assert.match(source, /node scripts\/verify-live-fixture-token\.mjs/);
+  assert.doesNotMatch(source, /LIVE_FIXTURE_TOKEN/);
   assert.doesNotMatch(source, /GH_TOKEN:\s*\$\{\{\s*github\.token\s*\}\}/);
 });
 

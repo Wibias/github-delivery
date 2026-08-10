@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import { runGitHubCommandWithRetry } from "./lib/github-retry.mjs";
 import {
   buildCredentialReport,
+  evaluateInstallationRepositoryScope,
   parseCredentialArgs,
 } from "./lib/live-fixture-credential.mjs";
 import { verifyFixtureTargetIdentity } from "./lib/live-fixture-identity.mjs";
@@ -25,6 +26,18 @@ function runGh(args) {
   };
 }
 
+function runGhJson(args, context) {
+  const result = runGh(args);
+  if (!result.ok) {
+    throw new Error(`${context}:${result.error || "github request failed"}`);
+  }
+  try {
+    return JSON.parse(result.stdout || "null");
+  } catch {
+    throw new Error(`${context}:invalid_json`);
+  }
+}
+
 function probe(args) {
   const result = runGh(args);
   return { ok: result.ok, error: result.error };
@@ -43,12 +56,11 @@ function branchProtectionQuery() {
 }
 
 try {
-  const { repo, base, sourceRepo, fixtureRepoId } = parseCredentialArgs(
-    process.argv.slice(2),
-  );
+  const { repo, base, sourceRepo, fixtureRepoId, installationId } =
+    parseCredentialArgs(process.argv.slice(2));
   if (!process.env.GH_TOKEN) {
     throw new Error(
-      "missing_live_fixture_token: configure the LIVE_FIXTURE_TOKEN repository Actions secret",
+      "missing_live_fixture_token: create a fixture-scoped GitHub App installation token",
     );
   }
 
@@ -58,6 +70,16 @@ try {
     expectedFixtureRepoId: fixtureRepoId,
     baseBranch: base,
     runner: execute,
+  });
+
+  const installationRepositories = runGhJson(
+    ["api", "installation/repositories?per_page=100"],
+    "live_fixture_installation_repositories_unreadable",
+  );
+  const repositoryScope = evaluateInstallationRepositoryScope({
+    installationId,
+    fixtureRepoId,
+    payload: installationRepositories,
   });
 
   const [owner, name] = repo.split("/");
@@ -101,6 +123,7 @@ try {
     base,
     login: identity.stdout,
     probes,
+    repositoryScope,
   });
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
   if (!report.valid) {

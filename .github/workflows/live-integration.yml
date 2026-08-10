@@ -20,6 +20,7 @@ jobs:
     env:
       FIXTURE_REPOSITORY: ${{ vars.LIVE_FIXTURE_REPOSITORY }}
       FIXTURE_REPOSITORY_ID: ${{ vars.LIVE_FIXTURE_REPOSITORY_ID }}
+      FIXTURE_APP_CLIENT_ID: ${{ vars.LIVE_FIXTURE_APP_CLIENT_ID }}
     steps:
       - name: Validate dedicated fixture target configuration
         shell: bash
@@ -31,6 +32,10 @@ jobs:
           fi
           if [[ -z "${FIXTURE_REPOSITORY_ID}" || ! "${FIXTURE_REPOSITORY_ID}" =~ ^[0-9]+$ ]]; then
             echo "LIVE_FIXTURE_REPOSITORY_ID must be the immutable numeric repository id of the dedicated fixture repository." >&2
+            exit 1
+          fi
+          if [[ -z "${FIXTURE_APP_CLIENT_ID}" ]]; then
+            echo "LIVE_FIXTURE_APP_CLIENT_ID must identify the dedicated fixture GitHub App." >&2
             exit 1
           fi
           if [[ "${FIXTURE_REPOSITORY,,}" == "${GITHUB_REPOSITORY,,}" ]]; then
@@ -59,23 +64,38 @@ jobs:
           tests/unit/live-fixture-cleanup.test.mjs
           tests/unit/live-fixture-credential.test.mjs
 
+      - name: Create fixture-scoped GitHub App token
+        id: fixture-app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.LIVE_FIXTURE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.LIVE_FIXTURE_APP_PRIVATE_KEY }}
+          repositories: ${{ vars.LIVE_FIXTURE_REPOSITORY }}
+          permission-actions: read
+          permission-checks: read
+          permission-contents: write
+          permission-issues: write
+          permission-pull-requests: write
+          permission-statuses: read
+
       - name: Verify live fixture credential and target identity
         id: credential
         env:
-          GH_TOKEN: ${{ secrets.LIVE_FIXTURE_TOKEN }}
+          GH_TOKEN: ${{ steps.fixture-app-token.outputs.token }}
         run: |
           set -o pipefail
           node scripts/verify-live-fixture-token.mjs \
             "${FIXTURE_REPOSITORY}" \
             --source-repo "${GITHUB_REPOSITORY}" \
             --fixture-repo-id "${FIXTURE_REPOSITORY_ID}" \
+            --installation-id "${{ steps.fixture-app-token.outputs.installation-id }}" \
             --base "main" \
             | tee live-fixture-credential.json
 
       - name: Exercise live GitHub lifecycle
         timeout-minutes: 20
         env:
-          GH_TOKEN: ${{ secrets.LIVE_FIXTURE_TOKEN }}
+          GH_TOKEN: ${{ steps.fixture-app-token.outputs.token }}
         run: >-
           node scripts/live-github-fixture.mjs
           "${FIXTURE_REPOSITORY}"
@@ -90,7 +110,7 @@ jobs:
         if: always() && steps.credential.outcome == 'success'
         timeout-minutes: 5
         env:
-          GH_TOKEN: ${{ secrets.LIVE_FIXTURE_TOKEN }}
+          GH_TOKEN: ${{ steps.fixture-app-token.outputs.token }}
         run: >-
           node scripts/cleanup-live-github-fixture.mjs
           "${FIXTURE_REPOSITORY}"
