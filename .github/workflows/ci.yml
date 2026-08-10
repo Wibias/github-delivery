@@ -36,6 +36,26 @@ jobs:
           node-version: ${{ matrix.node }}
           package-manager-cache: false
 
+      - name: Probe mutation document executor tests
+        continue-on-error: true
+        run: node --test tests/unit/mutation-document-execution.test.mjs
+
+      - name: Probe authority runtime defaults tests
+        continue-on-error: true
+        run: node --test tests/unit/authority-runtime-defaults.test.mjs
+
+      - name: Probe token-efficient workflow contract tests
+        continue-on-error: true
+        run: node --test tests/unit/token-efficient-workflow-contract.test.mjs
+
+      - name: Probe github-mutate entrypoint tests
+        continue-on-error: true
+        run: node --test tests/unit/github-mutate-entrypoint.test.mjs
+
+      - name: Probe mutation execution context tests
+        continue-on-error: true
+        run: node --test tests/unit/mutation-execution-context.test.mjs
+
       - name: Probe unit tests
         run: npm test
 
