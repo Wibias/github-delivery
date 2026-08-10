@@ -42,7 +42,7 @@ internal sealed class AllowlistDialog : Form
     {
         var repo = _repo.Text.Trim();
         if (repo.Length == 0) return;
-        if (!await HelloVerifier.VerifyAsync(Handle, $"Allow github-delivery trusted grants for {repo}")) return;
+        if (!await VerifyHelloAsync($"Allow github-delivery trusted grants for {repo}")) return;
         try
         {
             _store.SetRepositoryAllowed(repo, true, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
@@ -58,9 +58,29 @@ internal sealed class AllowlistDialog : Form
     private async void RemoveAsync(object? sender, EventArgs e)
     {
         if (_repos.SelectedItem is not string repo) return;
-        if (!await HelloVerifier.VerifyAsync(Handle, $"Remove {repo} from the github-delivery authority allowlist")) return;
-        _store.SetRepositoryAllowed(repo, false, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
-        Reload();
+        if (!await VerifyHelloAsync($"Remove {repo} from the github-delivery authority allowlist")) return;
+        try
+        {
+            _store.SetRepositoryAllowed(repo, false, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+            Reload();
+        }
+        catch (AuthorityException error)
+        {
+            MessageBox.Show(this, error.Code, "Allowlist update failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private async Task<bool> VerifyHelloAsync(string message)
+    {
+        var verification = await HelloVerifier.VerifyAsync(Handle, message);
+        if (verification.Verified) return true;
+        MessageBox.Show(
+            this,
+            verification.FailureMessage ?? "Windows Hello verification did not succeed.",
+            "Windows Hello required",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Warning);
+        return false;
     }
 
     private void Reload()
