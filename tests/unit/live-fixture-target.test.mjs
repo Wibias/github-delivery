@@ -206,11 +206,16 @@ test("only proven read-only gh commands are retryable", () => {
 test("rate-limit classifier honours Retry-After and reset metadata", () => {
   assert.deepEqual(
     classifyGitHubRateLimit({ status: 1, stderr: "HTTP 429\nRetry-After: 7" }),
-    { rateLimited: true, delayMs: 7000 },
+    { rateLimited: true, delayMs: 7000, source: "retry_after" },
   );
   assert.deepEqual(
     classifyGitHubRateLimit({ status: 1, stderr: "HTTP 403 API rate limit exceeded\nx-ratelimit-reset: 200" }),
-    { rateLimited: true, resetEpochSeconds: 200, delayMs: null },
+    {
+      rateLimited: true,
+      resetEpochSeconds: 200,
+      delayMs: null,
+      source: "rate_limit_reset",
+    },
   );
   assert.equal(
     classifyGitHubRateLimit({ status: 1, stderr: "HTTP 403 forbidden" }).rateLimited,
