@@ -10,46 +10,6 @@ permissions:
   contents: read
 
 jobs:
-  contract-probe:
-    name: Contract probe / ${{ matrix.name }}
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: final-roadmap
-            files: tests/unit/final-roadmap-acceptance.test.mjs
-          - name: mutation-modes
-            files: tests/unit/mutation-modes-docs.test.mjs
-          - name: mutation-policy
-            files: tests/unit/mutation-policy.test.mjs tests/unit/mutation-policy-cli.test.mjs
-          - name: policy
-            files: tests/unit/policy-architecture.test.mjs tests/unit/policy-bundle.test.mjs
-          - name: bare-github
-            files: tests/unit/bare-github-mentions.test.mjs
-          - name: distribution
-            files: tests/unit/distribution.test.mjs tests/unit/distribution-authority-host.test.mjs
-          - name: review
-            files: tests/unit/review-context-contract.test.mjs tests/unit/simplify-review-contract.test.mjs
-          - name: router
-            files: tests/unit/skill-router.test.mjs tests/unit/create-pr-local-route.test.mjs
-          - name: workflow-security
-            files: tests/unit/workflow-security.test.mjs tests/unit/mutation-boundary-security.test.mjs
-          - name: broker
-            files: tests/unit/github-mutation-broker.test.mjs tests/unit/mutation-action-registry-broker.test.mjs
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Set up Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 22
-          package-manager-cache: false
-      - name: Run contract probe
-        run: node --test ${{ matrix.files }}
-
   test:
     name: Node ${{ matrix.node }} / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
