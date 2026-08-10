@@ -1,40 +1,52 @@
+using Microsoft.UI.Dispatching;
+
 namespace GitHubDeliveryAuthority;
 
 internal sealed class ApprovalCoordinator
 {
-    private readonly SynchronizationContext _uiContext;
+    private readonly DispatcherQueue _dispatcher;
 
-    public ApprovalCoordinator(SynchronizationContext uiContext)
+    public ApprovalCoordinator(DispatcherQueue dispatcher)
     {
-        _uiContext = uiContext;
+        _dispatcher = dispatcher;
     }
 
     public Task<bool> ApproveBatchAsync(BatchApproval approval)
     {
         var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        _uiContext.Post(_ =>
+        if (!_dispatcher.TryEnqueue(async () =>
         {
-            using var dialog = new ApprovalDialog(
-                "GitHub Delivery Authorization",
-                approval.Summaries,
-                $"Approve {approval.Operations.Count} exact GitHub mutation(s) for {approval.Repo}",
-                approval.Repo);
-            completion.TrySetResult(dialog.ShowDialog() == DialogResult.OK && dialog.Approved);
-        }, null);
+            try
+            {
+                var window = new ApprovalWindow(
+                    approval.Summaries,
+                    $"Approve {approval.Operations.Count} exact GitHub mutation(s) for {approval.Repo}",
+                    approval.Repo);
+                completion.TrySetResult(await window.ShowAsync());
+            }
+            catch (Exception error)
+            {
+                completion.TrySetException(error);
+            }
+        })) completion.TrySetException(new InvalidOperationException("authority_ui_dispatch_failed"));
         return completion.Task;
     }
 
     public Task<bool> ApproveAdministrativeActionAsync(string action)
     {
         var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        _uiContext.Post(_ =>
+        if (!_dispatcher.TryEnqueue(async () =>
         {
-            using var dialog = new ApprovalDialog(
-                "GitHub Delivery Authority Administration",
-                new[] { action },
-                action);
-            completion.TrySetResult(dialog.ShowDialog() == DialogResult.OK && dialog.Approved);
-        }, null);
+            try
+            {
+                var window = new ApprovalWindow(new[] { action }, action);
+                completion.TrySetResult(await window.ShowAsync());
+            }
+            catch (Exception error)
+            {
+                completion.TrySetException(error);
+            }
+        })) completion.TrySetException(new InvalidOperationException("authority_ui_dispatch_failed"));
         return completion.Task;
     }
 }
