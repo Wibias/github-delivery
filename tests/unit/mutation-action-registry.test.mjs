@@ -2,13 +2,17 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  actionAllowedInMode,
   actionDefinition,
   actionNamesWhere,
   enabledActionNames,
   mutationActionNames,
   validateMutationActionRegistry,
 } from "../../scripts/lib/mutation-action-registry.mjs";
-import { mutationProfile } from "../../scripts/lib/mutation-policy.mjs";
+import {
+  MUTATION_MODES,
+  mutationProfile,
+} from "../../scripts/lib/mutation-policy.mjs";
 import { isLifecycleMutationAction } from "../../scripts/lib/github-lifecycle-mutation-broker.mjs";
 import { mutationRequiresTrustedAuthority } from "../../scripts/lib/mutation-execution-context.mjs";
 import { authorityScopeForRequest } from "../../scripts/lib/authority-scope.mjs";
@@ -66,6 +70,19 @@ test("direct issue creation and follow-up issue creation remain distinct actions
   assert.equal(followUp.issueCreationKind, "follow_up");
   assert.equal(followUp.route, "legacy");
   assert.equal(followUp.minimumMode, "maintainer");
+});
+
+test("registry minimum modes match executable mutation policy", () => {
+  for (const mode of MUTATION_MODES) {
+    const profile = mutationProfile(mode);
+    for (const action of enabledActionNames()) {
+      assert.equal(
+        actionAllowedInMode(action, mode),
+        profile.actions[action]?.allowed === true,
+        `${action} in ${mode}`,
+      );
+    }
+  }
 });
 
 test("mutation policy exposes exactly the enabled registry actions", () => {
