@@ -5,9 +5,9 @@ function requireString(value, field) {
   if (!value || typeof value !== "string") throw new TypeError(`${field} must be a non-empty string`);
 }
 
-function requireEvidence(value) {
+function requireEvidence(value, status) {
   if (!Array.isArray(value) || value.length === 0) {
-    throw new TypeError("runtime attempt requires concrete evidence");
+    throw new TypeError(`${status} runtime attempt requires concrete evidence`);
   }
 }
 
@@ -39,14 +39,11 @@ export function recordRuntimeAttempt(session, attempt = {}) {
   }
   if (!STATUSES.has(attempt.status)) throw new TypeError(`unknown runtime attempt status: ${attempt.status}`);
   requireString(attempt.trigger, "runtime attempt trigger");
-  requireEvidence(attempt.evidence);
+  requireEvidence(attempt.evidence, attempt.status);
 
   if (attempt.status === "reproduced" || attempt.status === "not-reproduced") {
     requireString(attempt.expected, "runtime attempt expected");
     requireString(attempt.actual, "runtime attempt actual");
-  }
-  if (attempt.status === "reproduced" && attempt.evidence.length === 0) {
-    throw new TypeError("reproduced runtime attempt requires evidence");
   }
   if (attempt.status === "blocked" || attempt.status === "inconclusive") {
     requireString(attempt.blocker, "runtime attempt blocker");
