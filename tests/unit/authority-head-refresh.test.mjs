@@ -21,6 +21,10 @@ function request(overrides = {}) {
   };
 }
 
+function liveHead(head, branch = "feature/audit") {
+  return JSON.stringify({ headRefOid: head, headRefName: branch });
+}
+
 test("headRefreshCandidate selects PR-scoped actions with an expected head", () => {
   assert.equal(headRefreshCandidate(request()), true);
   assert.equal(headRefreshCandidate(request({ action: "merge_pr" })), true);
@@ -31,10 +35,12 @@ test("headRefreshCandidate selects PR-scoped actions with an expected head", () 
   assert.equal(headRefreshCandidate(request({ action: "push_code" })), false);
 });
 
-test("refreshExpectedHeads leaves matching heads untouched", () => {
+test("refreshExpectedHeads binds the live PR branch even when the head already matches", () => {
   const runner = (args) => {
-    assert.deepEqual(args.slice(0, 4), ["gh", "pr", "view", "32"]);
-    return `${"a".repeat(40)}\n`;
+    assert.deepEqual(args, [
+      "gh", "pr", "view", "32", "--repo", "acme/widgets", "--json", "headRefOid,headRefName",
+    ]);
+    return liveHead("a".repeat(40), "feature/audit");
   };
   const result = refreshExpectedHeads({
     requests: [request()],
@@ -42,10 +48,11 @@ test("refreshExpectedHeads leaves matching heads untouched", () => {
   });
   assert.equal(result.refreshed.length, 0);
   assert.equal(result.requests[0].expectedHead, "a".repeat(40));
+  assert.equal(result.requests[0].authorityBranch, "feature/audit");
 });
 
-test("refreshExpectedHeads updates a stale head and reports the delta", () => {
-  const runner = () => `${"b".repeat(40)}\n`;
+test("refreshExpectedHeads updates a stale head, binds branch, and reports the delta", () => {
+  const runner = () => liveHead("b".repeat(40), "feature/review");
   const result = refreshExpectedHeads({
     requests: [request()],
     runner,
@@ -57,13 +64,15 @@ test("refreshExpectedHeads updates a stale head and reports the delta", () => {
     repo: "acme/widgets",
     from: "a".repeat(40),
     to: "b".repeat(40),
+    branch: "feature/review",
   });
   assert.equal(result.requests[0].expectedHead, "b".repeat(40));
+  assert.equal(result.requests[0].authorityBranch, "feature/review");
   assert.equal(result.requests[0].body, "Status update");
 });
 
-test("refreshExpectedHeads refreshes only stale operations in a batch", () => {
-  const runner = () => `${"c".repeat(40)}\n`;
+test("refreshExpectedHeads refreshes only stale operations while binding every PR branch", () => {
+  const runner = (args) => liveHead("c".repeat(40), `feature/pr-${args[3]}`);
   const stale = request({ pr: 1, expectedHead: "a".repeat(40), idempotencyKey: "k1" });
   const fresh = request({ pr: 2, expectedHead: "c".repeat(40), idempotencyKey: "k2" });
   const result = refreshExpectedHeads({
@@ -72,11 +81,14 @@ test("refreshExpectedHeads refreshes only stale operations in a batch", () => {
   });
   assert.deepEqual(result.refreshed.map((entry) => entry.pr), [1]);
   assert.equal(result.requests[0].expectedHead, "c".repeat(40));
+  assert.equal(result.requests[0].authorityBranch, "feature/pr-1");
   assert.equal(result.requests[1].expectedHead, "c".repeat(40));
+  assert.equal(result.requests[1].authorityBranch, "feature/pr-2");
   assert.equal(result.requests[2].action, "post_issue_comment");
+  assert.equal(result.requests[2].authorityBranch, undefined);
 });
 
-test("refreshExpectedHeads fails closed when the read errors or returns a bad head", () => {
+test("refreshExpectedHeads fails closed when live head or branch evidence is invalid", () => {
   assert.throws(
     () =>
       refreshExpectedHeads({
@@ -92,10 +104,20 @@ test("refreshExpectedHeads fails closed when the read errors or returns a bad he
       refreshExpectedHeads({
         requests: [request()],
         runner() {
-          return "not-a-sha\n";
+          return JSON.stringify({ headRefOid: "not-a-sha", headRefName: "feature/audit" });
         },
       }),
     /authority_head_refresh_invalid_head/,
+  );
+  assert.throws(
+    () =>
+      refreshExpectedHeads({
+        requests: [request()],
+        runner() {
+          return JSON.stringify({ headRefOid: "a".repeat(40), headRefName: "" });
+        },
+      }),
+    /authority_head_refresh_invalid_branch/,
   );
 });
 
