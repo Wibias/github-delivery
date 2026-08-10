@@ -80,3 +80,16 @@ jobs:
       - name: Run Windows authority host self-test
         if: runner.os == 'Windows'
         run: dotnet run --project authority-host/windows/GitHubDeliveryAuthority/GitHubDeliveryAuthority.csproj --configuration Release --no-build -- --self-test
+
+      - name: Publish Windows authority host
+        if: runner.os == 'Windows' && matrix.node == 24
+        shell: pwsh
+        run: |
+          $Project = 'authority-host/windows/GitHubDeliveryAuthority/GitHubDeliveryAuthority.csproj'
+          $PublishDir = Join-Path $env:RUNNER_TEMP 'github-delivery-authority-publish'
+          dotnet publish $Project --configuration Release --runtime win-x64 --self-contained true --no-restore --output $PublishDir
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $Executable = Join-Path $PublishDir 'GitHubDeliveryAuthority.exe'
+          if (-not (Test-Path $Executable -PathType Leaf)) {
+            throw 'Published authority executable is missing.'
+          }
