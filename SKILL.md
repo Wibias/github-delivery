@@ -46,6 +46,7 @@ simplify preparation first, then enter the merge workflow.
 | Watch / monitor PR #N (CI + new reviews until merged/closed/blocker)                                  | `references/watch-pr.md`                           |
 | Re-review PR #N from human review + commits + new rabbit/Codex                                        | `references/re-review-pr.md`                       |
 | Research issue(s) #N on latest development; priority; comment on issue                                | `references/research-issue.md`                     |
+| Create a PR from already-existing local work, with no issue supplied                                  | `references/create-pr-from-local-work.md`          |
 | Create PR for issue #N (bounded preflight → implement → pre-open bug/security gate); link + merge-ready | `references/create-pr-for-issue.md`                |
 | Full review on PR #N (or a list); babysit to green + verdict                                          | `references/full-review-pr.md`                     |
 | Spec and Standards review on PR #N                                                                    | `references/spec-standards-review.md`              |
@@ -113,7 +114,7 @@ GitHub write, and require final evidence for final claims.
   **Human replies always require exact-text confirmation.** Public GitHub text
   must keep notifying mentions bare: never wrap GitHub `@login` mentions in backticks.
   Detailed rules: `references/policy/mutation.md` and `references/mutation-modes.md`.
-- **Create-PR forward progress is explicit:** bounded need-to-fix research decides
+- **Issue-linked create-PR forward progress is explicit:** bounded need-to-fix research decides
   whether work is needed, then implementation begins. `pre-open-gate.mjs` reviews
   the resulting non-empty candidate diff before publication; it must never be
   treated as a prerequisite for writing the first implementation commit. Do not
