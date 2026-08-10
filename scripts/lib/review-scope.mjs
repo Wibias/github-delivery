@@ -4,17 +4,16 @@ import { PROBE_REGISTRY, validateProbeRegistry } from "./probe-registry.mjs";
 
 const CODE_RE = /\.(?:[cm]?[jt]sx?|mjs|cjs|py|go|rs|java|kt|rb|php|cs|swift|c|cc|cpp|h|hpp|vue|svelte)$/i;
 const DOC_RE = /\.(?:md|txt|rst|adoc)$/i;
+const OPERATIONAL_POLICY_RE = /(^|\/)(?:SKILL\.md|references\/.*\.md|overrides\/)/i;
 const LOCK_RE = /(^|\/)(?:package-lock\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb?|Cargo\.lock|go\.sum|Gemfile\.lock|composer\.lock)$/i;
 const MANIFEST_RE = /(^|\/)(?:package\.json|Cargo\.toml|go\.mod|pyproject\.toml|requirements[^/]*\.txt|Gemfile|composer\.json)$/i;
 
 // Exported so the eval validator can validate the probe registry against the
 // real lens/surface id universe without re-deriving it.
 export const KNOWN_LENS_IDS = [
-  // baseline/complementary umbrella lenses
   "silent_failures",
   "resource_leaks",
   "edge_cases",
-  // detailed lenses from LENS_SPECS
   "error_propagation",
   "resource_lifecycle",
   "concurrency_races",
@@ -28,7 +27,6 @@ export const KNOWN_LENS_IDS = [
   "ui_accessibility",
   "api_compatibility",
   "boundary_conditions",
-  // complementary table lenses
   "api_cli_wiring",
   "input_shape",
   "evidence_semantics",
@@ -70,7 +68,7 @@ const DOMAIN_SPECS = [
   ["supply_chain", "security", /package|lock|Cargo|go\.mod|requirements|Gemfile|composer/i, /dependencies|devDependencies|scripts|postinstall|preinstall|git\+|https:\/\//i],
   ["logging_privacy", "security", /log|telemetry|analytics|sentry|privacy|pii|audit/i, /logger|console\.|telemetry|analytics|sentry|email|phone|address|redact|PII/i],
   ["ai_agent_mcp", "security", /prompt|llm|openai|anthropic|mcp|agent|rag|embedding|tool/i, /prompt|tool_call|toolUse|mcp|model|embedding|system message|assistant/i],
-  ["agentic_skills_supply_chain", "security", /(^|\/)(?:SKILL\.md|skills\/|plugins\/|mcp\.json|\.mcp\.json|claude_desktop_config\.json)/i, /allowed-tools|mcpServers|references\/|scripts\/|prompt injection/i],
+  ["agentic_skills_supply_chain", "security", /(^|\/)(?:SKILL\.md|references\/|overrides\/|skills\/|plugins\/|mcp\.json|\.mcp\.json|claude_desktop_config\.json)/i, /allowed-tools|mcpServers|references\/|scripts\/|prompt injection/i],
   ["crypto_session", "security", /crypto|cipher|encrypt|decrypt|hash|jwt|cookie|tls|cert|hmac/i, /createHash|createHmac|encrypt|decrypt|jwt|cookie|SameSite|HttpOnly|TLS/i],
   ["business_logic", "security", /workflow|state|entitlement|checkout|subscription|transfer|refund|billing|quota/i, /state machine|entitlement|quota|transfer|refund|idempot|TOCTOU|compare-and-swap/i],
   ["iac_docker", "security", /Dockerfile|docker-compose|\.tf$|helm|charts|kubernetes|k8s|infra|deploy/i, /FROM\s|USER\s|privileged|cap_add|hostNetwork|iam|securityContext/i],
@@ -188,7 +186,7 @@ export function planReviewScope(input = {}) {
     const { added, removed } = patchLines(file.patch);
     const changedText = [...added, ...removed].join("\n");
     const symbols = extractSymbols(file.path, changedText);
-    const isLogic = CODE_RE.test(file.path) || /(^|\/)SKILL\.md$/i.test(file.path) || /^\.github\//.test(file.path);
+    const isLogic = CODE_RE.test(file.path) || OPERATIONAL_POLICY_RE.test(file.path) || /^\.github\//.test(file.path);
     if (isLogic) logicFiles.push(file.path);
     if (isLogic && !file.patch && file.status !== "removed") missingPatches.push(file.path);
 
@@ -234,9 +232,6 @@ export function planReviewScope(input = {}) {
     required: entry.score >= 3,
   })).sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
 
-  // Probe routing: a probe fires when any trigger regex matches an added line
-  // or a changed path. This is the deterministic bridge from diff shape to the
-  // named Must-probe blocks in bug-review.md / security-review.md.
   const probeHits = new Map();
   for (const file of files) {
     const paths = [file.path, file.previousPath].filter(Boolean);
@@ -261,7 +256,7 @@ export function planReviewScope(input = {}) {
   const bugLenses = finalize(lensEvidence);
   const requiredSecurity = domains.filter((item) => item.category === "security" && item.required);
   const requiredBug = bugLenses.filter((item) => item.required);
-  const docsOnly = files.length > 0 && files.every((file) => DOC_RE.test(file.path) && !/(^|\/)SKILL\.md$/i.test(file.path));
+  const docsOnly = files.length > 0 && files.every((file) => DOC_RE.test(file.path) && !OPERATIONAL_POLICY_RE.test(file.path));
   const criticalSecurity = requiredSecurity.some((item) => item.confidence === "high") || removedControlLeads.length > 0;
   const criticalBug = requiredBug.some((item) => item.confidence === "high");
   const securityDepth = docsOnly ? "skip" : criticalSecurity ? "full" : requiredSecurity.length ? "targeted" : logicFiles.length ? "baseline" : "skip";
@@ -270,8 +265,6 @@ export function planReviewScope(input = {}) {
   if (missingPatches.length) uncertainty.push({ code: "patch_missing", files: missingPatches, effect: "Do not downgrade path-only signals below baseline without manual inspection." });
   if (files.length >= 100) uncertainty.push({ code: "large_diff", fileCount: files.length, effect: "Partition review by domain and verify pagination completeness." });
 
-  // Registry integrity: a probe that references an unknown lens/surface or has
-  // no triggers/assertions must fail the plan rather than silently routing.
   const registryErrors = validateProbeRegistry(
     KNOWN_LENS_IDS,
     KNOWN_SECURITY_SURFACE_IDS,
