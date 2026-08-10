@@ -32,6 +32,7 @@ internal sealed partial class ControlCenterWindow : Window
     private void Refresh()
     {
         var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        _store.RecordExpiredBranchLeases(now);
         var repositories = _store.ListAllowedRepositories();
         AllowlistedCount.Text = repositories.Count.ToString(CultureInfo.InvariantCulture);
         AllowlistList.ItemsSource = repositories.Count == 0
