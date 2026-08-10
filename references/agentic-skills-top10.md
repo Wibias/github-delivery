@@ -4,18 +4,20 @@ Use when `security-scope.mjs` sets **`requireAgenticSkillsTop10: true`** (skill 
 
 This is **skill/MCP supply-chain review**, not a full classic app ASVS pass. Load skill **`ai-agent-security`** (especially `<ai-agent-security>/references/mcp-tool-security.md` plus its prompt-injection and tool-governance references) and walk this table.
 
+For a third-party skill candidate that may be installed/approved, also load `references/skill-admission.md` and run the admission planner. Registry popularity and a clean scanner result are discovery/evidence signals only; they never establish trust or installation authority.
+
 Source shape: [OWASP Agentic Skills Top 10](https://owasp.org/www-project-agentic-skills-top-10/) (AST01–AST10). Mark each row `done` + one-liner, or `n/a` + why.
 
 | ID | Risk | What to prove on this diff |
 |---|---|---|
 | **AST01** | Malicious Skills | No hidden exfil / reverse-shell / “ignore previous instructions” / credential harvest in skill prose, scripts, or side-loaded files |
-| **AST02** | Supply Chain Compromise | Install/source provenance clear (pinned URL/commit/registry); no unsigned “curl \| sh” skill fetch; trust path documented if third-party |
+| **AST02** | Supply Chain Compromise | Install/source provenance clear (immutable commit + reviewed content digest when third-party); no unsigned “curl \| sh” skill fetch; trust path documented |
 | **AST03** | Over-Privileged Skills | Tools/permissions least-privilege; no broad filesystem/network/shell unless required and justified; destructive actions need HITL |
 | **AST04** | Insecure Metadata | `SKILL.md` / YAML frontmatter honest (name, description, triggers); no brand impersonation; no untrusted HTML/script in metadata |
 | **AST05** | Untrusted External Instructions | Remote refs / fetched docs / URLs in the skill are pinned or inlined; treat external content as untrusted (injection) |
 | **AST06** | Weak Isolation | Skill does not silently require host-wide privileges; sandbox/container expectations documented when it needs elevated access |
 | **AST07** | Update Drift | Versions/pins for deps or remote skill sources; no floating `@latest` trust for high-impact install paths without note |
-| **AST08** | Poor Scanning | Secrets scan + manual read of scripts; do not rely on “looks fine” filename alone |
+| **AST08** | Poor Scanning | Secrets/static/manual review as applicable; high-risk candidates also need semantic + containment evidence per `references/skill-admission.md`; no scanner is a trust oracle |
 | **AST09** | No Governance | Clear owner/purpose in description; inventory-friendly naming; no silent auto-install of further skills/MCP servers |
 | **AST10** | Cross-Platform Reuse | If packaged for multiple agents (Cursor/Claude/Codex), same trust/permission story on each; no platform-specific privilege smuggling |
 
