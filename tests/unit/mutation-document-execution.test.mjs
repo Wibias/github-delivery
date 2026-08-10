@@ -74,6 +74,9 @@ test("execution batches only missing trusted grants and executes refreshed reque
       throw new Error("refresh runner should be consumed only by injected refresh helper");
     },
     dependencies: {
+      planMutationWithAuthority() {
+        return { kind: "validated" };
+      },
       mutationRequiresTrustedAuthority: () => true,
       refreshExpectedHeads({ requests }) {
         calls.push(["refresh", requests.map((entry) => entry.action)]);
@@ -161,4 +164,35 @@ test("multi-request execution stops at the first failed operation", () => {
     /second failed/,
   );
   assert.deepEqual(executed, ["one", "two"]);
+});
+
+test("execution validates every request before prompting for authority", () => {
+  let authorized = false;
+  let executed = false;
+
+  assert.throws(
+    () =>
+      executeMutationDocument({
+        document: request("create_pr"),
+        execute: true,
+        dependencies: {
+          mutationRequiresTrustedAuthority: () => true,
+          planMutationWithAuthority() {
+            throw new Error("mutation_denied:explicit_instruction_required");
+          },
+          authorizeBatchSync() {
+            authorized = true;
+            throw new Error("must not prompt before validation");
+          },
+          executeMutationWithAuthority() {
+            executed = true;
+            return {};
+          },
+        },
+      }),
+    /mutation_denied:explicit_instruction_required/,
+  );
+
+  assert.equal(authorized, false);
+  assert.equal(executed, false);
 });
