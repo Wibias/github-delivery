@@ -180,10 +180,10 @@ function selectTrustStoreKey({ payload, trustStore, now }) {
   if (!new Set(["active", "retiring"]).has(entry.status || "active")) {
     return { ok: false, reason: "key_status_invalid" };
   }
-  if (entry.notBefore !== undefined && (!finiteInteger(entry.notBefore) || now < entry.notBefore)) {
+  if (entry.notBefore != null && (!finiteInteger(entry.notBefore) || now < entry.notBefore)) {
     return { ok: false, reason: "key_not_yet_valid" };
   }
-  if (entry.notAfter !== undefined && (!finiteInteger(entry.notAfter) || now > entry.notAfter)) {
+  if (entry.notAfter != null && (!finiteInteger(entry.notAfter) || now > entry.notAfter)) {
     return { ok: false, reason: "key_expired" };
   }
   if (entry.repos !== undefined) {

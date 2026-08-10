@@ -73,15 +73,20 @@ internal sealed class TpmKeyRing
     public void WriteTrustStore()
     {
         var keys = _store.ListSigningKeys(includeRetired: true)
-            .Select(key => new Dictionary<string, object?>
+            .Select(key =>
             {
-                ["kid"] = key.Kid,
-                ["alg"] = "ES256",
-                ["publicKey"] = key.PublicKeyPem,
-                ["status"] = key.Status,
-                ["notAfter"] = key.RetireAfter,
-                ["requireScopeHash"] = true,
-                ["requireRedemption"] = true,
+                var entry = new Dictionary<string, object?>
+                {
+                    ["kid"] = key.Kid,
+                    ["alg"] = "ES256",
+                    ["publicKey"] = key.PublicKeyPem,
+                    ["status"] = key.Status,
+                    ["requireScopeHash"] = true,
+                    ["requireRedemption"] = true,
+                };
+                // Omit null notAfter — Node treats null as present and rejects the key as expired.
+                if (key.RetireAfter is long notAfter) entry["notAfter"] = notAfter;
+                return entry;
             })
             .ToArray();
         var document = new Dictionary<string, object?>
