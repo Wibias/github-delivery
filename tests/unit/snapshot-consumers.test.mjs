@@ -258,6 +258,7 @@ test("evaluates wake state using snapshot feedback and viewer identity", () => {
       html_url: "https://example.test/comment/99",
       user: { login: "maintainer" },
       author_association: "MEMBER",
+      repository_permission: "write",
       created_at: "2026-07-31T23:59:20.000Z",
       body: "Please add a regression test.",
     },
