@@ -39,6 +39,8 @@ internal static partial class ScopeCanonicalizer
             ["mutationMode"] = mode,
             ["repo"] = RequiredString(request, "repo"),
         };
+        var authorityBranch = OptionalString(request, "authorityBranch")?.Trim();
+        if (!string.IsNullOrEmpty(authorityBranch)) scope["authorityBranch"] = authorityBranch;
 
         switch (action)
         {
@@ -186,7 +188,7 @@ internal static partial class ScopeCanonicalizer
     public static JsonObject BuildResource(JsonElement request)
     {
         var resource = new JsonObject();
-        foreach (var field in new[] { "pr", "issue", "commentId", "threadId", "expectedHead", "headRefName", "targetRepo", "supersedingPr", "remote", "branch", "expectedRemoteTip", "newTip", "base", "head", "assignee" })
+        foreach (var field in new[] { "pr", "issue", "commentId", "threadId", "expectedHead", "authorityBranch", "headRefName", "targetRepo", "supersedingPr", "remote", "branch", "expectedRemoteTip", "newTip", "base", "head", "assignee" })
         {
             if (!request.TryGetProperty(field, out var value) || value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
             {
