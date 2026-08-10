@@ -7,64 +7,127 @@ internal sealed class ApprovalDialog : Form
     private bool _wasTopMost;
     public bool Approved { get; private set; }
 
-    public ApprovalDialog(string title, IReadOnlyList<string> lines, string helloMessage)
+    public ApprovalDialog(string title, IReadOnlyList<string> lines, string helloMessage, string? repo = null)
     {
         _helloMessage = helloMessage;
         Text = title;
         StartPosition = FormStartPosition.CenterScreen;
-        Width = 720;
+        Width = 760;
         Height = 560;
+        MinimumSize = new Size(680, 480);
         MinimizeBox = false;
         MaximizeBox = false;
         ShowInTaskbar = true;
+        BackColor = GitHubTheme.Canvas;
+        ForeColor = GitHubTheme.TextPrimary;
+        Font = GitHubTheme.UiFont(9.75f);
         // The approval dialog must not be silently hidden behind other windows.
         // TopMost is only held while the dialog is actually shown so the user
         // sees the Windows Hello prompt; it is restored on close.
         TopMost = true;
 
-        var layout = new TableLayoutPanel
+        var root = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            RowCount = 3,
+            RowCount = 5,
             ColumnCount = 1,
-            Padding = new Padding(16),
+            BackColor = GitHubTheme.Canvas,
+            Padding = new Padding(24, 18, 24, 18),
         };
-        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
-        layout.Controls.Add(new Label
+        // Header: shield + app name + READY pill
+        root.Controls.Add(GitHubTheme.BuildHeader("READY"), 0, 0);
+        root.Controls.Add(new Label
         {
-            Text = "Review the exact GitHub mutations below. Windows Hello approves only this displayed batch.",
-            Dock = DockStyle.Fill,
+            Text = "Approve GitHub mutation",
+            Font = GitHubTheme.UiFont(18f, FontStyle.Bold),
+            ForeColor = GitHubTheme.TextPrimary,
             AutoSize = true,
-            Font = new Font(FontFamily.GenericSansSerif, 9, FontStyle.Bold),
-        }, 0, 0);
+            Margin = new Padding(0, 16, 0, 2),
+        }, 0, 1);
 
+        // Repo line in monospace, GitHub-style
+        if (!string.IsNullOrWhiteSpace(repo))
+        {
+            root.Controls.Add(new Label
+            {
+                Text = repo,
+                Font = GitHubTheme.MonoFont(10.5f),
+                ForeColor = GitHubTheme.Accent,
+                AutoSize = true,
+                Margin = new Padding(0, 0, 0, 10),
+            }, 0, 2);
+        }
+
+        // Details panel: thin GitHub border, monospace mutation lines
         var details = new TextBox
         {
             Multiline = true,
             ReadOnly = true,
             ScrollBars = ScrollBars.Vertical,
             Dock = DockStyle.Fill,
-            Font = new Font(FontFamily.GenericMonospace, 10),
+            Font = GitHubTheme.MonoFont(10f),
+            BackColor = Color.White,
+            ForeColor = GitHubTheme.TextPrimary,
+            BorderStyle = BorderStyle.FixedSingle,
             Text = string.Join(Environment.NewLine + Environment.NewLine, lines),
+            Margin = new Padding(0, 4, 0, 4),
         };
-        layout.Controls.Add(details, 0, 1);
+        var detailsPanel = new Panel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = GitHubTheme.Canvas,
+            Margin = new Padding(0),
+        };
+        GitHubTheme.AddBorder(detailsPanel, GitHubTheme.Border);
+        detailsPanel.Controls.Add(details);
+        root.Controls.Add(detailsPanel, 0, 3);
+
+        // Footer: security note + buttons
+        var footer = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 2,
+            RowCount = 1,
+            BackColor = GitHubTheme.Canvas,
+            Margin = new Padding(0, 10, 0, 0),
+        };
+        footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        footer.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        footer.Controls.Add(new Label
+        {
+            Text = "Windows Hello approves only this displayed batch",
+            Font = GitHubTheme.UiFont(9f),
+            ForeColor = GitHubTheme.TextSecondary,
+            AutoSize = true,
+            Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Margin = new Padding(0),
+        }, 0, 0);
 
         var buttons = new FlowLayoutPanel
         {
             Dock = DockStyle.Fill,
             FlowDirection = FlowDirection.RightToLeft,
             AutoSize = true,
+            WrapContents = false,
+            Margin = new Padding(0),
         };
-        _approveButton = new Button { Text = "Approve with Windows Hello", AutoSize = true };
-        var cancel = new Button { Text = "Cancel", AutoSize = true, DialogResult = DialogResult.Cancel };
+        _approveButton = new Button { Text = "Approve with Windows Hello" };
+        var cancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel };
+        GitHubTheme.StyleButton(_approveButton, primary: true);
+        GitHubTheme.StyleButton(cancel);
         _approveButton.Click += ApproveAsync;
         buttons.Controls.Add(_approveButton);
         buttons.Controls.Add(cancel);
-        layout.Controls.Add(buttons, 0, 2);
-        Controls.Add(layout);
+        footer.Controls.Add(buttons, 1, 0);
+        root.Controls.Add(footer, 0, 4);
+        Controls.Add(root);
         AcceptButton = _approveButton;
         CancelButton = cancel;
     }

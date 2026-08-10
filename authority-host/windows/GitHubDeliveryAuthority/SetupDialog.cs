@@ -21,37 +21,51 @@ internal sealed class SetupDialog : Form
     {
         _store = store;
         Text = "GitHub Delivery Authority - Setup";
-        Width = 680;
-        Height = 430;
-        MinimumSize = new Size(620, 390);
+        Width = 720;
+        Height = 480;
+        MinimumSize = new Size(660, 430);
         StartPosition = FormStartPosition.CenterScreen;
+        BackColor = GitHubTheme.Canvas;
+        ForeColor = GitHubTheme.TextPrimary;
+        Font = GitHubTheme.UiFont(9.75f);
 
-        var messageBoxFont = SystemFonts.MessageBoxFont;
-        var messageBoxFontFamily = messageBoxFont?.FontFamily ?? FontFamily.GenericSansSerif;
-        var messageBoxFontSize = messageBoxFont?.Size ?? 9F;
+        GitHubTheme.StyleButton(_settings);
+        GitHubTheme.StyleButton(_checkAgain);
+        GitHubTheme.StyleButton(_verify, primary: true);
+        GitHubTheme.StyleButton(_addRepo, primary: true);
+        GitHubTheme.StyleButton(_finish);
+        GitHubTheme.StyleTextBox(_repo);
 
         var heading = new Label
         {
             Text = "Set up GitHub Delivery Authority",
             AutoSize = true,
-            Font = new Font(messageBoxFontFamily, 14, FontStyle.Bold),
+            Font = GitHubTheme.UiFont(18f, FontStyle.Bold),
+            ForeColor = GitHubTheme.TextPrimary,
+            Margin = new Padding(0, 14, 0, 2),
         };
         var intro = new Label
         {
             Text = "Windows Hello protects authority changes. A Windows Hello PIN is sufficient; a fingerprint reader or camera is not required.",
             AutoSize = true,
             MaximumSize = new Size(620, 0),
+            ForeColor = GitHubTheme.TextSecondary,
         };
-        var helloHeading = new Label { Text = "1. Windows Hello readiness", AutoSize = true, Font = new Font(messageBoxFontFamily, messageBoxFontSize, FontStyle.Bold) };
-        var verifyHeading = new Label { Text = "2. Test Windows Hello", AutoSize = true, Font = new Font(messageBoxFontFamily, messageBoxFontSize, FontStyle.Bold) };
-        var repoHeading = new Label { Text = "3. Trust your first repository", AutoSize = true, Font = new Font(messageBoxFontFamily, messageBoxFontSize, FontStyle.Bold) };
-        var repoHint = new Label { Text = "Repository (OWNER/REPO)", AutoSize = true };
+        var helloHeading = new Label { Text = "1. Windows Hello readiness", AutoSize = true, Font = GitHubTheme.UiFont(10.5f, FontStyle.Bold), ForeColor = GitHubTheme.TextPrimary };
+        var verifyHeading = new Label { Text = "2. Test Windows Hello", AutoSize = true, Font = GitHubTheme.UiFont(10.5f, FontStyle.Bold), ForeColor = GitHubTheme.TextPrimary };
+        var repoHeading = new Label { Text = "3. Trust your first repository", AutoSize = true, Font = GitHubTheme.UiFont(10.5f, FontStyle.Bold), ForeColor = GitHubTheme.TextPrimary };
+        var repoHint = new Label { Text = "Repository (OWNER/REPO)", AutoSize = true, ForeColor = GitHubTheme.TextSecondary };
+
+        var header = GitHubTheme.BuildHeader("SETUP");
+        _status.BackColor = GitHubTheme.SubtleBg;
+        _status.ForeColor = GitHubTheme.TextPrimary;
+        _status.Font = GitHubTheme.UiFont(9.75f);
 
         var readinessButtons = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.LeftToRight, WrapContents = false };
         readinessButtons.Controls.Add(_checkAgain);
         readinessButtons.Controls.Add(_settings);
 
-        var repoRow = new TableLayoutPanel { AutoSize = true, Dock = DockStyle.Top, ColumnCount = 2 };
+        var repoRow = new TableLayoutPanel { AutoSize = true, Dock = DockStyle.Top, ColumnCount = 2, BackColor = GitHubTheme.Canvas };
         repoRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         repoRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         repoRow.Controls.Add(_repo, 0, 0);
@@ -63,10 +77,12 @@ internal sealed class SetupDialog : Form
         var layout = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            Padding = new Padding(16),
+            Padding = new Padding(24, 18, 24, 18),
             ColumnCount = 1,
-            RowCount = 11,
+            RowCount = 12,
+            BackColor = GitHubTheme.Canvas,
         };
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -79,17 +95,18 @@ internal sealed class SetupDialog : Form
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 38));
 
-        layout.Controls.Add(heading, 0, 0);
-        layout.Controls.Add(intro, 0, 1);
-        layout.Controls.Add(helloHeading, 0, 2);
-        layout.Controls.Add(_status, 0, 3);
-        layout.Controls.Add(readinessButtons, 0, 4);
-        layout.Controls.Add(verifyHeading, 0, 5);
-        layout.Controls.Add(_verify, 0, 6);
-        layout.Controls.Add(repoHeading, 0, 7);
-        layout.Controls.Add(repoHint, 0, 8);
-        layout.Controls.Add(repoRow, 0, 9);
-        layout.Controls.Add(footer, 0, 10);
+        layout.Controls.Add(header, 0, 0);
+        layout.Controls.Add(heading, 0, 1);
+        layout.Controls.Add(intro, 0, 2);
+        layout.Controls.Add(helloHeading, 0, 3);
+        layout.Controls.Add(_status, 0, 4);
+        layout.Controls.Add(readinessButtons, 0, 5);
+        layout.Controls.Add(verifyHeading, 0, 6);
+        layout.Controls.Add(_verify, 0, 7);
+        layout.Controls.Add(repoHeading, 0, 8);
+        layout.Controls.Add(repoHint, 0, 9);
+        layout.Controls.Add(repoRow, 0, 10);
+        layout.Controls.Add(footer, 0, 11);
         Controls.Add(layout);
 
         _checkAgain.Click += async (_, _) => await CheckReadinessAsync();

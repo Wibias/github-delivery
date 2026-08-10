@@ -17,7 +17,8 @@ internal sealed class ApprovalCoordinator
             using var dialog = new ApprovalDialog(
                 "GitHub Delivery Authorization",
                 approval.Summaries,
-                $"Approve {approval.Operations.Count} exact GitHub mutation(s) for {approval.Repo}");
+                $"Approve {approval.Operations.Count} exact GitHub mutation(s) for {approval.Repo}",
+                approval.Repo);
             completion.TrySetResult(dialog.ShowDialog() == DialogResult.OK && dialog.Approved);
         }, null);
         return completion.Task;
