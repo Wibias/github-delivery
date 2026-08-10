@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { pathToFileURL } from "node:url";
 
+import { isDirectInvocation } from "./lib/direct-invocation.mjs";
 import { collectBranchReviewInput, planReviewScope } from "./lib/review-scope.mjs";
 import { projectBugScope, projectSecurityScope } from "./lib/review-scope-compat.mjs";
 import { evidenceClears, validatePreOpenEvidence } from "./lib/pre-open-evidence.mjs";
@@ -152,7 +152,7 @@ async function main() {
   process.exitCode = result.decision === "ready" ? 0 : result.decision === "blocked" ? 1 : 2;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectInvocation(import.meta.url)) {
   try {
     if (process.argv[2] === "--self-test") {
       selfTest();
