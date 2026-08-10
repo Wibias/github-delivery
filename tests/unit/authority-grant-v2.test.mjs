@@ -130,6 +130,20 @@ test("retired trust-store keys are rejected", () => {
   assert.equal(result.reason, "key_retired");
 });
 
+test("null notAfter in the trust store is treated as unbounded", () => {
+  const { publicKey, privateKey } = es256Keypair();
+  const store = trustStore(publicKey);
+  store.keys[0].notAfter = null;
+  const result = verifyAuthorityGrant({
+    token: signEs256(privateKey, basePayload()),
+    trustStore: store,
+    request,
+    now: NOW,
+  });
+  assert.equal(result.verified, true);
+  assert.equal(result.provenance, "trusted_grant");
+});
+
 test("broker compatibility slot accepts a trust-store object as authorityPublicKey", () => {
   const { publicKey, privateKey } = es256Keypair();
   const store = trustStore(publicKey);

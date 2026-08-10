@@ -6,3 +6,5 @@ Thumbs.db
 node_modules/
 dist/
 /tools
+/authority-host/windows/GitHubDeliveryAuthority/obj
+/authority-host/windows/GitHubDeliveryAuthority/bin
