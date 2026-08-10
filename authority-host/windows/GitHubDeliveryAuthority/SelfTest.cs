@@ -18,6 +18,7 @@ internal static class SelfTest
             ClassifierFixture();
             HelloFailureFixture();
             HelloReadinessFixture();
+            SetupRoutingFixture();
             Console.WriteLine("windows-authority-self-test: PASS");
             return 0;
         }
@@ -130,6 +131,13 @@ internal static class SelfTest
 
         var available = HelloVerifier.DescribeAvailability(UserConsentVerifierAvailability.Available);
         Assert(available.Available, "available Hello must be ready");
+    }
+
+    private static void SetupRoutingFixture()
+    {
+        Assert(AuthorityHostContext.ShouldShowSetup(false, 0), "empty allowlist must trigger first-run setup");
+        Assert(AuthorityHostContext.ShouldShowSetup(true, 1), "--setup must force setup");
+        Assert(!AuthorityHostContext.ShouldShowSetup(false, 1), "configured host must not force setup");
     }
 
     private static void Assert(bool condition, string message)
