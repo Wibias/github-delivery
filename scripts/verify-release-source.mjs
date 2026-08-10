@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+import { realpathSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+
 import { validateReleaseSourceComparison } from "./lib/release-contract.mjs";
 
 const usage =
@@ -14,8 +17,9 @@ function parseArgs(argv) {
 
 async function fetchComparison({ repo, sourceCommit, branch, token, fetchImpl = fetch }) {
   if (!token) throw new Error("release source verification requires GH_TOKEN or GITHUB_TOKEN");
-  const [owner, name] = repo.split("/");
-  if (!owner || !name || repo.split("/").length !== 2) throw new Error("release repository is invalid");
+  const parts = repo.split("/");
+  const [owner, name] = parts;
+  if (!owner || !name || parts.length !== 2) throw new Error("release repository is invalid");
 
   const endpoint = new URL(
     `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/compare/${sourceCommit}...${encodeURIComponent(branch)}`,
@@ -55,18 +59,25 @@ export async function verifyReleaseSource({ repo, sourceCommit, branch, token, f
   return validateReleaseSourceComparison({ sourceCommit, branch, comparison });
 }
 
-try {
-  const args = parseArgs(process.argv.slice(2));
+export async function main(argv = process.argv.slice(2), env = process.env) {
+  const args = parseArgs(argv);
   const result = await verifyReleaseSource({
     ...args,
-    token: process.env.GH_TOKEN || process.env.GITHUB_TOKEN,
+    token: env.GH_TOKEN || env.GITHUB_TOKEN,
   });
   process.stdout.write(`${JSON.stringify({
     schemaVersion: 1,
     kind: "github-delivery/release-source-verification",
     ...result,
   }, null, 2)}\n`);
-} catch (error) {
-  console.error(String(error?.message || error));
-  process.exitCode = 1;
+  return result;
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
+  try {
+    await main();
+  } catch (error) {
+    console.error(String(error?.message || error));
+    process.exitCode = 1;
+  }
 }
