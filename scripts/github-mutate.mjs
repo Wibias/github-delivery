@@ -2,7 +2,7 @@
 import { appendFileSync, readFileSync } from "node:fs";
 
 import { runGitHubCommandWithRetry } from "./lib/github-retry.mjs";
-import { executeMutationWithAuthority } from "./lib/mutation-execution-context.mjs";
+import { executeMutationDocument } from "./lib/mutation-document-execution.mjs";
 import { boundedSpawnSync } from "./lib/subprocess-policy.mjs";
 
 const usage =
@@ -40,9 +40,9 @@ export function mutationRunner(command, argv, options) {
 
 try {
   const args = parseArgs(process.argv.slice(2));
-  const request = JSON.parse(readFileSync(args.requestPath, "utf8"));
-  const output = executeMutationWithAuthority({
-    request,
+  const document = JSON.parse(readFileSync(args.requestPath, "utf8"));
+  const output = executeMutationDocument({
+    document,
     execute: args.execute,
     runner: mutationRunner,
   });
