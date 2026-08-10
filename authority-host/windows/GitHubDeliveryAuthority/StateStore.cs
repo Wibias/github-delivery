@@ -291,6 +291,47 @@ internal sealed class StateStore : IDisposable
         return reader.Read() ? ReadBranchLease(reader) : null;
     }
 
+    public BranchLeaseRecord? TryUseActiveBranchLease(string repo, string branch, long now, int operationCount)
+    {
+        ValidateRepo(repo);
+        branch = ValidateBranch(branch);
+        if (operationCount <= 0) throw new AuthorityException("branch_lease_operation_count_invalid");
+        using var connection = Open();
+        using var transaction = connection.BeginTransaction(deferred: false);
+        BranchLeaseRecord? lease = null;
+        using (var select = connection.CreateCommand())
+        {
+            select.Transaction = transaction;
+            select.CommandText = """
+                SELECT lease_id,repo,branch,created_at,expires_at,revoked_at
+                FROM branch_leases
+                WHERE lower(repo)=lower($repo) AND branch=$branch AND revoked_at IS NULL AND expires_at > $now
+                ORDER BY expires_at DESC LIMIT 1;
+                """;
+            select.Parameters.AddWithValue("$repo", repo);
+            select.Parameters.AddWithValue("$branch", branch);
+            select.Parameters.AddWithValue("$now", now);
+            using var reader = select.ExecuteReader();
+            if (reader.Read()) lease = ReadBranchLease(reader);
+        }
+        if (lease is null)
+        {
+            transaction.Rollback();
+            return null;
+        }
+        InsertAuditEvent(
+            connection,
+            transaction,
+            "branch_lease_used",
+            lease.Repo,
+            lease.Branch,
+            "approved",
+            $"lease_id={lease.LeaseId};operations={operationCount}",
+            now);
+        transaction.Commit();
+        return lease;
+    }
+
     public IReadOnlyList<BranchLeaseRecord> ListActiveBranchLeases(long now)
     {
         using var connection = Open();
