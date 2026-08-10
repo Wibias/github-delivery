@@ -16,6 +16,9 @@
     "updateBranch": true,
     "autoMerge": true
   },
+  "rulesets": {
+    "allowBypassActors": false
+  },
   "release": {
     "environment": "release",
     "protectedTagPattern": "v*",

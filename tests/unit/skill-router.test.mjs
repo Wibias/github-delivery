@@ -98,6 +98,19 @@ test("routes full-review plus merge through a composed prepare-and-merge workflo
   assert.ok(route.explicitActions.includes("merge_pr"));
 });
 
+test("preserves an explicitly requested review phase before merge", () => {
+  for (const prompt of [
+    "review PR #32 and merge it when green",
+    "look over PR #32 then ship it if clean",
+    "security review PR #32 and merge it if it passes",
+  ]) {
+    const route = routeShippingGithubPrompt(prompt);
+    assert.equal(route.workflow, "references/prepare-and-merge-pr.md", prompt);
+    assert.equal(route.mutationMode, "maintainer", prompt);
+    assert.ok(route.explicitActions.includes("merge_pr"), prompt);
+  }
+});
+
 test("routes fix-review-comments plus merge through prepare-and-merge", () => {
   const route = routeShippingGithubPrompt("fix the review comments on PR #18 and merge it");
   assert.equal(route.workflow, "references/prepare-and-merge-pr.md");
