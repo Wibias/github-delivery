@@ -67,7 +67,11 @@ test("write attempt is recorded only after authority redemption succeeds", () =>
     plannedCommand: ["gh", "pr", "merge", "32"],
     authority: {
       verified: true,
-      claims: { redemption: "required", scopeSha256: "b".repeat(64) },
+      claims: {
+        redemption: "required",
+        scopeSha256: "b".repeat(64),
+        nonce: "gnt_test",
+      },
     },
     authorityGrant: "gd1.fake.fake",
     redeemer() {
