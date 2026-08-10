@@ -33,3 +33,11 @@ For a standalone PR, update from its base. For a stack, update the bottom PR fro
 ### GD-CI-008 — Watch runs the authoritative gate every wake
 
 Watch MUST run scripts/ship-gate.mjs every wake. Exit 0 permits waiting, exit 1 means act on known blockers, and exit 2 forbids a readiness claim until incomplete evidence is restored.
+
+### GD-CI-009 — CI wait timing is adaptive and evidence-backed
+
+When pending required CI is the only blocker, use `scripts/ci-wait.mjs` instead of inventing a fixed runner-specific wait loop. Unknown check timing starts with an estimate of 5 minutes and the authoritative gate is polled every 30 seconds. Five minutes is an estimate, not a timeout: do not stop waiting merely because the estimate is exceeded, and do not impose a fixed poll-count or total-wait cap by default.
+
+The wait driver may learn successful check durations per repository and check identity from observed completed runs. Learned timing requires at least three samples; until then, keep the 5-minute estimate. Timing history is advisory only and never overrides gate state.
+
+Name a runner or platform only when current GitHub evidence names it in the current check context or metadata. Do not infer that Windows, macOS, Linux, or another runner is slow from historical prose or a previous repository. On every wake, rerun the authoritative gate; stop waiting immediately if the head moves, evidence becomes unknown, or any blocker other than pending required CI appears.
