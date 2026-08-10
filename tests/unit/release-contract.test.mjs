@@ -12,6 +12,7 @@ import {
   verifyDistribution,
   releaseNotesForVersion,
 } from "../../scripts/lib/release-contract.mjs";
+import { verifyReleaseSource } from "../../scripts/verify-release-source.mjs";
 
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), "github-delivery-release-"));
@@ -101,6 +102,37 @@ test("release source rejects diverged and non-ancestor tag commits", () => {
     }),
     /not protected-main lineage/,
   );
+});
+
+test("release source verifier queries GitHub with scoped authentication", async () => {
+  const source = "a".repeat(40);
+  let observed = null;
+  const result = await verifyReleaseSource({
+    repo: "Wibias/github-delivery",
+    sourceCommit: source,
+    branch: "main",
+    token: "test-token",
+    async fetchImpl(url, options) {
+      observed = { url: String(url), options };
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return {
+            status: "identical",
+            base_commit: { sha: source },
+            merge_base_commit: { sha: source },
+          };
+        },
+        async text() {
+          return "";
+        },
+      };
+    },
+  });
+  assert.equal(result.valid, true);
+  assert.match(observed.url, /compare\/a{40}\.\.\.main$/);
+  assert.equal(observed.options.headers.Authorization, "Bearer test-token");
 });
 
 test("distribution verification binds version, source commit, and checksums", () => {
