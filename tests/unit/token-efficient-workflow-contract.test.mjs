@@ -12,6 +12,10 @@ const mutationPolicy = readFileSync(
 );
 const skill = readFileSync(new URL("../../SKILL.md", import.meta.url), "utf8");
 
+function canonicalBytes(value) {
+  return Buffer.byteLength(value.replace(/\r\n?/g, "\n"), "utf8");
+}
+
 test("issue-to-PR workflow keeps safety gates while staying compact", () => {
   for (const pattern of [
     /Need-to-fix preflight/i,
@@ -27,10 +31,8 @@ test("issue-to-PR workflow keeps safety gates while staying compact", () => {
   ]) {
     assert.match(workflow, pattern);
   }
-  assert.ok(
-    Buffer.byteLength(workflow, "utf8") < 9000,
-    `workflow bytes: ${Buffer.byteLength(workflow, "utf8")}`,
-  );
+  const workflowBytes = canonicalBytes(workflow);
+  assert.ok(workflowBytes < 9000, `workflow bytes: ${workflowBytes}`);
   assert.doesNotMatch(workflow, /Plan, authorize, then execute/i);
   assert.doesNotMatch(workflow, /```json[\s\S]*?"action"/i);
 });
