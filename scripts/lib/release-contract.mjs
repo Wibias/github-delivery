@@ -13,6 +13,14 @@ function requireVersion(version) {
   return version;
 }
 
+function requireCommit(value, label = "source commit") {
+  const commit = String(value || "").toLowerCase();
+  if (!/^[0-9a-f]{40}$/.test(commit)) {
+    throw new Error(`${label} must be a 40-character SHA`);
+  }
+  return commit;
+}
+
 export function validateReleaseContext({ eventName, ref, version }) {
   version = requireVersion(version);
   const tag = `v${version}`;
@@ -23,6 +31,37 @@ export function validateReleaseContext({ eventName, ref, version }) {
   const actualTag = String(ref).slice("refs/tags/".length);
   if (actualTag !== tag) throw new Error(`release tag ${actualTag} does not match package version ${version}`);
   return { version, tag, publish: true };
+}
+
+export function validateReleaseSourceComparison({ sourceCommit, branch, comparison } = {}) {
+  const source = requireCommit(sourceCommit);
+  const targetBranch = String(branch || "").trim();
+  if (!targetBranch) throw new Error("release branch is required");
+  if (!comparison || typeof comparison !== "object" || Array.isArray(comparison)) {
+    throw new Error("release source comparison is missing");
+  }
+
+  const base = requireCommit(comparison.base_commit?.sha, "comparison base commit");
+  const mergeBase = requireCommit(comparison.merge_base_commit?.sha, "comparison merge-base commit");
+  const status = String(comparison.status || "").toLowerCase();
+
+  if (base !== source) {
+    throw new Error(`release comparison base ${base} does not match source commit ${source}`);
+  }
+  if (mergeBase !== source) {
+    throw new Error(`release source ${source} is not an ancestor of ${targetBranch}`);
+  }
+  if (!new Set(["ahead", "identical"]).has(status)) {
+    throw new Error(`release source comparison status ${status || "missing"} is not protected-main lineage`);
+  }
+
+  return {
+    valid: true,
+    sourceCommit: source,
+    branch: targetBranch,
+    status,
+    mergeBase,
+  };
 }
 
 function parseSums(source) {
