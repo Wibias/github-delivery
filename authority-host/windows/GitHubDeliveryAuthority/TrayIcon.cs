@@ -165,7 +165,7 @@ internal sealed class TrayIcon : IDisposable
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern IntPtr CreateWindowExW(uint exStyle, string className, string windowName, uint style, int x, int y, int width, int height, IntPtr parent, IntPtr menu, IntPtr instance, IntPtr parameter);
     [DllImport("user32.dll")] private static extern bool DestroyWindow(IntPtr hwnd);
     [DllImport("user32.dll")] private static extern IntPtr DefWindowProcW(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam);
-    [DllImport("user32.dll")] private static extern sbyte GetMessageW(out MSG message, IntPtr hwnd, uint min, uint max);
+    [DllImport("user32.dll")] private static extern int GetMessageW(out MSG message, IntPtr hwnd, uint min, uint max);
     [DllImport("user32.dll")] private static extern bool TranslateMessage(ref MSG message);
     [DllImport("user32.dll")] private static extern IntPtr DispatchMessageW(ref MSG message);
     [DllImport("user32.dll")] private static extern void PostQuitMessage(int exitCode);
