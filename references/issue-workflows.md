@@ -70,7 +70,7 @@ For a specific issue:
 1. Read body, comments, labels, reporter, dates, and prior triage notes.
 2. Check `.out-of-scope/*.md` for similar rejected enhancements.
 3. Explore relevant code and docs enough to understand domain behavior.
-4. For bugs, attempt reproduction before grilling the reporter.
+4. For bugs, attempt reproduction before grilling the reporter. When runtime reproduction is feasible, use `references/runtime-evidence.md`: bind observations to the exact commit/environment and never treat `not-reproduced` as proof the issue is fixed.
 5. Recommend category/state with reasoning.
 6. For `ready-for-agent`, post an agent brief. Read `references/agent-brief.md` first.
 7. For rejected enhancements, read `references/out-of-scope.md`, update `.out-of-scope/`, comment, and close only after maintainer confirmation.
@@ -86,9 +86,10 @@ For each issue:
 1. Let the user describe the problem.
 2. Ask at most 2-3 short clarifying questions about expected behavior, actual behavior, reproduction, and consistency.
 3. Explore the relevant codebase area in the background to learn domain terms and behavior boundaries.
-4. Decide whether this is one issue or a breakdown.
-5. File issues directly with `create_issue` when the report is clear enough AND issue-creation authority exists.
-6. Print issue URLs and ask whether there is another issue.
+4. When a runtime attempt is feasible and useful, follow `references/runtime-evidence.md`. Capture the exact head/environment, trigger, expected vs actual behavior, and evidence. Do not block a clear issue report merely because reproduction is unavailable.
+5. Decide whether this is one issue or a breakdown.
+6. File issues directly with `create_issue` when the report is clear enough AND issue-creation authority exists.
+7. Print issue URLs and ask whether there is another issue.
 
 Issue body for a single QA bug:
 
@@ -98,6 +99,9 @@ Issue body for a single QA bug:
 ## What I expected
 
 ## Steps to reproduce
+
+## Runtime evidence
+Reproduced / not reproduced / not attempted / blocked or inconclusive, with exact environment/head when available.
 
 ## Additional context
 ```
