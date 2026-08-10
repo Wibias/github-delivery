@@ -11,27 +11,58 @@ internal sealed class AllowlistDialog : Form
         _store = store;
         Text = "GitHub Delivery Authority — Repository Allowlist";
         StartPosition = FormStartPosition.CenterScreen;
-        Width = 620;
-        Height = 420;
+        Width = 660;
+        Height = 460;
+        MinimumSize = new Size(600, 400);
+        BackColor = GitHubTheme.Canvas;
+        ForeColor = GitHubTheme.TextPrimary;
+        Font = GitHubTheme.UiFont(9.75f);
 
-        var layout = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 3, ColumnCount = 1, Padding = new Padding(12) };
+        GitHubTheme.StyleTextBox(_repo);
+        _repos.BorderStyle = BorderStyle.FixedSingle;
+        _repos.BackColor = Color.White;
+        _repos.ForeColor = GitHubTheme.TextPrimary;
+        _repos.Font = GitHubTheme.MonoFont(10f);
+
+        var layout = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 5, ColumnCount = 1, Padding = new Padding(24, 18, 24, 18), BackColor = GitHubTheme.Canvas };
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        layout.Controls.Add(new Label { Text = "Only explicitly allowlisted repositories may receive trusted grants. Changes require Windows Hello.", AutoSize = true }, 0, 0);
-        layout.Controls.Add(_repos, 0, 1);
+        layout.Controls.Add(GitHubTheme.BuildHeader("ALLOWLIST"), 0, 0);
+        layout.Controls.Add(new Label
+        {
+            Text = "Repository Allowlist",
+            Font = GitHubTheme.UiFont(18f, FontStyle.Bold),
+            ForeColor = GitHubTheme.TextPrimary,
+            AutoSize = true,
+            Margin = new Padding(0, 16, 0, 2),
+        }, 0, 1);
+        layout.Controls.Add(new Label
+        {
+            Text = "Only explicitly allowlisted repositories may receive trusted grants. Changes require Windows Hello.",
+            AutoSize = true,
+            ForeColor = GitHubTheme.TextSecondary,
+            MaximumSize = new Size(600, 0),
+            Margin = new Padding(0, 0, 0, 10),
+        }, 0, 2);
+        layout.Controls.Add(_repos, 0, 3);
 
         var buttons = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true };
-        var add = new Button { Text = "Add", AutoSize = true };
-        var remove = new Button { Text = "Remove selected", AutoSize = true };
-        var close = new Button { Text = "Close", AutoSize = true, DialogResult = DialogResult.OK };
+        var add = new Button { Text = "Add" };
+        var remove = new Button { Text = "Remove selected" };
+        var close = new Button { Text = "Close", DialogResult = DialogResult.OK };
+        GitHubTheme.StyleButton(add, primary: true);
+        GitHubTheme.StyleButton(remove);
+        GitHubTheme.StyleButton(close);
         add.Click += AddAsync;
         remove.Click += RemoveAsync;
         buttons.Controls.Add(_repo);
         buttons.Controls.Add(add);
         buttons.Controls.Add(remove);
         buttons.Controls.Add(close);
-        layout.Controls.Add(buttons, 0, 2);
+        layout.Controls.Add(buttons, 0, 4);
         Controls.Add(layout);
         AcceptButton = add;
         CancelButton = close;
