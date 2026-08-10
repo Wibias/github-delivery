@@ -131,6 +131,8 @@ test("high-assurance lifecycle and social actions require trusted authority", ()
     "create_issue",
     "assign_issue",
     "resolve_thread",
+    "change_draft_state",
+    "request_reviewers",
     "close_linked_issue",
     "close_pr",
     "merge_pr",
@@ -171,6 +173,47 @@ test("social-write authority is enforced at execution even in review mode", () =
     }).requireTrustedAuthority,
     true,
   );
+});
+
+test("PR metadata writes cannot execute from caller-asserted authority", () => {
+  const head = "a".repeat(40);
+  for (const request of [
+    {
+      schemaVersion: 1,
+      action: "change_draft_state",
+      mutationMode: "maintainer",
+      explicitInstruction: true,
+      repo: "acme/widgets",
+      pr: 42,
+      expectedHead: head,
+      ready: true,
+    },
+    {
+      schemaVersion: 1,
+      action: "request_reviewers",
+      mutationMode: "maintainer",
+      explicitInstruction: true,
+      repo: "acme/widgets",
+      pr: 42,
+      expectedHead: head,
+      reviewers: ["alice"],
+    },
+  ]) {
+    let calls = 0;
+    assert.throws(
+      () => executeMutationWithAuthority({
+        request,
+        execute: true,
+        runner() {
+          calls += 1;
+          return { status: 0, stdout: "", stderr: "" };
+        },
+      }),
+      /trusted_authority_required/,
+      request.action,
+    );
+    assert.equal(calls, 0, request.action);
+  }
 });
 
 test("push_code dry-run plans an exact force-with-lease command", () => {
