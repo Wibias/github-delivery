@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   evaluateRequiredCheckWorkflowMapping,
+  workflowHasTopLevelEvent,
   workflowRunIdFromCheckRun,
 } from "../../scripts/lib/merge-group-workflow-coverage.mjs";
 import {
@@ -354,4 +355,27 @@ test("required GitHub Actions mapping fails closed when one producer lacks merge
   });
   assert.equal(result.requiredCheckWorkflowMappingComplete, false);
   assert.equal(result.unmapped[0].reason, "merge_group_trigger_missing");
+});
+
+test("merge_group detection reads only the top-level workflow trigger", () => {
+  for (const source of [
+    "# merge_group\non:\n  pull_request:\n",
+    "on:\n  pull_request:\nenv:\n  EVENT_NAME: merge_group\n",
+    "on:\n  pull_request:\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo merge_group\n",
+    "on:\n  pull_request:\n    branches: [merge_group]\n",
+  ]) {
+    assert.equal(workflowHasTopLevelEvent(source, "merge_group"), false, source);
+  }
+});
+
+test("merge_group detection supports GitHub workflow trigger forms", () => {
+  for (const source of [
+    "on: merge_group\n",
+    "on: [pull_request, merge_group]\n",
+    "on: ['pull_request', 'merge_group']\n",
+    "on: { pull_request: null, merge_group: null }\n",
+    "on:\n  pull_request:\n  merge_group:\n",
+  ]) {
+    assert.equal(workflowHasTopLevelEvent(source, "merge_group"), true, source);
+  }
 });
