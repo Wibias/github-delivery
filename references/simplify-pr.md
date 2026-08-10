@@ -21,6 +21,7 @@ Prefer reporting **nothing worth simplifying** over manufacturing edits.
 ## Authority and scope
 
 - Read `references/shared-rules.md` before acting.
+- Read `references/refactor-contract-card.md` before proposing or applying non-trivial candidates.
 - Inspect the PR comparison plus only the directly necessary adjacent code needed to prove equivalence.
 - Do not expand into unrelated refactors, repository-wide cleanup, formatting churn, dependency changes, or architectural redesign.
 - Simplification cannot overrule bug, security, Spec/Standards, review, CI, base-health, mutation-policy, or `ship-gate.mjs` authority.
@@ -67,8 +68,21 @@ For every proposed candidate, report:
 4. behavior and invariants that must remain unchanged
 5. realistic risk level
 6. focused validation that would prove the change safe
+7. contract-card result from `references/refactor-contract-card.md`
 
 Keep candidates separate from bugs, vulnerabilities, spec violations, and required review fixes. Those are handled by the normal review workflows and must not be disguised as optional simplification.
+
+## Contract-card gate
+
+Before a non-trivial candidate can be offered for approval or applied, build its contract card and evaluate it with `scripts/lib/refactor-contract-card.mjs` (or the equivalent host integration).
+
+The card must explicitly preserve behavior, API/data shape, persistence, performance/resources, security/authorization, compatibility, observable errors/logs, side effects, and timing/concurrency semantics. State an explicit "no such effect on this path" contract when a dimension genuinely does not apply; an empty dimension means the analysis is incomplete.
+
+Every relied-on test/check must state whether it would fail if the protected behavior were broken. A check that would still pass is vacuous and does not count as equivalence evidence.
+
+When important current behavior is poorly documented or weakly tested, capture characterization evidence **before** restructuring it. Any unresolved equivalence unknown blocks the candidate.
+
+Only `eligible: true` candidates may proceed to the approval gate. A failed contract-card evaluation means leave that candidate unchanged and report the blocker.
 
 ## Rejection boundary
 
@@ -91,7 +105,7 @@ If no worthwhile candidates remain, report **nothing worth simplifying** and ret
 
 If candidates remain:
 
-1. Present the complete bounded candidate list before editing.
+1. Present the complete bounded candidate list before editing, including each eligible contract-card summary.
 2. Wait for **explicit approval** of all or selected candidates.
 3. Do not interpret approval of the original full review, permission to fix bugs, or a broad maintainer mutation mode as approval to simplify.
 4. Record which candidates were approved and apply only those candidates.
@@ -106,7 +120,7 @@ For a combined full-review request, this approval is the only continuation gate.
 - Apply approved candidates in small, independently attributable changes.
 - Preserve existing tests and add or strengthen tests when equivalence is not already directly covered.
 - Run the candidate's focused validation immediately after applying it.
-- If focused validation fails or reveals changed behavior, revert that candidate individually before continuing. Do not keep a weaker approximation merely because it removes more code.
+- If focused validation fails, reveals changed behavior, or shows that a claimed test was vacuous, revert that candidate individually before continuing. Do not keep a weaker approximation merely because it removes more code.
 - Stop and report a blocker if independent rollback is not safe or the working tree contains unrelated changes.
 
 ## Validation
@@ -114,11 +128,12 @@ For a combined full-review request, this approval is the only continuation gate.
 After all approved candidates pass focused validation:
 
 1. run the repository's relevant formatter, lint, type-check, build, test, security, distribution, and other required gates
-2. compare the resulting behavior and interfaces against the preserved invariants
-3. push only after the required local evidence is clean
-4. re-read the PR head after push and treat the new SHA as the only authoritative review target
+2. compare the resulting behavior and interfaces against every preserved contract-card dimension
+3. confirm the relied-on tests/checks still protect the stated behavior rather than merely passing for unrelated reasons
+4. push only after the required local evidence is clean
+5. re-read the PR head after push and treat the new SHA as the only authoritative review target
 
-A passing type-check or reduced diff size alone never proves behavioral equivalence.
+A passing type-check, passing-but-vacuous test, or reduced diff size alone never proves behavioral equivalence.
 
 ## Mandatory full re-review
 
@@ -137,6 +152,9 @@ For a standalone simplify request, candidate approval and application are follow
 
 - activation was explicit
 - candidates were either rejected with rationale, reported as nothing worth simplifying, or explicitly approved
+- every non-trivial applied candidate had an eligible contract card with no unresolved equivalence unknowns
+- relied-on tests/checks were shown to fail when their protected behavior is broken, or were strengthened before use
+- important poorly documented behavior had characterization evidence before restructuring
 - on foreign PRs: the bounded candidate list was delivered to the PR owner and nothing was edited or pushed
 - only approved behavior-preserving changes were applied
 - failed candidates were reverted individually
