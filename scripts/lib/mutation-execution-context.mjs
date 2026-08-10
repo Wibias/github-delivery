@@ -13,6 +13,7 @@ import {
 import { classifyMergeOutcome, readMergeState } from "./merge-outcome.mjs";
 import { actionDefinition } from "./mutation-action-registry.mjs";
 import { boundedSpawnSync } from "./subprocess-policy.mjs";
+import { readUserConfig, resolveAuthorityMode } from "./user-config.mjs";
 
 export function authorityRuntimeEnvironment({
   env = process.env,
@@ -66,18 +67,85 @@ export function mutationRequiresTrustedAuthority(request = {}) {
   );
 }
 
+function effectiveAuthorityMode({
+  config = undefined,
+  env = process.env,
+  platform = process.platform,
+  exists = existsSync,
+  readConfigFile = readFileSync,
+} = {}) {
+  const resolvedConfig =
+    config === undefined
+      ? readUserConfig({
+          platform,
+          env,
+          exists,
+          readFile: readConfigFile,
+        }).config
+      : config;
+  return resolveAuthorityMode({ config: resolvedConfig, env });
+}
+
 export function mutationAuthorityOptions({
   request = {},
   enforceHighAssurance = false,
   env = process.env,
   readFile = readFileSync,
+  config = undefined,
+  platform = process.platform,
+  exists = existsSync,
+  readConfigFile = readFileSync,
 } = {}) {
+  const authorityMode = effectiveAuthorityMode({
+    config,
+    env,
+    platform,
+    exists,
+    readConfigFile,
+  });
+  const legacyStrict = env.GITHUB_DELIVERY_REQUIRE_TRUSTED_AUTHORITY === "1";
+  const modeRequiresAuthority =
+    enforceHighAssurance === true &&
+    (authorityMode === "all" ||
+      (authorityMode === "high-assurance" &&
+        mutationRequiresTrustedAuthority(request)));
+
   return {
-    authorityPublicKey: authorityVerifierConfiguration({ env, readFile }),
-    requireTrustedAuthority:
-      env.GITHUB_DELIVERY_REQUIRE_TRUSTED_AUTHORITY === "1" ||
-      (enforceHighAssurance && mutationRequiresTrustedAuthority(request)),
+    authorityMode,
+    authorityPublicKey: authorityVerifierConfiguration({
+      env,
+      readFile,
+      platform,
+      exists,
+    }),
+    requireTrustedAuthority: legacyStrict || modeRequiresAuthority,
   };
+}
+
+export function mutationAuthorityRequired(
+  request = {},
+  {
+    execute = false,
+    env = process.env,
+    config = undefined,
+    platform = process.platform,
+    exists = existsSync,
+    readConfigFile = readFileSync,
+  } = {},
+) {
+  if (execute !== true) return false;
+  const authorityMode = effectiveAuthorityMode({
+    config,
+    env,
+    platform,
+    exists,
+    readConfigFile,
+  });
+  return (
+    authorityMode === "all" ||
+    (authorityMode === "high-assurance" &&
+      mutationRequiresTrustedAuthority(request))
+  );
 }
 
 export function assertScopedTrustedAuthority(
@@ -102,7 +170,11 @@ function planWithAuthorityOptions(request, options) {
 
 export function planMutationWithAuthority(
   request,
-  { env = process.env, readFile = readFileSync } = {},
+  {
+    env = process.env,
+    readFile = readFileSync,
+    config = undefined,
+  } = {},
 ) {
   const runtimeEnv = authorityRuntimeEnvironment({ env });
   const options = mutationAuthorityOptions({
@@ -110,6 +182,7 @@ export function planMutationWithAuthority(
     enforceHighAssurance: false,
     env: runtimeEnv,
     readFile,
+    config,
   });
   return planWithAuthorityOptions(request, options);
 }
@@ -141,6 +214,7 @@ export function executeMutationWithAuthority({
   runner = boundedSpawnSync,
   env = process.env,
   readFile = readFileSync,
+  config = undefined,
   redeemer = undefined,
 } = {}) {
   const runtimeEnv = authorityRuntimeEnvironment({ env });
@@ -149,6 +223,7 @@ export function executeMutationWithAuthority({
     enforceHighAssurance: execute === true,
     env: runtimeEnv,
     readFile,
+    config,
   });
   const planned = planWithAuthorityOptions(request, options);
   const pipeName = runtimeEnv.GITHUB_DELIVERY_AUTHORITY_PIPE || undefined;

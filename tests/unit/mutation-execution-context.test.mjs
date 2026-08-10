@@ -46,6 +46,10 @@ function pushRequest(overrides = {}) {
   };
 }
 
+const protectedEnv = {
+  GITHUB_DELIVERY_AUTHORITY_MODE: "high-assurance",
+};
+
 test("canonical subprocess policy always applies a finite deadline", () => {
   let observedOptions = null;
   const result = boundedSpawnSync(
@@ -115,7 +119,7 @@ test("compatibility mode can still inspect a legacy unscoped grant", () => {
   );
 });
 
-test("autonomous execution always requires trusted authority", () => {
+test("autonomous execution remains intrinsically high assurance", () => {
   assert.equal(
     mutationRequiresTrustedAuthority({
       mutationMode: "autonomous",
@@ -125,7 +129,7 @@ test("autonomous execution always requires trusted authority", () => {
   );
 });
 
-test("high-assurance lifecycle and social actions require trusted authority", () => {
+test("high-assurance lifecycle and social actions remain intrinsically classified", () => {
   for (const action of [
     "push_code",
     "create_pr",
@@ -157,14 +161,24 @@ test("high-assurance lifecycle and social actions require trusted authority", ()
   }
 });
 
-test("social-write authority is enforced at execution even in review mode", () => {
+test("social-write authority follows the selected protection mode", () => {
   const request = { mutationMode: "review", action: "post_comment" };
   assert.equal(
-    mutationAuthorityOptions({ request, enforceHighAssurance: false }).requireTrustedAuthority,
+    mutationAuthorityOptions({
+      request,
+      enforceHighAssurance: true,
+      config: { schemaVersion: 1, authorityMode: "off" },
+      env: {},
+    }).requireTrustedAuthority,
     false,
   );
   assert.equal(
-    mutationAuthorityOptions({ request, enforceHighAssurance: true }).requireTrustedAuthority,
+    mutationAuthorityOptions({
+      request,
+      enforceHighAssurance: true,
+      config: { schemaVersion: 1, authorityMode: "high-assurance" },
+      env: {},
+    }).requireTrustedAuthority,
     true,
   );
   assert.equal(
@@ -172,12 +186,13 @@ test("social-write authority is enforced at execution even in review mode", () =
       request,
       enforceHighAssurance: false,
       env: { GITHUB_DELIVERY_REQUIRE_TRUSTED_AUTHORITY: "1" },
+      config: { schemaVersion: 1, authorityMode: "off" },
     }).requireTrustedAuthority,
     true,
   );
 });
 
-test("PR metadata writes cannot execute from caller-asserted authority", () => {
+test("PR metadata writes cannot execute from caller-asserted authority in high-assurance mode", () => {
   const head = "a".repeat(40);
   for (const request of [
     {
@@ -206,6 +221,7 @@ test("PR metadata writes cannot execute from caller-asserted authority", () => {
       () => executeMutationWithAuthority({
         request,
         execute: true,
+        env: protectedEnv,
         runner() {
           calls += 1;
           return { status: 0, stdout: "", stderr: "" };
@@ -229,12 +245,13 @@ test("push_code dry-run plans an exact force-with-lease command", () => {
   ]);
 });
 
-test("push_code execution cannot reach git without trusted authority", () => {
+test("push_code execution cannot reach git without trusted authority in high-assurance mode", () => {
   let calls = 0;
   assert.throws(
     () => executeMutationWithAuthority({
       request: pushRequest(),
       execute: true,
+      env: protectedEnv,
       runner() {
         calls += 1;
         return { status: 0, stdout: "", stderr: "" };

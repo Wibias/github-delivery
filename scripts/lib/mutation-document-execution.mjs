@@ -4,6 +4,7 @@ import { authorizeBatchSync } from "./authority-host-client.mjs";
 import {
   authorityRuntimeEnvironment,
   executeMutationWithAuthority,
+  mutationAuthorityRequired,
   mutationRequiresTrustedAuthority,
   planMutationWithAuthority,
 } from "./mutation-execution-context.mjs";
@@ -56,17 +57,30 @@ function refreshRunner(runner) {
 }
 
 function resolvedDependencies(overrides = {}) {
-  return {
+  const resolved = {
     attachAuthorityGrants,
     refreshExpectedHeads,
     authorizeBatchSync,
     authorityRuntimeEnvironment,
     executeMutationWithAuthority,
+    mutationAuthorityRequired,
     mutationRequiresTrustedAuthority,
     planMutationWithAuthority,
     stampAuthorizedReviewVerdicts,
     ...overrides,
   };
+
+  // Older focused tests and integrations may replace the intrinsic classifier.
+  // Preserve that injection point unless they explicitly provide the new
+  // effective-mode decision as well.
+  if (
+    Object.hasOwn(overrides, "mutationRequiresTrustedAuthority") &&
+    !Object.hasOwn(overrides, "mutationAuthorityRequired")
+  ) {
+    resolved.mutationAuthorityRequired = (request, { execute = false } = {}) =>
+      execute === true && overrides.mutationRequiresTrustedAuthority(request);
+  }
+  return resolved;
 }
 
 export function executeMutationDocument({
@@ -93,7 +107,10 @@ export function executeMutationDocument({
     const approvalIndexes = [];
     for (let index = 0; index < requests.length; index += 1) {
       if (
-        deps.mutationRequiresTrustedAuthority(requests[index]) &&
+        deps.mutationAuthorityRequired(requests[index], {
+          execute: true,
+          env: effectiveEnv,
+        }) &&
         !requests[index].authorityGrant
       ) {
         approvalIndexes.push(index);

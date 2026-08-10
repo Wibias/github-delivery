@@ -4,15 +4,22 @@ Every workflow has an explicit mutation mode. Default to `read-only` unless the 
 
 The user never needs to choose CLI flags. The agent derives the narrowest appropriate mode from the request, loads the matching workflow, and passes the mode to internal scripts.
 
+Mutation mode and trusted-authority protection are separate controls:
+
+- mutation mode answers **what the workflow is allowed to request**;
+- authority protection answers **when an executed mutation additionally needs an independently verified OS-backed grant**.
+
+Turning trusted-authority protection off never broadens the mutation profile or waives workflow policy.
+
 ## Profiles
 
 | Action | read-only | review | maintainer | autonomous |
 |---|---:|---:|---:|---:|
 | Read evidence and draft text | yes | yes | yes | yes |
 | Publish ordinary PR/issue comments and reviews | no | yes | yes | yes |
-| Publish a full-review verdict | no | yes, trusted authority required | yes, trusted authority required | yes, trusted authority required |
+| Publish a full-review verdict | no | yes, authority policy applies | yes, authority policy applies | yes, authority policy applies |
 | Reply to a bot thread | no | yes | yes | yes |
-| Reply to a human thread | no | exact text + trusted authority required | exact text + trusted authority required | exact text + trusted authority required |
+| Reply to a human thread | no | exact text required; authority policy applies | exact text required; authority policy applies | exact text required; authority policy applies |
 | Push scoped code | no | no | yes | yes |
 | Post feedback-resolution records | no | no | yes | yes |
 | Resolve bot-authored threads (`--resolve-bot`) | no | yes, after verification | yes | yes |
@@ -22,18 +29,25 @@ The user never needs to choose CLI flags. The agent derives the narrowest approp
 | Merge PR / close linked issue | no | no | explicit instruction | yes, only inside the governing workflow |
 | Create a follow-up issue | no | no | explicit instruction | yes |
 
-The profile is an upper bound, not a waiver. Draft/WIP gates, exact-text confirmation, linked-issue thanks, stack handling, thread ownership, expected-head checks, and workflow-specific requirements still apply.
+The profile is an upper bound, not a waiver. Draft/WIP gates, exact-text confirmation, linked-issue thanks, stack handling, thread ownership, expected-head checks, idempotency, and workflow-specific requirements still apply in every authority-protection mode.
 
-## Trusted authority at execution
+## Trusted-authority protection
 
-Mutation mode describes what a workflow may request. It is not, by itself, proof that a human granted the exact effect.
+The global user setting `authorityMode` has exactly three values:
 
-Dry-run planning remains available with the normal mode rules so the agent can show the bounded operation before approval. At `--execute`, the mutation boundary additionally requires a scoped trusted authority grant when any condition is true:
+| authorityMode | Extra trusted-authority requirement at execution |
+|---|---|
+| `off` | none |
+| `high-assurance` | autonomous execution and registry actions marked `highAssurance` |
+| `all` | every executed GitHub mutation |
 
-- the request uses `autonomous` mode; or
-- the action is marked `highAssurance` in `scripts/lib/mutation-action-registry.mjs`.
+The persistent user config defaults to `off`. It lives outside the installed skill directory so upgrading the skill cannot overwrite it. `GITHUB_DELIVERY_AUTHORITY_MODE=off|high-assurance|all` may override the persistent value for automation or diagnosis. The legacy `GITHUB_DELIVERY_REQUIRE_TRUSTED_AUTHORITY=1` switch remains supported and maps to the stricter `all` mode.
 
-The canonical enabled high-assurance action set is listed below. CI verifies exact set equality against the executable registry. Do not maintain a second informal subset elsewhere.
+`off` means **no Windows Hello / trusted-authority prompt**. It does not mean “the agent can do anything.” Direct merge instruction, exact-text confirmation for human replies, expected-head checks, ownership checks, idempotency, workflow routing, ship gates, and all other mutation-policy rules remain mandatory.
+
+Dry-run planning never requires trusted authority. When the selected mode requires authority at `--execute`, the trusted grant must contain `scopeSha256`; a legacy resource-only signature is not enough.
+
+The canonical enabled high-assurance action set is listed below. CI verifies exact set equality against the executable registry. The list is an intrinsic risk classification even when the user selected `off`; do not delete actions merely because the extra OS-backed layer is disabled.
 
 <!-- high-assurance-actions:start -->
 - `assign_issue`
@@ -60,54 +74,47 @@ The canonical enabled high-assurance action set is listed below. CI verifies exa
 - `update_pr_body`
 <!-- high-assurance-actions:end -->
 
-The existing `GITHUB_DELIVERY_REQUIRE_TRUSTED_AUTHORITY=1` switch remains a stronger global policy and requires trusted authority for every executed mutation. In every strict case, the trusted grant must contain `scopeSha256`; a legacy resource-only signature is not enough.
+This keeps hostile repository text and model-selected mode inside the request layer. In `high-assurance` and `all`, a protected write additionally needs an independently verified grant for the exact effect. In `off`, the normal mutation boundary still validates the exact request but deliberately skips that additional trusted-authority requirement.
 
-This keeps hostile repository text and model-selected mode inside the request layer. The actual high-impact write still needs an independently verified grant for the exact effect.
-
-A review-mode human reply may be planned so the exact text can be shown for approval, but it cannot execute from caller-supplied `exactTextConfirmed` alone. Execution requires a trusted grant whose `exactTextSha256` matches the exact outgoing body.
+A human reply always needs exact-text confirmation. When authority protection requires a grant, the grant additionally binds `exactTextSha256` to the exact outgoing body. Caller-supplied `exactTextConfirmed` is never itself trusted provenance.
 
 ### Durable full-review verdict provenance
 
-A full-review verdict is not trusted merge evidence merely because its Markdown is valid and it was posted by the authenticated GitHub actor.
+A full-review verdict is never merge evidence merely because arbitrary repository text copied the `[GD]` format. Publisher ownership, exact reviewed head, required verdict structure, workflow routing, and publication checks always apply.
 
-The full-review publication path must:
+When `authorityMode` is `high-assurance` or `all`, the full-review publication path additionally must:
 
 1. build the normal `post_comment` request for the exact reviewed head and verdict body;
-2. obtain scoped trusted authority through `scripts/github-authorize.mjs`;
-3. use the authorized request returned by that helper — it automatically adds a hidden `github-delivery:review-authority` marker that carries the exact scoped grant without changing the human-visible body hash;
-4. execute that stamped request through `scripts/github-mutate.mjs`;
-5. run `scripts/verify-verdict-published.mjs`, which now requires both valid verdict format and valid historical trusted-authority provenance.
+2. obtain scoped trusted authority through the normal mutation execution path;
+3. publish the authorized request with the hidden `github-delivery:review-authority` marker that binds the exact scope without changing the human-visible body hash;
+4. run `scripts/verify-verdict-published.mjs`, which re-verifies the signed grant at the GitHub comment creation time and requires Windows Hello approval, `scopeSha256`, and the one-time redemption claim.
 
-The provenance check re-verifies the signed grant at the comment's GitHub creation time and requires `windows_hello`, `scopeSha256`, and the one-time redemption claim. A generic `post_comment` that merely copies the `[GD]` format never satisfies merge review evidence.
+When `authorityMode` is `off`, `scripts/verify-verdict-published.mjs` still requires the authenticated publisher, exact head, and valid verdict format, but intentionally does not require OS-backed provenance. It reports `trusted:false` and `trusted_authority_disabled_by_user_config`; it must never manufacture a trusted claim.
+
+Offline security fixtures that explicitly provide `--authority-public-key-file` remain strict regardless of local user config so verifier regression tests cannot be weakened by a developer machine setting.
+
+A generic `post_comment` that does not satisfy the full-review publication contract never satisfies merge review evidence.
 
 ## Natural-language selection
 
 Examples:
 
-- `full review PR #32` → `review` (the full-review workflow publishes its verdict comment through trusted verdict authority)
+- `full review PR #32` → `review` (the full-review workflow publishes its verdict comment; trusted authority is added when the configured protection mode requires it)
 - `what is left on PR #32?` → `read-only`
 - `review PR #32 and post the findings` → `review`
 - `fix PR #32 and make it merge ready` → `maintainer`
-- `merge PR #32` → `maintainer` with explicit authority for the merge workflow
+- `merge PR #32` → `maintainer` with explicit mutation authority for the merge workflow; OS-backed approval depends on `authorityMode`
 - `supersede PR #12 with #45` → `maintainer` with explicit authority for the close/comment actions
 - `maintainer overtake PR #32` → `maintainer` with explicit authority for the push/close/comment actions the overtake workflow needs
-- `watch and autonomously fix/merge PR #32` → `autonomous` only when the wording truly grants that scope; execution still requires a scoped trusted grant
+- `watch and autonomously fix/merge PR #32` → `autonomous` only when the wording truly grants that scope; normal workflow bounds still apply, and trusted authority is additionally required in `high-assurance` or `all`
 
 Do not ask users to run scripts. These mappings are agent behavior.
 
 ## Router authority
 
-The router output is authoritative. A full review resolves to `review` (bare)
-or `maintainer` (when `fix` or `simplify` is explicitly requested); both
-profiles permit ordinary `post_comment`, while the final full-review verdict is
-a high-assurance special case and requires trusted authority at execution.
+The router output is authoritative. A full review resolves to `review` (bare) or `maintainer` (when `fix` or `simplify` is explicitly requested); both profiles permit ordinary `post_comment`. The full-review verdict remains intrinsically high assurance, while whether that classification triggers trusted authority at execution is controlled by `authorityMode`.
 
-Gate invocations must pass the routed mutation mode plus `--workflow`, and the
-gate rejects incompatible combinations (for example
-`--mutation-mode read-only --workflow references/full-review-pr.md`). A stricter
-self-selected mode is a workflow violation, never a publication excuse: a
-full-review run may complete with a chat-only verdict only when GitHub
-publication is genuinely unavailable and that hard blocker is recorded.
+Gate invocations must pass the routed mutation mode plus `--workflow`, and the gate rejects incompatible combinations (for example `--mutation-mode read-only --workflow references/full-review-pr.md`). A stricter self-selected mode is a workflow violation, never a publication excuse: a full-review run may complete with a chat-only verdict only when GitHub publication is genuinely unavailable and that hard blocker is recorded.
 
 ## Machine-readable policy
 
@@ -132,7 +139,7 @@ node scripts/github-mutate.mjs --request request.json
 node scripts/github-mutate.mjs --request request.json --execute --audit mutations.jsonl
 ```
 
-The first form is a dry run. The second executes and records a versioned receipt. High-assurance execution requires a scoped trusted grant as described above.
+The first form is a dry run. The second executes and records a versioned receipt. Additional trusted-authority enforcement follows `authorityMode` as described above.
 
 ## Denial reasons
 
@@ -140,7 +147,7 @@ The first form is a dry run. The second executes and records a versioned receipt
 - `explicit_instruction_required`: maintainer mode needs a direct instruction for the action
 - `exact_text_confirmation_required`: a human-facing reply needs exact-text confirmation
 - `unknown_action`: the requested mutation is not part of the policy schema
-- `trusted_authority_required:*`: execution requires independently verified scoped authority
+- `trusted_authority_required:*`: the selected protection mode requires independently verified scoped authority
 - `expected_head_mismatch`: the PR changed after the decision was made
-- `review_authority_*`: a full-review verdict lacks valid durable trusted provenance
+- `review_authority_*`: a protected full-review verdict lacks valid durable trusted provenance
 - request validation failures such as `idempotency_key_required`
