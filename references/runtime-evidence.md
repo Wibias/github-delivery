@@ -2,7 +2,7 @@
 
 Use runtime evidence when QA intake, issue triage/research, debugging, or review makes a claim about what the software actually does when executed.
 
-The machine contract lives in `scripts/lib/runtime-evidence.mjs`.
+The machine contract lives in `scripts/lib/runtime-evidence.mjs`. When runtime observations must be reconciled with source, specs, history, or external research, also use `references/research-evidence-hierarchy.md` so evidence authority matches the claim being proved.
 
 ## Evidence session
 
@@ -50,4 +50,11 @@ Issue text should state whether the problem was:
 
 For “is this still broken on latest development?” research, prefer runtime evidence on the latest development tip when feasible. A code search that looks fixed is weaker than an executable regression/reproduction check when one is practical.
 
-Never turn “I could not reproduce it” into “Already fixed/shipped” without separate code/history/fix evidence. The research verdict must expose that gap.
+Use the claim-sensitive hierarchy when sources disagree:
+
+- exact-head runtime/test evidence is strongest for current observed behavior;
+- repository policy/spec/official contracts are strongest for what behavior is required;
+- commit/PR/timeline evidence is strongest for when a fix landed or shipped;
+- primary official/repository/research sources outrank blogs/forums/model memory for external prior art.
+
+Never turn “I could not reproduce it” into “Already fixed/shipped” without separate code/history/fix evidence. The research verdict must expose that gap. Contradictory top-tier evidence keeps the verdict partial until discriminating evidence resolves it.
