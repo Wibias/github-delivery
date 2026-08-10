@@ -64,17 +64,12 @@ internal sealed class AuthorityService
         var approvalMethod = "host_policy";
         if (requiresHello)
         {
-            var activeLease = branch is null ? null : _store.TryGetActiveBranchLease(repo, branch, now);
+            var activeLease = branch is null
+                ? null
+                : _store.TryUseActiveBranchLease(repo, branch, now, operations.Length);
             if (activeLease is not null)
             {
                 approvalMethod = "branch_lease";
-                _store.RecordAuditEvent(
-                    "branch_lease_used",
-                    repo,
-                    branch,
-                    "approved",
-                    $"lease_id={activeLease.LeaseId};operations={operations.Length}",
-                    now);
             }
             else
             {
