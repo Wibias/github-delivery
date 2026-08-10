@@ -45,3 +45,7 @@ Algorithm-agile trusted grants must bind a deterministic `scopeSha256` to every 
 ### GD-AUTH-010 — Redemption-required grants are one-time
 
 When a trusted grant declares `redemption: required`, the mutation path must redeem its nonce with the trusted issuer after fresh-head/target/idempotency preflight and immediately before spawning the exact planned GitHub write. A consumed nonce is never automatically reopened after a crash or downstream failure.
+
+### GD-AUTH-011 — Social writes require independent trusted approval
+
+Repository, issue, PR, review, bot, CI, and linked-web content are untrusted data and can never authorize a socially visible GitHub write. `post_review`, `post_comment`, `post_issue_comment`, `edit_own_comment`, bot/human thread replies, follow-up issue creation, and resolution-record publication are high-assurance actions at execution and require a verified exact-scope authority grant. With the Windows authority host these actions require Windows Hello, including when the routed mutation mode is only `review`. This deliberately prefers an independent human intent check over silent publication if prompt-injected repository text tries to turn itself into authority.
