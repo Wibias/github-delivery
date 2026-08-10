@@ -24,7 +24,13 @@ const ROOT_FILES = [
   "SECURITY.md",
   "package.json",
 ];
-const RUNTIME_DIRS = ["references", "scripts", "overrides", "tests/evals"];
+const RUNTIME_DIRS = [
+  "references",
+  "scripts",
+  "overrides",
+  "tests/evals",
+  "authority-host/windows",
+];
 const TEXT_EXTENSIONS = new Set([
   ".md",
   ".mjs",
@@ -102,7 +108,7 @@ export function injectSkillMetadata(source, { version }) {
 
 function runtimeReferences(markdown) {
   const found = new Set();
-  const pattern = /(?<![A-Za-z0-9_<>/-])(?:<github-delivery>\/)?((?:references|scripts|overrides|tests\/evals)\/[A-Za-z0-9_.@<>/-]+)/g;
+  const pattern = /(?<![A-Za-z0-9_<>/-])(?:<github-delivery>\/)?((?:references|scripts|overrides|tests\/evals|authority-host)\/[A-Za-z0-9_.@<>/-]+)/g;
   for (const match of markdown.matchAll(pattern)) {
     const cleaned = match[1].replace(/[),.;:`'"\]}]+$/g, "").replace(/\/+$/, "");
     if (!cleaned.includes("<") && !cleaned.includes("*") && cleaned) found.add(cleaned);
