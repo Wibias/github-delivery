@@ -48,15 +48,22 @@ Read `references/mutation-modes.md` and `references/github-mutation-broker.md` b
    node scripts/ship-gate.mjs OWNER/REPO N --mutation-mode maintainer
    ```
 
-4. Require decision `ready` on the current head SHA. A blocked or unknown result forbids merge.
-5. Require the PR not to be draft, WIP, held, conflicted, behind, or mid-stack.
-6. Confirm required CI, review policy, unresolved threads, feedback, base health, and merge queue state are clear.
-7. Require current-head Bug, Security, and Spec/Standards review evidence with valid review-verdict provenance. Missing review evidence is not waivable inside the merge workflow: run or complete the required review workflow on the current head before continuing.
-8. Confirm the branch was built and tested against the current base tip.
-9. Confirm valid adaptive-settle evidence exists for the unchanged PR and immediate-base heads. If it does not, run the adaptive settle from `references/shared-rules.md`: announce that green is provisional, choose 60 or 180 seconds from observed activity (**~30–60s for a docs/markdown-only head**), poll `ship-gate.mjs` every 20 seconds without a silent sleep longer than 30 seconds, reset on changes, and require the final gate to return `ready`.
-10. Immediately before the first mutation, rerun the authoritative gate and verify the recorded head/base generation is unchanged.
-11. Resolve linked issues through both GitHub closing references and body keywords.
-12. Select the repository’s normal merge method. Do not silently squash when trailers or history matter.
+4. If and only if the gate is blocked solely by pending required CI, run the canonical adaptive CI wait instead of hand-rolling a bounded shell loop:
+
+   ```bash
+   node "<github-delivery>/scripts/ci-wait.mjs" OWNER/REPO N --workflow merge-pr --mutation-mode maintainer
+   ```
+
+   The driver starts unknown timing at the 5-minute estimate, polls every 30 seconds, learns per-repository/check duration from successful runs, and has no fixed default wait cap. Five minutes is not a timeout. Runner/platform names may be repeated only from current GitHub check evidence. A moved head, unknown evidence, or any non-CI blocker stops the wait and returns control to preflight.
+5. Require decision `ready` on the current head SHA after any CI wait. A blocked or unknown result forbids merge.
+6. Require the PR not to be draft, WIP, held, conflicted, behind, or mid-stack.
+7. Confirm required CI, review policy, unresolved threads, feedback, base health, and merge queue state are clear.
+8. Require current-head Bug, Security, and Spec/Standards review evidence with valid review-verdict provenance. Missing review evidence is not waivable inside the merge workflow: run or complete the required review workflow on the current head before continuing.
+9. Confirm the branch was built and tested against the current base tip.
+10. Confirm valid adaptive-settle evidence exists for the unchanged PR and immediate-base heads. If it does not, run the adaptive settle from `references/shared-rules.md`: announce that green is provisional, choose 60 or 180 seconds from observed activity (**~30–60s for a docs/markdown-only head**), poll `ship-gate.mjs` every 20 seconds without a silent sleep longer than 30 seconds, reset on changes, and require the final gate to return `ready`.
+11. Immediately before the first mutation, rerun the authoritative gate and verify the recorded head/base generation is unchanged.
+12. Resolve linked issues through both GitHub closing references and body keywords.
+13. Select the repository’s normal merge method. Do not silently squash when trailers or history matter.
 
 ## Internal mutation sequence
 
