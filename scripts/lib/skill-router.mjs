@@ -35,6 +35,8 @@ const ISSUE_CREATE_REQUEST =
 const FOLLOW_UP_ISSUE_REQUEST = /\bfollow[- ]?up\s+(?:issue|ticket)\b/;
 const CREATE_PR_FOR_ISSUE_REQUEST =
   /\b(?:create|open)\b[\s\S]*\b(?:pr|pull request)\b[\s\S]*\b(?:issue|#\d+)\b/;
+const CREATE_PR_REQUEST =
+  /\b(?:create|open|make)\b[\s\S]{0,120}\b(?:pr|pull request)\b/;
 
 function prepareAndMergeActions(text) {
   const actions = ["merge_pr", "post_comment", "post_issue_comment", "close_linked_issue"];
@@ -185,10 +187,15 @@ export function routeShippingGithubPrompt(prompt) {
     );
   }
 
-  if (
-    /\b(create|open)\b[\s\S]*\b(?:pr|pull request)\b[\s\S]*\b(issue|#\d+)\b/.test(text)
-  ) {
+  if (CREATE_PR_FOR_ISSUE_REQUEST.test(text)) {
     return result("references/create-pr-for-issue.md", "maintainer");
+  }
+
+  if (CREATE_PR_REQUEST.test(text) && !PR_REFERENCE.test(text)) {
+    return result("references/create-pr-from-local-work.md", "maintainer", [
+      "push_code",
+      "create_pr",
+    ]);
   }
 
   if (/\b(research|investigate)\b[\s\S]*\b(issue|issues|#\d+)\b/.test(text)) {
