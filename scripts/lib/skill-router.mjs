@@ -23,7 +23,8 @@ const DEFERRED_MERGE_AUTHORITY =
   /\b(?:merge|ship)\b[\s\S]*\b(?:only\s+)?(?:after|when|if)\s+(?:i|we)\s+(?:later\s+)?(?:confirm|approve|say\s+so|give\s+(?:you\s+)?(?:the\s+)?go-ahead)\b|\b(?:merge|ship)\b[\s\S]*\bafter\s+(?:asking|checking\s+with)\s+me\b|\b(?:ask|check\s+with)\s+me\s+(?:again\s+)?before\s+(?:you\s+)?(?:merge|ship)\b|\b(?:wait|hold)\s+(?:for\s+)?my\s+(?:confirmation|approval)\b/;
 const ASSISTANT_MERGE_REQUEST =
   /^(?:please\s+)?(?:merge|ship)\b|\b(?:and|then)\s+(?:please\s+)?(?:merge|ship)\b|\b(?:can|could|would|will)\s+you\s+(?:please\s+)?(?:merge|ship)\b|\b(?:i want|i need|i'd like|i would like)\s+you\s+to\s+(?:merge|ship)\b|\bgo ahead(?:\s+and)?\s+(?:merge|ship)\b/;
-const PR_REFERENCE = /\bpr\s*#?\d+\b/;
+const PR_REFERENCE = /\b(?:pr|pull request)\s*#?\d+\b/;
+const PR_WORD = /\b(?:pr|pull request)\b/;
 const FULL_REVIEW_REQUEST = /\b(full review|review .* for real bugs|usefulness verdict)\b/;
 const REVIEW_PREPARATION_REQUEST =
   /\b(review|re-review|review again|look over|look through)\b/;
@@ -131,7 +132,7 @@ export function routeShippingGithubPrompt(prompt) {
   }
 
   if (
-    /\b(supersede|supersedes|replace|replaces|in favor of|in favour of)\b[\s\S]*\bpr\b/.test(
+    /\b(supersede|supersedes|replace|replaces|in favor of|in favour of)\b[\s\S]*\b(?:pr|pull request)\b/.test(
       text,
     )
   ) {
@@ -142,7 +143,7 @@ export function routeShippingGithubPrompt(prompt) {
   }
 
   if (
-    /\b(overtake|take over|maintainer overtake|take it over)\b[\s\S]*\bpr\b/.test(
+    /\b(overtake|take over|maintainer overtake|take it over)\b[\s\S]*\b(?:pr|pull request)\b/.test(
       text,
     )
   ) {
@@ -166,7 +167,7 @@ export function routeShippingGithubPrompt(prompt) {
     return result("references/simplify-pr.md", "maintainer", ["push_code"]);
   }
 
-  if (/\bsecurity review\b/.test(text)) {
+  if (/\b(?:security review|review security)\b/.test(text)) {
     return result("references/security-review.md", "review");
   }
 
@@ -174,7 +175,7 @@ export function routeShippingGithubPrompt(prompt) {
     return result("references/re-review-pr.md", "review");
   }
 
-  if (/\b(watch|monitor|babysit|keep an eye on)\b[\s\S]*\bpr\b/.test(text)) {
+  if (/\b(watch|monitor|babysit|keep an eye on)\b[\s\S]*\b(?:pr|pull request)\b/.test(text)) {
     const autonomous = /\bautonomous(ly)?\b|\bauto[- ]?fix\b|\bfix and merge without asking\b/.test(
       text,
     );
@@ -185,7 +186,7 @@ export function routeShippingGithubPrompt(prompt) {
   }
 
   if (
-    /\b(create|open)\b[\s\S]*\bpr\b[\s\S]*\b(issue|#\d+)\b/.test(text)
+    /\b(create|open)\b[\s\S]*\b(?:pr|pull request)\b[\s\S]*\b(issue|#\d+)\b/.test(text)
   ) {
     return result("references/create-pr-for-issue.md", "maintainer");
   }
@@ -203,14 +204,14 @@ export function routeShippingGithubPrompt(prompt) {
 
   if (
     FIX_REVIEW_REQUEST.test(text) ||
-    /\bmake\b[\s\S]*\bpr\b[\s\S]*\bmerge[- ]?ready\b/.test(text)
+    /\bmake\b[\s\S]*\b(?:pr|pull request)\b[\s\S]*\bmerge[- ]?ready\b/.test(text)
   ) {
     return result("references/fix-pr-bots.md", "maintainer", ["push_code"]);
   }
 
   if (
     /\b(what(?:'s| is) left|status|merge[- ]?ready\?|is .* ready)\b/.test(text) &&
-    /\bpr\b/.test(text)
+    PR_WORD.test(text)
   ) {
     return result("references/status.md", "read-only");
   }
