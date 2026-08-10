@@ -1,4 +1,3 @@
-import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
 import {
@@ -9,6 +8,7 @@ import { makeRedemptionRunner } from "./authority-execution.mjs";
 import { makeAuthorityRedeemer } from "./authority-host-client.mjs";
 import { classifyMergeOutcome, readMergeState } from "./merge-outcome.mjs";
 import { isFullReviewVerdictBody } from "./review-verdict-marker.mjs";
+import { boundedSpawnSync } from "./subprocess-policy.mjs";
 
 const HIGH_ASSURANCE_ACTIONS = new Set([
   "push_code",
@@ -117,7 +117,7 @@ export function reconcileAttemptedMerge({ planned, runner } = {}) {
 export function executeMutationWithAuthority({
   request,
   execute = false,
-  runner = (command, args, options) => spawnSync(command, args, options),
+  runner = boundedSpawnSync,
   env = process.env,
   readFile = readFileSync,
   redeemer = undefined,
