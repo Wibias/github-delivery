@@ -12,6 +12,10 @@ import {
   lifecycleCommandFor,
   preflightLifecycleMutation,
 } from "../../scripts/lib/lifecycle-mutations.mjs";
+import {
+  boundedSpawnSync,
+  DEFAULT_SUBPROCESS_TIMEOUT_MS,
+} from "../../scripts/lib/subprocess-policy.mjs";
 
 const scoped = {
   verified: true,
@@ -40,6 +44,50 @@ function pushRequest(overrides = {}) {
     ...overrides,
   };
 }
+
+test("canonical subprocess policy always applies a finite deadline", () => {
+  let observedOptions = null;
+  const result = boundedSpawnSync(
+    "gh",
+    ["api", "repos/acme/widgets"],
+    { encoding: "utf8" },
+    {
+      timeoutMs: 37,
+      spawn(_command, _args, options) {
+        observedOptions = options;
+        return {
+          status: null,
+          signal: "SIGTERM",
+          stdout: "",
+          stderr: "",
+          error: { code: "ETIMEDOUT" },
+        };
+      },
+    },
+  );
+  assert.equal(DEFAULT_SUBPROCESS_TIMEOUT_MS > 0, true);
+  assert.equal(observedOptions.timeout, 37);
+  assert.equal(observedOptions.killSignal, "SIGTERM");
+  assert.match(result.stderr, /subprocess_timeout:gh:37ms/);
+});
+
+test("caller-specified subprocess deadlines stay bounded and are preserved", () => {
+  let observedOptions = null;
+  boundedSpawnSync(
+    "git",
+    ["status"],
+    { timeout: 51, killSignal: "SIGKILL" },
+    {
+      timeoutMs: 999,
+      spawn(_command, _args, options) {
+        observedOptions = options;
+        return { status: 0, stdout: "", stderr: "" };
+      },
+    },
+  );
+  assert.equal(observedOptions.timeout, 51);
+  assert.equal(observedOptions.killSignal, "SIGKILL");
+});
 
 test("strict trusted authority rejects a verified legacy grant without scope binding", () => {
   assert.throws(
