@@ -13,8 +13,18 @@ test("authority host is unpackaged self-contained WinUI 3, not WinForms", () => 
   assert.match(project, /<UseWinUI>true<\/UseWinUI>/);
   assert.match(project, /<WindowsPackageType>None<\/WindowsPackageType>/);
   assert.match(project, /<WindowsAppSDKSelfContained>true<\/WindowsAppSDKSelfContained>/);
+  assert.match(project, /<SelfContained>true<\/SelfContained>/);
   assert.match(project, /Microsoft\.WindowsAppSDK/);
   assert.doesNotMatch(project, /UseWindowsForms/);
+});
+
+test("installer preserves the self-contained deployment contract and CI publishes it", () => {
+  const installer = read("authority-host/windows/install.ps1");
+  const workflow = read(".github/workflows/ci.yml");
+  assert.match(installer, /dotnet\.Source publish[\s\S]*--self-contained true/);
+  assert.doesNotMatch(installer, /--self-contained false/);
+  assert.match(workflow, /Publish Windows authority host/);
+  assert.match(workflow, /dotnet publish[\s\S]*--self-contained true/);
 });
 
 test("control center implements the selected activity-first audit design in light/dark system theme", () => {
