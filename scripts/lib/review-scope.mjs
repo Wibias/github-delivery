@@ -68,7 +68,7 @@ const DOMAIN_SPECS = [
   ["supply_chain", "security", /package|lock|Cargo|go\.mod|requirements|Gemfile|composer/i, /dependencies|devDependencies|scripts|postinstall|preinstall|git\+|https:\/\//i],
   ["logging_privacy", "security", /log|telemetry|analytics|sentry|privacy|pii|audit/i, /logger|console\.|telemetry|analytics|sentry|email|phone|address|redact|PII/i],
   ["ai_agent_mcp", "security", /prompt|llm|openai|anthropic|mcp|agent|rag|embedding|tool/i, /prompt|tool_call|toolUse|mcp|model|embedding|system message|assistant/i],
-  ["agentic_skills_supply_chain", "security", /(^|\/)(?:SKILL\.md|references\/|overrides\/|skills\/|plugins\/|mcp\.json|\.mcp\.json|claude_desktop_config\.json)/i, /allowed-tools|mcpServers|references\/|scripts\/|prompt injection/i],
+  ["agentic_skills_supply_chain", "security", /(^|\/)(?:SKILL\.md|skills\/|plugins\/|mcp\.json|\.mcp\.json|claude_desktop_config\.json)/i, /allowed-tools|mcpServers|references\/|scripts\/|prompt injection/i],
   ["crypto_session", "security", /crypto|cipher|encrypt|decrypt|hash|jwt|cookie|tls|cert|hmac/i, /createHash|createHmac|encrypt|decrypt|jwt|cookie|SameSite|HttpOnly|TLS/i],
   ["business_logic", "security", /workflow|state|entitlement|checkout|subscription|transfer|refund|billing|quota/i, /state machine|entitlement|quota|transfer|refund|idempot|TOCTOU|compare-and-swap/i],
   ["iac_docker", "security", /Dockerfile|docker-compose|\.tf$|helm|charts|kubernetes|k8s|infra|deploy/i, /FROM\s|USER\s|privileged|cap_add|hostNetwork|iam|securityContext/i],
