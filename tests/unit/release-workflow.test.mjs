@@ -19,6 +19,15 @@ test("release workflow uses least privilege and pinned actions", () => {
   }
 });
 
+test("tag publish verifies protected-main lineage before validation and publication", () => {
+  const matches = [...workflow.matchAll(/node scripts\/verify-release-source\.mjs/g)];
+  assert.equal(matches.length, 2, "release lineage must be verified in both validate and publish jobs");
+  assert.match(workflow, /RELEASE_SOURCE_COMMIT: \$\{\{ github\.sha \}\}/);
+  assert.match(workflow, /RELEASE_DEFAULT_BRANCH: \$\{\{ github\.event\.repository\.default_branch \}\}/);
+  assert.match(workflow, /Verify tagged source belongs to protected main lineage[\s\S]*Run repository checks/);
+  assert.match(workflow, /Reverify tagged source belongs to protected main lineage[\s\S]*Rebuild from the tagged commit/);
+});
+
 test("tag publish rebuilds, attests, and refuses an existing release", () => {
   assert.match(workflow, /Rebuild from the tagged commit/);
 

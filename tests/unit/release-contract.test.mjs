@@ -8,9 +8,11 @@ import test from "node:test";
 import {
   createSpdxSbom,
   validateReleaseContext,
+  validateReleaseSourceComparison,
   verifyDistribution,
   releaseNotesForVersion,
 } from "../../scripts/lib/release-contract.mjs";
+import { verifyReleaseSource } from "../../scripts/verify-release-source.mjs";
 
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), "github-delivery-release-"));
@@ -49,6 +51,88 @@ test("manual workflow runs are always dry-run", () => {
   assert.deepEqual(validateReleaseContext({ eventName: "workflow_dispatch", ref: "refs/heads/main", version: "0.1.0" }), {
     version: "0.1.0", tag: "v0.1.0", publish: false,
   });
+});
+
+test("release source must be the comparison base and an ancestor of the default branch", () => {
+  const source = "a".repeat(40);
+  assert.deepEqual(
+    validateReleaseSourceComparison({
+      sourceCommit: source,
+      branch: "main",
+      comparison: {
+        status: "ahead",
+        base_commit: { sha: source },
+        merge_base_commit: { sha: source },
+      },
+    }),
+    {
+      valid: true,
+      sourceCommit: source,
+      branch: "main",
+      status: "ahead",
+      mergeBase: source,
+    },
+  );
+});
+
+test("release source rejects diverged and non-ancestor tag commits", () => {
+  const source = "a".repeat(40);
+  const other = "b".repeat(40);
+  assert.throws(
+    () => validateReleaseSourceComparison({
+      sourceCommit: source,
+      branch: "main",
+      comparison: {
+        status: "diverged",
+        base_commit: { sha: source },
+        merge_base_commit: { sha: other },
+      },
+    }),
+    /not an ancestor/,
+  );
+  assert.throws(
+    () => validateReleaseSourceComparison({
+      sourceCommit: source,
+      branch: "main",
+      comparison: {
+        status: "behind",
+        base_commit: { sha: source },
+        merge_base_commit: { sha: source },
+      },
+    }),
+    /not protected-main lineage/,
+  );
+});
+
+test("release source verifier queries GitHub with scoped authentication", async () => {
+  const source = "a".repeat(40);
+  let observed = null;
+  const result = await verifyReleaseSource({
+    repo: "Wibias/github-delivery",
+    sourceCommit: source,
+    branch: "main",
+    token: "test-token",
+    async fetchImpl(url, options) {
+      observed = { url: String(url), options };
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return {
+            status: "identical",
+            base_commit: { sha: source },
+            merge_base_commit: { sha: source },
+          };
+        },
+        async text() {
+          return "";
+        },
+      };
+    },
+  });
+  assert.equal(result.valid, true);
+  assert.match(observed.url, /compare\/a{40}\.\.\.main$/);
+  assert.equal(observed.options.headers.Authorization, "Bearer test-token");
 });
 
 test("distribution verification binds version, source commit, and checksums", () => {
