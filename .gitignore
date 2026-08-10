@@ -6,4 +6,3 @@ Thumbs.db
 node_modules/
 dist/
 /tools
-/.commandcode
