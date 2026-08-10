@@ -8,6 +8,10 @@ public partial class App : Application
     private readonly bool _forceSetup;
     private AuthorityAppHost? _host;
 
+    public App() : this(forceSetup: false)
+    {
+    }
+
     public App(bool forceSetup)
     {
         _forceSetup = forceSetup;
