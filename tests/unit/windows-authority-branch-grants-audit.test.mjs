@@ -33,6 +33,13 @@ test("authority branch is part of the exact signed scope", () => {
   assert.notEqual(authorityScopeSha256(first), authorityScopeSha256(second));
 });
 
+test("branch lease resolver accepts authorityBranch only for PR-bound operations", () => {
+  const scope = read(`${host}/BranchScope.cs`);
+  assert.match(scope, /PrBoundActions/);
+  assert.match(scope, /PrBoundActions\.Contains\(action\)/);
+  assert.doesNotMatch(scope, /"delete_head_branch"\s*=>/);
+});
+
 test("authority state persists bounded branch leases and a token-free audit ledger", () => {
   const store = read(`${host}/StateStore.cs`);
   assert.match(store, /CREATE TABLE IF NOT EXISTS branch_leases/);
