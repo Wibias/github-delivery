@@ -7,7 +7,7 @@ internal sealed class AuthorityHostContext : ApplicationContext
     private readonly AuthorityPipeServer _pipe;
     private readonly NotifyIcon _tray;
 
-    public AuthorityHostContext()
+    public AuthorityHostContext(bool forceSetup = false)
     {
         Directory.CreateDirectory(AppPaths.RootDirectory);
         _store = new StateStore(AppPaths.DatabasePath);
@@ -21,6 +21,7 @@ internal sealed class AuthorityHostContext : ApplicationContext
         _pipe.Start();
 
         var menu = new ContextMenuStrip();
+        menu.Items.Add("Setup / readiness", null, (_, _) => ShowSetup());
         menu.Items.Add("Repository allowlist", null, (_, _) => ShowAllowlist());
         menu.Items.Add("Rotate signing key", null, async (_, _) => await RotateKeyAsync());
         menu.Items.Add(new ToolStripSeparator());
@@ -32,7 +33,37 @@ internal sealed class AuthorityHostContext : ApplicationContext
             Visible = true,
             ContextMenuStrip = menu,
         };
-        _tray.DoubleClick += (_, _) => ShowAllowlist();
+        _tray.DoubleClick += (_, _) => ShowDefaultUi();
+
+        if (ShouldShowSetup(forceSetup, _store.ListAllowedRepositories().Count))
+        {
+            EventHandler? idleHandler = null;
+            idleHandler = (_, _) =>
+            {
+                Application.Idle -= idleHandler;
+                ShowSetup();
+            };
+            Application.Idle += idleHandler;
+        }
+    }
+
+    internal static bool ShouldShowSetup(bool forceSetup, int allowedRepositoryCount)
+        => forceSetup || allowedRepositoryCount == 0;
+
+    private void ShowDefaultUi()
+    {
+        if (ShouldShowSetup(false, _store.ListAllowedRepositories().Count))
+        {
+            ShowSetup();
+            return;
+        }
+        ShowAllowlist();
+    }
+
+    private void ShowSetup()
+    {
+        using var dialog = new SetupDialog(_store);
+        dialog.ShowDialog();
     }
 
     private void ShowAllowlist()
