@@ -42,6 +42,7 @@ test("authority state persists bounded branch leases and a token-free audit ledg
   assert.match(store, /TryUseActiveBranchLease/);
   assert.match(store, /CreateBranchLease/);
   assert.match(store, /RevokeBranchLease/);
+  assert.match(store, /RecordExpiredBranchLeases/);
   assert.match(store, /ListRecentAuditEvents/);
   assert.doesNotMatch(store, /audit_events[\s\S]{0,800}\btoken\b/i);
 });
@@ -58,8 +59,9 @@ test("approval flow atomically reuses only an exact repo plus branch lease", () 
   assert.doesNotMatch(approval, /x:Name="BranchGrantToggle"[^>]*IsEnabled="False"/);
 });
 
-test("control center renders persisted audit events and active branch leases", () => {
+test("control center renders persisted audit events, expiries, and active branch leases", () => {
   const code = read(`${host}/ControlCenterWindow.xaml.cs`);
+  assert.match(code, /RecordExpiredBranchLeases/);
   assert.match(code, /ListRecentAuditEvents/);
   assert.match(code, /ListActiveBranchLeases/);
   assert.doesNotMatch(code, /Detailed event history lands in the audit-ledger PR/);
