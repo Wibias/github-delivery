@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { planReviewScope } from "../../scripts/lib/review-scope.mjs";
+import {
+  assertCompletePrFileEnumeration,
+  planReviewScope,
+} from "../../scripts/lib/review-scope.mjs";
 
 function plan(files) { return planReviewScope({ repo: "acme/widget", pr: 7, headRefOid: "abc", files }); }
 function file(path, patch = "", extra = {}) { return { path, patch, additions: 1, deletions: 1, ...extra }; }
@@ -131,6 +134,18 @@ test("flags large diffs for partitioned review", () => {
   const files = Array.from({ length: 100 }, (_, index) => file(`src/file-${index}.ts`, "+export const value = 1;"));
   const result = plan(files);
   assert.ok(result.uncertainty.some((item) => item.code === "large_diff"));
+});
+
+test("fails closed when GitHub changed-file enumeration is incomplete", () => {
+  assert.doesNotThrow(() => assertCompletePrFileEnumeration(3000, 3000));
+  assert.throws(
+    () => assertCompletePrFileEnumeration(3001, 3000),
+    /pr_changed_files_incomplete: expected 3001, observed 3000/,
+  );
+  assert.throws(
+    () => assertCompletePrFileEnumeration(undefined, 0),
+    /pr_changed_files_count_invalid/,
+  );
 });
 
 test("keeps low-confidence path noise residual", () => {
