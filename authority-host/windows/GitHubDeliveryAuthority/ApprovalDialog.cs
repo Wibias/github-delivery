@@ -4,6 +4,7 @@ internal sealed class ApprovalDialog : Form
 {
     private readonly string _helloMessage;
     private readonly Button _approveButton;
+    private bool _wasTopMost;
     public bool Approved { get; private set; }
 
     public ApprovalDialog(string title, IReadOnlyList<string> lines, string helloMessage)
@@ -16,6 +17,10 @@ internal sealed class ApprovalDialog : Form
         MinimizeBox = false;
         MaximizeBox = false;
         ShowInTaskbar = true;
+        // The approval dialog must not be silently hidden behind other windows.
+        // TopMost is only held while the dialog is actually shown so the user
+        // sees the Windows Hello prompt; it is restored on close.
+        TopMost = true;
 
         var layout = new TableLayoutPanel
         {
@@ -62,6 +67,52 @@ internal sealed class ApprovalDialog : Form
         Controls.Add(layout);
         AcceptButton = _approveButton;
         CancelButton = cancel;
+    }
+
+    protected override void OnShown(EventArgs e)
+    {
+        base.OnShown(e);
+        _wasTopMost = TopMost;
+        TopMost = true;
+        Activate();
+        FlashWindow();
+    }
+
+    protected override void OnActivated(EventArgs e)
+    {
+        base.OnActivated(e);
+        // Re-assert foreground attention if the user switched away and back.
+        if (Visible && !IsDisposed)
+        {
+            Activate();
+            FlashWindow();
+        }
+    }
+
+    protected override void OnFormClosed(FormClosedEventArgs e)
+    {
+        TopMost = _wasTopMost;
+        base.OnFormClosed(e);
+    }
+
+    private void FlashWindow()
+    {
+        try
+        {
+            var info = new NativeMethods.FlashWindowInfo
+            {
+                cbSize = (uint)System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.FlashWindowInfo>(),
+                hwnd = Handle,
+                dwFlags = NativeMethods.FlashWindowFlags.FLASHW_ALL | NativeMethods.FlashWindowFlags.FLASHW_TIMERNOFG,
+                uCount = uint.MaxValue,
+                dwTimeout = 0,
+            };
+            NativeMethods.FlashWindowEx(ref info);
+        }
+        catch
+        {
+            // Flash is best-effort; activation alone is the primary mechanism.
+        }
     }
 
     private async void ApproveAsync(object? sender, EventArgs e)

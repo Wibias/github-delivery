@@ -3,9 +3,11 @@ import test from "node:test";
 
 import {
   AUTHORITY_PROTOCOL,
+  AUTHORITY_HOST_BUSY_ERROR,
   decodeAuthorityFrame,
   encodeAuthorityFrame,
   normalizePipeName,
+  withBusyRetry,
 } from "../../scripts/lib/authority-host-client.mjs";
 import { attachAuthorityGrants } from "../../scripts/lib/authority-batch.mjs";
 
@@ -62,5 +64,63 @@ test("missing or duplicate operation grants are rejected", () => {
       ],
     }),
     /authority_grant_operation_duplicate/,
+  );
+});
+
+test("busy retry waits for a pending Hello prompt and succeeds when the host frees up", () => {
+  let calls = 0;
+  const result = withBusyRetry(() => {
+    calls += 1;
+    if (calls < 3) {
+      const error = new Error(AUTHORITY_HOST_BUSY_ERROR);
+      throw error;
+    }
+    return { batchId: "bch_retry" };
+  }, {
+    busyRetryBaseMs: 1,
+  });
+  assert.equal(calls, 3);
+  assert.equal(result.batchId, "bch_retry");
+});
+
+test("busy retry fails with a clear wait-for-hello error after the deadline", () => {
+  let calls = 0;
+  assert.throws(
+    () => withBusyRetry(() => {
+      calls += 1;
+      throw new Error(AUTHORITY_HOST_BUSY_ERROR);
+    }, {
+      busyTimeoutMs: 5,
+      busyRetryBaseMs: 1,
+    }),
+    /authority_host_still_busy:wait_for_pending_hello/,
+  );
+  assert.ok(calls >= 2, "retry should attempt more than once before giving up");
+});
+
+test("busy retry rethrows non-busy errors immediately", () => {
+  assert.throws(
+    () => withBusyRetry(() => {
+      throw new Error("authority_host_error:user_denied");
+    }, {
+      busyTimeoutMs: 5,
+      busyRetryBaseMs: 1,
+    }),
+    /authority_host_error:user_denied/,
+  );
+});
+
+test("busy retry validates its timeout parameters", () => {
+  assert.throws(
+    () => withBusyRetry(() => "ok", { busyTimeoutMs: 0 }),
+    /authority_busy_timeout_invalid/,
+  );
+  assert.throws(
+    () => withBusyRetry(() => "ok", { busyRetryBaseMs: 0 }),
+    /authority_busy_retry_base_invalid/,
+  );
+  assert.throws(
+    () => withBusyRetry("not-a-function"),
+    /authority_busy_retry_call_required/,
   );
 });

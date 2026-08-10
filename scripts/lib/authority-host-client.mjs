@@ -10,6 +10,10 @@ import { randomUUID } from "node:crypto";
 export const AUTHORITY_PROTOCOL = "github-delivery-authority/1";
 export const DEFAULT_AUTHORITY_PIPE = "github-delivery-authority-v1";
 export const MAX_AUTHORITY_FRAME_BYTES = 256 * 1024;
+export const AUTHORITY_HOST_BUSY_ERROR = "authority_host_error:authority_host_busy";
+export const DEFAULT_BUSY_TIMEOUT_MS = 120_000;
+const DEFAULT_BUSY_RETRY_BASE_MS = 250;
+const MAX_BUSY_RETRY_DELAY_MS = 2_000;
 const PIPE_NAME_RE = /^[A-Za-z0-9._-]{1,128}$/;
 const sleepArray = new Int32Array(new SharedArrayBuffer(4));
 
@@ -141,10 +145,16 @@ export function authorizeBatchSync(operations, options = {}) {
   if (!Array.isArray(operations) || operations.length === 0) {
     throw new Error("authority_batch_operations_required");
   }
-  return callAuthorityHostSync({
+  const busyTimeoutMs = options.busyTimeoutMs ?? DEFAULT_BUSY_TIMEOUT_MS;
+  const attempt = () => callAuthorityHostSync({
     ...options,
     method: "authorizeBatch",
     params: { operations },
+  });
+  if (options.disableBusyRetry === true) return attempt();
+  return withBusyRetry(attempt, {
+    busyTimeoutMs,
+    busyRetryBaseMs: options.busyRetryBaseMs,
   });
 }
 
@@ -160,6 +170,35 @@ export function redeemGrantSync({ grant, scopeSha256 }, options = {}) {
     method: "redeemGrant",
     params: { grant, scopeSha256 },
   });
+}
+
+export function withBusyRetry(call, options = {}) {
+  if (typeof call !== "function") throw new Error("authority_busy_retry_call_required");
+  const busyTimeoutMs = options.busyTimeoutMs ?? DEFAULT_BUSY_TIMEOUT_MS;
+  const busyRetryBaseMs = options.busyRetryBaseMs ?? DEFAULT_BUSY_RETRY_BASE_MS;
+  if (!Number.isFinite(busyTimeoutMs) || busyTimeoutMs <= 0) throw new Error("authority_busy_timeout_invalid");
+  if (!Number.isFinite(busyRetryBaseMs) || busyRetryBaseMs <= 0) throw new Error("authority_busy_retry_base_invalid");
+
+  const deadline = Date.now() + busyTimeoutMs;
+  let attempt = 0;
+  for (;;) {
+    try {
+      return call();
+    } catch (error) {
+      if (String(error?.message || "") !== AUTHORITY_HOST_BUSY_ERROR) throw error;
+      if (Date.now() >= deadline) {
+        throw new Error(
+          "authority_host_still_busy:wait_for_pending_hello",
+        );
+      }
+      const delay = Math.min(
+        busyRetryBaseMs * 2 ** attempt,
+        MAX_BUSY_RETRY_DELAY_MS,
+      );
+      attempt += 1;
+      sleepSync(delay);
+    }
+  }
 }
 
 export function makeAuthorityRedeemer(options = {}) {

@@ -13,6 +13,12 @@ This optional Windows 11 host turns a real local user approval into short-lived 
 - Repository access is default-deny. Allowlist changes and key rotation are only available in local UI and require Windows Hello.
 - Grants expire after 60 seconds and must be redeemed exactly once before the GitHub write when redemption is required.
 - The agent never receives private key material and the host has no arbitrary `sign(bytes)` endpoint.
+- The approval dialog is foreground-visible (`TopMost`, activates, flashes the
+  taskbar) so a Windows Hello prompt is never silently hidden behind other
+  windows.
+- Only one approval prompt runs at a time. A concurrent `authorizeBatch` gets a
+  distinct `authority_host_busy` error; the Node client retries it with backoff
+  until the pending prompt finishes or a configurable deadline expires.
 
 The host is an optional stronger authorization path. Installing it does **not** enable `GITHUB_DELIVERY_REQUIRE_TRUSTED_AUTHORITY=1` automatically.
 
