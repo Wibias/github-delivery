@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
-import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { enrichSnapshotWithBaseHealth } from "./base-health-live.mjs";
 import { validateSnapshot } from "./snapshot-input.mjs";
+import { boundedSpawnSync } from "./subprocess-policy.mjs";
 
 const SNAPSHOT_COMMAND = fileURLToPath(
   new URL("../ship-gate-snapshot.mjs", import.meta.url),
@@ -71,7 +71,7 @@ function runJson(runner, args, errorCode) {
 export function captureCurrentCheckGeneration({
   repo,
   sha,
-  runner = spawnSync,
+  runner = boundedSpawnSync,
 } = {}) {
   if (!repo?.includes("/")) throw new Error("check_generation_repo_required");
   const commit = String(sha || "").trim().toLowerCase();
@@ -152,7 +152,7 @@ export function captureLiveSnapshot({
   repo,
   pr,
   maxAgeSeconds = 300,
-  runner = spawnSync,
+  runner = boundedSpawnSync,
 } = {}) {
   const result = runner(
     process.execPath,
