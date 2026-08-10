@@ -19,28 +19,70 @@ The host is an optional stronger authorization path. Installing it does **not** 
 ## Requirements
 
 - Windows 11 build 22000 or newer.
-- Windows Hello configured for the signed-in user.
+- Windows Hello for the signed-in user. A **Windows Hello PIN is sufficient**; fingerprint or face hardware is not required.
 - TPM recommended for the Microsoft Platform Crypto Provider.
 - .NET 8 SDK to build/install from source; the installer publishes a framework-dependent `win-x64` app.
 
+If Windows Hello is not ready, the setup UI can open **Settings > Accounts > Sign-in options** so you can configure or repair the PIN before continuing.
+
 ## Install
 
-From PowerShell:
+From PowerShell at the repository root:
 
 ```powershell
 .\authority-host\windows\install.ps1
 ```
 
-The installer:
+The installer fails early unless it finds:
+
+1. Windows 11 build 22000 or newer;
+2. the `dotnet` command;
+3. at least one installed .NET 8 SDK.
+
+It then:
 
 1. publishes the tray host under `%LOCALAPPDATA%\GitHubDeliveryAuthority`;
-2. creates a per-user Startup shortcut;
-3. sets `GITHUB_DELIVERY_AUTHORITY_TRUST_STORE` to the generated public-key trust store;
-4. sets `GITHUB_DELIVERY_AUTHORITY_PIPE=github-delivery-authority-v1`;
-5. starts the tray host;
-6. leaves strict trusted-authority enforcement disabled.
+2. stops only a running `GitHubDeliveryAuthority` process whose executable is inside that install directory, so upgrades can replace the binary cleanly;
+3. copies the new files and creates a per-user Startup shortcut;
+4. sets `GITHUB_DELIVERY_AUTHORITY_TRUST_STORE` to the generated public-key trust store;
+5. sets `GITHUB_DELIVERY_AUTHORITY_PIPE=github-delivery-authority-v1`;
+6. starts the host with `--setup`;
+7. leaves strict trusted-authority enforcement disabled.
 
-Open the tray icon and add `Wibias/github-delivery` (or any other repository you intentionally trust). The host starts with an empty allowlist.
+### First-run setup
+
+The guided setup is intentionally fail-closed:
+
+1. **Windows Hello readiness** calls `UserConsentVerifier.CheckAvailabilityAsync()`.
+2. **Verify Windows Hello** runs a real Windows Hello prompt. This confirms the verifier works but does not authorize a repository change.
+3. Enter the first repository as `OWNER/REPO`.
+4. **Add repository** requires a second, fresh Windows Hello verification for that exact allowlist mutation.
+5. Only after that verification succeeds is the repository stored in the allowlist.
+
+An empty allowlist opens first-run setup automatically. You can also reopen it from the tray with **Setup / readiness**, or start the installed executable with `--setup`.
+
+The existing repository allowlist remains available from the tray after setup. Add and remove operations continue to require their own Windows Hello verification.
+
+## Windows Hello recovery
+
+The UI reports the actual Windows Hello readiness/failure state instead of making a button look inactive.
+
+| State | Meaning and recovery |
+| --- | --- |
+| `DeviceNotPresent` | Windows cannot currently expose a verifier. A Windows Hello PIN is enough; use **Open Windows sign-in options**, confirm a PIN exists, then **Check again**. |
+| `NotConfiguredForUser` | Windows Hello is not configured for this user. Open **Settings > Accounts > Sign-in options**, configure a PIN, then **Check again**. |
+| `DisabledByPolicy` | Windows Hello is disabled by policy. An administrator may need to enable it. The host does not add a fallback authentication path. |
+| `DeviceBusy` | Another Windows Hello operation is active. Finish or close that prompt, then **Check again**. |
+| `RetriesExhausted` | Verification stopped after too many failed attempts. Complete any Windows-required recovery and try again later. |
+| `Canceled` | The Windows Hello prompt was canceled. No authority state changes are made. |
+
+For `DeviceNotPresent` and `NotConfiguredForUser`, the setup and allowlist UI can offer **Open Windows sign-in options**. It uses the Windows `ms-settings:signinoptions` page and does not change authority state by itself.
+
+## Upgrade behavior
+
+Running `install.ps1` again performs the same prerequisite checks, publishes the replacement build, stops only the currently installed authority-host instance under the selected install directory, replaces the files, and starts the new host with `--setup`.
+
+Existing authority state remains in the configured install directory. The installer still does not enable `GITHUB_DELIVERY_REQUIRE_TRUSTED_AUTHORITY=1` automatically.
 
 ## Use from github-delivery
 
@@ -74,4 +116,4 @@ The CI self-test intentionally does not invoke TPM or Windows Hello:
 dotnet run --project .\authority-host\windows\GitHubDeliveryAuthority\GitHubDeliveryAuthority.csproj -c Release -- --self-test
 ```
 
-It checks the shared Node/C# canonical scope fixture, ES256 token verification with an ephemeral software key, the SQLite one-time redemption invariant, and mutation classification including the high-assurance review-verdict/human-reply cases.
+It checks the shared Node/C# canonical scope fixture, ES256 token verification with an ephemeral software key, the SQLite one-time redemption invariant, Windows Hello readiness/result mapping, setup routing, and mutation classification including the high-assurance review-verdict/human-reply cases.
