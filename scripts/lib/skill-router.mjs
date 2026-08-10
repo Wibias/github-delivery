@@ -25,6 +25,8 @@ const ASSISTANT_MERGE_REQUEST =
   /^(?:please\s+)?(?:merge|ship)\b|\b(?:and|then)\s+(?:please\s+)?(?:merge|ship)\b|\b(?:can|could|would|will)\s+you\s+(?:please\s+)?(?:merge|ship)\b|\b(?:i want|i need|i'd like|i would like)\s+you\s+to\s+(?:merge|ship)\b|\bgo ahead(?:\s+and)?\s+(?:merge|ship)\b/;
 const PR_REFERENCE = /\bpr\s*#?\d+\b/;
 const FULL_REVIEW_REQUEST = /\b(full review|review .* for real bugs|usefulness verdict)\b/;
+const REVIEW_PREPARATION_REQUEST =
+  /\b(review|re-review|review again|look over|look through)\b/;
 const FIX_REVIEW_REQUEST =
   /\b(fix|address)\b[\s\S]*(review|coderabbit|codex|comment|feedback)/;
 const ISSUE_CREATE_REQUEST =
@@ -79,6 +81,7 @@ function isPrepareAndMergeRequest(text) {
   }
   return (
     FULL_REVIEW_REQUEST.test(text) ||
+    REVIEW_PREPARATION_REQUEST.test(text) ||
     FIX_REVIEW_REQUEST.test(text) ||
     SIMPLIFY_REQUEST.test(text)
   );

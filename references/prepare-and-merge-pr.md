@@ -14,7 +14,7 @@ Policy modules:
 
 # Prepare and merge a PR
 
-Use this workflow only when the user explicitly combines a merge request with work that must happen before the merge, such as full review, addressing review feedback, or safe simplification.
+Use this workflow only when the user explicitly combines a merge request with work that must happen before the merge, such as review, full review, addressing review feedback, or safe simplification.
 
 Read `references/shared-rules.md` first. The explicit merge request authorizes the final merge step only after every requested preparation phase has completed successfully; it does not waive any gate or authorize unrelated code changes.
 
@@ -28,7 +28,7 @@ Capture the starting PR head and base. All preparation workflows and the final m
 
 Interpret only preparation actions explicitly present in the user request:
 
-- **Full review requested:** run `references/full-review-pr.md`. Do not merge if its final verdict is `changes-requested`, `not-useful`, `gated`, incomplete, or otherwise non-approving.
+- **Review requested:** run `references/full-review-pr.md`. Generic review wording and focused review wording such as security review still enter the complete merge-preparation review bar, because the final merge requires current Bug + Security + Spec/Standards evidence on the same head. Do not silently drop a requested review phase merely because the request also asks to merge.
 - **Fix/address review feedback requested:** run `references/fix-pr-bots.md` through its merge-ready completion bar. Pushes are allowed only because this preparation action was explicitly requested and only within that workflow's ownership/scope rules.
 - **Simplification requested:** run `references/simplify-pr.md`, including its bounded-candidate approval rules and mandatory complete post-simplification re-review. A no-op simplification is valid; a failed or non-approved re-review blocks merge.
 

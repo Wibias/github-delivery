@@ -1,3 +1,5 @@
+const UNTRUSTED_RUN_EXPRESSION_RE = /\$\{\{\s*(github\.(?:head_ref|event\.(?:pull_request\.(?:title|body|head\.ref|head\.label)|issue\.(?:title|body)|comment\.body|review\.body|review_comment\.body|head_commit\.message|workflow_run\.head_branch)))\b[^}]*\}\}/gi;
+
 function stripComment(line) {
   let single = false;
   let double = false;
@@ -65,10 +67,52 @@ function decodeScalar(value) {
   return text;
 }
 
+function runCommandLines(source) {
+  const lines = String(source).replace(/\r\n?/g, "\n").split("\n");
+  const commands = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    const raw = lines[index];
+    const match = raw.match(/^(\s*)(?:-\s+)?(?:["']?run["']?)\s*:\s*(.*)$/);
+    if (!match) continue;
+    const indent = match[1].length;
+    const value = match[2];
+    if (/^[|>][+-]?\s*(?:#.*)?$/.test(value.trim())) {
+      for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
+        const candidate = lines[cursor];
+        if (!candidate.trim()) {
+          commands.push({ line: cursor + 1, text: candidate });
+          continue;
+        }
+        const candidateIndent = candidate.length - candidate.trimStart().length;
+        if (candidateIndent <= indent) break;
+        commands.push({ line: cursor + 1, text: candidate });
+      }
+    } else {
+      commands.push({ line: index + 1, text: value });
+    }
+  }
+  return commands;
+}
+
+function untrustedRunExpressionErrors(source) {
+  const errors = [];
+  for (const command of runCommandLines(source)) {
+    UNTRUSTED_RUN_EXPRESSION_RE.lastIndex = 0;
+    for (const match of command.text.matchAll(UNTRUSTED_RUN_EXPRESSION_RE)) {
+      errors.push({
+        code: "yaml_untrusted_run_expression",
+        line: command.line,
+        expression: match[1],
+      });
+    }
+  }
+  return errors;
+}
+
 export function parseWorkflowSecurityYaml(source = "") {
   source = String(source).replace(/\r\n?/g, "\n");
   const records = [];
-  const errors = [];
+  const errors = [...untrustedRunExpressionErrors(source)];
   const lines = source.split("\n");
 
   for (let index = 0; index < lines.length; index += 1) {
