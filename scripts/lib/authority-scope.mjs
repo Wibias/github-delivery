@@ -50,11 +50,16 @@ function exactString(value, name) {
 
 function base(request) {
   if (!plainObject(request)) throw new Error("authority_scope_request_invalid");
-  return {
+  const scope = {
     action: exactString(request.action, "action"),
     mutationMode: normalizeMode(request.mutationMode),
     repo: exactString(request.repo, "repo"),
   };
+  const authorityBranch = typeof request.authorityBranch === "string"
+    ? request.authorityBranch.trim()
+    : "";
+  if (authorityBranch) scope.authorityBranch = authorityBranch;
+  return scope;
 }
 
 function prScope(request) {
