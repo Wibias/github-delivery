@@ -27,13 +27,35 @@ internal sealed record IssuedGrant(
     string ScopeSha256,
     string Nonce);
 
+internal sealed record BranchLeaseRecord(
+    string LeaseId,
+    string Repo,
+    string Branch,
+    long CreatedAt,
+    long ExpiresAt,
+    long? RevokedAt);
+
+internal sealed record AuditEventRecord(
+    string EventId,
+    string EventType,
+    string? Repo,
+    string? Branch,
+    string Outcome,
+    string? Detail,
+    long CreatedAt);
+
+internal sealed record ApprovalDecision(
+    bool Approved,
+    int? BranchLeaseMinutes = null);
+
 internal sealed record BatchApproval(
     string Repo,
     string BatchId,
     string BatchSha256,
     IReadOnlyList<JsonElement> Operations,
     IReadOnlyList<string> Summaries,
-    long ExpiresAt);
+    long ExpiresAt,
+    string? Branch = null);
 
 internal sealed record VerifiedGrant(
     string Kid,
