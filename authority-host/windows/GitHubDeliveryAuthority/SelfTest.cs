@@ -17,6 +17,7 @@ internal static class SelfTest
             LedgerFixture();
             ClassifierFixture();
             HelloFailureFixture();
+            HelloReadinessFixture();
             Console.WriteLine("windows-authority-self-test: PASS");
             return 0;
         }
@@ -108,8 +109,27 @@ internal static class SelfTest
             HelloVerifier.DescribeFailure(UserConsentVerificationResult.NotConfiguredForUser)?.Contains("not configured", StringComparison.OrdinalIgnoreCase) == true,
             "unconfigured Hello result must explain the configuration problem");
         Assert(
+            HelloVerifier.DescribeFailure(UserConsentVerificationResult.DeviceNotPresent)?.Contains("PIN", StringComparison.OrdinalIgnoreCase) == true,
+            "missing-verifier failure must explain that a Windows Hello PIN is sufficient");
+        Assert(
             HelloVerifier.DescribeFailure(UserConsentVerificationResult.Canceled)?.Contains("cancel", StringComparison.OrdinalIgnoreCase) == true,
             "canceled Hello result must explain the cancellation");
+    }
+
+    private static void HelloReadinessFixture()
+    {
+        var configured = HelloVerifier.DescribeAvailability(UserConsentVerifierAvailability.NotConfiguredForUser);
+        Assert(!configured.Available, "unconfigured Hello must not be ready");
+        Assert(configured.CanOpenSignInOptions, "unconfigured Hello must offer sign-in settings");
+        Assert(configured.Message.Contains("PIN", StringComparison.OrdinalIgnoreCase), "setup guidance must say a PIN is sufficient");
+
+        var absent = HelloVerifier.DescribeAvailability(UserConsentVerifierAvailability.DeviceNotPresent);
+        Assert(!absent.Available, "missing verifier must not be ready");
+        Assert(absent.CanOpenSignInOptions, "missing verifier must offer sign-in settings");
+        Assert(absent.Message.Contains("PIN", StringComparison.OrdinalIgnoreCase), "missing-verifier guidance must mention PIN");
+
+        var available = HelloVerifier.DescribeAvailability(UserConsentVerifierAvailability.Available);
+        Assert(available.Available, "available Hello must be ready");
     }
 
     private static void Assert(bool condition, string message)
