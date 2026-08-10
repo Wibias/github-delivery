@@ -1,5 +1,5 @@
 const PERMISSION_REQUIRED_ASSOCIATIONS = new Set(["MEMBER", "COLLABORATOR"]);
-const WRITE_LEVEL_PERMISSIONS = new Set(["ADMIN", "WRITE"]);
+const WRITE_LEVEL_PERMISSIONS = new Set(["ADMIN", "MAINTAIN", "WRITE"]);
 const BOT_RE = /\[bot\]$/i;
 
 function loginOf(raw) {
