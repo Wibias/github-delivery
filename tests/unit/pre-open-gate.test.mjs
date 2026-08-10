@@ -129,14 +129,14 @@ test("pre-open gate: evidenceClears accepts done and n/a-with-reason only", () =
 
 test("create-pr workflow has a bounded research-to-implementation transition", () => {
   const workflow = readFileSync("references/create-pr-for-issue.md", "utf8");
-  const implementationIndex = workflow.indexOf("### D. Implement locally");
-  const gateIndex = workflow.indexOf("### D2. Pre-open bug + security gate");
+  const implementationIndex = workflow.indexOf("## C. Implement locally");
+  const gateIndex = workflow.indexOf("## D. Pre-open bug + security gate");
 
   assert.ok(implementationIndex >= 0, "implementation phase must exist");
   assert.ok(gateIndex > implementationIndex, "pre-open gate must run after implementation");
-  assert.match(workflow, /Preflight completion boundary/);
-  assert.match(workflow, /Do not re-enter preflight/);
-  assert.match(workflow, /Finding another implementation call site[\s\S]*not by itself/);
+  assert.match(workflow, /research-issue\.md[\s\S]*reuse it/i);
+  assert.match(workflow, /Do not restart broad research/i);
+  assert.match(workflow, /implementation reveals another call site[\s\S]*Re-enter preflight only when a new fact invalidates/i);
   assert.doesNotMatch(workflow, /required — before coding or opening/);
 });
 
