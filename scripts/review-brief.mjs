@@ -14,6 +14,7 @@ import { pathToFileURL } from "node:url";
 
 import { collectPrReviewInput, planReviewScope } from "./lib/review-scope.mjs";
 import { projectBugScope, projectSecurityScope } from "./lib/review-scope-compat.mjs";
+import { planReviewDepthExecution } from "./lib/review-depth-execution.mjs";
 import { extractRequiredProbeBlocks } from "./lib/probe-blocks.mjs";
 
 const USAGE =
@@ -62,12 +63,21 @@ export function normalizeFile(file) {
   };
 }
 
-export function briefText({ meta, plan, files, bugScope, securityScope, maxHunkLines, probeBlocks = [] }) {
+export function briefText({ meta, plan, files, bugScope, securityScope, executionPlan = null, maxHunkLines, probeBlocks = [] }) {
   const out = [];
   out.push(`# Review brief: ${meta.repo}#${meta.pr}`);
   out.push(`Head: ${plan.headRefOid || "unknown"}`);
   out.push(`Files: ${plan.fileCount}  Logic: ${plan.logicFiles.length}`);
   out.push("");
+
+  if (executionPlan) {
+    out.push("## Review depth execution");
+    out.push(`Bug depth: ${executionPlan.bug.depth}`);
+    for (const stage of executionPlan.bug.stages) out.push(`- [bug] ${stage.id}: ${stage.description}`);
+    out.push(`Security depth: ${executionPlan.security.depth}`);
+    for (const stage of executionPlan.security.stages) out.push(`- [security] ${stage.id}: ${stage.description}`);
+    out.push("");
+  }
 
   out.push("## Required bug lenses");
   if (bugScope.requiredLenses.length) {
@@ -149,6 +159,7 @@ async function main() {
   const plan = planReviewScope(input);
   const bugScope = projectBugScope(plan);
   const securityScope = projectSecurityScope(plan);
+  const executionPlan = planReviewDepthExecution({ bugScope, securityScope });
   const probeBlocks = args.referenceMap
     ? extractRequiredProbeBlocks([
         ...bugScope.requiredProbes.map((id) => ({ id, axis: "bug" })),
@@ -165,6 +176,7 @@ async function main() {
       headRefOid: plan.headRefOid,
       bugScope,
       securityScope,
+      executionPlan,
       probeBlocks,
       plan,
     };
@@ -173,7 +185,7 @@ async function main() {
   }
 
   process.stdout.write(
-    `${briefText({ meta: { repo: args.repo, pr: args.pr }, plan, files: input.files, bugScope, securityScope, maxHunkLines: args.maxHunkLines, probeBlocks })}\n`,
+    `${briefText({ meta: { repo: args.repo, pr: args.pr }, plan, files: input.files, bugScope, securityScope, executionPlan, maxHunkLines: args.maxHunkLines, probeBlocks })}\n`,
   );
 }
 
