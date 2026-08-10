@@ -15,8 +15,9 @@ internal static class Program
         if (!createdNew) return 0;
 
         WinRT.ComWrappersSupport.InitializeComWrappers();
-        Application.Start(_ =>
+        Application.Start(callbackParams =>
         {
+            _ = callbackParams;
             var dispatcher = DispatcherQueue.GetForCurrentThread();
             SynchronizationContext.SetSynchronizationContext(new DispatcherQueueSynchronizationContext(dispatcher));
             _ = new App(forceSetup);
