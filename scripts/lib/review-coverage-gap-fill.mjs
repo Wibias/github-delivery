@@ -1,5 +1,6 @@
 const CLOSED_STATUSES = new Set(["done", "clean", "findings", "confirmed", "dismissed"]);
 const OPEN_STATUSES = new Set(["manual-review", "unreviewed", "needs-more-evidence", "unknown"]);
+const KIND_ORDER = new Map([["lens", 0], ["surface", 1], ["probe", 2]]);
 
 function normalizeRequirements(values, fallbackFiles) {
   if (!Array.isArray(values)) return [];
@@ -24,6 +25,13 @@ function evidenceState(item) {
   if (CLOSED_STATUSES.has(item.status)) return { closed: true, reason: `closed by ${item.status}` };
   if (OPEN_STATUSES.has(item.status)) return { closed: false, reason: `unresolved ${item.status} evidence` };
   return { closed: false, reason: item.status ? `unresolved evidence status ${item.status}` : "missing evidence status" };
+}
+
+function compareCoverageCells(a, b) {
+  return a.file.localeCompare(b.file)
+    || (KIND_ORDER.get(a.kind) ?? Number.MAX_SAFE_INTEGER) - (KIND_ORDER.get(b.kind) ?? Number.MAX_SAFE_INTEGER)
+    || a.kind.localeCompare(b.kind)
+    || a.id.localeCompare(b.id);
 }
 
 export function planCoverageGapFill(input = {}) {
@@ -62,8 +70,8 @@ export function planCoverageGapFill(input = {}) {
     });
   }
 
-  targets.sort((a, b) => a.file.localeCompare(b.file) || a.kind.localeCompare(b.kind) || a.id.localeCompare(b.id));
-  closed.sort((a, b) => a.file.localeCompare(b.file) || a.kind.localeCompare(b.kind) || a.id.localeCompare(b.id));
+  targets.sort(compareCoverageCells);
+  closed.sort(compareCoverageCells);
 
   return {
     schemaVersion: 1,
