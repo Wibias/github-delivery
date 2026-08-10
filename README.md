@@ -14,6 +14,9 @@ Speak naturally. `github-delivery` routes the request, gathers live evidence, ru
 </div>
 
 > [!IMPORTANT]
+> **Natural language is the public API.** This is not yet production ready to 100%. I would say I am at 80% at this point.
+> 
+> [!IMPORTANT]
 > **Natural language is the public API.** You do **not** need to invoke Node scripts yourself. The scripts, policy modules, authority layer, evaluators, and mutation broker are internal safety and evidence machinery.
 
 ## At a glance
