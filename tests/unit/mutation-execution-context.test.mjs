@@ -14,6 +14,7 @@ import {
 } from "../../scripts/lib/lifecycle-mutations.mjs";
 import {
   boundedSpawnSync,
+  DEFAULT_SUBPROCESS_KILL_SIGNAL,
   DEFAULT_SUBPROCESS_TIMEOUT_MS,
 } from "../../scripts/lib/subprocess-policy.mjs";
 
@@ -57,7 +58,7 @@ test("canonical subprocess policy always applies a finite deadline", () => {
         observedOptions = options;
         return {
           status: null,
-          signal: "SIGTERM",
+          signal: DEFAULT_SUBPROCESS_KILL_SIGNAL,
           stdout: "",
           stderr: "",
           error: { code: "ETIMEDOUT" },
@@ -66,8 +67,9 @@ test("canonical subprocess policy always applies a finite deadline", () => {
     },
   );
   assert.equal(DEFAULT_SUBPROCESS_TIMEOUT_MS > 0, true);
+  assert.equal(DEFAULT_SUBPROCESS_KILL_SIGNAL, "SIGKILL");
   assert.equal(observedOptions.timeout, 37);
-  assert.equal(observedOptions.killSignal, "SIGTERM");
+  assert.equal(observedOptions.killSignal, DEFAULT_SUBPROCESS_KILL_SIGNAL);
   assert.match(result.stderr, /subprocess_timeout:gh:37ms/);
 });
 
