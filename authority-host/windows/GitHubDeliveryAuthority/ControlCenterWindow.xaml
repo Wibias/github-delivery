@@ -66,7 +66,7 @@
 
                         <Border Grid.Column="0" Padding="16" CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
                             <StackPanel Spacing="12">
-                                <Grid><TextBlock Text="Recent activity / Audit trail" FontWeight="SemiBold"/><Button Content="View full activity" HorizontalAlignment="Right" Style="{StaticResource AccentButtonStyle}" Padding="9,3"/></Grid>
+                                <Grid><TextBlock Text="Recent activity / Audit trail" FontWeight="SemiBold"/><Button Content="View full activity" HorizontalAlignment="Right" Style="{StaticResource AccentButtonStyle}" Padding="9,3" IsEnabled="False"/></Grid>
                                 <Grid ColumnSpacing="10" Opacity="0.65"><Grid.ColumnDefinitions><ColumnDefinition Width="72"/><ColumnDefinition Width="1.1*"/><ColumnDefinition Width="1.4*"/><ColumnDefinition Width="92"/><ColumnDefinition Width="90"/></Grid.ColumnDefinitions><TextBlock Text="Time"/><TextBlock Grid.Column="1" Text="Repository"/><TextBlock Grid.Column="2" Text="Action"/><TextBlock Grid.Column="3" Text="Status"/><TextBlock Grid.Column="4" Text="Actor"/></Grid>
                                 <ListView x:Name="ActivityList" SelectionMode="None" IsItemClickEnabled="False" MinHeight="280" />
                             </StackPanel>
@@ -74,10 +74,10 @@
 
                         <StackPanel Grid.Column="1" Spacing="16">
                             <Border Padding="16" CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
-                                <StackPanel Spacing="10"><Grid><TextBlock Text="Repository allowlist" FontWeight="SemiBold"/><Button Content="+ Add repository" HorizontalAlignment="Right" Padding="7,2"/></Grid><ListView x:Name="AllowlistList" SelectionMode="None" MinHeight="135"/></StackPanel>
+                                <StackPanel Spacing="10"><Grid><TextBlock Text="Repository allowlist" FontWeight="SemiBold"/><Button Content="+ Add repository" HorizontalAlignment="Right" Padding="7,2" IsEnabled="False"/></Grid><ListView x:Name="AllowlistList" SelectionMode="None" MinHeight="135"/></StackPanel>
                             </Border>
                             <Border Padding="16" CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
-                                <StackPanel Spacing="10"><Grid><TextBlock Text="Active temporary grants" FontWeight="SemiBold"/><Button Content="+ Grant access" HorizontalAlignment="Right" Padding="7,2" IsEnabled="False"/></Grid><ListView x:Name="GrantList" SelectionMode="None" MinHeight="145"/></StackPanel>
+                                <StackPanel Spacing="10"><Grid><TextBlock Text="Active temporary grants" FontWeight="SemiBold"/><Button x:Name="RevokeGrantButton" Content="Revoke selected" HorizontalAlignment="Right" Padding="7,2" IsEnabled="False" Click="RevokeGrant_Click"/></Grid><ListView x:Name="GrantList" SelectionMode="Single" SelectionChanged="GrantList_SelectionChanged" MinHeight="145"/></StackPanel>
                             </Border>
                         </StackPanel>
                     </Grid>
