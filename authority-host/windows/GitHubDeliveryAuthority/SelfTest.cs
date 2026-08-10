@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text.Json;
+using Windows.Security.Credentials.UI;
 
 namespace GitHubDeliveryAuthority;
 
@@ -15,6 +16,7 @@ internal static class SelfTest
             GrantFixture();
             LedgerFixture();
             ClassifierFixture();
+            HelloFailureFixture();
             Console.WriteLine("windows-authority-self-test: PASS");
             return 0;
         }
@@ -97,6 +99,17 @@ internal static class SelfTest
         Assert(MutationClassifier.RequiresWindowsHello(review.RootElement), "review publication must require independent Hello approval");
         Assert(MutationClassifier.RequiresWindowsHello(botReply.RootElement), "bot reply must require independent Hello approval");
         Assert(MutationClassifier.RequiresWindowsHello(humanReply.RootElement), "human reply must require Hello");
+    }
+
+    private static void HelloFailureFixture()
+    {
+        Assert(HelloVerifier.DescribeFailure(UserConsentVerificationResult.Verified) is null, "verified Hello result must not have a failure message");
+        Assert(
+            HelloVerifier.DescribeFailure(UserConsentVerificationResult.NotConfiguredForUser)?.Contains("not configured", StringComparison.OrdinalIgnoreCase) == true,
+            "unconfigured Hello result must explain the configuration problem");
+        Assert(
+            HelloVerifier.DescribeFailure(UserConsentVerificationResult.Canceled)?.Contains("cancel", StringComparison.OrdinalIgnoreCase) == true,
+            "canceled Hello result must explain the cancellation");
     }
 
     private static void Assert(bool condition, string message)

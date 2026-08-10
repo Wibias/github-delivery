@@ -69,7 +69,8 @@ internal sealed class ApprovalDialog : Form
         _approveButton.Enabled = false;
         try
         {
-            if (await HelloVerifier.VerifyAsync(Handle, _helloMessage))
+            var verification = await HelloVerifier.VerifyAsync(Handle, _helloMessage);
+            if (verification.Verified)
             {
                 Approved = true;
                 DialogResult = DialogResult.OK;
@@ -77,7 +78,12 @@ internal sealed class ApprovalDialog : Form
             }
             else
             {
-                MessageBox.Show(this, "Windows Hello verification did not succeed.", "Authorization denied", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(
+                    this,
+                    verification.FailureMessage ?? "Windows Hello verification did not succeed.",
+                    "Authorization denied",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
             }
         }
         finally
