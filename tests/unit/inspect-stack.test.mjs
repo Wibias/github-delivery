@@ -159,3 +159,18 @@ test("a same-repository base/head match still creates the expected stack edge", 
   const stack = connectedFromHead("child", byHead, children, "acme/widgets");
   assert.deepEqual(stack.map((pr) => pr.number), [1, 2]);
 });
+
+test("branching stacks fail closed instead of inventing a linear merge order", () => {
+  const prs = normalizePullPages([
+    [
+      pull(1, "main", { headRefName: "parent" }),
+      pull(2, "parent", { headRefName: "child-a" }),
+      pull(3, "parent", { headRefName: "child-b" }),
+    ],
+  ]);
+  const { byHead, children } = buildGraph(prs);
+  assert.throws(
+    () => connectedFromHead("child-a", byHead, children, "acme/widgets"),
+    /stack_branching:1:children=2,3/,
+  );
+});
