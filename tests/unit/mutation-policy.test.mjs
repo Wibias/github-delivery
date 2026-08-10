@@ -61,7 +61,7 @@ test("maintainer human replies still require exact-text confirmation", () => {
   assert.equal(allowed.allowed, true);
 });
 
-test("full-review verdict comments require trusted authority while ordinary review comments do not", () => {
+test("social comments require trusted authority, including full-review verdicts", () => {
   const base = {
     action: "post_comment",
     mutationMode: "review",
@@ -71,7 +71,7 @@ test("full-review verdict comments require trusted authority while ordinary revi
   };
   assert.equal(
     mutationRequiresTrustedAuthority({ ...base, body: "ordinary review note" }),
-    false,
+    true,
   );
   assert.equal(
     mutationRequiresTrustedAuthority({

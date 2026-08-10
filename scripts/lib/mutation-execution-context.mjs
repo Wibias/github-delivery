@@ -7,24 +7,8 @@ import {
 import { makeRedemptionRunner } from "./authority-execution.mjs";
 import { makeAuthorityRedeemer } from "./authority-host-client.mjs";
 import { classifyMergeOutcome, readMergeState } from "./merge-outcome.mjs";
-import { isFullReviewVerdictBody } from "./review-verdict-marker.mjs";
+import { actionDefinition } from "./mutation-action-registry.mjs";
 import { boundedSpawnSync } from "./subprocess-policy.mjs";
-
-const HIGH_ASSURANCE_ACTIONS = new Set([
-  "push_code",
-  "create_pr",
-  "update_pr_body",
-  "create_issue",
-  "assign_issue",
-  "reply_human_thread",
-  "resolve_thread",
-  "resolve_bot_thread",
-  "close_linked_issue",
-  "close_pr",
-  "merge_pr",
-  "retarget_pr",
-  "delete_head_branch",
-]);
 
 export function authorityVerifierConfiguration({
   env = process.env,
@@ -41,8 +25,7 @@ export function mutationRequiresTrustedAuthority(request = {}) {
   const action = String(request?.action || "");
   return (
     String(request?.mutationMode || "").toLowerCase() === "autonomous" ||
-    HIGH_ASSURANCE_ACTIONS.has(action) ||
-    (action === "post_comment" && isFullReviewVerdictBody(request?.body))
+    actionDefinition(action)?.highAssurance === true
   );
 }
 

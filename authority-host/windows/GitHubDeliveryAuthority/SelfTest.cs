@@ -83,13 +83,15 @@ internal static class SelfTest
         using var autonomousRetarget = JsonDocument.Parse("{\"action\":\"retarget_pr\",\"mutationMode\":\"autonomous\"}");
         using var botThread = JsonDocument.Parse("{\"action\":\"resolve_bot_thread\",\"mutationMode\":\"review\"}");
         using var comment = JsonDocument.Parse("{\"action\":\"post_comment\",\"mutationMode\":\"review\",\"body\":\"ordinary note\"}");
-        using var verdict = JsonDocument.Parse("{\"action\":\"post_comment\",\"mutationMode\":\"review\",\"body\":\"## [GD] Verdict: approve-comment\\n<!-- github-delivery:full-review-verdict run:fr-1 head:abc -->\"}");
-        using var humanReply = JsonDocument.Parse("{\"action\":\"reply_human_thread\",\"mutationMode\":\"maintainer\"}");
+        using var review = JsonDocument.Parse("{\"action\":\"post_review\",\"mutationMode\":\"review\",\"body\":\"review note\"}");
+        using var botReply = JsonDocument.Parse("{\"action\":\"reply_bot_thread\",\"mutationMode\":\"review\",\"body\":\"addressed\"}");
+        using var humanReply = JsonDocument.Parse("{\"action\":\"reply_human_thread\",\"mutationMode\":\"review\"}");
         Assert(MutationClassifier.RequiresWindowsHello(merge.RootElement), "merge must require Hello");
         Assert(MutationClassifier.RequiresWindowsHello(autonomousRetarget.RootElement), "autonomous retarget must require Hello");
         Assert(MutationClassifier.RequiresWindowsHello(botThread.RootElement), "bot thread resolution must require Hello even in review mode");
-        Assert(!MutationClassifier.RequiresWindowsHello(comment.RootElement), "ordinary review comment must not require Hello");
-        Assert(MutationClassifier.RequiresWindowsHello(verdict.RootElement), "full-review verdict must require Hello");
+        Assert(MutationClassifier.RequiresWindowsHello(comment.RootElement), "ordinary review comment must require independent Hello approval");
+        Assert(MutationClassifier.RequiresWindowsHello(review.RootElement), "review publication must require independent Hello approval");
+        Assert(MutationClassifier.RequiresWindowsHello(botReply.RootElement), "bot reply must require independent Hello approval");
         Assert(MutationClassifier.RequiresWindowsHello(humanReply.RootElement), "human reply must require Hello");
     }
 

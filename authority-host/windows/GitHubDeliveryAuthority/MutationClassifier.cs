@@ -21,6 +21,18 @@ internal static class MutationClassifier
         "create_follow_up_issue",
     };
 
+    private static readonly HashSet<string> SocialActions = new(StringComparer.Ordinal)
+    {
+        "post_review",
+        "post_comment",
+        "post_issue_comment",
+        "edit_own_comment",
+        "reply_bot_thread",
+        "reply_human_thread",
+        "create_follow_up_issue",
+        "post_resolution_record",
+    };
+
     public static bool RequiresWindowsHello(JsonElement operation)
     {
         var action = operation.GetProperty("action").GetString() ?? string.Empty;
@@ -29,18 +41,9 @@ internal static class MutationClassifier
             : "read-only";
         return string.Equals(mode, "maintainer", StringComparison.OrdinalIgnoreCase)
             || DestructiveActions.Contains(action)
-            || IsFullReviewVerdict(operation, action);
+            || SocialActions.Contains(action);
     }
 
     public static bool RequiresExactHumanApproval(JsonElement operation)
         => string.Equals(operation.GetProperty("action").GetString(), "reply_human_thread", StringComparison.Ordinal);
-
-    private static bool IsFullReviewVerdict(JsonElement operation, string action)
-    {
-        if (!string.Equals(action, "post_comment", StringComparison.Ordinal)) return false;
-        if (!operation.TryGetProperty("body", out var bodyValue) || bodyValue.ValueKind != JsonValueKind.String) return false;
-        var body = bodyValue.GetString() ?? string.Empty;
-        return body.Contains("github-delivery:full-review-verdict", StringComparison.OrdinalIgnoreCase)
-            && body.Contains("## [GD] Verdict:", StringComparison.OrdinalIgnoreCase);
-    }
 }
