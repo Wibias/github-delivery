@@ -20,6 +20,17 @@ test("treats SKILL.md as executable agent supply chain", () => {
   assert.notEqual(result.securityReview.depth, "skip");
 });
 
+test("treats operational reference markdown as executable agent policy", () => {
+  const result = plan([
+    file("references/merge-pr.md", "-Require the final ship gate.\n+Merge when checks look green."),
+  ]);
+  assert.ok(result.logicFiles.includes("references/merge-pr.md"));
+  assert.ok(result.securityReview.requiredDomains.includes("agentic_skills_supply_chain"));
+  assert.notEqual(result.securityReview.depth, "skip");
+  assert.notEqual(result.bugReview.depth, "skip");
+  assert.ok(result.baselineScreens.length > 0);
+});
+
 test("raises auth review when an authorization control is removed", () => {
   const result = plan([file("src/api/admin.ts", "-if (!requireAdmin(user)) throw forbidden();\n+return destroyAccount();")]);
   assert.equal(domain(result, "authz").confidence, "high");
@@ -172,7 +183,7 @@ test("routes SQLite NULL cast diff to malformed-input-robustness probe", () => {
 
 test("routes alias self-recursion diff to recursion-termination probe", () => {
   const result = plan([
-    file("src/router/resolve.ts", "+export function resolveAlias(alias: string): string {\n+  const target = routeModel(alias);\n+  return target === alias ? resolveAlias(target) : target;\n+}"),
+    file("src/router/resolve.ts", "+export function resolveAlias(alias: string): string {\n+  const target = routeModel(alias);\n+  return target === alias ? resolveAlias(target) : target;\n}"),
   ]);
   assert.ok(result.requiredProbes.includes("recursion-termination"));
 });
@@ -191,6 +202,5 @@ test("docs-only diff routes no probes", () => {
 
 test("probe registry validates against known lens and surface ids", () => {
   const result = plan([file("src/math.ts", "+export function add(a, b) { return a + b; }")]);
-  // A clean registry means no probe_registry_invalid uncertainty
   assert.ok(!result.uncertainty.some((u) => u.code === "probe_registry_invalid"));
 });
