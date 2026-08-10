@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { boundedSpawnSync } from "./subprocess-policy.mjs";
 
 const RATE_LIMIT_RE = /(?:HTTP\s+429|secondary rate limit|API rate limit exceeded|rate limit)/i;
 const RETRY_AFTER_RE = /retry-after\s*:?\s*(\d+)/i;
@@ -93,7 +93,7 @@ export function runGitHubCommandWithRetry(
   command,
   args,
   {
-    runner = (executable, argv, options) => spawnSync(executable, argv, options),
+    runner = boundedSpawnSync,
     options = {},
     maxAttempts = 3,
     maxDelayMs = 60_000,
