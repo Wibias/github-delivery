@@ -39,18 +39,19 @@ test("authority state persists bounded branch leases and a token-free audit ledg
   assert.match(store, /CREATE TABLE IF NOT EXISTS audit_events/);
   assert.match(store, /ListActiveBranchLeases/);
   assert.match(store, /TryGetActiveBranchLease/);
+  assert.match(store, /TryUseActiveBranchLease/);
   assert.match(store, /CreateBranchLease/);
   assert.match(store, /RevokeBranchLease/);
   assert.match(store, /ListRecentAuditEvents/);
   assert.doesNotMatch(store, /audit_events[\s\S]{0,800}\btoken\b/i);
 });
 
-test("approval flow can create and reuse only an exact repo plus branch lease", () => {
+test("approval flow atomically reuses only an exact repo plus branch lease", () => {
   const service = read(`${host}/AuthorityService.cs`);
   const coordinator = read(`${host}/ApprovalCoordinator.cs`);
   const approval = read(`${host}/ApprovalWindow.xaml`);
   assert.match(service, /branch_lease/);
-  assert.match(service, /TryGetActiveBranchLease/);
+  assert.match(service, /TryUseActiveBranchLease/);
   assert.match(service, /CreateBranchLease/);
   assert.match(coordinator, /BranchLeaseMinutes/);
   assert.match(approval, /x:Name="BranchGrantToggle"/);
@@ -65,10 +66,11 @@ test("control center renders persisted audit events and active branch leases", (
   assert.doesNotMatch(code, /No active temporary branch grants" \}/);
 });
 
-test("host self-test covers lease expiry, repo-branch isolation, audit recording, and revocation", () => {
+test("host self-test covers lease expiry, repo-branch isolation, atomic use, audit recording, and revocation", () => {
   const selfTest = read(`${host}/SelfTest.cs`);
   for (const marker of [
     "branch_lease_scope",
+    "branch_lease_atomic_use",
     "branch_lease_expiry",
     "branch_lease_revocation",
     "audit_event_roundtrip",
