@@ -53,8 +53,15 @@ internal sealed class AuthorityHostContext : ApplicationContext
             Opacity = 0,
         };
         owner.Show();
-        if (!await HelloVerifier.VerifyAsync(owner.Handle, "Rotate the github-delivery authority signing key"))
+        var verification = await HelloVerifier.VerifyAsync(owner.Handle, "Rotate the github-delivery authority signing key");
+        if (!verification.Verified)
         {
+            MessageBox.Show(
+                owner,
+                verification.FailureMessage ?? "Windows Hello verification did not succeed.",
+                "Authorization denied",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
             owner.Close();
             return;
         }
