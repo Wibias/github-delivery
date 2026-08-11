@@ -29,3 +29,9 @@ Every network-visible GitHub mutation must pass the mutation policy and broker b
 ### GD-CORE-007 — Final claims require final evidence
 
 Provisional green, queued merge, a successful helper, or an earlier snapshot is not a final result. Before a final readiness, publication, or merge claim, run the workflow's authoritative final verification on unchanged relevant heads/state.
+
+### GD-CORE-008 — Make bounded forward progress
+
+Once evidence and authority for the next step are satisfied, perform that step. Do not replace an available tool call or mutation with repeated planning, payload printing, re-reading, or re-verification of unchanged inputs.
+
+Repeat verification only after a relevant state/input change, an ambiguous or failed tool result, or an explicit workflow rule that requires a fresh check. If the same next action is selected twice without an intervening tool call, state change, or new evidence, the workflow is stalled: execute the already-authorized action immediately, or stop and report the concrete blocker. Never keep rephrasing the intention to act.
