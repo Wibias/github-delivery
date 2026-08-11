@@ -37,6 +37,7 @@ export function parseInstallArgs(argv) {
     codexHome,
     host: inferHost(codexHome),
     lifecycleHooksSupported: undefined,
+    hookTrustVerified: parseBoolean(process.env.SHIPPING_GITHUB_HOOK_TRUST_VERIFIED),
     streamLaunchControlled: parseBoolean(
       process.env.SHIPPING_GITHUB_STREAM_LAUNCH_CONTROLLED,
     ),
@@ -51,6 +52,7 @@ export function parseInstallArgs(argv) {
     else if (arg === "--host") options.host = argv[++index];
     else if (arg === "--lifecycle-hooks-supported") options.lifecycleHooksSupported = true;
     else if (arg === "--no-lifecycle-hooks") options.lifecycleHooksSupported = false;
+    else if (arg === "--hook-trust-verified") options.hookTrustVerified = true;
     else if (arg === "--stream-launch-controlled") options.streamLaunchControlled = true;
     else if (arg === "--apply") options.apply = true;
     else if (arg === "--allow-downgrade") options.allowDowngrade = true;
@@ -98,15 +100,6 @@ export function installSkill(options) {
     throw new Error("protected Codex launcher was not installed with the skill payload");
   }
 
-  const selection = selectWatchdogMode({
-    host: options.host,
-    streamLaunchControlled: streamLaunchVerified,
-    lifecycleHooksSupported: options.lifecycleHooksSupported,
-  });
-  if (options.streamLaunchControlled && !launcherBundled && selection.mode !== "stream") {
-    selection.degradationReason = "stream_launcher_unavailable";
-  }
-
   let hookResult = hookPlan;
   if (options.apply && hookPlan) {
     hookResult = installCodexWatchdogHooks({
@@ -116,12 +109,30 @@ export function installSkill(options) {
     });
   }
 
+  const hooksConfigured = Boolean(hookPlan);
+  const hookDefinitionChanged = Boolean(hookPlan?.wouldChange || hookResult?.applied);
+  const hookTrustVerified = Boolean(
+    hooksConfigured && options.hookTrustVerified === true && !hookDefinitionChanged,
+  );
+
+  const selection = selectWatchdogMode({
+    host: options.host,
+    streamLaunchControlled: streamLaunchVerified,
+    lifecycleHooksSupported: options.lifecycleHooksSupported,
+    hookTrustVerified,
+  });
+  if (options.streamLaunchControlled && !launcherBundled && selection.mode !== "stream") {
+    selection.degradationReason = "stream_launcher_unavailable";
+  }
+
   const launcherPath = selection.mode === "stream" ? installedLauncherPath : null;
   const receiptResult = writeActivationReceipt({
     codexHome: options.codexHome,
     mode: selection.mode,
     degradationReason: selection.degradationReason,
     launcherPath,
+    hooksConfigured,
+    hookTrustVerified,
     apply: options.apply,
   });
 
@@ -132,6 +143,9 @@ export function installSkill(options) {
       degradationReason: selection.degradationReason,
       receiptPath: receiptResult.path,
       receiptChanged: receiptResult.changed,
+      hooksConfigured,
+      hookTrustVerified,
+      hookTrustRequired: hooksConfigured && !hookTrustVerified,
       hookResult,
       launcherPath,
       streamLauncherPath: launcherBundled ? installedLauncherPath : null,
