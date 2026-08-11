@@ -278,7 +278,7 @@ export async function runInstallCommand(options, dependencies = {}) {
     verifyRelease({ target: options.target, manifest: candidate.manifest });
     const configAfter = readConfig();
     if (!sameUserConfig(configBefore, configAfter)) {
-      throw new Error("stable_release_user_config_changed");
+      throw new Error("stable_update_user_config_changed_unexpectedly");
     }
 
     return {
