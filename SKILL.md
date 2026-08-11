@@ -115,11 +115,6 @@ progress once the next step is ready.
   **Human replies always require exact-text confirmation.** Public GitHub text
   must keep notifying mentions bare: never wrap GitHub `@login` mentions in backticks.
   Detailed rules: `references/policy/mutation.md` and `references/mutation-modes.md`.
-- **Bounded forward progress is mandatory:** once required evidence and authority
-  for the next step are satisfied, perform the next tool call or mutation. Do not
-  re-plan or re-verify unchanged inputs. If the same next action is selected twice
-  without a tool call, state change, or new evidence, execute it or report the
-  concrete blocker. See GD-CORE-008.
 - **Issue-linked create-PR forward progress is explicit:** bounded need-to-fix research decides
   whether work is needed, then implementation begins. `pre-open-gate.mjs` reviews
   the resulting non-empty candidate diff before publication; it must never be
