@@ -6,6 +6,21 @@ All notable changes to `github-delivery` are documented here.
 
 ### Added
 
+- Verified stable self-update for installed skills. `node scripts/install-skill.mjs
+  --update` now performs a non-mutating check against the fixed upstream's
+  latest published stable Release, while `--update --apply` reuses the existing
+  backup/replacement installer only after release metadata, GitHub asset digests
+  when exposed, `SHA256SUMS`, the distribution manifest, tag-to-source-commit
+  binding, a workflow/tag/commit-constrained GitHub artifact attestation, and a
+  strict bounded ZIP extraction all verify successfully. Local installed
+  modifications block replacement even with `--force`; current/ahead versions
+  are no-ops; update mode cannot use `--source`, `--restore`, or
+  `--allow-downgrade`; post-install manifest verification and persistent user
+  config preservation fail closed and surface the backup path after a completed
+  replacement. `scripts/update-skill.mjs` is now only a compatibility forwarder
+  to the same verified installer path, so there is one release trust chain and
+  one mutation boundary.
+
 - Supersede and maintainer-overtake lifecycle actions. A new
   `references/supersede-pr.md` workflow closes an obsolete open PR in favor of
   a replacement PR through the broker `supersede_pr` action (never a bare
