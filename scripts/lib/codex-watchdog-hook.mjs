@@ -31,7 +31,7 @@ export function classifyCodexTool(toolName, toolInput = {}) {
   const name = String(toolName || "");
   if (name === "Bash") return bashClassification(toolInput?.command);
   if (/^(?:apply_patch|Edit|Write)$/i.test(name)) return { kind: "write" };
-  if (name === "Agent" || /spawn_agent/i.test(name)) return { kind: "progress" };
+  if (name === "Agent" || /spawn_agent/i.test(name)) return { kind: "delegate" };
   if (WRITE_NAME.test(name)) return { kind: "write" };
   if (READ_NAME.test(name)) {
     return {
@@ -62,11 +62,36 @@ function duplicateReason(decision) {
   return "Duplicate read blocked on unchanged state. Reuse the valid evidence already captured; read again only after relevant state changes or the prior result becomes failed, ambiguous, or stale.";
 }
 
+function inputChars(value) {
+  try {
+    return JSON.stringify(value ?? null).length;
+  } catch {
+    return String(value ?? "").length;
+  }
+}
+
+function stopDecision(watchdog, input) {
+  const decision = watchdog.observeAssistantDelta(input.last_assistant_message || "");
+  if (decision.action !== "interrupt") return null;
+  if (input.stop_hook_active) {
+    return {
+      continue: false,
+      stopReason: "no_progress_stall_after_corrective_continuation",
+      systemMessage: "GitHub Delivery stopped a repeated no-progress narration stall.",
+    };
+  }
+  return {
+    decision: "block",
+    reason: "GitHub Delivery detected a no-progress narration stall. Do not restate the plan. Execute the already-selected tool call/action if authorised, otherwise report the concrete blocker.",
+  };
+}
+
 export function evaluateCodexHook(input, state = {}, options = {}) {
   const config = {
     now: options.now ?? Date.now(),
     volatileReadIntervalMs: options.volatileReadIntervalMs ?? 30_000,
     maxToolOutputChars: options.maxToolOutputChars ?? 4_000,
+    maxSubagentInputChars: options.maxSubagentInputChars ?? 6_000,
   };
   const watchdog = hydrate(state, config);
   const event = input?.hook_event_name;
@@ -84,6 +109,14 @@ export function evaluateCodexHook(input, state = {}, options = {}) {
       if (decision.action === "block") {
         output = { decision: "block", reason: duplicateReason(decision) };
       }
+    } else if (
+      classification.kind === "delegate" &&
+      inputChars(input.tool_input) > config.maxSubagentInputChars
+    ) {
+      output = {
+        decision: "block",
+        reason: `Subagent brief exceeds the ${config.maxSubagentInputChars}-character context budget. Compact it to the task, target refs/files, required checks, and output schema; reference source files instead of copying large context blocks.`,
+      };
     }
   } else if (event === "PostToolUse") {
     const classification = classifyCodexTool(input.tool_name, input.tool_input);
@@ -99,22 +132,8 @@ export function evaluateCodexHook(input, state = {}, options = {}) {
         stopReason: `tool_output_compacted: ${compacted.originalChars} chars -> ${compacted.text.length} chars; omitted ${compacted.omittedChars}. Omitted content is not positive evidence.\n${compacted.text}`,
       };
     }
-  } else if (event === "Stop") {
-    const decision = watchdog.observeAssistantDelta(input.last_assistant_message || "");
-    if (decision.action === "interrupt") {
-      if (input.stop_hook_active) {
-        output = {
-          continue: false,
-          stopReason: "no_progress_stall_after_corrective_continuation",
-          systemMessage: "GitHub Delivery stopped a repeated no-progress narration stall.",
-        };
-      } else {
-        output = {
-          decision: "block",
-          reason: "GitHub Delivery detected a no-progress narration stall. Do not restate the plan. Execute the already-selected tool call/action if authorised, otherwise report the concrete blocker.",
-        };
-      }
-    }
+  } else if (event === "Stop" || event === "SubagentStop") {
+    output = stopDecision(watchdog, input);
   }
 
   return { output, state: stateOf(watchdog) };
