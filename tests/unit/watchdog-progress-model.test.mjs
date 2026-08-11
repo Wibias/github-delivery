@@ -111,6 +111,61 @@ test("PreToolUse soft evidence warning uses supported model-visible context with
   assert.match(second.output?.hookSpecificOutput?.additionalContext || "", /synthesi[sz]e|evidence/i);
 });
 
+test("a read denied only by the hard evidence budget is not cached as completed evidence", () => {
+  const options = { evidenceSoftLimit: 1, evidenceHardLimit: 2 };
+  let state = evaluateCodexHook(
+    {
+      hook_event_name: "PreToolUse",
+      session_id: "s",
+      turn_id: "t",
+      tool_name: "mcp__github__fetch_file",
+      tool_input: { path: "a" },
+    },
+    {},
+    { ...options, now: 1_000 },
+  ).state;
+
+  const denied = evaluateCodexHook(
+    {
+      hook_event_name: "PreToolUse",
+      session_id: "s",
+      turn_id: "t",
+      tool_name: "mcp__github__fetch_file",
+      tool_input: { path: "b" },
+    },
+    state,
+    { ...options, now: 2_000 },
+  );
+  assert.equal(denied.output?.decision, "block");
+  state = denied.state;
+
+  state = evaluateCodexHook(
+    {
+      hook_event_name: "PostToolUse",
+      session_id: "s",
+      turn_id: "t",
+      tool_name: "Bash",
+      tool_input: { command: "npm run check" },
+      tool_response: "ok",
+    },
+    state,
+    { ...options, now: 3_000 },
+  ).state;
+
+  const retry = evaluateCodexHook(
+    {
+      hook_event_name: "PreToolUse",
+      session_id: "s",
+      turn_id: "t",
+      tool_name: "mcp__github__fetch_file",
+      tool_input: { path: "b" },
+    },
+    state,
+    { ...options, now: 4_000 },
+  );
+  assert.notEqual(retry.output?.decision, "block");
+});
+
 test("shared classifier is conservative about progress", () => {
   assert.deepEqual(
     classifyHookTool({ tool_name: "mcp__github__fetch_file", tool_input: {} }),
