@@ -22,6 +22,20 @@ function compareVersions(left, right) {
   return 0;
 }
 
+export function compareStableVersions(left, right) {
+  const parse = (value) => {
+    const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(String(value || ""));
+    if (!match) throw new Error("stable_release_version_invalid");
+    return match.slice(1).map(Number);
+  };
+  const a = parse(left);
+  const b = parse(right);
+  for (let index = 0; index < 3; index += 1) {
+    if (a[index] !== b[index]) return a[index] < b[index] ? -1 : 1;
+  }
+  return 0;
+}
+
 export function selectStableRelease(releases = []) {
   const stable = releases
     .filter((release) => release && release.draft !== true && release.prerelease !== true)
@@ -45,6 +59,20 @@ function defaultListFiles(root) {
   return files.sort();
 }
 
+export function validateManifestPath(path) {
+  if (typeof path !== "string" || path.length === 0 || path.includes("\0")) {
+    throw new Error("installed_manifest_path_invalid");
+  }
+  if (path.includes("\\") || path.startsWith("/") || /^[A-Za-z]:/.test(path)) {
+    throw new Error(`installed_manifest_path_invalid:${path}`);
+  }
+  const segments = path.split("/");
+  if (segments.some((segment) => segment === "" || segment === "." || segment === "..")) {
+    throw new Error(`installed_manifest_path_invalid:${path}`);
+  }
+  return path;
+}
+
 export function compareInstalledManifest({ manifest, target, dependencies = {} } = {}) {
   if (manifest?.schemaVersion !== 1 || manifest?.kind !== "github-delivery/distribution-manifest" || !Array.isArray(manifest.files)) {
     throw new Error("installed_manifest_invalid");
@@ -55,16 +83,18 @@ export function compareInstalledManifest({ manifest, target, dependencies = {} }
   const digest = dependencies.sha256 || sha256;
   const listFiles = dependencies.listFiles || defaultListFiles;
   const modifications = [];
-  const tracked = new Set(manifest.files.map((entry) => entry.path));
+  const tracked = new Set();
 
   for (const entry of manifest.files) {
-    const path = join(target, ...entry.path.split("/"));
+    const relativePath = validateManifestPath(entry?.path);
+    tracked.add(relativePath);
+    const path = join(target, ...relativePath.split("/"));
     if (!exists(path)) {
-      modifications.push({ path: entry.path, reason: "missing" });
+      modifications.push({ path: relativePath, reason: "missing" });
       continue;
     }
     if (digest(readFile(path)) !== entry.sha256) {
-      modifications.push({ path: entry.path, reason: "changed" });
+      modifications.push({ path: relativePath, reason: "changed" });
     }
   }
 
@@ -89,12 +119,30 @@ export function releaseAssetPlan(release) {
   if (!version) throw new Error("stable_release_tag_invalid");
   const versionText = version.join(".");
   const assets = Array.isArray(release.assets) ? release.assets : [];
-  const names = new Set(assets.map((asset) => asset?.name).filter(Boolean));
   const archive = `github-delivery-v${versionText}.zip`;
-  for (const required of [archive, "manifest.json", "SHA256SUMS"]) {
-    if (!names.has(required)) throw new Error(`stable_release_asset_missing:${required}`);
+  const assetsByName = new Map();
+
+  for (const asset of assets) {
+    const name = asset?.name;
+    if (!name) continue;
+    const matches = assetsByName.get(name) || [];
+    matches.push(asset);
+    assetsByName.set(name, matches);
   }
-  return { tag, version: versionText, archive, manifest: "manifest.json", checksums: "SHA256SUMS" };
+
+  for (const required of [archive, "manifest.json", "SHA256SUMS"]) {
+    const matches = assetsByName.get(required) || [];
+    if (matches.length === 0) throw new Error(`stable_release_asset_missing:${required}`);
+    if (matches.length > 1) throw new Error(`stable_release_asset_duplicate:${required}`);
+  }
+
+  return {
+    tag,
+    version: versionText,
+    archive,
+    manifest: "manifest.json",
+    checksums: "SHA256SUMS",
+  };
 }
 
 export function planStableUpdate({ releases, target, installedManifest = undefined, dependencies = {} } = {}) {
@@ -102,6 +150,14 @@ export function planStableUpdate({ releases, target, installedManifest = undefin
   const assets = releaseAssetPlan(release);
   const current = installedManifest || readInstalledManifest(target);
   const local = compareInstalledManifest({ manifest: current, target, dependencies });
+  const comparison = compareStableVersions(assets.version, current.version);
+  const action = !local.clean
+    ? "blocked_local_modifications"
+    : comparison > 0
+      ? "update"
+      : comparison === 0
+        ? "already_current"
+        : "already_ahead";
   return {
     schemaVersion: 1,
     kind: "github-delivery/stable-update-plan",
@@ -111,7 +167,7 @@ export function planStableUpdate({ releases, target, installedManifest = undefin
     target: resolve(target),
     localModifications: local.modifications,
     safeToReplace: local.clean,
-    action: local.clean ? (current.version === assets.version ? "already_current" : "update") : "blocked_local_modifications",
+    action,
     assets,
   };
 }
@@ -122,7 +178,9 @@ export function parseChecksums(source) {
     if (!line.trim()) continue;
     const match = /^([0-9a-f]{64})  (.+)$/.exec(line.trim());
     if (!match) throw new Error("stable_release_checksums_invalid");
-    map.set(match[2], match[1]);
+    const name = match[2];
+    if (map.has(name)) throw new Error(`stable_release_checksums_duplicate:${name}`);
+    map.set(name, match[1]);
   }
   return map;
 }
