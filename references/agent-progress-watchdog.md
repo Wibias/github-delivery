@@ -71,7 +71,9 @@ This layer can:
 
 The 8/12 evidence limits are defaults and are intentionally turn-scoped. Exact duplicate/poll protection is independent and can block earlier. The default subagent-input budget is 6,000 serialised characters. These are context/progress budgets, not authority or correctness gates.
 
-Hook state is stored outside repository content under a hashed session directory and a hashed `(turn_id, agent_id-or-main)` file. Updates use an exclusive per-turn lock with bounded acquisition, stale-lock recovery, restrictive permissions where supported, and atomic replacement. Malformed state fails explicitly rather than silently resetting protection. Persisted state contains only counters, generation values, timestamps and SHA-256 read fingerprints. Raw prompts, assistant text, tool arguments, tool output, bearer tokens and repository secrets are not persisted.
+Hook state is stored outside repository content under a hashed session directory. Every turn-scoped event includes `session_id + turn_id`; when Codex actually supplies `agent_id`, that value is included in the hashed state scope too. Current Codex `PreToolUse`/`PostToolUse` schemas document `turn_id` but do not document `agent_id`, so supported local tool activity without an exposed agent identifier intentionally shares one conservative evidence budget within that turn rather than inventing a subagent identity. `SubagentStop` does expose `agent_id` and can use the narrower scope. Sharing a tool budget can stop parallel subagent exploration earlier, but it cannot weaken the loop bound.
+
+Updates use an exclusive per-scope lock with bounded acquisition, stale-lock recovery, restrictive permissions where supported, and atomic replacement. Malformed state fails explicitly rather than silently resetting protection. Persisted state contains only counters, generation values, timestamps and SHA-256 read fingerprints. Raw prompts, assistant text, tool arguments, tool output, bearer tokens and repository secrets are not persisted.
 
 Codex local tool hooks do not cover every host/tool surface. Hosted tools such as WebSearch are not assumed to pass through `PreToolUse`/`PostToolUse`, and lifecycle hooks cannot reclaim tokens already emitted inside the assistant message that reaches `Stop` or `SubagentStop`. Hook mode is therefore a deterministic supported-tool boundary, not a universal hard interrupt.
 
@@ -132,7 +134,7 @@ A repeated stable read on the same generation is blocked. State progress increme
 
 Volatile reads are rate-limited rather than cached forever. The default interval is 30 seconds. When pending required CI is the only blocker, `scripts/ci-wait.mjs` remains authoritative and manual polling is not a parallel waiting mechanism.
 
-The consecutive evidence budget is separate from duplicate-read detection. Distinct reads still consume the turn budget, which closes the failure mode where an agent avoided dedupe simply by moving to a different file/search on every step.
+The consecutive evidence budget is separate from duplicate-read detection. Distinct reads still consume the turn budget, which closes the failure mode where an agent avoided dedupe simply by moving to a different file/search on every step. A read denied solely by the hard evidence budget is not committed to the read-fingerprint cache because that tool never ran.
 
 Unknown tools are not denied by economy classification and do not reset the watchdog merely by completing. This avoids both unsafe bypass and false blocking when a future host/tool is not yet classified.
 
