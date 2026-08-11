@@ -151,13 +151,13 @@ export function planStableUpdate({ releases, target, installedManifest = undefin
   const current = installedManifest || readInstalledManifest(target);
   const local = compareInstalledManifest({ manifest: current, target, dependencies });
   const comparison = compareStableVersions(assets.version, current.version);
-  const action = !local.clean
-    ? "blocked_local_modifications"
-    : comparison > 0
-      ? "update"
-      : comparison === 0
-        ? "already_current"
-        : "already_ahead";
+  const action = comparison === 0
+    ? "already_current"
+    : comparison < 0
+      ? "already_ahead"
+      : !local.clean
+        ? "blocked_local_modifications"
+        : "update";
   return {
     schemaVersion: 1,
     kind: "github-delivery/stable-update-plan",
