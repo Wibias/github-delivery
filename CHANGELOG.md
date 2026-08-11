@@ -80,6 +80,47 @@ All notable changes to `github-delivery` are documented here.
   the TLDR; a comment failing the gate must be repaired, never marked
   published.
 
+## [0.3.0] - 2026-08-11
+
+### Added
+
+- Added a protected Codex streaming launcher, `scripts/codex-with-watchdog.mjs`,
+  that starts the real App Server on stdio and places an authenticated loopback
+  bridge in front of the Codex remote client. The bridge observes streamed
+  assistant deltas and can issue one private `turn/interrupt` while repeated
+  no-progress narration is still being generated.
+- Added persisted watchdog activation metadata under the active Codex home so
+  runtime capability reporting can distinguish configured state from verified
+  active protection without storing prompts, conversations, bearer tokens, or
+  raw tool inputs.
+
+### Changed
+
+- Normal Codex installation and upgrade now configure GitHub Delivery's
+  `PreToolUse`, `PostToolUse`, `Stop`, `SubagentStop`, and `SessionEnd` hooks
+  as part of the standard installer flow. The standalone hook installer remains
+  available for repair and non-standard installs.
+- Watchdog capability reporting now uses the strongest mode that can actually
+  be proven: controlled `stream`, explicitly trusted `hooks`, or `none`.
+  Newly configured non-managed Codex hooks report `hook_trust_required` until
+  their exact unchanged definition is reviewed in `/hooks`; the installer does
+  not bypass Codex's hook-trust gate.
+- Added same-version activation refresh support so trusted hook state can be
+  recorded with `node scripts/install-skill.mjs --hook-trust-verified --apply`
+  without reinstalling or backing up the skill again.
+
+### Fixed
+
+- Closed the v0.2.0 activation gap where the watchdog implementation could be
+  installed but remain dormant in a normal Codex setup.
+- Added end-to-end regression coverage for the observed `Let me check the
+  type...` narration loop and require streaming interruption before 500 emitted
+  characters, with exactly one interrupt per stalled turn.
+- Hardened the protected loopback bridge with bearer authentication, one-client
+  enforcement, WebSocket v13 upgrade validation, bounded frames, malformed
+  traffic handling, and launcher-owned remote flags that cannot be replaced by
+  caller arguments.
+
 ## [0.2.0] - 2026-08-11
 
 ### Added
