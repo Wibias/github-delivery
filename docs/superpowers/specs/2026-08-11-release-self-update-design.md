@@ -44,7 +44,9 @@ The stable update planner uses these action values:
 - `update`: a strictly newer verified release is available and the installed tracked payload is clean;
 - `already_current`: the installed version equals the latest published stable release;
 - `already_ahead`: the installed version is newer than the latest published stable release;
-- `blocked_local_modifications`: tracked installed files differ from the installed manifest and replacement is forbidden.
+- `blocked_local_modifications`: a strictly newer verified release exists, but tracked installed files differ from the installed manifest and replacement is forbidden.
+
+Current/ahead states remain no-ops even when local drift exists. The drift is still reported and `safeToReplace` remains false, but no replacement is attempted because there is no newer release to install.
 
 This distinction matters during release preparation, when a locally installed bundle can be ahead of the latest published GitHub Release. `--update` never interprets that as permission to downgrade.
 
@@ -193,13 +195,14 @@ Version comparison uses strict numeric `major.minor.patch` values only, matching
 
 Given installed version `I` and latest verified release version `R`:
 
-- `R > I`: `update`;
+- `R > I` and the installed tracked payload is clean: `update`;
+- `R > I` and the installed tracked payload has drift: `blocked_local_modifications`;
 - `R === I`: `already_current`;
 - `R < I`: `already_ahead`.
 
-If the installed tracked payload differs from its installed manifest, the planner returns `blocked_local_modifications` rather than authorizing replacement.
+Local drift is always measured and reported. For `already_current` and `already_ahead`, drift sets `safeToReplace` false but does not change the no-op action because there is no replacement to authorize. For a strictly newer release, local drift blocks replacement.
 
-`--allow-downgrade` does not change `--update` behavior and is rejected in update mode. The existing explicit local-source downgrade mechanism remains separate. `--force` cannot bypass the self-update local-modification guard.
+`--allow-downgrade` does not change `--update` behavior and is rejected in update mode. The existing explicit local-source downgrade mechanism remains separate. `--force` cannot bypass the self-update local-modification guard for a newer replacement.
 
 ## Integration with the existing installer
 
@@ -236,8 +239,8 @@ parse args
   -> verify exact tag/source commit + attestation
   -> strict extract + rehash candidate
   -> compare installed/latest versions and installed manifest
-  -> if current/ahead: return no-op result
-  -> if local modifications: fail closed
+  -> if current/ahead: return no-op result with drift diagnostics
+  -> if newer + local modifications: fail closed
   -> if dry-run: return verified plan
   -> if --apply: existing installSkill()/applyInstallation() path
   -> existing Codex hook/watchdog handling
@@ -305,7 +308,7 @@ Representative error classes:
 - attestation verification failure;
 - unsafe ZIP entry;
 - ZIP/manifest mismatch;
-- local installed modifications;
+- local installed modifications that block a newer replacement;
 - existing installer preflight failure;
 - replacement/postcondition failure;
 - unexpected persistent user-config change.
@@ -378,9 +381,9 @@ Cover:
 
 - dry-run performs no target mutation;
 - `--update --apply` upgrades through existing backup/atomic replacement;
-- same-version and already-ahead are no-op even with `--apply`;
+- same-version and already-ahead are no-op even with `--apply`, including when drift diagnostics are present;
 - `--update` rejects `--source`, `--restore`, and `--allow-downgrade` combinations;
-- local modifications block replacement even when the caller supplied `--force`;
+- local modifications block a newer replacement even when the caller supplied `--force`;
 - failed candidate verification never reaches installation;
 - hook definition changes invalidate trusted activation under the existing installer rules;
 - successful update verifies the final installed manifest and user config;
@@ -413,13 +416,13 @@ The feature is complete when all of the following are true:
 1. An installed skill can check for the latest published release without a repository checkout.
 2. Dry-run is the default and performs no installed-skill replacement.
 3. `--update --apply` installs only a strictly newer verified release.
-4. Same-version and already-ahead states are safe no-ops.
+4. Same-version and already-ahead states are safe no-ops, including when local drift is reported diagnostically.
 5. Drafts, prereleases, branches, `main`, arbitrary URLs, and downgrades are not installable through `--update`.
 6. The ZIP must pass GitHub asset digest checks where exposed, `SHA256SUMS`, manifest validation, tag/source-commit binding, and constrained GitHub artifact-attestation verification including source digest.
 7. Missing or failed attestation verification has no weaker fallback.
 8. Unsafe ZIP structures and manifest mismatches are rejected before installation.
 9. Existing backup, atomic replacement, hook trust, watchdog activation, and restore semantics remain authoritative.
-10. Local installed modifications cannot be bypassed with `--force` in self-update mode.
+10. Local installed modifications cannot be bypassed with `--force` when a newer release would otherwise replace the installation.
 11. Successful replacement is followed by installed-manifest verification and user-config preservation checks; failed postconditions surface the backup path.
 12. Tests are offline/deterministic and cover the verification chain plus archive attack classes.
 13. README, INSTALL, update workflow, and changelog describe the self-update path accurately.
