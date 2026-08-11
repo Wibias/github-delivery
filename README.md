@@ -52,7 +52,20 @@ A status question stays read-only. A merge happens only from an actual merge ins
 - GitHub network access
 - an authenticated GitHub CLI (`gh auth login`) **or** a host-provided brokered GitHub connector
 
+### Download the repository
+
+The quickest path is to clone the repository and enter its root directory:
+
+```bash
+git clone https://github.com/Wibias/github-delivery.git
+cd github-delivery
+```
+
+If you prefer not to use Git, download the source archive from the [latest GitHub release](https://github.com/Wibias/github-delivery/releases/latest), extract it, and open a terminal in the extracted repository root.
+
 ### Build and install
+
+Run these commands **from the repository root**, the directory containing `package.json` and `scripts/`:
 
 ```bash
 npm run build:dist
