@@ -7,6 +7,13 @@ import { startCodexWatchdogRemoteBridge } from "./lib/codex-watchdog-remote-brid
 
 const TOKEN_ENV = "GITHUB_DELIVERY_CODEX_REMOTE_TOKEN";
 
+function waitForSpawn(child) {
+  return new Promise((resolve, reject) => {
+    child.once("spawn", resolve);
+    child.once("error", reject);
+  });
+}
+
 function waitForExit(child) {
   return new Promise((resolve, reject) => {
     child.once("error", reject);
@@ -14,13 +21,17 @@ function waitForExit(child) {
   });
 }
 
-export function protectedClientArgs(args, url) {
+export function validateProtectedClientArgs(args) {
   if (args.some((arg) => arg === "--remote" || arg.startsWith("--remote="))) {
     throw new Error("protected Codex launcher owns --remote; remove the caller-supplied remote endpoint");
   }
   if (args.some((arg) => arg === "--remote-auth-token-env" || arg.startsWith("--remote-auth-token-env="))) {
     throw new Error("protected Codex launcher owns --remote-auth-token-env");
   }
+}
+
+export function protectedClientArgs(args, url) {
+  validateProtectedClientArgs(args);
   return ["--remote", url, "--remote-auth-token-env", TOKEN_ENV, ...args];
 }
 
@@ -31,15 +42,14 @@ export async function runProtectedCodex({
   spawnImpl = spawn,
   stderr = process.stderr,
 } = {}) {
+  validateProtectedClientArgs(args);
   const token = randomBytes(32).toString("base64url");
   const appServer = spawnImpl(codexBin, ["app-server"], {
     stdio: ["pipe", "pipe", "inherit"],
     windowsHide: true,
     env,
   });
-  appServer.once("error", (error) => {
-    stderr.write(`github-delivery watchdog app-server error: ${error?.message || error}\n`);
-  });
+  await waitForSpawn(appServer);
 
   let bridge;
   try {
@@ -54,14 +64,23 @@ export async function runProtectedCodex({
   }
 
   const clientEnv = { ...env, [TOKEN_ENV]: token };
-  const client = spawnImpl(codexBin, protectedClientArgs(args, bridge.url), {
-    stdio: "inherit",
-    windowsHide: true,
-    env: clientEnv,
-  });
+  let client;
+  try {
+    client = spawnImpl(codexBin, protectedClientArgs(args, bridge.url), {
+      stdio: "inherit",
+      windowsHide: true,
+      env: clientEnv,
+    });
+    await waitForSpawn(client);
+  } catch (error) {
+    if (client && !client.killed) client.kill();
+    if (!appServer.killed) appServer.kill();
+    await bridge.close().catch(() => {});
+    throw error;
+  }
 
   const cleanup = async () => {
-    if (!client.killed) client.kill();
+    if (client && !client.killed) client.kill();
     if (!appServer.killed) appServer.kill();
     await bridge.close().catch(() => {});
   };
@@ -74,11 +93,10 @@ export async function runProtectedCodex({
   }
 
   try {
-    const outcome = await waitForExit(client);
-    if (!appServer.killed) appServer.kill();
-    await bridge.close();
-    return outcome;
+    return await waitForExit(client);
   } finally {
+    if (!appServer.killed) appServer.kill();
+    await bridge.close().catch(() => {});
     for (const [signal, handler] of handlers) process.off(signal, handler);
   }
 }
