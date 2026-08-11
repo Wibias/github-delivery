@@ -13,12 +13,14 @@ function fixture() {
   const source = join(root, "source");
   const target = join(root, "skills", "github-delivery");
   const codexHome = join(root, ".codex");
-  mkdirSync(source, { recursive: true });
+  mkdirSync(join(source, "scripts"), { recursive: true });
   writeFileSync(
     join(source, "package.json"),
     `${JSON.stringify({ name: "github-delivery", version: "0.2.0" }, null, 2)}\n`,
   );
   writeFileSync(join(source, "marker.txt"), "installed\n");
+  writeFileSync(join(source, "scripts", "codex-watchdog-hook.mjs"), "// hook fixture\n");
+  writeFileSync(join(source, "scripts", "codex-with-watchdog.mjs"), "// launcher fixture\n");
   return { root, source, target, codexHome };
 }
 
@@ -61,9 +63,13 @@ test("normal Codex install activates lifecycle watchdog without a second install
   }
 
   assert.equal(existsSync(join(f.codexHome, "github-delivery", "watchdog-activation.json")), true);
+  assert.equal(
+    receipt.watchdog.streamLauncherPath,
+    join(f.target, "scripts", "codex-with-watchdog.mjs"),
+  );
 });
 
-test("stream mode is selected only when the launch boundary is explicitly controllable", () => {
+test("stream mode is selected only when the installed launch boundary is explicitly controllable", () => {
   const f = fixture();
   const withoutBoundary = runInstall(f, ["--lifecycle-hooks-supported"]);
   assert.equal(withoutBoundary.status, 0, withoutBoundary.stderr);
@@ -74,7 +80,9 @@ test("stream mode is selected only when the launch boundary is explicitly contro
     "--stream-launch-controlled",
   ]);
   assert.equal(withBoundary.status, 0, withBoundary.stderr);
-  assert.equal(JSON.parse(withBoundary.stdout).watchdog.mode, "stream");
+  const result = JSON.parse(withBoundary.stdout);
+  assert.equal(result.watchdog.mode, "stream");
+  assert.equal(result.watchdog.launcherPath, join(f.target, "scripts", "codex-with-watchdog.mjs"));
 });
 
 test("unsupported hosts report watchdog unavailability without blocking skill installation", () => {
