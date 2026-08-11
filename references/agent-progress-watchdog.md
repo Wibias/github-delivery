@@ -64,7 +64,7 @@ After a fresh or changed hook definition, use Codex `/hooks` to review and trust
 
 ### Protected Codex streaming launcher
 
-For the strongest boundary, launch Codex through the installed entry point:
+For the strongest boundary currently exposed by Codex, launch through the installed entry point:
 
 ```text
 node ~/.agents/skills/github-delivery/scripts/codex-with-watchdog.mjs
@@ -82,11 +82,13 @@ The launcher:
 6. consumes the private interrupt response rather than leaking it to the client;
 7. declares `SHIPPING_GITHUB_PROGRESS_WATCHDOG=stream` inside the launched process tree so runtime inspection sees the current protected session directly.
 
-The bearer token is generated in memory for the launched client and is not persisted. The bridge binds only to loopback. The protected launcher owns the remote endpoint flags and rejects caller-supplied replacements.
+The bearer token is generated in memory for the launched client and is not persisted. The bridge binds only to loopback, validates the WebSocket v13 upgrade, requires the bearer token in normal launcher use, permits one client, and bounds individual frames. The protected launcher owns the remote endpoint flags and rejects caller-supplied replacements.
 
 This is the only GitHub Delivery layer that can stop the targeted failure while an assistant message is still streaming. The incident regression includes the observed phrase family `Let me check the type`, `Let me check the NOUS_DEF type`, and `Let me check the OAuthProviderDef type`, and requires the interrupt before 500 emitted characters.
 
 Installing the launcher does not silently reroute an already-running or ordinarily-launched Codex CLI/IDE process. A one-off protected session gets its `stream` declaration from the launcher itself. A persisted `stream` activation receipt is reserved for a host integration that explicitly asserts it controls future launches through this entry point.
+
+**Maturity:** Codex currently documents `app-server` and its WebSocket transport as experimental and unsupported for production workloads. GitHub Delivery therefore treats this launcher as the strongest available Codex enforcement boundary, not as a stable production host API. Lifecycle hooks and policy fallback remain available when that experimental streaming surface is inappropriate.
 
 The older `scripts/codex-app-server-watchdog-proxy.mjs` remains useful to custom stdio App Server clients. It provides the same delta watchdog for clients that already own the App Server protocol connection.
 
