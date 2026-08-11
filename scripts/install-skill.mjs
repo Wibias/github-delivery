@@ -1,11 +1,12 @@
 #!/usr/bin/env node
-import { existsSync } from "node:fs";
-import { homedir } from "node:os";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { installCodexWatchdogHooks } from "./install-codex-watchdog-hooks.mjs";
 import { applyInstallation, planInstallation, restoreBackup } from "./lib/distribution.mjs";
+import { prepareVerifiedReleaseCandidate } from "./lib/release-self-update.mjs";
 import {
   selectWatchdogMode,
   writeActivationReceipt,
@@ -190,18 +191,58 @@ export function installSkill(options) {
   };
 }
 
-export function main(argv = process.argv.slice(2)) {
+function makeReleaseUpdateWorkspace() {
+  return mkdtempSync(join(tmpdir(), "github-delivery-release-update-"));
+}
+
+function removeReleaseUpdateWorkspace(workspace) {
+  rmSync(workspace, { recursive: true, force: true });
+}
+
+export async function runInstallCommand(options, dependencies = {}) {
+  const install = dependencies.installSkill || installSkill;
+  if (!options.update) return install(options);
+
+  const prepareCandidate = dependencies.prepareVerifiedReleaseCandidate || prepareVerifiedReleaseCandidate;
+  const makeWorkspace = dependencies.makeWorkspace || makeReleaseUpdateWorkspace;
+  const removeWorkspace = dependencies.removeWorkspace || removeReleaseUpdateWorkspace;
+  const workspace = makeWorkspace();
+
+  try {
+    const candidate = await prepareCandidate({
+      target: options.target,
+      workspace,
+    });
+    if (!candidate?.verified || !candidate?.plan || !candidate?.release) {
+      throw new Error("stable_release_candidate_invalid");
+    }
+
+    if (!options.apply) {
+      return {
+        ...candidate.plan,
+        apply: false,
+        updated: false,
+        verified: true,
+        release: candidate.release,
+      };
+    }
+
+    throw new Error("stable_release_apply_not_implemented");
+  } finally {
+    removeWorkspace(workspace);
+  }
+}
+
+export async function main(argv = process.argv.slice(2)) {
   const options = parseInstallArgs(argv);
-  const result = installSkill(options);
+  const result = await runInstallCommand(options);
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   return result;
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  try {
-    main();
-  } catch (error) {
+  main().catch((error) => {
     process.stderr.write(`${JSON.stringify({ error: String(error?.message || error) }, null, 2)}\n`);
     process.exitCode = 1;
-  }
+  });
 }
