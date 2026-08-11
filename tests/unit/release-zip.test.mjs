@@ -55,7 +55,7 @@ function makeStoredZip(entries) {
     central.writeUInt32LE(data.length, 20);
     central.writeUInt32LE(data.length, 24);
     central.writeUInt16LE(name.length, 28);
-    central.writeUInt32LE((entry.mode & 0xffff) << 16, 38);
+    central.writeUInt32LE(((entry.mode & 0xffff) << 16) >>> 0, 38);
     central.writeUInt32LE(offset, 42);
     centrals.push(central, name);
     offset += local.length + name.length + data.length;
