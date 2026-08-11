@@ -1,6 +1,6 @@
 # Agent Progress Watchdog
 
-GitHub Delivery uses a layered progress watchdog to reduce token waste without weakening evidence, freshness, review, or mutation-authority gates.
+GitHub Delivery uses a layered progress watchdog to reduce token waste without weakening evidence, freshness, review, mutation-authority, or Codex hook-trust gates.
 
 ## What it protects against
 
@@ -14,25 +14,27 @@ The watchdog never grants GitHub mutation authority, executes a write on the age
 
 ## Activation truth
 
-A normal Codex install/upgrade through `scripts/install-skill.mjs --apply` activates lifecycle hooks when Codex is detected and records the effective watchdog mode in:
+A normal Codex install/upgrade through `scripts/install-skill.mjs --apply` configures lifecycle hooks when Codex is detected and records watchdog installation state in:
 
 ```text
 ~/.codex/github-delivery/watchdog-activation.json
 ```
 
-The receipt is non-sensitive activation metadata only. Runtime capability discovery reads it so `none`, `hooks`, and `stream` describe what is actually active instead of merely what code exists in the installed skill.
+The receipt is non-sensitive activation metadata only. It distinguishes hook configuration from verified active enforcement.
 
 Mode selection is strongest verified mode only:
 
-1. `stream` when the host has explicitly bound future launches to the protected streaming entry point;
-2. `hooks` when lifecycle hooks are active but the launch boundary is not controlled;
-3. `none` when neither runtime surface is verified.
+1. `stream` when the current protected launcher declares the streaming boundary or a host explicitly controls future launches through it;
+2. `hooks` only when the expected lifecycle hooks are configured and the exact unchanged definition has been explicitly confirmed trusted;
+3. `none` when no runtime surface is verified. `hook_trust_required` distinguishes configured-but-untrusted hooks from an unavailable watchdog.
+
+Codex requires non-managed command hooks to be reviewed and trusted before they run. Trust is tied to the current hook definition, so adding or changing the hook makes it review-pending again. GitHub Delivery therefore never treats `hooks.json` presence as proof that lifecycle enforcement is active and never enables `--dangerously-bypass-hook-trust` by default.
 
 ## Enforcement levels
 
 ### Policy only
 
-`GD-CORE-008` through `GD-CORE-010` remain the universal fallback when the host exposes no runtime lifecycle or streaming interception.
+`GD-CORE-008` through `GD-CORE-010` remain the universal fallback when the host exposes no verified runtime lifecycle or streaming interception.
 
 This reduces ordinary waste but cannot forcibly stop a pathological assistant message while that message is already being generated.
 
@@ -56,7 +58,9 @@ Hook state is stored outside repository content. Session ids and read inputs are
 
 Lifecycle hooks cannot reclaim tokens already emitted inside the assistant message that reaches `Stop` or `SubagentStop`.
 
-The normal Codex installer path now reuses the safe hook installer automatically on `--apply`. `scripts/install-codex-watchdog-hooks.mjs` remains available for repair and non-standard installs. Hook configuration is backup-first, preserves unrelated entries, rejects malformed or symlinked configuration, and is idempotent.
+The normal Codex installer path configures GitHub Delivery's hook entries automatically on `--apply`. Hook configuration is backup-first, preserves unrelated entries, rejects malformed or symlinked configuration, and is idempotent. `scripts/install-codex-watchdog-hooks.mjs` remains available for repair and non-standard installs.
+
+After a fresh or changed hook definition, use Codex `/hooks` to review and trust it. A host/operator can then refresh the same installer with `--hook-trust-verified --apply`; same-version activation refreshes do not reinstall the skill. The installer accepts that trust assertion only when its expected hook definition is unchanged.
 
 ### Protected Codex streaming launcher
 
@@ -75,13 +79,14 @@ The launcher:
 3. starts the ordinary Codex client with the documented `--remote` and `--remote-auth-token-env` flags pointed at that bridge;
 4. forwards JSON-RPC traffic while observing `item/agentMessage/delta` notifications;
 5. issues one private `turn/interrupt` when repeated low-novelty intent narration crosses the watchdog threshold;
-6. consumes the private interrupt response rather than leaking it to the client.
+6. consumes the private interrupt response rather than leaking it to the client;
+7. declares `SHIPPING_GITHUB_PROGRESS_WATCHDOG=stream` inside the launched process tree so runtime inspection sees the current protected session directly.
 
 The bearer token is generated in memory for the launched client and is not persisted. The bridge binds only to loopback. The protected launcher owns the remote endpoint flags and rejects caller-supplied replacements.
 
 This is the only GitHub Delivery layer that can stop the targeted failure while an assistant message is still streaming. The incident regression includes the observed phrase family `Let me check the type`, `Let me check the NOUS_DEF type`, and `Let me check the OAuthProviderDef type`, and requires the interrupt before 500 emitted characters.
 
-Installing the launcher does not silently reroute an already-running or ordinarily-launched Codex CLI/IDE process. `stream` is recorded only when the host actually controls launches through this entry point. Otherwise lifecycle hooks remain active and the receipt reports `hooks` with `streaming_interruption_unavailable`.
+Installing the launcher does not silently reroute an already-running or ordinarily-launched Codex CLI/IDE process. A one-off protected session gets its `stream` declaration from the launcher itself. A persisted `stream` activation receipt is reserved for a host integration that explicitly asserts it controls future launches through this entry point.
 
 The older `scripts/codex-app-server-watchdog-proxy.mjs` remains useful to custom stdio App Server clients. It provides the same delta watchdog for clients that already own the App Server protocol connection.
 
