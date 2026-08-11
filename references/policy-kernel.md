@@ -41,3 +41,9 @@ Repeat verification only after a relevant state/input change, an ambiguous or fa
 On unchanged relevant code and state, reuse valid passing evidence. Do not run a narrower, filtered, or otherwise overlapping check after a broader passing check already proves the same property, and do not climb through overlapping variants for extra confidence. During implementation, run the smallest useful targeted check once, then the workflow-required aggregate gate once when ready. Additional checks are justified only by a failed or ambiguous result, a relevant input/state change, or an explicit independent requirement not covered by existing evidence.
 
 Execute deterministic tool calls without narrating each one. User-facing progress updates are for phase changes, material new evidence or plan changes, blockers, or needed user input; do not precede each test/read/write with micro-narration such as “let me run” or “I’ll run”.
+
+### GD-CORE-010 — Minimise evidence acquisition and context
+
+Prefer the highest-level authoritative helper or aggregate read that can decide the current step. Reuse one valid state snapshot while relevant state is unchanged. Do not delegate deterministic script or gate interpretation to a subagent. Escalate evidence progressively: decision/status, failing component, focused excerpt, then full raw output only when required.
+
+When the host exposes the GitHub Delivery progress watchdog, use it to interrupt no-progress narration, deduplicate unchanged reads, rate-limit polling, and compact oversized model-facing tool output. The watchdog never grants mutation authority, executes writes, or converts omitted or unknown evidence into success.
