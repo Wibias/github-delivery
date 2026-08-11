@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 const DEFAULTS = Object.freeze({
   exactIntentRepeatThreshold: 3,
   recentIntentWindow: 8,
@@ -21,6 +23,12 @@ function stableValue(value) {
 
 function stableStringify(value) {
   return JSON.stringify(stableValue(value));
+}
+
+function fingerprintRead(stateGeneration, toolName, input) {
+  return createHash("sha256")
+    .update(`${stateGeneration}\0${toolName}\0${stableStringify(input ?? null)}`)
+    .digest("hex");
 }
 
 function normalizeIntent(clause) {
@@ -81,21 +89,17 @@ export function compactToolOutput(value, { maxChars = 4_000 } = {}) {
   }
 
   const important = uniqueFailureLines(original, 12).join("\n");
-  const markerBase = `\n[github-delivery watchdog: tool output compacted; original ${original.length} chars]\n`;
   const importantBudget = Math.min(Math.floor(maxChars * 0.28), important.length);
   const importantText = important.slice(0, importantBudget);
   const separator = importantText ? `\n[signals]\n${importantText}\n[/signals]\n` : "";
-  const fixed = markerBase.length + separator.length;
-  const payloadBudget = Math.max(0, maxChars - fixed);
+  const markerReserve = 128;
+  const payloadBudget = Math.max(0, maxChars - markerReserve - separator.length);
   const headBudget = Math.floor(payloadBudget * 0.52);
   const tailBudget = payloadBudget - headBudget;
   const head = original.slice(0, headBudget);
   const tail = original.slice(original.length - tailBudget);
   const omittedChars = Math.max(0, original.length - head.length - tail.length);
-  const marker = markerBase.replace(
-    `original ${original.length} chars`,
-    `original ${original.length} chars; omitted ${omittedChars}`,
-  );
+  const marker = `\n[github-delivery watchdog: tool output compacted; original ${original.length} chars; omitted ${omittedChars}]\n`;
 
   let text = `${head}${marker}${separator}${tail}`;
   if (text.length > maxChars) text = text.slice(0, maxChars);
@@ -199,7 +203,7 @@ export function createProgressWatchdog(options = {}) {
     if (volatility !== "stable" && volatility !== "volatile") {
       throw new Error("volatility must be stable or volatile");
     }
-    const fingerprint = `${stateGeneration}:${toolName}:${stableStringify(input ?? null)}`;
+    const fingerprint = fingerprintRead(stateGeneration, toolName, input);
     const prior = reads.get(fingerprint);
     if (!prior) {
       reads.set(fingerprint, { lastAllowedAt: now, volatility });
