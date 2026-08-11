@@ -2,11 +2,17 @@
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { pathToFileURL } from "node:url";
 
 import { installCodexWatchdogHooks } from "./install-codex-watchdog-hooks.mjs";
 import { applyInstallation, planInstallation, restoreBackup } from "./lib/distribution.mjs";
 import { prepareVerifiedReleaseCandidate } from "./lib/release-self-update.mjs";
+import {
+  compareInstalledManifest,
+  readInstalledManifest,
+} from "./lib/stable-release-update.mjs";
+import { readUserConfig } from "./lib/user-config.mjs";
 import {
   selectWatchdogMode,
   writeActivationReceipt,
@@ -199,6 +205,22 @@ function removeReleaseUpdateWorkspace(workspace) {
   rmSync(workspace, { recursive: true, force: true });
 }
 
+function verifyInstalledRelease({ target, manifest }) {
+  const installedManifest = readInstalledManifest(target);
+  if (!isDeepStrictEqual(installedManifest, manifest)) {
+    throw new Error("stable_release_postinstall_manifest_mismatch");
+  }
+  const comparison = compareInstalledManifest({ manifest, target });
+  if (!comparison.clean) {
+    throw new Error("stable_release_postinstall_verification_failed");
+  }
+  return comparison;
+}
+
+function sameUserConfig(before, after) {
+  return isDeepStrictEqual(before?.config, after?.config);
+}
+
 export async function runInstallCommand(options, dependencies = {}) {
   const install = dependencies.installSkill || installSkill;
   if (!options.update) return install(options);
@@ -206,14 +228,17 @@ export async function runInstallCommand(options, dependencies = {}) {
   const prepareCandidate = dependencies.prepareVerifiedReleaseCandidate || prepareVerifiedReleaseCandidate;
   const makeWorkspace = dependencies.makeWorkspace || makeReleaseUpdateWorkspace;
   const removeWorkspace = dependencies.removeWorkspace || removeReleaseUpdateWorkspace;
+  const readConfig = dependencies.readUserConfig || readUserConfig;
+  const verifyRelease = dependencies.verifyInstalledRelease || verifyInstalledRelease;
   const workspace = makeWorkspace();
+  let installation = null;
 
   try {
     const candidate = await prepareCandidate({
       target: options.target,
       workspace,
     });
-    if (!candidate?.verified || !candidate?.plan || !candidate?.release) {
+    if (!candidate?.verified || !candidate?.plan || !candidate?.release || !candidate?.manifest || !candidate?.source) {
       throw new Error("stable_release_candidate_invalid");
     }
 
@@ -227,7 +252,52 @@ export async function runInstallCommand(options, dependencies = {}) {
       };
     }
 
-    throw new Error("stable_release_apply_not_implemented");
+    if (candidate.plan.action === "already_current" || candidate.plan.action === "already_ahead") {
+      return {
+        ...candidate.plan,
+        apply: true,
+        updated: false,
+        verified: true,
+        release: candidate.release,
+      };
+    }
+    if (candidate.plan.action !== "update" || candidate.plan.safeToReplace !== true) {
+      throw new Error(`stable_release_update_blocked:${candidate.plan.action || "invalid"}`);
+    }
+
+    const configBefore = readConfig();
+    installation = install({
+      ...options,
+      source: candidate.source,
+      update: false,
+      apply: true,
+      allowDowngrade: false,
+      force: false,
+    });
+
+    verifyRelease({ target: options.target, manifest: candidate.manifest });
+    const configAfter = readConfig();
+    if (!sameUserConfig(configBefore, configAfter)) {
+      throw new Error("stable_release_user_config_changed");
+    }
+
+    return {
+      action: "update",
+      apply: true,
+      updated: true,
+      verified: true,
+      previousVersion: candidate.plan.currentVersion,
+      sourceVersion: candidate.release.version,
+      target: options.target,
+      backupPath: installation?.backupPath || null,
+      release: candidate.release,
+      watchdog: installation?.watchdog || null,
+    };
+  } catch (error) {
+    if (installation?.backupPath && error && typeof error === "object") {
+      error.backupPath = installation.backupPath;
+    }
+    throw error;
   } finally {
     removeWorkspace(workspace);
   }
@@ -242,7 +312,10 @@ export async function main(argv = process.argv.slice(2)) {
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((error) => {
-    process.stderr.write(`${JSON.stringify({ error: String(error?.message || error) }, null, 2)}\n`);
+    process.stderr.write(`${JSON.stringify({
+      error: String(error?.message || error),
+      ...(error?.backupPath ? { backupPath: error.backupPath } : {}),
+    }, null, 2)}\n`);
     process.exitCode = 1;
   });
 }
