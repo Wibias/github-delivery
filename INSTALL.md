@@ -80,8 +80,12 @@ The receipt contains only activation metadata. It does not contain prompts, conv
 The modes are intentionally strict:
 
 - `stream`: a host has explicitly bound launches to GitHub Delivery's protected streaming boundary, or the current process was started by the protected launcher;
-- `hooks`: the expected lifecycle hooks are configured and their unchanged definition has been explicitly confirmed trusted; in-progress assistant text still cannot be interrupted before `Stop`;
+- `hooks`: the expected lifecycle hooks are configured and their unchanged definition has been explicitly confirmed trusted; this mode applies deterministic per-turn supported-tool guardrails but cannot interrupt assistant text before a local tool boundary;
 - `none`: no runtime enforcement surface is verified. `hook_trust_required` distinguishes configured-but-untrusted hooks from a genuinely unavailable watchdog.
+
+Trusted hook mode tracks progress independently for each `(session_id, turn_id, agent_id-or-main)` scope. Exact duplicate reads and rapid repeated polls are blocked as before. Distinct reads/searches now consume a consecutive evidence budget: the default soft warning appears at 8 attempts without execution/state progress, and the 12th supported evidence attempt is denied until the turn makes execution/state progress or a new turn begins. Evidence gathering itself does not reset the repeated-narration detector.
+
+Hosted tools that do not pass through Codex's local lifecycle hooks are not claimed as hook-protected. Use the controlled streaming launcher when hard in-flight interruption and hosted App Server item visibility are required.
 
 ### Protected streaming launcher
 
@@ -91,7 +95,7 @@ The protected launcher is installed with the skill at:
 ~/.agents/skills/github-delivery/scripts/codex-with-watchdog.mjs
 ```
 
-Run Codex through it when you need the exact repeated-narration failure stopped while the assistant message is still being generated:
+Run Codex through it when you need repeated narration or a runaway evidence-exploration turn stopped while the turn is still in progress:
 
 ```bash
 node ~/.agents/skills/github-delivery/scripts/codex-with-watchdog.mjs
@@ -103,7 +107,9 @@ Arguments after the script are passed to remote-compatible Codex CLI modes, for 
 node ~/.agents/skills/github-delivery/scripts/codex-with-watchdog.mjs resume <SESSION>
 ```
 
-The launcher starts the real Codex App Server on its normal stdio transport, exposes an authenticated loopback bridge to the Codex `--remote` client, observes assistant-message deltas, and can issue a private `turn/interrupt` before a repeated no-progress message grows unbounded. It owns `--remote` and `--remote-auth-token-env`; caller-supplied replacements are rejected so the protected boundary cannot be bypassed accidentally.
+The launcher starts the real Codex App Server on its normal stdio transport, exposes an authenticated loopback bridge to the Codex `--remote` client, and keeps independent watchdog state per active turn. It observes assistant-message deltas plus supported App Server item events, preserves narration history across evidence reads/searches, and can issue a private `turn/interrupt` for either a repeated no-progress narration stall or a hard evidence-budget breach. It owns `--remote` and `--remote-auth-token-env`; caller-supplied replacements are rejected so the protected boundary cannot be bypassed accidentally.
+
+Protected stream mode fails closed. The bridge rejects a client that opts out of required watchdog notifications, detects a non-empty completed agent message that arrived without the required streaming deltas, treats router failures as fatal, and requires every private `turn/interrupt` to receive a successful acknowledgement within a bounded interval. If any of those enforcement properties fail, the bridge destroys the protected client connection and the launcher kills both Codex child processes rather than leaving a session running under a false `stream` claim.
 
 Inside the launched App Server/client process tree, the launcher sets the runtime watchdog declaration to `stream`. That makes capability discovery describe the current protected session directly rather than relying on a stale machine-wide claim.
 
