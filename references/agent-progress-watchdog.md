@@ -4,13 +4,29 @@ GitHub Delivery uses a layered progress watchdog to reduce token waste without w
 
 ## What it protects against
 
-- repeated in-turn intentions such as `Let me read ...` with no tool boundary;
+- repeated in-turn intentions such as `Let me read ...` or `Let me check ...` with no tool boundary;
 - exact reads repeated on unchanged state;
 - ad-hoc high-frequency CI/status polling;
 - oversized model-facing tool output when only a focused diagnostic excerpt is required;
 - oversized subagent briefs that duplicate large parent-context blocks.
 
 The watchdog never grants GitHub mutation authority, executes a write on the agent's behalf, or treats omitted/unknown evidence as success.
+
+## Activation truth
+
+A normal Codex install/upgrade through `scripts/install-skill.mjs --apply` activates lifecycle hooks when Codex is detected and records the effective watchdog mode in:
+
+```text
+~/.codex/github-delivery/watchdog-activation.json
+```
+
+The receipt is non-sensitive activation metadata only. Runtime capability discovery reads it so `none`, `hooks`, and `stream` describe what is actually active instead of merely what code exists in the installed skill.
+
+Mode selection is strongest verified mode only:
+
+1. `stream` when the host has explicitly bound future launches to the protected streaming entry point;
+2. `hooks` when lifecycle hooks are active but the launch boundary is not controlled;
+3. `none` when neither runtime surface is verified.
 
 ## Enforcement levels
 
@@ -22,66 +38,52 @@ This reduces ordinary waste but cannot forcibly stop a pathological assistant me
 
 ### Codex lifecycle hooks
 
-Use `scripts/codex-watchdog-hook.mjs` for `PreToolUse`, `PostToolUse`, `Stop`, `SubagentStop`, and `SessionEnd`.
+`scripts/codex-watchdog-hook.mjs` handles `PreToolUse`, `PostToolUse`, `Stop`, `SubagentStop`, and `SessionEnd`.
 
 This layer can:
 
 - block an exact stable duplicate read on unchanged state;
 - rate-limit identical volatile polls;
-- reject an oversized `Agent`/subagent tool input and require a focused brief that references source files instead of copying them;
+- reject an oversized `Agent`/subagent tool input and require a focused source-referenced brief;
 - compact oversized model-facing tool output while retaining failure/error/blocker signals;
 - detect a completed no-progress assistant or subagent message and request one corrective continuation;
 - fail closed if that corrective continuation stalls again;
 - delete per-session state at `SessionEnd`.
 
-The default subagent-input budget is 6,000 serialized characters. It is intentionally a context budget, not an authority or correctness gate.
+The default subagent-input budget is 6,000 serialized characters. It is a context budget, not an authority or correctness gate.
 
 Hook state is stored outside repository content. Session ids and read inputs are represented only by SHA-256 fingerprints; raw tool arguments are not persisted.
 
 Lifecycle hooks cannot reclaim tokens already emitted inside the assistant message that reaches `Stop` or `SubagentStop`.
 
-Example hook command for a skill installed under the standard agents directory:
+The normal Codex installer path now reuses the safe hook installer automatically on `--apply`. `scripts/install-codex-watchdog-hooks.mjs` remains available for repair and non-standard installs. Hook configuration is backup-first, preserves unrelated entries, rejects malformed or symlinked configuration, and is idempotent.
 
-```json
-{
-  "description": "GitHub Delivery progress watchdog",
-  "hooks": {
-    "PreToolUse": [{"hooks": [{"type": "command", "command": "node ~/.agents/skills/github-delivery/scripts/codex-watchdog-hook.mjs", "commandWindows": "node \"%USERPROFILE%\\.agents\\skills\\github-delivery\\scripts\\codex-watchdog-hook.mjs\""}]}],
-    "PostToolUse": [{"hooks": [{"type": "command", "command": "node ~/.agents/skills/github-delivery/scripts/codex-watchdog-hook.mjs", "commandWindows": "node \"%USERPROFILE%\\.agents\\skills\\github-delivery\\scripts\\codex-watchdog-hook.mjs\""}]}],
-    "Stop": [{"hooks": [{"type": "command", "command": "node ~/.agents/skills/github-delivery/scripts/codex-watchdog-hook.mjs", "commandWindows": "node \"%USERPROFILE%\\.agents\\skills\\github-delivery\\scripts\\codex-watchdog-hook.mjs\""}]}],
-    "SubagentStop": [{"hooks": [{"type": "command", "command": "node ~/.agents/skills/github-delivery/scripts/codex-watchdog-hook.mjs", "commandWindows": "node \"%USERPROFILE%\\.agents\\skills\\github-delivery\\scripts\\codex-watchdog-hook.mjs\""}]}],
-    "SessionEnd": [{"hooks": [{"type": "command", "command": "node ~/.agents/skills/github-delivery/scripts/codex-watchdog-hook.mjs", "commandWindows": "node \"%USERPROFILE%\\.agents\\skills\\github-delivery\\scripts\\codex-watchdog-hook.mjs\""}]}]
-  }
-}
-```
+### Protected Codex streaming launcher
 
-Configure this in the host's trusted hook configuration. GitHub Delivery does not silently modify global host configuration.
-
-Declare this capability to runtime inspection with:
+For the strongest boundary, launch Codex through the installed entry point:
 
 ```text
-SHIPPING_GITHUB_PROGRESS_WATCHDOG=hooks
-```
-
-### Codex App Server streaming proxy
-
-For the strongest boundary, launch Codex App Server through:
-
-```text
-node ~/.agents/skills/github-delivery/scripts/codex-app-server-watchdog-proxy.mjs
+node ~/.agents/skills/github-delivery/scripts/codex-with-watchdog.mjs
 ```
 
 On Windows use the equivalent path under `%USERPROFILE%\.agents\skills\github-delivery`.
 
-The proxy transparently forwards App Server JSONL traffic, observes streamed assistant-message deltas, and issues one private `turn/interrupt` request when repeated low-novelty intent narration crosses the watchdog threshold. Responses to the proxy's private interrupt requests are consumed rather than forwarded to the client.
+The launcher:
 
-This is the only GitHub Delivery layer that can stop the targeted failure while the assistant message is still streaming. A client must intentionally launch/use this proxy instead of plain `codex app-server`; the normal CLI or IDE is not automatically rerouted through it.
+1. starts the real `codex app-server` on its normal stdio transport;
+2. creates a loopback-only authenticated bridge;
+3. starts the ordinary Codex client with the documented `--remote` and `--remote-auth-token-env` flags pointed at that bridge;
+4. forwards JSON-RPC traffic while observing `item/agentMessage/delta` notifications;
+5. issues one private `turn/interrupt` when repeated low-novelty intent narration crosses the watchdog threshold;
+6. consumes the private interrupt response rather than leaking it to the client.
 
-Declare this mode with:
+The bearer token is generated in memory for the launched client and is not persisted. The bridge binds only to loopback. The protected launcher owns the remote endpoint flags and rejects caller-supplied replacements.
 
-```text
-SHIPPING_GITHUB_PROGRESS_WATCHDOG=stream
-```
+This is the only GitHub Delivery layer that can stop the targeted failure while an assistant message is still streaming. The incident regression includes the observed phrase family `Let me check the type`, `Let me check the NOUS_DEF type`, and `Let me check the OAuthProviderDef type`, and requires the interrupt before 500 emitted characters.
+
+Installing the launcher does not silently reroute an already-running or ordinarily-launched Codex CLI/IDE process. `stream` is recorded only when the host actually controls launches through this entry point. Otherwise lifecycle hooks remain active and the receipt reports `hooks` with `streaming_interruption_unavailable`.
+
+The older `scripts/codex-app-server-watchdog-proxy.mjs` remains useful to custom stdio App Server clients. It provides the same delta watchdog for clients that already own the App Server protocol connection.
 
 ## Read economy
 
