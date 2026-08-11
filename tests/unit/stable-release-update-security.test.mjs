@@ -36,6 +36,15 @@ function cleanInstalledDependencies() {
   };
 }
 
+function dirtyInstalledDependencies() {
+  return {
+    exists: () => true,
+    readFile: () => Buffer.from("locally changed"),
+    sha256: () => "c".repeat(64),
+    listFiles: () => ["SKILL.md"],
+  };
+}
+
 test("stable update never downgrades an installation ahead of the latest release", () => {
   const plan = planStableUpdate({
     releases: [{
@@ -51,6 +60,32 @@ test("stable update never downgrades an installation ahead of the latest release
 
   assert.equal(plan.action, "already_ahead");
   assert.equal(plan.safeToReplace, true);
+});
+
+test("current and ahead releases remain no-ops when local drift exists", () => {
+  for (const [releaseVersion, installedVersion, expectedAction] of [
+    ["0.4.0", "0.4.0", "already_current"],
+    ["0.3.0", "0.4.0", "already_ahead"],
+  ]) {
+    const plan = planStableUpdate({
+      releases: [{
+        tag_name: `v${releaseVersion}`,
+        draft: false,
+        prerelease: false,
+        assets: requiredAssets(releaseVersion),
+      }],
+      target: "/skill",
+      installedManifest: manifest(installedVersion, [{
+        path: "SKILL.md",
+        sha256: "b".repeat(64),
+      }]),
+      dependencies: dirtyInstalledDependencies(),
+    });
+
+    assert.equal(plan.action, expectedAction);
+    assert.equal(plan.safeToReplace, false);
+    assert.deepEqual(plan.localModifications, [{ path: "SKILL.md", reason: "changed" }]);
+  }
 });
 
 test("required release assets must occur exactly once", () => {
