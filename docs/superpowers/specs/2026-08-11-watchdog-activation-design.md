@@ -20,6 +20,7 @@ Success means a normal Codex install/upgrade configures the available watchdog s
 - Do not replace Codex itself or assume an undocumented host interception API.
 - Do not silently alter unrelated user hooks or editor configuration.
 - Do not bypass Codex's persisted hook-trust review by default.
+- Do not represent Codex App Server/WebSocket integration as production-stable while OpenAI documents that surface as experimental.
 
 ## Approaches considered
 
@@ -40,6 +41,8 @@ Better than v0.2.0, but still cannot stop tokens already emitted inside a single
 Recommended. During install/upgrade, detect the target host and available watchdog integration surface, select `stream` only when a protected App Server launch boundary is actually controlled, otherwise select `hooks` only when lifecycle hooks are configured and their exact current definition is confirmed trusted, otherwise record `none` with a concrete degradation reason.
 
 A fresh Codex install may therefore configure hooks automatically while reporting `none / hook_trust_required` until the user reviews them in `/hooks`. This preserves Codex's trust model instead of silently weakening it.
+
+The streaming path uses Codex's documented remote TUI/App Server connection to place GitHub Delivery between assistant deltas and the client. Because OpenAI currently documents `codex app-server` and the WebSocket transport as experimental and unsupported for production workloads, this is explicitly a strongest-current enforcement option rather than a promise of a stable host API.
 
 ## Architecture
 
@@ -81,13 +84,17 @@ The existing standalone hook installer remains available for recovery/manual use
 
 Because Codex records trust against the exact hook definition hash, a newly added or changed hook is reported as `hook_trust_required` until it is reviewed in `/hooks`. The installer does not use `--dangerously-bypass-hook-trust` as a default activation mechanism.
 
+A same-version `--hook-trust-verified --apply` activation refresh updates only the activation receipt when the hook definition is unchanged; it does not reinstall/back up the skill again.
+
 ### 3. Streaming launcher integration
 
-GitHub Delivery installs a protected launcher owned by the skill. It starts the real Codex App Server on the default stdio transport, exposes an authenticated loopback bridge, and starts the ordinary Codex client with its documented `--remote` flags pointed at that bridge.
+GitHub Delivery installs a protected launcher owned by the skill. It starts the real Codex App Server on the default stdio transport, exposes an authenticated loopback WebSocket bridge, and starts the ordinary Codex client with its documented `--remote` flags pointed at that bridge.
 
 The bridge observes `item/agentMessage/delta` notifications and may issue one private `turn/interrupt` while the repeated narration is still being generated.
 
-Installing the launcher alone does not make plain `codex` or an IDE session use it. `stream` is recorded only when the caller/host explicitly controls launches through this protected entry point. This avoids claiming a mid-message boundary that is not actually in the traffic path.
+The bridge is loopback-only, bearer-authenticated in normal launcher operation, limited to one client, validates the WebSocket v13 upgrade, caps frame size, and destroys malformed/oversized connections instead of letting them crash the launcher.
+
+Installing the launcher alone does not make plain `codex` or an IDE session use it. `stream` is recorded only when the caller/host explicitly controls launches through this protected entry point. The launcher itself declares `stream` inside the process tree it creates, so current-session capability discovery is truthful without persisting a machine-wide stream claim.
 
 ### 4. Runtime capability truth
 
@@ -129,9 +136,12 @@ If no runtime surface is available, installation does not fail solely for that r
 - Non-managed hooks are never reported active solely because they are configured.
 - A changed hook definition invalidates a supplied trust assertion for that install pass.
 - The default workflow never adds `--dangerously-bypass-hook-trust`.
+- The protected launcher uses an in-memory bearer token and loopback-only bridge; the token is not persisted.
+- The bridge fails closed on invalid upgrades, malformed frames, and oversized frames.
 - Streaming launch integration never swallows ordinary App Server traffic, mutation prompts, or errors.
 - The watchdog remains incapable of granting GitHub write authority.
 - Existing `GD-CORE-*`, `GD-AUTH-*`, CI, review, security, and final-evidence rules remain authoritative.
+- Codex App Server/WebSocket maturity is disclosed rather than hidden.
 
 ## Testing strategy
 
@@ -147,12 +157,15 @@ Add an incident regression using the real repeated phrase family from the observ
 - newly configured non-managed hooks report `hook_trust_required`, not `hooks`;
 - an explicit trust assertion is accepted only when the hook definition is unchanged;
 - changing the hook definition invalidates the trust assertion;
+- same-version trust refresh updates activation without reinstalling the skill;
 - upgrade from v0.2.0 does not duplicate hook entries;
 - existing unrelated hooks survive semantic-content unchanged;
 - malformed/symlinked config fails closed;
 - `stream` is selected only when the protected launch boundary is controlled;
+- protected launcher prevents caller replacement of its `--remote` boundary;
+- protected loopback bridge rejects unauthenticated clients;
 - `none` is reported honestly on unsupported hosts;
-- runtime capability output matches persisted effective mode;
+- runtime capability output matches persisted effective mode or the explicit current protected-session declaration;
 - repeated install is idempotent;
 - existing repository `npm run check`, distribution reproducibility, security, and cross-platform CI remain green.
 
@@ -165,3 +178,4 @@ Add an incident regression using the real repeated phrase family from the observ
 5. Hook-only installations clearly disclose that in-turn token burn cannot be stopped mid-message.
 6. Runtime capability reporting reflects the mode actually active, not merely configured code.
 7. Existing user configuration and GitHub Delivery safety/authority gates are preserved.
+8. The protected streaming boundary's current Codex maturity is explicitly documented as experimental rather than production-stable.
