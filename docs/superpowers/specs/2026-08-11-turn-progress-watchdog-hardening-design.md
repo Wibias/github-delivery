@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-11
 **Repository:** `Wibias/github-delivery`
-**Status:** Design approved in chat, pending written-spec review
+**Status:** Direction approved in chat, pending written-spec review
 **Target:** Post-0.3.0 watchdog hardening
 
 ## Problem
@@ -33,10 +33,13 @@ Current OpenAI hook documentation says:
 - `PostToolUse` can replace/stop normal processing of the completed tool result, but the tool has already run and Codex continues from the hook feedback;
 - `Stop` sees `last_assistant_message` only after the model has reached a stop boundary. A blocking Stop result asks Codex to continue from a synthetic continuation prompt; it does not reclaim tokens already emitted.
 
+OpenAI's current Codex issue tracker also contains reports of user-level `PostToolUse` not firing on some releases/configurations. This is supporting evidence, not the primary contract, but it reinforces one design rule: **hard exploration enforcement must happen in `PreToolUse`; `PostToolUse` must never be the sole boundary required for safety.**
+
 References:
 
 - https://developers.openai.com/codex/hooks
 - https://github.com/openai/codex/tree/main/codex-rs/hooks
+- https://github.com/openai/codex/issues
 
 ### Codex App Server
 
@@ -47,6 +50,7 @@ Current OpenAI App Server documentation says:
 - `turn/interrupt` cancels an in-flight turn and the turn completes with `status: "interrupted"`;
 - App Server exposes item types including `commandExecution`, `fileChange`, `mcpToolCall`, `dynamicToolCall`, `collabToolCall`, `webSearch`, and `imageView`;
 - clients may opt out of exact notification methods through `initialize.params.capabilities.optOutNotificationMethods`;
+- `turn/started` contains the turn object/turn id but does not itself provide the parent thread id;
 - `codex app-server` and WebSocket transport are currently experimental and unsupported for production workloads.
 
 References:
@@ -98,7 +102,9 @@ Useful information gathering that does **not** by itself prove the agent is movi
 - image viewing;
 - read-like MCP/dynamic tools.
 
-Evidence progress increments the turn's exploration budget and **does not reset narration-stall history**.
+Evidence activity consumes the turn's exploration budget and **does not reset narration-stall history**.
+
+For hook mode, the budget is charged/reserved at `PreToolUse`, before the read executes. For stream mode, it is charged when the evidence item starts. This prevents parallel, hanging, or repeatedly-started reads from evading the limit. Completion does not double-charge the same item.
 
 ### Execution progress
 
@@ -121,7 +127,7 @@ A completed action that may change the relevant working/repository state:
 
 State progress increments the state generation, clears duplicate-read fingerprints, resets the consecutive evidence streak, and resets narration-stall history.
 
-A tool merely starting is never progress. A failed or declined state-changing tool is not assumed successful, although conservative invalidation may be used when side effects could have occurred before failure.
+A tool merely starting is never **progress** even when its start reserves evidence budget. A failed or declined state-changing tool is not assumed successful, although conservative invalidation may be used when side effects could have occurred before failure.
 
 ## Turn-scoped state
 
@@ -147,14 +153,14 @@ The persisted record contains only non-sensitive counters and hashes:
 - turn id hash / scope identity;
 - state generation;
 - exact-read fingerprints;
-- total evidence calls;
-- consecutive evidence calls since execution/state progress;
+- total evidence attempts;
+- consecutive evidence attempts since execution/state progress;
 - warning/denial counters;
 - execution/state progress counters.
 
 It must never contain prompts, assistant text, raw tool input, tool output, bearer tokens, or repository secrets.
 
-`SessionEnd` removes the whole hashed session directory. New turn ids naturally create clean turn state. Every turn-scoped hook validates its state scope, so correctness does not depend on `UserPromptSubmit` firing first.
+`SessionEnd` removes the whole hashed session directory. New turn ids naturally create clean turn state. Every turn-scoped hook validates its state scope, so correctness does not depend on `UserPromptSubmit` firing first and the installer does not need to add another trusted hook solely for state reset.
 
 ### Concurrent hook safety
 
@@ -171,15 +177,9 @@ The store is isolated from watchdog policy so it can be tested independently.
 
 ### Stream mode
 
-The App Server router owns one watchdog state per:
+The App Server router owns one watchdog state per **turn id**, not one global watchdog per connection.
 
-```text
-threadId + turnId
-```
-
-not one global watchdog per connection.
-
-Turn state is created lazily or on `turn/started` and deleted after `turn/completed`. One turn can never reset another turn's narration or evidence budget.
+`turn/started` can initialise a state record from the turn id alone. Once a scoped item/delta provides `threadId`, the state binds that thread id to the turn and rejects inconsistent thread binding. `turn/completed` deletes the turn state. One turn can never reset another turn's narration or evidence budget.
 
 ## Narration stall enforcement
 
@@ -202,10 +202,11 @@ Default per-turn behaviour:
 
 1. Exact stable duplicate read on unchanged state -> **deny immediately**.
 2. Identical volatile poll inside the existing refresh interval -> **deny immediately**.
-3. At **8 consecutive evidence calls** without execution/state progress -> allow the call but attach a concise model-visible warning: synthesise the evidence already gathered and choose the next execution step; additional reading must be narrowly justified.
-4. At **12 consecutive evidence calls** without execution/state progress -> deny further confidently-classified evidence calls until execution/state progress occurs or a new turn begins.
-5. State progress resets the streak and invalidates old stable-read fingerprints.
-6. Execution progress resets the streak but does not invalidate stable-read fingerprints.
+3. Each permitted evidence attempt is reserved before execution (`PreToolUse` in hook mode, `item/started` in stream mode).
+4. At **8 consecutive evidence attempts** without execution/state progress -> allow the call but attach a concise model-visible warning: synthesise the evidence already gathered and choose the next execution step; additional reading must be narrowly justified.
+5. At **12 consecutive evidence attempts** without execution/state progress -> deny further confidently-classified evidence calls until execution/state progress occurs or a new turn begins.
+6. State progress resets the streak and invalidates old stable-read fingerprints.
+7. Execution progress resets the streak but does not invalidate stable-read fingerprints.
 
 Why 8/12 instead of a much larger fixed cap: the observed failures become pathological far earlier than 12 reads, while a warning before denial gives legitimate research tasks room to pivot. The limits are configurable for tests/hosts but have safe defaults.
 
@@ -275,16 +276,20 @@ Internal `turn/interrupt` requests must no longer be blindly swallowed regardles
 ### PreToolUse
 
 - exact duplicate/poll protection remains;
+- evidence attempts are charged before execution;
 - evidence budget warning and denial happen here, before the next read executes;
 - subagent input budget remains;
 - a denied read receives one concise reason that tells the model to synthesise existing evidence and act or report a concrete blocker.
+
+This is the hard local-tool enforcement point. The design does not depend on `PostToolUse` firing for the read budget to work.
 
 ### PostToolUse
 
 - classify successful completion as evidence, execution, or state progress;
 - do not call a generic `recordExternalProgress()` for every non-write tool;
+- evidence completion never double-counts a `PreToolUse` reservation;
 - tool-output compaction remains independent of progress classification;
-- because PostToolUse cannot undo side effects and may not cover every host/tool path, correctness must not depend on it being a universal boundary.
+- because PostToolUse cannot undo side effects, is not a universal host boundary, and has had compatibility reports in current Codex releases, correctness must not depend on it as the sole enforcement point.
 
 ### Stop / SubagentStop
 
@@ -332,13 +337,17 @@ item started/completed: read B
 
 Requirements:
 
-- evidence completion does not reset narration history;
+- evidence start/completion does not reset narration history;
 - warning occurs at the configured soft evidence threshold;
 - further evidence is denied/stream-interrupted according to the active boundary before the trace can grow remotely close to the observed dozens/hundreds of steps.
 
+### Parallel/hanging evidence
+
+Start multiple read/search items without completing them and prove the exploration budget is still consumed at start/PreToolUse. The hard budget must not be bypassable by concurrency or missing completion events.
+
 ### Turn isolation
 
-Run two concurrent `(threadId, turnId)` streams. Evidence or execution progress in turn B must not reset turn A. Hook fixtures with the same parent `session_id` but different `turn_id`/`agent_id` must remain isolated.
+Run two concurrent turn ids. Bind thread ids from scoped events after `turn/started`. Evidence or execution progress in turn B must not reset turn A. Hook fixtures with the same parent `session_id` but different `turn_id`/`agent_id` must remain isolated.
 
 ### State-store concurrency
 
@@ -393,12 +402,13 @@ Final head must pass:
 1. The pure `Let me read request-log.test.ts.` trace is interrupted in controlled stream mode before 500 characters.
 2. Interleaving different evidence reads no longer resets narration detection.
 3. Hook-only mode denies runaway supported evidence calls per turn instead of rewarding each read as complete progress.
-4. New user turns and subagents do not inherit another turn's exploration budget.
-5. Concurrent App Server turns cannot reset each other's watchdog state.
-6. Unknown tools cannot bypass the watchdog by being automatically treated as progress.
-7. A protected launcher refuses notification opt-outs that would blind the watchdog.
-8. Failed/unacknowledged interrupts cannot leave the protected session running while it still claims `stream`.
-9. No watchdog state persists raw prompts, assistant text, tool inputs, outputs, tokens, or secrets.
-10. Existing GitHub mutation authority and evidence gates remain unchanged.
-11. Documentation states the exact guarantee boundary: hard in-flight interruption only on the controlled App Server stream, deterministic local tool-boundary guardrails in trusted hook mode, policy fallback elsewhere.
-12. No documentation or runtime output claims universal or production-stable Codex protection while OpenAI documents App Server/WebSocket as experimental.
+4. Parallel/hanging evidence calls cannot evade the exploration budget.
+5. New user turns and subagents do not inherit another turn's exploration budget.
+6. Concurrent App Server turns cannot reset each other's watchdog state.
+7. Unknown tools cannot bypass the watchdog by being automatically treated as progress.
+8. A protected launcher refuses notification opt-outs that would blind the watchdog.
+9. Failed/unacknowledged interrupts cannot leave the protected session running while it still claims `stream`.
+10. No watchdog state persists raw prompts, assistant text, tool inputs, outputs, tokens, or secrets.
+11. Existing GitHub mutation authority and evidence gates remain unchanged.
+12. Documentation states the exact guarantee boundary: hard in-flight interruption only on the controlled App Server stream, deterministic local tool-boundary guardrails in trusted hook mode, policy fallback elsewhere.
+13. No documentation or runtime output claims universal or production-stable Codex protection while OpenAI documents App Server/WebSocket as experimental.
