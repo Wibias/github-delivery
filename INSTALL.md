@@ -47,6 +47,32 @@ node scripts/install-skill.mjs --apply
 
 Existing directory installations are backed up before replacement. Symlinks and non-skill directories fail closed unless the operator inspects the plan and explicitly supplies `--force`. Downgrades require `--allow-downgrade`.
 
+## Optional Codex progress watchdog
+
+For Codex, GitHub Delivery can install lifecycle hooks that block duplicate unchanged reads, rate-limit manual status polling, bound oversized subagent briefs/tool output, and recover from completed no-progress narration stalls.
+
+The hook installer is separately opt-in and dry-runs by default. It preserves existing hooks and reports the planned change:
+
+```bash
+node scripts/install-codex-watchdog-hooks.mjs
+```
+
+Apply it explicitly after installing/upgrading the skill:
+
+```bash
+node scripts/install-codex-watchdog-hooks.mjs --apply
+```
+
+The installer targets `~/.codex/hooks.json`, creates a backup before changing an existing file, fails closed on malformed or symlinked hook configuration, and adds only GitHub Delivery's missing `PreToolUse`, `PostToolUse`, `Stop`, `SubagentStop`, and `SessionEnd` entries. Reapplying is idempotent.
+
+If the skill was installed somewhere other than `~/.agents/skills/github-delivery`, pass that path explicitly:
+
+```bash
+node scripts/install-codex-watchdog-hooks.mjs --skill-dir ~/.codex/skills/github-delivery --apply
+```
+
+Lifecycle hooks cannot stop tokens already emitted inside one assistant message. Custom Codex App Server clients can use the stronger streaming proxy described in [`references/agent-progress-watchdog.md`](references/agent-progress-watchdog.md).
+
 ## Restore a backup
 
 ```bash
