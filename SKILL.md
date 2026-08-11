@@ -102,9 +102,9 @@ individual PR's review/fix/readiness bar.
 6. Canonical `GD-*` rules are defined once in the kernel/modules. Workflow prose
    may add ordering and workflow-specific contracts but must not weaken them.
 
-Core invariants are GD-CORE-001 through GD-CORE-009. They cover fail-closed
+Core invariants are GD-CORE-001 through GD-CORE-010. They cover fail-closed
 evidence, locked scope, gate integrity, untrusted repository instructions, live
-state, write authority, final evidence, bounded progress, and verification economy.
+state, write authority, final evidence, bounded progress, and evidence/context economy.
 
 ## Mandatory entrypoint behavior
 
