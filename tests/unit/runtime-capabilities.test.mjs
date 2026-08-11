@@ -23,6 +23,7 @@ test("prefers connected capabilities and records safe brokered fallbacks", () =>
       bugbot: false,
       subagents: true,
       reviewTool: true,
+      progressWatchdog: "stream",
     },
   });
   assert.equal(result.schemaVersion, 1);
@@ -34,8 +35,28 @@ test("prefers connected capabilities and records safe brokered fallbacks", () =>
   assert.equal(result.fallbacks.githubWrites, "connector-broker");
   assert.equal(result.fallbacks.rateLimits, "composio");
   assert.equal(result.fallbacks.bugReview, "complementary-lenses");
+  assert.equal(result.runtime.progressWatchdog, "stream");
+  assert.equal(result.fallbacks.contextEconomy, "streaming-watchdog");
   assert.equal(result.readyForMutation, true);
   assert.deepEqual(result.degraded, []);
+});
+
+test("reports lifecycle-hook watchdog separately from streaming interception", () => {
+  const result = buildRuntimeCapabilities({
+    probes: { node: true },
+    declarations: { progressWatchdog: "hooks" },
+  });
+  assert.equal(result.runtime.progressWatchdog, "hooks");
+  assert.equal(result.fallbacks.contextEconomy, "lifecycle-hooks");
+});
+
+test("defaults watchdog capability to policy-only when the host declares no runtime hook", () => {
+  const result = buildRuntimeCapabilities({
+    probes: { node: true },
+    declarations: {},
+  });
+  assert.equal(result.runtime.progressWatchdog, "none");
+  assert.equal(result.fallbacks.contextEconomy, "policy-only");
 });
 
 test("falls back to authenticated gh through the mutation broker", () => {
