@@ -24,6 +24,33 @@ test("prepared GitHub writes do not get a second ad-hoc preflight loop", () => {
   assert.match(mutationPolicy, /prepared mutation request/i);
   assert.match(mutationPolicy, /github-mutate\.mjs/i);
   assert.match(mutationPolicy, /do not .*repeat.*preflight|do not .*duplicate.*preflight/i);
-  assert.match(skill, /GD-CORE-008/i);
-  assert.match(skill, /bounded forward progress/i);
+  assert.match(skill, /GD-CORE-001 through GD-CORE-010/i);
+  assert.match(skill, /bounded progress/i);
+});
+
+test("verification economy reuses passing evidence on unchanged code and state", () => {
+  assert.match(kernel, /GD-CORE-009/i);
+  assert.match(kernel, /reuse.*passing evidence|reuse.*valid evidence/i);
+  assert.match(kernel, /overlapping|narrower/i);
+  assert.match(kernel, /targeted.*aggregate|aggregate.*targeted/i);
+  assert.match(kernel, /failure|failed/i);
+  assert.match(kernel, /state.*change|inputs?.*change/i);
+  assert.match(skill, /verification economy|evidence.*economy/i);
+});
+
+test("deterministic tool calls are executed without micro-narration", () => {
+  assert.match(kernel, /do not narrate.*tool calls|execute.*without.*narrat/i);
+  assert.match(kernel, /phase change|material.*change|user input/i);
+});
+
+test("context economy minimises evidence acquisition and model-facing output", () => {
+  assert.match(kernel, /GD-CORE-010/i);
+  assert.match(kernel, /highest-level authoritative|aggregate/i);
+  assert.match(kernel, /state snapshot|unchanged state/i);
+  assert.match(kernel, /do not delegate.*deterministic|deterministic.*subagent/i);
+  assert.match(kernel, /status.*failing.*excerpt.*raw|progressive/i);
+  assert.match(kernel, /watchdog/i);
+  assert.match(kernel, /never.*mutation authority|does not.*mutation authority/i);
+  assert.match(kernel, /omitted|unknown/i);
+  assert.match(skill, /context economy|evidence\/context economy/i);
 });

@@ -38,6 +38,8 @@ Watch MUST run scripts/ship-gate.mjs every wake. Exit 0 permits waiting, exit 1 
 
 When pending required CI is the only blocker, use `scripts/ci-wait.mjs` instead of inventing a fixed runner-specific wait loop. Unknown check timing starts with an estimate of 5 minutes and the authoritative gate is polled every 30 seconds. Five minutes is an estimate, not a timeout: do not stop waiting merely because the estimate is exceeded, and do not impose a fixed poll-count or total-wait cap by default.
 
+When this path applies, do not run parallel ad-hoc `Start-Sleep`, repeated `gh pr checks`, `gh run view`, or equivalent manual polling loops. Inspect lower-level run, job, or log evidence only after the wait driver reports a failure or ambiguous state, or another material state change requires diagnosis.
+
 The wait driver may learn successful check durations per repository and check identity from observed completed runs. Learned timing requires at least three samples; until then, keep the 5-minute estimate. Timing history is advisory only and never overrides gate state.
 
 Name a runner or platform only when current GitHub evidence names it in the current check context or metadata. Do not infer that Windows, macOS, Linux, or another runner is slow from historical prose or a previous repository. On every wake, rerun the authoritative gate; stop waiting immediately if the head moves, evidence becomes unknown, or any blocker other than pending required CI appears.

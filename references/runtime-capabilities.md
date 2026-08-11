@@ -35,11 +35,14 @@ SHIPPING_GITHUB_COMPOSIO=true|false
 SHIPPING_GITHUB_BUGBOT=true|false
 SHIPPING_GITHUB_SUBAGENTS=true|false
 SHIPPING_GITHUB_REVIEW_TOOL=true|false
+SHIPPING_GITHUB_PROGRESS_WATCHDOG=none|hooks|stream
 ```
 
 `CONNECTOR_WRITE` means the host connector has write permission. `BROKERED_CONNECTOR_WRITE` means the github-delivery mutation broker has an adapter that enforces the same request, expected-head, idempotency, exact-text, audit, and verification contract through that connector. Permission without an adapter is not a usable mutation path.
 
-A Node process cannot discover a host connector that was never exposed to it. Inventing those capabilities would be charmingly optimistic and operationally useless.
+`PROGRESS_WATCHDOG=hooks` declares lifecycle-hook enforcement. `stream` declares a streaming host boundary capable of interrupting an in-flight no-progress turn. See `references/agent-progress-watchdog.md` for the Codex integrations and their different guarantees.
+
+A Node process cannot discover a host connector or streaming interception boundary that was never exposed to it. These capabilities are declarations, not guesses.
 
 ## Output contract
 
@@ -63,13 +66,17 @@ A Node process cannot discover a host connector that was never exposed to it. In
     "rulesetsReadable": true,
     "reviewThreadsReadable": true
   },
+  "runtime": {
+    "progressWatchdog": "stream"
+  },
   "fallbacks": {
     "githubReads": "connector",
     "githubWrites": "connector-broker",
     "rateLimits": "composio",
     "bugReview": "complementary-lenses",
     "standardsReview": "review-tool",
-    "parallelism": "subagents"
+    "parallelism": "subagents",
+    "contextEconomy": "streaming-watchdog"
   },
   "degraded": []
 }
@@ -87,6 +94,7 @@ A Node process cannot discover a host connector that was never exposed to it. In
 - Composio rate-limit checks are preferred when declared; authenticated `gh` is the fallback.
 - Bugbot is used only on Cursor when both host and capability declarations permit it. Every other host uses complementary lenses.
 - Subagents are used only when declared. Otherwise run the work in-session without claiming fan-out occurred.
+- `runtime.progressWatchdog` is `stream`, `hooks`, or `none`; the corresponding `contextEconomy` fallback is `streaming-watchdog`, `lifecycle-hooks`, or `policy-only`.
 - Missing ruleset or review-thread evidence is degraded capability and must flow into an unknown gate result rather than being guessed.
 
 ## Offline fixtures

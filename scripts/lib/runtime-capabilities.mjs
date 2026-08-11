@@ -6,6 +6,11 @@ function unique(values) {
   return [...new Set(values.filter(Boolean))];
 }
 
+function watchdogMode(value) {
+  const normalized = String(value || "none").toLowerCase();
+  return ["hooks", "stream"].includes(normalized) ? normalized : "none";
+}
+
 export function buildRuntimeCapabilities({
   host = "unknown",
   os = process.platform,
@@ -28,6 +33,9 @@ export function buildRuntimeCapabilities({
     bugbot: boolean(declarations.bugbot),
     subagents: boolean(declarations.subagents),
     reviewTool: boolean(declarations.reviewTool),
+  };
+  const runtime = {
+    progressWatchdog: watchdogMode(declarations.progressWatchdog),
   };
 
   const ghReadable =
@@ -81,6 +89,12 @@ export function buildRuntimeCapabilities({
         : "complementary-lenses",
     standardsReview: optional.reviewTool ? "review-tool" : "in-session",
     parallelism: optional.subagents ? "subagents" : "in-session",
+    contextEconomy:
+      runtime.progressWatchdog === "stream"
+        ? "streaming-watchdog"
+        : runtime.progressWatchdog === "hooks"
+          ? "lifecycle-hooks"
+          : "policy-only",
   };
 
   const degraded = unique([
@@ -110,6 +124,7 @@ export function buildRuntimeCapabilities({
     repo,
     tools,
     github,
+    runtime,
     optional,
     fallbacks,
     degraded,

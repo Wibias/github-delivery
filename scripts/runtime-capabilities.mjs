@@ -12,6 +12,11 @@ function parseBoolean(value) {
   return ["1", "true", "yes", "on"].includes(String(value).toLowerCase());
 }
 
+function watchdogDeclaration(value) {
+  const normalized = String(value || "none").toLowerCase();
+  return ["hooks", "stream"].includes(normalized) ? normalized : "none";
+}
+
 function commandAvailable(command, args = ["--version"]) {
   const result = spawnSync(command, args, { encoding: "utf8" });
   return result.status === 0;
@@ -86,6 +91,9 @@ function liveInput(repo) {
       bugbot: parseBoolean(process.env.SHIPPING_GITHUB_BUGBOT),
       subagents: parseBoolean(process.env.SHIPPING_GITHUB_SUBAGENTS),
       reviewTool: parseBoolean(process.env.SHIPPING_GITHUB_REVIEW_TOOL),
+      progressWatchdog: watchdogDeclaration(
+        process.env.SHIPPING_GITHUB_PROGRESS_WATCHDOG,
+      ),
       rulesetsReadable: parseBoolean(
         process.env.SHIPPING_GITHUB_CONNECTOR_RULESETS,
       ),
