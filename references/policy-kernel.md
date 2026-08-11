@@ -35,3 +35,9 @@ Provisional green, queued merge, a successful helper, or an earlier snapshot is 
 Once evidence and authority for the next step are satisfied, perform that step. Do not replace an available tool call or mutation with repeated planning, payload printing, re-reading, or re-verification of unchanged inputs.
 
 Repeat verification only after a relevant state/input change, an ambiguous or failed tool result, or an explicit workflow rule that requires a fresh check. If the same next action is selected twice without an intervening tool call, state change, or new evidence, the workflow is stalled: execute the already-authorized action immediately, or stop and report the concrete blocker. Never keep rephrasing the intention to act.
+
+### GD-CORE-009 — Reuse evidence and keep tool execution quiet
+
+On unchanged relevant code and state, reuse valid passing evidence. Do not run a narrower, filtered, or otherwise overlapping check after a broader passing check already proves the same property, and do not climb through overlapping variants for extra confidence. During implementation, run the smallest useful targeted check once, then the workflow-required aggregate gate once when ready. Additional checks are justified only by a failed or ambiguous result, a relevant input/state change, or an explicit independent requirement not covered by existing evidence.
+
+Execute deterministic tool calls without narrating each one. User-facing progress updates are for phase changes, material new evidence or plan changes, blockers, or needed user input; do not precede each test/read/write with micro-narration such as “let me run” or “I’ll run”.
