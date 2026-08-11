@@ -2,10 +2,15 @@ const VOLATILE_NAME = /(checks?|workflow|runs?|status|mergeable|pull_request|pr_
 const EVIDENCE_NAME = /(?:^|__|_)(fetch|get|list|search|read|view|status|diff|compare|find|inspect|lookup|show|logs?|checks?)(?:_|$)/i;
 const STATE_CHANGE_NAME = /(?:^|__|_)(create|update|delete|remove|merge|reply|push|close|reopen|mark|set|add|apply|write|edit|patch|commit|move|rename|archive|restore|publish)(?:_|$)/i;
 const DELEGATE_NAME = /(?:^|__|_)(agent|spawn_agent|delegate|collab)(?:_|$)/i;
+const EXPLICIT_SHELL_WRITE = /\b(?:set-content|add-content|out-file|clear-content|new-item|remove-item|move-item|copy-item|rename-item)\b/i;
 
 function commandText(command) {
   if (Array.isArray(command)) return command.join(" ");
   return String(command || "").trim();
+}
+
+function hasOutputRedirection(value) {
+  return />{1,2}/.test(value);
 }
 
 function classifyGhApi(value) {
@@ -36,10 +41,19 @@ function classifyCommand(command) {
   if (!value) return { kind: "neutral" };
 
   const ghApi = classifyGhApi(value);
-  if (ghApi) return ghApi;
+  if (ghApi) {
+    if (ghApi.kind === "evidence" && hasOutputRedirection(value)) {
+      return { kind: "neutral" };
+    }
+    return ghApi;
+  }
+
+  if (EXPLICIT_SHELL_WRITE.test(value)) return { kind: "state-change" };
 
   if (/\bgh\s+(?:pr\s+(?:checks|view|diff)|run\s+(?:view|list))/i.test(value)) {
-    return { kind: "evidence", volatility: "volatile" };
+    return hasOutputRedirection(value)
+      ? { kind: "neutral" }
+      : { kind: "evidence", volatility: "volatile" };
   }
 
   if (
@@ -47,6 +61,7 @@ function classifyCommand(command) {
       value,
     )
   ) {
+    if (hasOutputRedirection(value)) return { kind: "neutral" };
     return { kind: "evidence", volatility: "stable" };
   }
 
@@ -78,8 +93,12 @@ export function classifyHookTool(input = {}) {
   }
   if (/^(?:apply_patch|Edit|Write)$/i.test(name)) return { kind: "state-change" };
   if (name === "Agent" || DELEGATE_NAME.test(name)) return { kind: "delegate" };
-  if (STATE_CHANGE_NAME.test(name)) return { kind: "state-change" };
-  if (EVIDENCE_NAME.test(name)) {
+
+  const stateChange = STATE_CHANGE_NAME.test(name);
+  const evidence = EVIDENCE_NAME.test(name);
+  if (stateChange && evidence) return { kind: "neutral" };
+  if (stateChange) return { kind: "state-change" };
+  if (evidence) {
     return {
       kind: "evidence",
       volatility: VOLATILE_NAME.test(name) ? "volatile" : "stable",
