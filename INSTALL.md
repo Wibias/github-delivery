@@ -49,21 +49,41 @@ Existing directory installations are backed up before replacement. Symlinks and 
 
 ## Codex progress watchdog activation
 
-A standard Codex install/upgrade now plans the watchdog together with the skill. When Codex is detected and lifecycle hooks are supported, `--apply` also installs the GitHub Delivery hook entries in `~/.codex/hooks.json`. Existing hook configuration is preserved, backed up before a change, and updated idempotently.
+A standard Codex install/upgrade now plans the watchdog together with the skill. When Codex is detected and lifecycle hooks are supported, `--apply` also configures GitHub Delivery's `PreToolUse`, `PostToolUse`, `Stop`, `SubagentStop`, and `SessionEnd` entries in `~/.codex/hooks.json`. Existing hook configuration is preserved, backed up before a change, and updated idempotently.
 
-The installer records the effective mode in:
+Codex deliberately does **not** run a new or changed non-managed command hook until you review and trust its exact definition. A fresh install therefore reports:
+
+```text
+mode: none
+degradationReason: hook_trust_required
+hooksConfigured: true
+```
+
+Open `/hooks` in Codex, review the GitHub Delivery hook definitions, and trust them. After that exact unchanged definition is trusted, refresh the activation receipt with the normal installer:
+
+```bash
+node scripts/install-skill.mjs --hook-trust-verified --apply
+```
+
+A same-version run with that explicit activation refresh does not reinstall or back up the skill again. It verifies that the expected hook definition is unchanged and then records `hooks` as the active mode. If the hook definition has changed, the trust assertion is rejected for activation purposes and `hook_trust_required` remains.
+
+The installer never adds Codex's `--dangerously-bypass-hook-trust` flag by default.
+
+The effective installation state is recorded in:
 
 ```text
 ~/.codex/github-delivery/watchdog-activation.json
 ```
 
-The receipt contains only activation metadata. It does not contain prompts, conversations, tool inputs, or secrets.
+The receipt contains only activation metadata. It does not contain prompts, conversations, tool inputs, bearer tokens, or other secrets.
 
 The modes are intentionally strict:
 
-- `stream`: a host has explicitly bound future Codex launches to GitHub Delivery's protected streaming launcher;
-- `hooks`: lifecycle enforcement is active, but in-progress assistant text cannot be interrupted before `Stop`;
-- `none`: no runtime enforcement surface was verified and policy-only protection remains.
+- `stream`: a host has explicitly bound launches to GitHub Delivery's protected streaming boundary, or the current process was started by the protected launcher;
+- `hooks`: the expected lifecycle hooks are configured and their unchanged definition has been explicitly confirmed trusted; in-progress assistant text still cannot be interrupted before `Stop`;
+- `none`: no runtime enforcement surface is verified. `hook_trust_required` distinguishes configured-but-untrusted hooks from a genuinely unavailable watchdog.
+
+### Protected streaming launcher
 
 The protected launcher is installed with the skill at:
 
@@ -71,13 +91,13 @@ The protected launcher is installed with the skill at:
 ~/.agents/skills/github-delivery/scripts/codex-with-watchdog.mjs
 ```
 
-Run Codex through it when you need in-flight repeated-narration interruption:
+Run Codex through it when you need the exact repeated-narration failure stopped while the assistant message is still being generated:
 
 ```bash
 node ~/.agents/skills/github-delivery/scripts/codex-with-watchdog.mjs
 ```
 
-Arguments after the script are passed to the normal Codex CLI, for example:
+Arguments after the script are passed to remote-compatible Codex CLI modes, for example:
 
 ```bash
 node ~/.agents/skills/github-delivery/scripts/codex-with-watchdog.mjs resume <SESSION>
@@ -85,7 +105,9 @@ node ~/.agents/skills/github-delivery/scripts/codex-with-watchdog.mjs resume <SE
 
 The launcher starts the real Codex App Server on its normal stdio transport, exposes an authenticated loopback bridge to the Codex `--remote` client, observes assistant-message deltas, and can issue a private `turn/interrupt` before a repeated no-progress message grows unbounded. It owns `--remote` and `--remote-auth-token-env`; caller-supplied replacements are rejected so the protected boundary cannot be bypassed accidentally.
 
-Installing the launcher does **not** make an ordinary `codex` or IDE process use it automatically. Codex currently exposes remote App Server selection as a launch option rather than a persistent default. A host must actually launch through the protected entry point before GitHub Delivery records `stream` as active.
+Inside the launched App Server/client process tree, the launcher sets the runtime watchdog declaration to `stream`. That makes capability discovery describe the current protected session directly rather than relying on a stale machine-wide claim.
+
+Installing the launcher does **not** make an ordinary `codex` or IDE process use it automatically. Codex exposes remote App Server selection as a launch option; GitHub Delivery does not replace your global `codex` executable or silently rewrite editor startup configuration. A persistent host integration may use `--stream-launch-controlled` only when it genuinely controls future launches through this boundary.
 
 ### Manual hook repair
 
@@ -101,6 +123,8 @@ If the skill was installed somewhere other than `~/.agents/skills/github-deliver
 ```bash
 node scripts/install-codex-watchdog-hooks.mjs --skill-dir ~/.codex/skills/github-delivery --apply
 ```
+
+Hook repair still requires Codex's normal `/hooks` review/trust flow for a new or changed non-managed hook.
 
 See [`references/agent-progress-watchdog.md`](references/agent-progress-watchdog.md) for the enforcement boundaries and incident behaviour.
 
