@@ -7,7 +7,8 @@ GitHub Delivery uses a layered progress watchdog to reduce token waste without w
 - repeated in-turn intentions such as `Let me read ...` with no tool boundary;
 - exact reads repeated on unchanged state;
 - ad-hoc high-frequency CI/status polling;
-- oversized model-facing tool output when only a focused diagnostic excerpt is required.
+- oversized model-facing tool output when only a focused diagnostic excerpt is required;
+- oversized subagent briefs that duplicate large parent-context blocks.
 
 The watchdog never grants GitHub mutation authority, executes a write on the agent's behalf, or treats omitted/unknown evidence as success.
 
@@ -21,20 +22,23 @@ This reduces ordinary waste but cannot forcibly stop a pathological assistant me
 
 ### Codex lifecycle hooks
 
-Use `scripts/codex-watchdog-hook.mjs` for `PreToolUse`, `PostToolUse`, `Stop`, and `SessionEnd`.
+Use `scripts/codex-watchdog-hook.mjs` for `PreToolUse`, `PostToolUse`, `Stop`, `SubagentStop`, and `SessionEnd`.
 
 This layer can:
 
 - block an exact stable duplicate read on unchanged state;
 - rate-limit identical volatile polls;
+- reject an oversized `Agent`/subagent tool input and require a focused brief that references source files instead of copying them;
 - compact oversized model-facing tool output while retaining failure/error/blocker signals;
-- detect a completed no-progress assistant message at `Stop` and request one corrective continuation;
+- detect a completed no-progress assistant or subagent message and request one corrective continuation;
 - fail closed if that corrective continuation stalls again;
 - delete per-session state at `SessionEnd`.
 
+The default subagent-input budget is 6,000 serialized characters. It is intentionally a context budget, not an authority or correctness gate.
+
 Hook state is stored outside repository content. Session ids and read inputs are represented only by SHA-256 fingerprints; raw tool arguments are not persisted.
 
-Lifecycle hooks cannot reclaim tokens already emitted inside the assistant message that reaches `Stop`.
+Lifecycle hooks cannot reclaim tokens already emitted inside the assistant message that reaches `Stop` or `SubagentStop`.
 
 Example hook command for a skill installed under the standard agents directory:
 
@@ -45,6 +49,7 @@ Example hook command for a skill installed under the standard agents directory:
     "PreToolUse": [{"hooks": [{"type": "command", "command": "node ~/.agents/skills/github-delivery/scripts/codex-watchdog-hook.mjs", "commandWindows": "node \"%USERPROFILE%\\.agents\\skills\\github-delivery\\scripts\\codex-watchdog-hook.mjs\""}]}],
     "PostToolUse": [{"hooks": [{"type": "command", "command": "node ~/.agents/skills/github-delivery/scripts/codex-watchdog-hook.mjs", "commandWindows": "node \"%USERPROFILE%\\.agents\\skills\\github-delivery\\scripts\\codex-watchdog-hook.mjs\""}]}],
     "Stop": [{"hooks": [{"type": "command", "command": "node ~/.agents/skills/github-delivery/scripts/codex-watchdog-hook.mjs", "commandWindows": "node \"%USERPROFILE%\\.agents\\skills\\github-delivery\\scripts\\codex-watchdog-hook.mjs\""}]}],
+    "SubagentStop": [{"hooks": [{"type": "command", "command": "node ~/.agents/skills/github-delivery/scripts/codex-watchdog-hook.mjs", "commandWindows": "node \"%USERPROFILE%\\.agents\\skills\\github-delivery\\scripts\\codex-watchdog-hook.mjs\""}]}],
     "SessionEnd": [{"hooks": [{"type": "command", "command": "node ~/.agents/skills/github-delivery/scripts/codex-watchdog-hook.mjs", "commandWindows": "node \"%USERPROFILE%\\.agents\\skills\\github-delivery\\scripts\\codex-watchdog-hook.mjs\""}]}]
   }
 }
