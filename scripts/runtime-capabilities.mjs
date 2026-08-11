@@ -1,8 +1,11 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join, resolve } from "node:path";
 
 import { buildRuntimeCapabilities } from "./lib/runtime-capabilities.mjs";
+import { readActivationReceipt } from "./lib/watchdog-activation.mjs";
 
 const usage =
   "Usage: node scripts/runtime-capabilities.mjs [--repo OWNER/REPO] [--input FILE]";
@@ -13,8 +16,9 @@ function parseBoolean(value) {
 }
 
 function watchdogDeclaration(value) {
-  const normalized = String(value || "none").toLowerCase();
-  return ["hooks", "stream"].includes(normalized) ? normalized : "none";
+  if (value === undefined || value === null || value === "") return undefined;
+  const normalized = String(value).toLowerCase();
+  return ["hooks", "stream", "none"].includes(normalized) ? normalized : "none";
 }
 
 function commandAvailable(command, args = ["--version"]) {
@@ -67,10 +71,12 @@ function liveInput(repo) {
         ])
       : null;
   const permission = String(repoData?.viewerPermission || "").toUpperCase();
+  const codexHome = resolve(process.env.CODEX_HOME || join(homedir(), ".codex"));
   return {
     host: process.env.SHIPPING_GITHUB_HOST || "unknown",
     os: process.platform,
     repo: resolvedRepo,
+    activation: readActivationReceipt({ codexHome }),
     probes: {
       node: true,
       git: commandAvailable("git"),

@@ -16,6 +16,7 @@ export function buildRuntimeCapabilities({
   os = process.platform,
   probes = {},
   declarations = {},
+  activation = null,
   repo = null,
 } = {}) {
   const tools = {
@@ -34,9 +35,20 @@ export function buildRuntimeCapabilities({
     subagents: boolean(declarations.subagents),
     reviewTool: boolean(declarations.reviewTool),
   };
+  const declaredWatchdog = declarations.progressWatchdog;
+  const installedWatchdog = activation?.mode;
   const runtime = {
-    progressWatchdog: watchdogMode(declarations.progressWatchdog),
+    progressWatchdog: watchdogMode(
+      declaredWatchdog === undefined || declaredWatchdog === null || declaredWatchdog === ""
+        ? installedWatchdog
+        : declaredWatchdog,
+    ),
+    progressWatchdogDegradationReason:
+      activation?.degradationReason || null,
+    progressWatchdogLauncherPath:
+      typeof activation?.launcherPath === "string" ? activation.launcherPath : null,
   };
+  runtime.progressWatchdogAvailable = runtime.progressWatchdog !== "none";
 
   const ghReadable =
     tools.gh && tools.ghAuthenticated && boolean(probes.repoReadableViaGh);
@@ -113,6 +125,7 @@ export function buildRuntimeCapabilities({
     !github.rulesetsReadable && "rulesets_unreadable",
     !github.reviewThreadsReadable && "review_threads_unreadable",
     fallbacks.rateLimits === "unavailable" && "rate_limit_probe_unavailable",
+    runtime.progressWatchdog === "none" && "progress_watchdog_unavailable",
   ]);
 
   return {

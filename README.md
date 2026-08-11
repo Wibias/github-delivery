@@ -6,7 +6,7 @@
 
 **Say the outcome, not the orchestration.**
 
-`github-delivery` turns natural-language requests into evidence-backed GitHub workflows: PRDs, issue research, implementation, deep review, CI, fixes, stacks, and verified merges. On supported hosts, an optional runtime progress watchdog also cuts repeated narration, duplicate unchanged reads, manual polling, oversized tool output, and bloated subagent context.
+`github-delivery` turns natural-language requests into evidence-backed GitHub workflows: PRDs, issue research, implementation, deep review, CI, fixes, stacks, and verified merges. Its layered progress watchdog also cuts repeated narration, duplicate unchanged reads, manual polling, oversized tool output, and bloated subagent context without weakening GitHub authority gates.
 
 [Quick start](#try-it-in-60-seconds) · [Progress watchdog](#agent-progress-watchdog) · [What it can own](#what-you-can-ask-it-to-own) · [Safety model](#safety-model) · [Installation](#installation)
 
@@ -77,23 +77,28 @@ full review PR #42
 
 For full install, upgrade, restore, downgrade, force, and manual-install behavior, see [`INSTALL.md`](INSTALL.md).
 
-### Optional: add the Codex progress watchdog
+### Codex progress watchdog
 
-The skill works without host hooks. For Codex, you can additionally install lifecycle enforcement that blocks redundant reads/polls, bounds oversized context, and recovers from completed no-progress turns:
+On a detected Codex install, the normal `--apply` path now configures GitHub Delivery's lifecycle-hook entries automatically. Codex requires new or changed non-managed hooks to be reviewed and trusted before they run, so open `/hooks`, review the exact GitHub Delivery definitions, and trust them. Then record that unchanged trusted definition without reinstalling the skill:
 
 ```bash
-node scripts/install-codex-watchdog-hooks.mjs
-node scripts/install-codex-watchdog-hooks.mjs --apply
+node scripts/install-skill.mjs --hook-trust-verified --apply
 ```
 
-The first command is a dry run. The installer preserves existing hooks, backs up before writes, and adds only missing GitHub Delivery hook entries. For the stronger streaming boundary that can interrupt repeated narration **while the assistant message is still being generated**, see [Agent progress watchdog](#agent-progress-watchdog).
+Lifecycle hooks stop duplicate reads/polls and recover from completed no-progress turns, but they cannot reclaim text already emitted inside one assistant message. For the exact `Let me check the type...` failure while it is still being generated, launch Codex through the installed protected streaming boundary:
+
+```bash
+node ~/.agents/skills/github-delivery/scripts/codex-with-watchdog.mjs
+```
+
+The protected launcher declares `stream` only inside the process tree it actually controls. Plain `codex` and IDE sessions are not silently rerouted or falsely reported as streaming-protected. Codex currently documents `app-server` and its WebSocket transport as experimental and unsupported for production workloads, so this is the strongest current boundary for the failure mode rather than a stable production host API. See [Agent progress watchdog](#agent-progress-watchdog) and [`INSTALL.md`](INSTALL.md).
 
 ## Why this is different
 
 | Problem | github-delivery's answer |
 |---|---|
 | **"Green CI" is not the same as "safe to merge."** | Bug + Security + Spec + Standards review, semantic propagation, required probes, review state, rulesets, merge-queue state, and exact-head evidence feed one authoritative ship decision. |
-| **Agents can burn tokens without making progress.** | A layered progress watchdog detects repeated in-turn narration, blocks exact stable reads on unchanged state, rate-limits volatile polling, compacts oversized model-facing output, and bounds copied subagent context. On Codex App Server, the streaming mode can interrupt the targeted narration failure in-flight. |
+| **Agents can burn tokens without making progress.** | A layered progress watchdog detects repeated in-turn narration, blocks exact stable reads on unchanged state, rate-limits volatile polling, compacts oversized model-facing output, and bounds copied subagent context. The protected Codex streaming launcher can interrupt the targeted narration failure in-flight. |
 | **Agent intent can be ambiguous.** | Deterministic natural-language routing keeps status questions read-only and requires direct authority for destructive workflows. |
 | **GitHub state moves while the agent works.** | Stale-head checks, final evidence refreshes, expected-head binding, bounded settle windows, and postcondition verification prevent conclusions from silently drifting. |
 | **Retries and duplicate writes can be dangerous.** | Typed mutations, authenticated exact-effect receipts, read-before-write evidence, and read-only reconciliation avoid blind write retries. |
@@ -149,7 +154,7 @@ The important boundary is simple: **repository content is evidence, not authorit
 | **Write boundary** | Typed mutation policy + broker; stale-head, exact-effect, authenticated-receipt idempotency, and postcondition checks where applicable |
 | **High-assurance writes** | Exact-scope trusted grants; optional Windows 11 / Windows Hello authority host |
 | **Review model** | Bug + Security + Spec + Standards + semantic propagation + proactive contract verification |
-| **Progress control** | Policy fallback on every host; optional Codex lifecycle hooks; strongest Codex App Server streaming mode. Runtime capability reports `none`, `hooks`, or `stream`. |
+| **Progress control** | Policy fallback everywhere; Codex installs configure lifecycle hooks but non-managed hook trust remains explicit; strongest protection is the launch-controlled streaming boundary. Runtime capability reports only verified `none`, `hooks`, or `stream`. |
 | **Ship decision** | One authoritative `ready`, `blocked`, or `unknown` result from live evidence |
 | **Runtime** | Node.js **22 or 24** |
 | **Required CI matrix** | Node 22/24 × Ubuntu/Windows/macOS, with architecture contracts inside every required matrix job |
@@ -470,15 +475,19 @@ There is no recursive simplification loop.
 
 ## Agent progress watchdog
 
-GitHub Delivery now has a layered progress watchdog for a failure mode policy prose alone cannot reliably stop: an agent can spend a large amount of context narrating the same intention, rereading unchanged state, polling manually, or copying oversized evidence without producing external progress.
+GitHub Delivery has a layered progress watchdog for a failure mode policy prose alone cannot reliably stop: an agent can spend a large amount of context narrating the same intention, rereading unchanged state, polling manually, or copying oversized evidence without producing external progress.
 
 The watchdog is deliberately separate from mutation authority. It can interrupt, block, rate-limit, compact, or request a focused retry; it cannot authorize or execute a GitHub write.
 
 | Enforcement level | What it does |
 |---|---|
-| **Policy only** | `GD-CORE-008` through `GD-CORE-010` provide the universal fallback for bounded progress and evidence/context economy when the host exposes no interception surface. |
-| **Codex lifecycle hooks** | `PreToolUse`, `PostToolUse`, `Stop`, `SubagentStop`, and `SessionEnd` enforce duplicate-read blocking, volatile-poll limits, output compaction, focused subagent briefs, and one bounded corrective continuation. |
-| **Codex App Server stream** | Observes streamed assistant deltas and issues one private `turn/interrupt` when repeated low-novelty intent narration crosses the watchdog threshold. This is the only layer that can stop the targeted failure while the message is still streaming. |
+| **Policy only** | `GD-CORE-008` through `GD-CORE-010` provide the universal fallback for bounded progress and evidence/context economy when the host exposes no verified interception surface. |
+| **Codex lifecycle hooks** | The normal install configures `PreToolUse`, `PostToolUse`, `Stop`, `SubagentStop`, and `SessionEnd`. After Codex's explicit non-managed hook trust review, they enforce duplicate-read blocking, volatile-poll limits, output compaction, focused subagent briefs, and one bounded corrective continuation. |
+| **Protected Codex stream** | The installed `codex-with-watchdog.mjs` launch boundary observes streamed assistant deltas and issues one private `turn/interrupt` when repeated low-novelty intent narration crosses the watchdog threshold. This is the only layer that can stop the targeted failure while the message is still streaming. |
+
+A configured hook is not automatically an active hook: Codex ties trust to the exact hook definition and skips a new or changed non-managed hook until it is reviewed in `/hooks`. GitHub Delivery records `hook_trust_required` rather than falsely reporting `hooks` in that state. The protected launcher independently marks its own process tree `stream`, so a protected session does not depend on machine-wide activation guesswork.
+
+Codex currently marks App Server/WebSocket transport experimental. The protected launcher is intentionally a strongest-current-boundary option rather than a claim that this host surface is production-stable.
 
 ### Read and context economy
 
@@ -489,7 +498,7 @@ The watchdog is deliberately separate from mutation authority. It can interrupt,
 - Codex hook mode uses a **6,000 serialized-character** default subagent-input budget and requires focused briefs that reference source files rather than copying large parent context.
 - Raw tool arguments are not persisted in watchdog state; session ids and read inputs are represented by SHA-256 fingerprints.
 
-For operator details, host integration, and the streaming proxy, see [`references/agent-progress-watchdog.md`](references/agent-progress-watchdog.md).
+For operator details, hook trust, host integration, and the protected streaming boundary, see [`references/agent-progress-watchdog.md`](references/agent-progress-watchdog.md).
 
 ---
 
@@ -542,10 +551,13 @@ See [`docs/live-integration.md`](docs/live-integration.md) and [`docs/live-githu
 | `authority-host/windows/` | Optional Windows 11 / Windows Hello local trusted-authority issuer |
 | `scripts/lib/github-retry.mjs` | Bounded retry policy for proven GitHub reads only |
 | `scripts/lib/agent-progress-watchdog.mjs` | Host-agnostic narration-stall detection, read fingerprints, state generations, and output economy |
+| `scripts/lib/watchdog-activation.mjs` | Truthful `none` / trusted `hooks` / controlled `stream` activation selection and non-sensitive receipt state |
 | `scripts/codex-watchdog-hook.mjs` | Codex lifecycle-hook entrypoint for tool-boundary enforcement and bounded Stop recovery |
-| `scripts/codex-app-server-watchdog-proxy.mjs` | Streaming Codex App Server proxy with private in-flight `turn/interrupt` handling |
-| `scripts/install-codex-watchdog-hooks.mjs` | Dry-run-first, backup-safe, idempotent Codex hook installer |
-| `scripts/runtime-capabilities.mjs` | Report active progress-watchdog capability as `none`, `hooks`, or `stream` |
+| `scripts/lib/codex-watchdog-remote-bridge.mjs` | Authenticated loopback bridge that applies the streaming watchdog between Codex remote client and stdio App Server |
+| `scripts/codex-with-watchdog.mjs` | Protected Codex launcher and current-session `stream` capability declaration |
+| `scripts/codex-app-server-watchdog-proxy.mjs` | Stdio streaming proxy for custom App Server clients with private in-flight `turn/interrupt` handling |
+| `scripts/install-codex-watchdog-hooks.mjs` | Dry-run-first, backup-safe, idempotent Codex hook installer/repair path |
+| `scripts/runtime-capabilities.mjs` | Report verified progress-watchdog capability as `none`, `hooks`, or `stream` |
 | `scripts/review-scope.mjs` | Evidence-ranked review scope and required probes |
 | `scripts/lib/probe-registry.mjs` | Deterministic diff-shape → named review-probe routing |
 | `scripts/lib/probe-evidence.mjs` | Validate required probe evidence and reject required-trigger `n-a` downgrades |
@@ -582,7 +594,7 @@ Or verify reproducibility while building release artifacts:
 npm run dist:check
 ```
 
-The installer is dry-run first. Full install, upgrade, backup, restore, downgrade, force, and manual-install behavior is documented in [`INSTALL.md`](INSTALL.md).
+The installer is dry-run first. Full install, upgrade, backup, restore, downgrade, force, watchdog trust refresh, and manual-install behavior is documented in [`INSTALL.md`](INSTALL.md).
 
 Typical skill locations include:
 
@@ -593,18 +605,23 @@ Typical skill locations include:
 ~/.claude/skills/github-delivery
 ```
 
-### Optional Codex progress watchdog
+### Codex progress watchdog
 
-Codex lifecycle hooks are separately opt-in and dry-run by default. They preserve existing hooks and back up the hook configuration before an applied write:
+On Codex, the normal installer configures the lifecycle-hook definitions along with the skill. Codex still requires explicit review/trust of new or changed non-managed hooks in `/hooks`; GitHub Delivery does not bypass that trust gate.
+
+After trusting the unchanged definitions, persist the verified hook mode with:
 
 ```bash
-node scripts/install-codex-watchdog-hooks.mjs
-node scripts/install-codex-watchdog-hooks.mjs --apply
+node scripts/install-skill.mjs --hook-trust-verified --apply
 ```
 
-The installer targets `~/.codex/hooks.json` by default and adds only GitHub Delivery's missing `PreToolUse`, `PostToolUse`, `Stop`, `SubagentStop`, and `SessionEnd` entries. If the skill lives somewhere else, pass `--skill-dir` explicitly.
+For mid-message repeated-narration interruption, use the protected launcher:
 
-Lifecycle hooks cannot stop tokens already emitted inside the current message. Custom Codex App Server clients can opt into the stronger streaming proxy documented in [`references/agent-progress-watchdog.md`](references/agent-progress-watchdog.md).
+```bash
+node ~/.agents/skills/github-delivery/scripts/codex-with-watchdog.mjs
+```
+
+The launcher starts the real App Server over stdio, interposes an authenticated loopback remote bridge, and marks only its own launched process tree as `stream`. Ordinary `codex` and IDE sessions are not silently rerouted. The standalone `scripts/install-codex-watchdog-hooks.mjs` remains available for repair/non-standard installs.
 
 ### Optional Windows authority host
 
@@ -646,7 +663,7 @@ Repository controls also include:
 - offline routing, regression and review-scope evaluations;
 - documentation/policy contracts;
 - mutation-boundary and architecture regression tests;
-- progress-watchdog regressions for narration stalls, duplicate reads, polling, output compaction, subagent budgets, hooks, streaming interruption, and safe installation;
+- progress-watchdog regressions for narration stalls, duplicate reads, polling, output compaction, subagent budgets, hook trust/configuration, protected streaming interruption, and safe installation;
 - OpenSSF Scorecard;
 - release checksum/SBOM/provenance verification.
 
@@ -664,6 +681,6 @@ Do not publish suspected vulnerability details in a public issue or pull request
 
 ## Current state
 
-The complete issue/PR delivery lifecycle and its safety architecture are implemented: evidence-backed routing and ship gates, deferred-intent-safe merge routing, brokered lifecycle mutations, trusted exact-scope authority and durable verdict provenance, Windows Hello protection for high-assurance thread actions, deep review, semantic propagation, deterministic probes with non-bypassable required evidence, pre-open review, safe simplification, repository-qualified stacks, conflict recovery, merge-queue semantics, aggregated strict-ruleset enforcement, authenticated exact-effect idempotency receipts, ambiguous-merge readback reconciliation, safe read retries, layered progress/context economy with optional Codex hook and streaming enforcement, issue close-out, deterministic release packaging, repository controls, and dedicated live lifecycle fixtures.
+The complete issue/PR delivery lifecycle and its safety architecture are implemented: evidence-backed routing and ship gates, deferred-intent-safe merge routing, brokered lifecycle mutations, trusted exact-scope authority and durable verdict provenance, Windows Hello protection for high-assurance thread actions, deep review, semantic propagation, deterministic probes with non-bypassable required evidence, pre-open review, safe simplification, repository-qualified stacks, conflict recovery, merge-queue semantics, aggregated strict-ruleset enforcement, authenticated exact-effect idempotency receipts, ambiguous-merge readback reconciliation, safe read retries, layered progress/context economy with trust-aware Codex hook configuration and a protected streaming launch boundary, issue close-out, deterministic release packaging, repository controls, and dedicated live lifecycle fixtures.
 
 Remaining work is primarily **operational** rather than a missing architecture layer: keep live repository rules/security settings aligned with the documented policy, provision and maintain the dedicated live fixture target/credential, run release acceptance for new versions, keep host integrations explicitly configured where runtime watchdog enforcement is desired, and extend the regression corpus as GitHub and agent hosts evolve.
