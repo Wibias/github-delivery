@@ -59,3 +59,7 @@ The independent trusted-authority layer is controlled by the global `authorityMo
 - `all`: require a verified exact-scope trusted grant for every executed GitHub mutation.
 
 `off` does not make untrusted content authoritative and does not waive the normal mutation policy. Exact-text confirmation for human replies, direct instruction for maintainer actions, expected-head checks, ownership, idempotency, routing, and workflow/ship gates remain mandatory. With the Windows authority host, protected writes in `high-assurance` or `all` require Windows Hello. The legacy `GITHUB_DELIVERY_REQUIRE_TRUSTED_AUTHORITY=1` switch remains a compatibility alias for `all`.
+
+### GD-AUTH-012 — Prepared writes execute through the public boundary
+
+Once a prepared mutation request has the evidence and authority required by the selected workflow, hand it directly to `github-mutate.mjs`. That entrypoint owns the fresh-head, target, idempotency, and authority preflight required above. Do not duplicate or repeat that preflight with ad-hoc `gh`, repeated payload/body reads, or extra final checks unless relevant state changed, the entrypoint failed or returned ambiguous evidence, or the workflow explicitly requires a fresh check.
