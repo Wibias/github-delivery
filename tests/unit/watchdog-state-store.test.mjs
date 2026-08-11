@@ -6,6 +6,7 @@ import {
   mkdtempSync,
   readFileSync,
   statSync,
+  symlinkSync,
   utimesSync,
   writeFileSync,
 } from "node:fs";
@@ -149,6 +150,37 @@ test("malformed persisted state fails explicitly instead of silently disabling p
   assert.throws(
     () => runCodexWatchdogHook(input, { stateRoot: root, now: 1_000 }),
     /Malformed watchdog state/,
+  );
+});
+
+test("symlinked state roots and state files fail closed on POSIX", () => {
+  if (process.platform === "win32") return;
+  const parent = mkdtempSync(join(tmpdir(), "gd-symlink-state-"));
+  const targetRoot = join(parent, "target-root");
+  const linkedRoot = join(parent, "linked-root");
+  mkdirSync(targetRoot, { mode: 0o700 });
+  symlinkSync(targetRoot, linkedRoot, "dir");
+  const input = readInput({
+    sessionId: "session-symlink",
+    turnId: "turn-symlink",
+    path: "README.md",
+  });
+
+  assert.throws(
+    () => runCodexWatchdogHook(input, { stateRoot: linkedRoot, now: 1_000 }),
+    /symlink/i,
+  );
+
+  const safeRoot = mkdtempSync(join(tmpdir(), "gd-symlink-file-"));
+  const statePath = statePathForSession(safeRoot, input.session_id, input.turn_id);
+  mkdirSync(dirname(statePath), { recursive: true, mode: 0o700 });
+  const targetFile = join(parent, "outside-state.json");
+  writeFileSync(targetFile, "{}\n", "utf8");
+  symlinkSync(targetFile, statePath, "file");
+
+  assert.throws(
+    () => runCodexWatchdogHook(input, { stateRoot: safeRoot, now: 2_000 }),
+    /symlink/i,
   );
 });
 
