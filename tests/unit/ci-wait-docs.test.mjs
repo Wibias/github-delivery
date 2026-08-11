@@ -19,6 +19,15 @@ test('CI policy defines adaptive waiting without treating five minutes as a time
   assert.match(ciPolicy, /current GitHub evidence/i);
 });
 
+test('pending-only CI uses ci-wait instead of parallel manual polling loops', async () => {
+  const ciPolicy = await text('references/policy/ci.md');
+  assert.match(ciPolicy, /ci-wait\.mjs/i);
+  assert.match(ciPolicy, /Start-Sleep|manual polling|ad-hoc/i);
+  assert.match(ciPolicy, /gh pr checks/i);
+  assert.match(ciPolicy, /lower-level.*(?:job|log)|(?:job|log).*lower-level/i);
+  assert.match(ciPolicy, /failure|ambiguous/i);
+});
+
 test('watch and merge workflows use ci-wait and do not hard-code Windows duration', async () => {
   const [watchPr, mergePr] = await Promise.all([
     text('references/watch-pr.md'),
