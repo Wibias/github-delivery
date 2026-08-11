@@ -90,29 +90,35 @@ function sleep(ms) {
 function acquireLock(lockPath, { lockWaitMs, staleLockMs }) {
   const started = Date.now();
   while (true) {
+    let contentionError;
     try {
       const fd = openSync(lockPath, "wx", 0o600);
       closeSync(fd);
       return;
     } catch (error) {
-      if (error?.code !== "EEXIST") throw error;
-      try {
-        const stat = safeExistingFile(lockPath, "lock file");
-        if (!stat) continue;
+      const retryable = error?.code === "EEXIST"
+        || (process.platform === "win32" && error?.code === "EPERM");
+      if (!retryable) throw error;
+      contentionError = error;
+    }
+
+    try {
+      const stat = safeExistingFile(lockPath, "lock file");
+      if (stat) {
         const age = Date.now() - stat.mtimeMs;
         if (age >= staleLockMs) {
           rmSync(lockPath, { force: true });
           continue;
         }
-      } catch (statError) {
-        if (statError?.code === "ENOENT") continue;
-        throw statError;
       }
-      if (Date.now() - started >= lockWaitMs) {
-        throw new Error(`Timed out acquiring watchdog state lock: ${lockPath}`);
-      }
-      sleep(LOCK_RETRY_MS);
+    } catch (statError) {
+      if (statError?.code !== "ENOENT") throw statError;
     }
+
+    if (Date.now() - started >= lockWaitMs) {
+      throw new Error(`Timed out acquiring watchdog state lock: ${lockPath}`, { cause: contentionError });
+    }
+    sleep(LOCK_RETRY_MS);
   }
 }
 
