@@ -47,23 +47,54 @@ node scripts/install-skill.mjs --apply
 
 Existing directory installations are backed up before replacement. Symlinks and non-skill directories fail closed unless the operator inspects the plan and explicitly supplies `--force`. Downgrades require `--allow-downgrade`.
 
-## Optional Codex progress watchdog
+## Codex progress watchdog activation
 
-For Codex, GitHub Delivery can install lifecycle hooks that block duplicate unchanged reads, rate-limit manual status polling, bound oversized subagent briefs/tool output, and recover from completed no-progress narration stalls.
+A standard Codex install/upgrade now plans the watchdog together with the skill. When Codex is detected and lifecycle hooks are supported, `--apply` also installs the GitHub Delivery hook entries in `~/.codex/hooks.json`. Existing hook configuration is preserved, backed up before a change, and updated idempotently.
 
-The hook installer is separately opt-in and dry-runs by default. It preserves existing hooks and reports the planned change:
+The installer records the effective mode in:
+
+```text
+~/.codex/github-delivery/watchdog-activation.json
+```
+
+The receipt contains only activation metadata. It does not contain prompts, conversations, tool inputs, or secrets.
+
+The modes are intentionally strict:
+
+- `stream`: a host has explicitly bound future Codex launches to GitHub Delivery's protected streaming launcher;
+- `hooks`: lifecycle enforcement is active, but in-progress assistant text cannot be interrupted before `Stop`;
+- `none`: no runtime enforcement surface was verified and policy-only protection remains.
+
+The protected launcher is installed with the skill at:
+
+```text
+~/.agents/skills/github-delivery/scripts/codex-with-watchdog.mjs
+```
+
+Run Codex through it when you need in-flight repeated-narration interruption:
+
+```bash
+node ~/.agents/skills/github-delivery/scripts/codex-with-watchdog.mjs
+```
+
+Arguments after the script are passed to the normal Codex CLI, for example:
+
+```bash
+node ~/.agents/skills/github-delivery/scripts/codex-with-watchdog.mjs resume <SESSION>
+```
+
+The launcher starts the real Codex App Server on its normal stdio transport, exposes an authenticated loopback bridge to the Codex `--remote` client, observes assistant-message deltas, and can issue a private `turn/interrupt` before a repeated no-progress message grows unbounded. It owns `--remote` and `--remote-auth-token-env`; caller-supplied replacements are rejected so the protected boundary cannot be bypassed accidentally.
+
+Installing the launcher does **not** make an ordinary `codex` or IDE process use it automatically. Codex currently exposes remote App Server selection as a launch option rather than a persistent default. A host must actually launch through the protected entry point before GitHub Delivery records `stream` as active.
+
+### Manual hook repair
+
+`scripts/install-codex-watchdog-hooks.mjs` remains available as a repair or non-standard-install tool. It is dry-run by default:
 
 ```bash
 node scripts/install-codex-watchdog-hooks.mjs
-```
-
-Apply it explicitly after installing/upgrading the skill:
-
-```bash
 node scripts/install-codex-watchdog-hooks.mjs --apply
 ```
-
-The installer targets `~/.codex/hooks.json`, creates a backup before changing an existing file, fails closed on malformed or symlinked hook configuration, and adds only GitHub Delivery's missing `PreToolUse`, `PostToolUse`, `Stop`, `SubagentStop`, and `SessionEnd` entries. Reapplying is idempotent.
 
 If the skill was installed somewhere other than `~/.agents/skills/github-delivery`, pass that path explicitly:
 
@@ -71,7 +102,7 @@ If the skill was installed somewhere other than `~/.agents/skills/github-deliver
 node scripts/install-codex-watchdog-hooks.mjs --skill-dir ~/.codex/skills/github-delivery --apply
 ```
 
-Lifecycle hooks cannot stop tokens already emitted inside one assistant message. Custom Codex App Server clients can use the stronger streaming proxy described in [`references/agent-progress-watchdog.md`](references/agent-progress-watchdog.md).
+See [`references/agent-progress-watchdog.md`](references/agent-progress-watchdog.md) for the enforcement boundaries and incident behaviour.
 
 ## Restore a backup
 
