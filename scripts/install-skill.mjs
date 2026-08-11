@@ -11,12 +11,17 @@ import {
   writeActivationReceipt,
 } from "./lib/watchdog-activation.mjs";
 
+function parseBoolean(value) {
+  return ["1", "true", "yes", "on"].includes(String(value || "").toLowerCase());
+}
+
 function defaultCodexHome() {
   return resolve(process.env.CODEX_HOME || join(homedir(), ".codex"));
 }
 
 function inferHost(codexHome) {
-  return process.env.CODEX_HOME || existsSync(codexHome) ? "codex" : "unknown";
+  return process.env.SHIPPING_GITHUB_HOST ||
+    (process.env.CODEX_HOME || existsSync(codexHome) ? "codex" : "unknown");
 }
 
 export function parseInstallArgs(argv) {
@@ -32,7 +37,9 @@ export function parseInstallArgs(argv) {
     codexHome,
     host: inferHost(codexHome),
     lifecycleHooksSupported: undefined,
-    streamLaunchControlled: false,
+    streamLaunchControlled: parseBoolean(
+      process.env.SHIPPING_GITHUB_STREAM_LAUNCH_CONTROLLED,
+    ),
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -72,6 +79,16 @@ export function installSkill(options) {
   const installedLauncherPath = join(options.target, "scripts", "codex-with-watchdog.mjs");
   const launcherBundled = existsSync(sourceLauncherPath);
   const streamLaunchVerified = options.streamLaunchControlled === true && launcherBundled;
+  const hooksPath = join(options.codexHome, "hooks.json");
+
+  let hookPlan = null;
+  if (options.host === "codex" && options.lifecycleHooksSupported) {
+    hookPlan = installCodexWatchdogHooks({
+      hooksPath,
+      skillDir: options.target,
+      apply: false,
+    });
+  }
 
   const installation = options.apply
     ? applyInstallation(options)
@@ -90,12 +107,12 @@ export function installSkill(options) {
     selection.degradationReason = "stream_launcher_unavailable";
   }
 
-  let hookResult = null;
-  if (options.host === "codex" && options.lifecycleHooksSupported) {
+  let hookResult = hookPlan;
+  if (options.apply && hookPlan) {
     hookResult = installCodexWatchdogHooks({
-      hooksPath: join(options.codexHome, "hooks.json"),
+      hooksPath,
       skillDir: options.target,
-      apply: options.apply,
+      apply: true,
     });
   }
 
