@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { connect } from "node:net";
 import { PassThrough } from "node:stream";
 import test from "node:test";
 
@@ -15,6 +16,45 @@ function openWebSocket(url) {
     socket.addEventListener("error", () => reject(new Error("WebSocket connection failed")), { once: true });
   });
 }
+
+function rawUpgrade(url) {
+  const parsed = new URL(url);
+  return new Promise((resolve, reject) => {
+    const socket = connect({ host: parsed.hostname, port: Number(parsed.port) });
+    let response = "";
+    socket.setEncoding("utf8");
+    socket.once("error", reject);
+    socket.on("data", (chunk) => {
+      response += chunk;
+    });
+    socket.once("end", () => resolve(response));
+    socket.once("connect", () => {
+      socket.write(
+        "GET / HTTP/1.1\r\n" +
+          `Host: ${parsed.host}\r\n` +
+          "Upgrade: websocket\r\n" +
+          "Connection: Upgrade\r\n" +
+          "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n" +
+          "Sec-WebSocket-Version: 13\r\n\r\n",
+      );
+    });
+  });
+}
+
+test("protected bridge rejects a client that lacks its bearer token", async () => {
+  const appServerInput = new PassThrough();
+  const appServerOutput = new PassThrough();
+  const bridge = await startCodexWatchdogRemoteBridge({
+    appServerInput,
+    appServerOutput,
+    token: "secret-token",
+  });
+
+  const response = await rawUpgrade(bridge.url);
+  assert.match(response, /^HTTP\/1\.1 401 Unauthorized/m);
+
+  await bridge.close();
+});
 
 test("installed streaming boundary interrupts the observed Let me check type loop before 500 characters", async () => {
   const appServerInput = new PassThrough();
