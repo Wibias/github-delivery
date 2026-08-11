@@ -80,6 +80,33 @@ All notable changes to `github-delivery` are documented here.
   the TLDR; a comment failing the gate must be repaired, never marked
   published.
 
+## [0.2.0] - 2026-08-11
+
+### Added
+
+- Added a layered runtime progress watchdog that detects repeated no-progress
+  intent narration, blocks exact stable reads on unchanged state, rate-limits
+  volatile status polling, compacts oversized model-facing tool output, and
+  rejects oversized subagent briefs in favor of focused source-referenced
+  context. The watchdog never grants mutation authority or executes GitHub
+  writes.
+- Added opt-in Codex lifecycle hooks for `PreToolUse`, `PostToolUse`, `Stop`,
+  `SubagentStop`, and `SessionEnd`, plus a Codex App Server streaming proxy
+  that can issue one private `turn/interrupt` while pathological repeated
+  narration is still being generated. Runtime capability reporting now
+  distinguishes `none`, `hooks`, and `stream`.
+
+### Changed
+
+- Added evidence/context economy rules that prefer authoritative aggregate
+  reads, reuse valid state snapshots, keep deterministic gate interpretation
+  out of unnecessary subagents, and escalate diagnostics from status to a
+  focused failing excerpt before loading full raw output. Pending-only required
+  CI is owned by `scripts/ci-wait.mjs` instead of parallel manual polling.
+- Refreshed the README with a faster natural-language quick start, repository
+  workflow visuals, clearer safety/value positioning, and user-facing setup
+  and architecture documentation for the progress watchdog.
+
 ## [0.1.1] - 2026-08-11
 
 ### Fixed
