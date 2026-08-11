@@ -35,6 +35,15 @@ export function protectedClientArgs(args, url) {
   return ["--remote", url, "--remote-auth-token-env", TOKEN_ENV, ...args];
 }
 
+export function protectedRuntimeEnv(env = process.env) {
+  return {
+    ...env,
+    SHIPPING_GITHUB_HOST: "codex",
+    SHIPPING_GITHUB_PROGRESS_WATCHDOG: "stream",
+    SHIPPING_GITHUB_STREAM_LAUNCH_CONTROLLED: "true",
+  };
+}
+
 export async function runProtectedCodex({
   codexBin = process.env.CODEX_BIN || "codex",
   args = process.argv.slice(2),
@@ -44,10 +53,11 @@ export async function runProtectedCodex({
 } = {}) {
   validateProtectedClientArgs(args);
   const token = randomBytes(32).toString("base64url");
+  const runtimeEnv = protectedRuntimeEnv(env);
   const appServer = spawnImpl(codexBin, ["app-server"], {
     stdio: ["pipe", "pipe", "inherit"],
     windowsHide: true,
-    env,
+    env: runtimeEnv,
   });
   await waitForSpawn(appServer);
 
@@ -63,7 +73,7 @@ export async function runProtectedCodex({
     throw error;
   }
 
-  const clientEnv = { ...env, [TOKEN_ENV]: token };
+  const clientEnv = { ...runtimeEnv, [TOKEN_ENV]: token };
   let client;
   try {
     client = spawnImpl(codexBin, protectedClientArgs(args, bridge.url), {
