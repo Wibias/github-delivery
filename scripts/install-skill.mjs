@@ -70,6 +70,19 @@ export function parseInstallArgs(argv) {
   return options;
 }
 
+function sameVersionActivationReceipt(plan) {
+  return {
+    schemaVersion: 1,
+    kind: "github-delivery/install-receipt",
+    action: "same-version",
+    sourceVersion: plan.sourceVersion,
+    previousVersion: plan.targetVersion,
+    target: plan.target,
+    backupPath: null,
+    unchanged: true,
+  };
+}
+
 export function installSkill(options) {
   if (options.restore) {
     return options.apply
@@ -92,9 +105,17 @@ export function installSkill(options) {
     });
   }
 
-  const installation = options.apply
-    ? applyInstallation(options)
-    : { ...planInstallation(options), apply: false };
+  const installationPlan = planInstallation(options);
+  const activationRefreshRequested =
+    options.hookTrustVerified === true || options.streamLaunchControlled === true;
+  let installation;
+  if (!options.apply) {
+    installation = { ...installationPlan, apply: false };
+  } else if (installationPlan.action === "same-version" && activationRefreshRequested) {
+    installation = sameVersionActivationReceipt(installationPlan);
+  } else {
+    installation = applyInstallation(options);
+  }
 
   if (options.apply && launcherBundled && !existsSync(installedLauncherPath)) {
     throw new Error("protected Codex launcher was not installed with the skill payload");
