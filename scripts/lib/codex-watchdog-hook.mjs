@@ -89,12 +89,13 @@ export function evaluateCodexHook(input, state = {}, options = {}) {
   if (event === "PreToolUse") {
     const classification = classifyHookTool(input);
     if (classification.kind === "evidence") {
-      const readDecision = watchdog.decideRead({
+      const read = {
         toolName: input.tool_name,
         input: input.tool_input,
         volatility: classification.volatility || "stable",
         now: config.now,
-      });
+      };
+      const readDecision = watchdog.decideRead({ ...read, record: false });
       if (readDecision.action === "block") {
         output = { decision: "block", reason: duplicateReason(readDecision) };
       } else {
@@ -104,13 +105,16 @@ export function evaluateCodexHook(input, state = {}, options = {}) {
             decision: "block",
             reason: evidenceBudgetReason(budgetDecision),
           };
-        } else if (budgetDecision.action === "warn") {
-          output = {
-            hookSpecificOutput: {
-              hookEventName: "PreToolUse",
-              additionalContext: evidenceWarning(budgetDecision),
-            },
-          };
+        } else {
+          watchdog.decideRead({ ...read, record: true });
+          if (budgetDecision.action === "warn") {
+            output = {
+              hookSpecificOutput: {
+                hookEventName: "PreToolUse",
+                additionalContext: evidenceWarning(budgetDecision),
+              },
+            };
+          }
         }
       }
     } else if (
