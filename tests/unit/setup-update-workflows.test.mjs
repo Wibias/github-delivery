@@ -7,6 +7,7 @@ import {
   selectStableRelease,
 } from "../../scripts/lib/stable-release-update.mjs";
 import { routeShippingGithubPrompt } from "../../scripts/lib/skill-router.mjs";
+import { runUpdateCommand } from "../../scripts/update-skill.mjs";
 
 const config = { schemaVersion: 1, authorityMode: "off" };
 
@@ -55,4 +56,17 @@ test("natural language routes setup, settings, and stable update", () => {
   assert.equal(routeShippingGithubPrompt("set up github-delivery for me")?.workflow, "references/configuration.md");
   assert.equal(routeShippingGithubPrompt("show me my github-delivery settings and let me change them")?.workflow, "references/configuration.md");
   assert.equal(routeShippingGithubPrompt("update github-delivery to the latest stable release")?.workflow, "references/update.md");
+});
+
+test("legacy updater delegates to the shared installer update mode", async () => {
+  let forwarded = null;
+  const result = await runUpdateCommand(["--target", "/custom/skill", "--apply"], {
+    installMain: async (argv) => {
+      forwarded = argv;
+      return { action: "update", updated: true };
+    },
+  });
+
+  assert.deepEqual(forwarded, ["--update", "--target", "/custom/skill", "--apply"]);
+  assert.deepEqual(result, { action: "update", updated: true });
 });

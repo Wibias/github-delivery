@@ -1,11 +1,18 @@
 #!/usr/bin/env node
-import { existsSync } from "node:fs";
-import { homedir } from "node:os";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { pathToFileURL } from "node:url";
 
 import { installCodexWatchdogHooks } from "./install-codex-watchdog-hooks.mjs";
 import { applyInstallation, planInstallation, restoreBackup } from "./lib/distribution.mjs";
+import { prepareVerifiedReleaseCandidate } from "./lib/release-self-update.mjs";
+import {
+  compareInstalledManifest,
+  readInstalledManifest,
+} from "./lib/stable-release-update.mjs";
+import { readUserConfig } from "./lib/user-config.mjs";
 import {
   selectWatchdogMode,
   writeActivationReceipt,
@@ -24,13 +31,16 @@ function inferHost(codexHome) {
     (process.env.CODEX_HOME || existsSync(codexHome) ? "codex" : "unknown");
 }
 
-export function parseInstallArgs(argv) {
+export function parseInstallArgs(argv, { installedRoot = resolve(import.meta.dirname, "..") } = {}) {
   const codexHome = defaultCodexHome();
   const options = {
     source: join(process.cwd(), "dist", "github-delivery"),
     target: join(homedir(), ".agents", "skills", "github-delivery"),
     backupRoot: undefined,
     apply: false,
+    update: false,
+    sourceExplicit: false,
+    targetExplicit: false,
     allowDowngrade: false,
     force: false,
     restore: null,
@@ -44,9 +54,13 @@ export function parseInstallArgs(argv) {
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
-    if (arg === "--source") options.source = argv[++index];
-    else if (arg === "--target") options.target = argv[++index];
-    else if (arg === "--backup-root") options.backupRoot = argv[++index];
+    if (arg === "--source") {
+      options.source = argv[++index];
+      options.sourceExplicit = true;
+    } else if (arg === "--target") {
+      options.target = argv[++index];
+      options.targetExplicit = true;
+    } else if (arg === "--backup-root") options.backupRoot = argv[++index];
     else if (arg === "--restore") options.restore = argv[++index];
     else if (arg === "--codex-home") options.codexHome = argv[++index];
     else if (arg === "--host") options.host = argv[++index];
@@ -55,10 +69,19 @@ export function parseInstallArgs(argv) {
     else if (arg === "--hook-trust-verified") options.hookTrustVerified = true;
     else if (arg === "--stream-launch-controlled") options.streamLaunchControlled = true;
     else if (arg === "--apply") options.apply = true;
+    else if (arg === "--update") options.update = true;
     else if (arg === "--allow-downgrade") options.allowDowngrade = true;
     else if (arg === "--force") options.force = true;
     else throw new Error(`unknown argument: ${arg}`);
   }
+
+  if (options.update) {
+    if (options.sourceExplicit) throw new Error("update_source_conflict");
+    if (options.restore) throw new Error("update_restore_conflict");
+    if (options.allowDowngrade) throw new Error("update_allow_downgrade_forbidden");
+    if (!options.targetExplicit) options.target = installedRoot;
+  }
+
   options.source = resolve(options.source);
   options.target = resolve(options.target);
   options.codexHome = resolve(options.codexHome);
@@ -174,18 +197,125 @@ export function installSkill(options) {
   };
 }
 
-export function main(argv = process.argv.slice(2)) {
+function makeReleaseUpdateWorkspace() {
+  return mkdtempSync(join(tmpdir(), "github-delivery-release-update-"));
+}
+
+function removeReleaseUpdateWorkspace(workspace) {
+  rmSync(workspace, { recursive: true, force: true });
+}
+
+function verifyInstalledRelease({ target, manifest }) {
+  const installedManifest = readInstalledManifest(target);
+  if (!isDeepStrictEqual(installedManifest, manifest)) {
+    throw new Error("stable_release_postinstall_manifest_mismatch");
+  }
+  const comparison = compareInstalledManifest({ manifest, target });
+  if (!comparison.clean) {
+    throw new Error("stable_release_postinstall_verification_failed");
+  }
+  return comparison;
+}
+
+function sameUserConfig(before, after) {
+  return isDeepStrictEqual(before?.config, after?.config);
+}
+
+export async function runInstallCommand(options, dependencies = {}) {
+  const install = dependencies.installSkill || installSkill;
+  if (!options.update) return install(options);
+
+  const prepareCandidate = dependencies.prepareVerifiedReleaseCandidate || prepareVerifiedReleaseCandidate;
+  const makeWorkspace = dependencies.makeWorkspace || makeReleaseUpdateWorkspace;
+  const removeWorkspace = dependencies.removeWorkspace || removeReleaseUpdateWorkspace;
+  const readConfig = dependencies.readUserConfig || readUserConfig;
+  const verifyRelease = dependencies.verifyInstalledRelease || verifyInstalledRelease;
+  const workspace = makeWorkspace();
+  let installation = null;
+
+  try {
+    const candidate = await prepareCandidate({
+      target: options.target,
+      workspace,
+    });
+    if (!candidate?.verified || !candidate?.plan || !candidate?.release || !candidate?.manifest || !candidate?.source) {
+      throw new Error("stable_release_candidate_invalid");
+    }
+
+    if (!options.apply) {
+      return {
+        ...candidate.plan,
+        apply: false,
+        updated: false,
+        verified: true,
+        release: candidate.release,
+      };
+    }
+
+    if (candidate.plan.action === "already_current" || candidate.plan.action === "already_ahead") {
+      return {
+        ...candidate.plan,
+        apply: true,
+        updated: false,
+        verified: true,
+        release: candidate.release,
+      };
+    }
+    if (candidate.plan.action !== "update" || candidate.plan.safeToReplace !== true) {
+      throw new Error(`stable_release_update_blocked:${candidate.plan.action || "invalid"}`);
+    }
+
+    const configBefore = readConfig();
+    installation = install({
+      ...options,
+      source: candidate.source,
+      update: false,
+      apply: true,
+      allowDowngrade: false,
+      force: false,
+    });
+
+    verifyRelease({ target: options.target, manifest: candidate.manifest });
+    const configAfter = readConfig();
+    if (!sameUserConfig(configBefore, configAfter)) {
+      throw new Error("stable_update_user_config_changed_unexpectedly");
+    }
+
+    return {
+      action: "update",
+      apply: true,
+      updated: true,
+      verified: true,
+      previousVersion: candidate.plan.currentVersion,
+      sourceVersion: candidate.release.version,
+      target: options.target,
+      backupPath: installation?.backupPath || null,
+      release: candidate.release,
+      watchdog: installation?.watchdog || null,
+    };
+  } catch (error) {
+    if (installation?.backupPath && error && typeof error === "object") {
+      error.backupPath = installation.backupPath;
+    }
+    throw error;
+  } finally {
+    removeWorkspace(workspace);
+  }
+}
+
+export async function main(argv = process.argv.slice(2)) {
   const options = parseInstallArgs(argv);
-  const result = installSkill(options);
+  const result = await runInstallCommand(options);
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   return result;
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  try {
-    main();
-  } catch (error) {
-    process.stderr.write(`${JSON.stringify({ error: String(error?.message || error) }, null, 2)}\n`);
+  main().catch((error) => {
+    process.stderr.write(`${JSON.stringify({
+      error: String(error?.message || error),
+      ...(error?.backupPath ? { backupPath: error.backupPath } : {}),
+    }, null, 2)}\n`);
     process.exitCode = 1;
-  }
+  });
 }

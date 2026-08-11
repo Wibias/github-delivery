@@ -6,9 +6,9 @@
 
 **Say the outcome, not the orchestration.**
 
-`github-delivery` turns natural-language requests into evidence-backed GitHub workflows: PRDs, issue research, implementation, deep review, CI, fixes, stacks, and verified merges. Its layered progress watchdog also cuts repeated narration, duplicate unchanged reads, manual polling, oversized tool output, and bloated subagent context without weakening GitHub authority gates.
+`github-delivery` turns natural-language requests into evidence-backed GitHub workflows: PRDs, issue research, implementation, deep review, CI, fixes, stacks, verified merges, and verified stable self-update. Its layered progress watchdog also cuts repeated narration, duplicate unchanged reads, manual polling, oversized tool output, and bloated subagent context without weakening GitHub authority gates.
 
-[Quick start](#try-it-in-60-seconds) · [Progress watchdog](#agent-progress-watchdog) · [What it can own](#what-you-can-ask-it-to-own) · [Safety model](#safety-model) · [Installation](#installation)
+[Quick start](#try-it-in-60-seconds) · [Self-update](#update-an-installed-release) · [Progress watchdog](#agent-progress-watchdog) · [What it can own](#what-you-can-ask-it-to-own) · [Safety model](#safety-model) · [Installation](#installation)
 
 [![CI](https://github.com/Wibias/github-delivery/actions/workflows/ci.yml/badge.svg)](https://github.com/Wibias/github-delivery/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/Wibias/github-delivery/actions/workflows/codeql.yml/badge.svg)](https://github.com/Wibias/github-delivery/actions/workflows/codeql.yml)
@@ -35,6 +35,7 @@ what is left on PR #41?
 full review PR #42
 fix the review comments on PR #18 and make it merge ready
 review PR #42, fix it, and merge it when green
+update github-delivery to the latest stable release
 ```
 
 That is the interface.
@@ -88,7 +89,19 @@ Then use it like this:
 full review PR #42
 ```
 
-For full install, upgrade, restore, downgrade, force, and manual-install behavior, see [`INSTALL.md`](INSTALL.md).
+For full install, upgrade, restore, downgrade, force, self-update, and manual-install behavior, see [`INSTALL.md`](INSTALL.md).
+
+### Update an installed release
+
+An installed release can check and update itself without cloning the repository again:
+
+```bash
+cd ~/.agents/skills/github-delivery
+node scripts/install-skill.mjs --update
+node scripts/install-skill.mjs --update --apply
+```
+
+The first command is a dry-run. Self-update accepts only the fixed upstream's latest published stable `vX.Y.Z` GitHub Release and replaces nothing until the release assets, checksums, manifest, exact tag/source commit, constrained GitHub artifact attestation, and strict ZIP extraction all verify. Local tracked modifications block replacement even with `--force`; same-version and already-ahead installations are safe no-ops; downgrades are never performed through `--update`. The compatibility `scripts/update-skill.mjs` command forwards to this same verified path. See [`references/update.md`](references/update.md) and [`INSTALL.md`](INSTALL.md).
 
 ### Codex progress watchdog
 
@@ -139,6 +152,7 @@ The protected launcher keeps watchdog state per turn and fails closed if require
 | `inspect this PR stack and tell me the safe merge order` | Stack topology, restack/retarget analysis, and safe ordering |
 | `merge PR #32` | Final gate, exact transaction authority, head-pinned merge, verification, thanks, and linked-issue close-out |
 | `maintainer overtake PR #32 and finish it` | Explicit maintainer takeover workflow for an unresponsive author |
+| `update github-delivery to the latest stable release` | Latest-stable discovery → release/checksum/manifest/tag/attestation verification → safe extraction → dry-run/apply with backup and postconditions |
 
 ## The lifecycle
 
@@ -199,6 +213,7 @@ merge PR #42 only after I confirm again
 inspect this PR stack and tell me the safe merge order
 supersede PR #12 with PR #45
 maintainer overtake PR #32 and finish it
+update github-delivery to the latest stable release
 ```
 
 ## Full workflow map
@@ -225,6 +240,7 @@ maintainer overtake PR #32 and finish it
 | **Maintainer overtake** | Take over an unresponsive author's PR under explicit maintainer scope | `references/overtake-pr.md` |
 | **Conflicts** | Resolve active conflicts from both sides' intent/evidence, then resume | `references/resolve-conflicts.md` |
 | **Stacked PRs** | Inspect, restack, retarget, recover, review and merge stacks | `references/stacked-prs.md` |
+| **Update installed skill** | Check/apply the latest verified stable GitHub Release without a repository checkout | `references/update.md` |
 | **Agent progress watchdog** | Runtime no-progress, read, polling, output, and subagent-context economy | `references/agent-progress-watchdog.md` |
 
 For oversized-change splitting, post-ship branch/worktree cleanup, and version/tag/changelog work, `SKILL.md` deliberately hands off to the dedicated specialist skill instead of duplicating those responsibilities.
@@ -588,6 +604,10 @@ See [`docs/live-integration.md`](docs/live-integration.md) and [`docs/live-githu
 | `scripts/lib/live-fixture-identity.mjs` | Bind live lifecycle tests to the immutable opted-in fixture target |
 | `scripts/live-github-fixture.mjs` | Exercise the real GitHub lifecycle |
 | `scripts/build-dist.mjs` | Build deterministic versioned skill bundles |
+| `scripts/lib/release-self-update.mjs` | Discover, download, verify, attest, bind, and prepare the latest stable release candidate |
+| `scripts/lib/release-zip.mjs` | Strict bounded ZIP validation/extraction against the separately verified distribution manifest |
+| `scripts/lib/stable-release-update.mjs` | Stable-version selection, installed-manifest drift checks, checksums, and safe update planning |
+| `scripts/install-skill.mjs` | Dry-run/apply install plus the single verified `--update` mutation path, backups, hooks, and postconditions |
 | `scripts/prepare-release.mjs` | Verify release identity, checksums, SBOM, notes and provenance subjects |
 
 The architecture intentionally uses **progressive disclosure**: a routed workflow loads the policy kernel plus only the modules it declares, instead of dumping every rule into every agent turn. `GD-CORE-009` and `GD-CORE-010` extend that idea into execution: prefer authoritative aggregate reads, reuse valid state snapshots, escalate diagnostics from status → failing component → focused excerpt → full raw output only when required, and pass subagents focused briefs with source references instead of copied context. Architecture validation ensures these context reductions do not remove required safety contracts.
@@ -615,7 +635,7 @@ Or verify reproducibility while building release artifacts:
 npm run dist:check
 ```
 
-The installer is dry-run first. Full install, upgrade, backup, restore, downgrade, force, watchdog trust refresh, and manual-install behavior is documented in [`INSTALL.md`](INSTALL.md).
+The installer is dry-run first. Full install, upgrade, backup, restore, downgrade, force, watchdog trust refresh, verified stable self-update, and manual-install behavior is documented in [`INSTALL.md`](INSTALL.md).
 
 Typical skill locations include:
 
@@ -625,6 +645,18 @@ Typical skill locations include:
 ~/.codex/skills/github-delivery
 ~/.claude/skills/github-delivery
 ```
+
+### Update an installed release
+
+From the installed bundle, check first and apply second:
+
+```bash
+cd ~/.agents/skills/github-delivery
+node scripts/install-skill.mjs --update
+node scripts/install-skill.mjs --update --apply
+```
+
+Self-update is fail-closed and latest-stable only. It verifies release digests/checksums, the manifest, the release-tag commit binding, GitHub artifact attestation, and a strict bounded ZIP before the existing backup/replacement installer can run. Local tracked modifications block replacement, no update downgrade is permitted, and the final installed manifest plus persistent user config are verified after replacement. A post-install failure surfaces the backup path for recovery.
 
 ### Codex progress watchdog
 
@@ -702,6 +734,6 @@ Do not publish suspected vulnerability details in a public issue or pull request
 
 ## Current state
 
-The complete issue/PR delivery lifecycle and its safety architecture are implemented: evidence-backed routing and ship gates, deferred-intent-safe merge routing, brokered lifecycle mutations, trusted exact-scope authority and durable verdict provenance, Windows Hello protection for high-assurance thread actions, deep review, semantic propagation, deterministic probes with non-bypassable required evidence, pre-open review, safe simplification, repository-qualified stacks, conflict recovery, merge-queue semantics, aggregated strict-ruleset enforcement, authenticated exact-effect idempotency receipts, ambiguous-merge readback reconciliation, safe read retries, layered progress/context economy with trust-aware Codex hook configuration and a protected streaming launch boundary, issue close-out, deterministic release packaging, repository controls, and dedicated live lifecycle fixtures.
+The complete issue/PR delivery lifecycle and its safety architecture are implemented: evidence-backed routing and ship gates, deferred-intent-safe merge routing, brokered lifecycle mutations, trusted exact-scope authority and durable verdict provenance, Windows Hello protection for high-assurance thread actions, deep review, semantic propagation, deterministic probes with non-bypassable required evidence, pre-open review, safe simplification, repository-qualified stacks, conflict recovery, merge-queue semantics, aggregated strict-ruleset enforcement, authenticated exact-effect idempotency receipts, ambiguous-merge readback reconciliation, safe read retries, layered progress/context economy with trust-aware Codex hook configuration and a protected streaming launch boundary, issue close-out, deterministic release packaging, verified latest-stable self-update, repository controls, and dedicated live lifecycle fixtures.
 
 Remaining work is primarily **operational** rather than a missing architecture layer: keep live repository rules/security settings aligned with the documented policy, provision and maintain the dedicated live fixture target/credential, run release acceptance for new versions, keep host integrations explicitly configured where runtime watchdog enforcement is desired, and extend the regression corpus as GitHub and agent hosts evolve.

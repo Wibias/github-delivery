@@ -47,6 +47,63 @@ node scripts/install-skill.mjs --apply
 
 Existing directory installations are backed up before replacement. Symlinks and non-skill directories fail closed unless the operator inspects the plan and explicitly supplies `--force`. Downgrades require `--allow-downgrade`.
 
+## Update an installed skill from the latest stable release
+
+You do not need a repository checkout to update an already installed release. Run the installer that is inside the installed bundle:
+
+```bash
+cd ~/.agents/skills/github-delivery
+node scripts/install-skill.mjs --update
+node scripts/install-skill.mjs --update --apply
+```
+
+The first command is a dry-run. It discovers and fully verifies the latest published stable `Wibias/github-delivery` GitHub Release, compares it with the installed copy, and prints the update plan without replacing the installed skill. Add `--apply` only after inspecting that plan.
+
+Unless `--target` is explicitly provided, release self-update targets the root of the installed bundle that is executing `install-skill.mjs`. The compatibility command below reaches the same implementation and security boundary:
+
+```bash
+node scripts/update-skill.mjs
+node scripts/update-skill.mjs --apply
+```
+
+The compatibility wrapper does not contain its own downloader or installer. It forwards to `install-skill.mjs --update`.
+
+### What is eligible
+
+Self-update accepts only the latest published, non-draft, non-prerelease release from the fixed upstream repository, with a strict `vX.Y.Z` tag. It never falls back to `main`, another branch, a fork, an arbitrary URL, or GitHub's generated source archive.
+
+Self-update never downgrades. If the installed version is already current, or is newer than the latest published stable release, `--apply` is a no-op. `--update` rejects `--source`, `--restore`, and `--allow-downgrade` so those separate local install/recovery controls cannot weaken release provenance.
+
+### Verification before replacement
+
+The downloaded release is not trusted merely because it came from a GitHub Release page. Before the existing installer can replace anything, self-update requires the complete chain below:
+
+1. Valid latest-stable Release metadata and exactly one version-matching ZIP, `manifest.json`, and `SHA256SUMS` asset.
+2. GitHub `sha256:` asset-digest verification for each required asset when GitHub exposes a digest.
+3. Strict `SHA256SUMS` verification of the ZIP and separately downloaded manifest.
+4. Strict distribution-manifest validation, including repository identity, release version, source commit, file hashes, sizes, modes, uniqueness, and safe relative paths.
+5. GitHub tag resolution, including bounded annotated-tag peeling, with the final commit required to equal `manifest.sourceCommit`.
+6. `gh attestation verify` for the ZIP, constrained to repository `Wibias/github-delivery`, signer workflow `Wibias/github-delivery/.github/workflows/release.yml`, the exact `refs/tags/vX.Y.Z` source ref, and the resolved source commit. There is no checksum-only fallback if attestation verification is unavailable or fails.
+7. Strict ZIP extraction into a private temporary directory. Traversal, absolute/Windows paths, links, unsupported entry types/compression, duplicates, undeclared or missing files, manifest-byte mismatches, CRC failures, unsafe destinations, and configured expansion limits fail closed.
+8. Rehashing and byte-count verification of every extracted manifest file before that directory can become an installation source.
+9. Comparison of the current installed payload with its installed manifest. Local tracked modifications block replacement, and `--force` does not bypass this self-update guard.
+
+Redirects remain HTTPS-only and downloads are size bounded. Verification failures occur before the installed skill is replaced.
+
+### Apply, backup, and recovery
+
+For a clean, strictly newer verified release, `--update --apply` passes the verified extracted directory into the existing installer. The existing backup and replacement implementation remains authoritative rather than introducing a second mutation path.
+
+After replacement, self-update verifies that the installed `manifest.json` is exactly the verified release manifest, rechecks every tracked file, and rereads persistent user configuration. The user configuration must remain unchanged.
+
+If replacement succeeded but a post-install verification fails, the command fails instead of claiming success and reports the preserved backup path. Restore it with the normal restore command documented below.
+
+Persistent user settings are not reset or migrated silently. After an update, inspect any new configuration options and decide explicitly whether to adopt them.
+
+A release can also change GitHub Delivery's Codex hook definitions. Existing hook trust is valid only for the exact unchanged definition. If the update changes that definition, the resulting activation state reports `hook_trust_required` until you review and trust the new hooks through Codex's normal `/hooks` flow.
+
+See [`references/update.md`](references/update.md) for the agent-facing update workflow and exact safety rules.
+
 ## Codex progress watchdog activation
 
 A standard Codex install/upgrade now plans the watchdog together with the skill. When Codex is detected and lifecycle hooks are supported, `--apply` also configures GitHub Delivery's `PreToolUse`, `PostToolUse`, `Stop`, `SubagentStop`, and `SessionEnd` entries in `~/.codex/hooks.json`. Existing hook configuration is preserved, backed up before a change, and updated idempotently.
