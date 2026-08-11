@@ -33,6 +33,21 @@ function encodeFrame(payload, opcode = 0x1) {
   return Buffer.concat([header, data]);
 }
 
+function safeWriteFrame(socket, payload, opcode = 0x1) {
+  if (socket.destroyed || !socket.writable) return false;
+  try {
+    socket.write(encodeFrame(payload, opcode));
+    return true;
+  } catch {
+    socket.destroy();
+    return false;
+  }
+}
+
+function broadcast(clients, payload) {
+  for (const client of clients) safeWriteFrame(client, payload);
+}
+
 function createFrameParser(onText, onClose, sendControl) {
   let buffer = Buffer.alloc(0);
   let fragmentedOpcode = null;
@@ -117,6 +132,12 @@ function rejectUpgrade(socket, status, message) {
   );
 }
 
+function headerContainsToken(value, token) {
+  return String(value || "")
+    .split(",")
+    .some((part) => part.trim().toLowerCase() === token);
+}
+
 export async function startCodexWatchdogRemoteBridge({
   appServerInput,
   appServerOutput,
@@ -146,7 +167,10 @@ export async function startCodexWatchdogRemoteBridge({
       }
     }
     const key = request.headers["sec-websocket-key"];
-    if (!key || String(request.headers.upgrade || "").toLowerCase() !== "websocket") {
+    const version = String(request.headers["sec-websocket-version"] || "");
+    const upgrade = String(request.headers.upgrade || "").toLowerCase();
+    const connectionUpgrade = headerContainsToken(request.headers.connection, "upgrade");
+    if (!key || version !== "13" || upgrade !== "websocket" || !connectionUpgrade) {
       rejectUpgrade(socket, "400 Bad Request", "invalid WebSocket upgrade");
       return;
     }
@@ -164,7 +188,7 @@ export async function startCodexWatchdogRemoteBridge({
         if (appServerInput.writable) appServerInput.write(`${text}\n`);
       },
       () => socket.end(),
-      (opcode, payload) => socket.write(encodeFrame(payload, opcode)),
+      (opcode, payload) => safeWriteFrame(socket, payload, opcode),
     );
     socket.on("data", (chunk) => {
       try {
@@ -175,7 +199,13 @@ export async function startCodexWatchdogRemoteBridge({
     });
     socket.on("close", () => clients.delete(socket));
     socket.on("error", () => clients.delete(socket));
-    if (head?.length) parser.push(head);
+    if (head?.length) {
+      try {
+        parser.push(head);
+      } catch {
+        socket.destroy();
+      }
+    }
   });
 
   const lines = createInterface({ input: appServerOutput, crlfDelay: Infinity });
@@ -184,14 +214,11 @@ export async function startCodexWatchdogRemoteBridge({
     try {
       message = JSON.parse(line);
     } catch {
-      for (const client of clients) client.write(encodeFrame(line));
+      broadcast(clients, line);
       return;
     }
     const routed = router.onServerMessage(message);
-    if (routed.forward) {
-      const text = JSON.stringify(routed.forward);
-      for (const client of clients) client.write(encodeFrame(text));
-    }
+    if (routed.forward) broadcast(clients, JSON.stringify(routed.forward));
     for (const request of routed.internalRequests) {
       if (appServerInput.writable) appServerInput.write(`${JSON.stringify(request)}\n`);
     }
