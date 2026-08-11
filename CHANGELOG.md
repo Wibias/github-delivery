@@ -80,6 +80,19 @@ All notable changes to `github-delivery` are documented here.
   the TLDR; a comment failing the gate must be repaired, never marked
   published.
 
+## [0.1.1] - 2026-08-11
+
+### Fixed
+
+- Prevented severe no-progress agent loops after a GitHub mutation is already
+  prepared by adding the global `GD-CORE-008` bounded forward-progress rule.
+- Prepared GitHub writes now cross directly into `github-mutate.mjs` once the
+  required evidence and authority are satisfied. Re-verification remains
+  required after relevant state changes, failed or ambiguous tool results, or
+  explicit workflow freshness requirements.
+- Added regression coverage that fails when unchanged-state re-planning can
+  replace the next required tool call or mutation.
+
 ## [0.1.0] - 2026-08-01
 
 ### Added
