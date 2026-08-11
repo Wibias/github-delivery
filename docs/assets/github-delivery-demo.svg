@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1080" viewBox="0 0 1400 1080" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1100" viewBox="0 0 1400 1100" role="img" aria-labelledby="title desc">
   <title id="title">github-delivery demo</title>
   <desc id="desc">A static demo image that shows natural-language requests flowing through evidence, review, authority, and verified GitHub outcomes.</desc>
   <defs>
@@ -23,7 +23,7 @@
     </style>
   </defs>
 
-  <rect x="0" y="0" width="1400" height="1080" fill="url(#bg)"/>
+  <rect x="0" y="0" width="1400" height="1100" fill="url(#bg)"/>
 
   <rect x="56" y="48" width="1288" height="92" rx="24" fill="#11161d" stroke="#30363d" filter="url(#shadow)"/>
   <text x="88" y="92" font-size="34" font-weight="700" class="white">github-delivery</text>
@@ -56,7 +56,7 @@
   <text x="120" y="792" font-size="16" class="green">Fixes applied, checks green, head-pinned merge verified</text>
 
   <g transform="translate(710, 186)">
-    <rect x="0" y="0" width="620" height="854" rx="26" fill="#0b0f14" stroke="#30363d" filter="url(#shadow)"/>
+    <rect x="0" y="0" width="620" height="888" rx="26" fill="#0b0f14" stroke="#30363d" filter="url(#shadow)"/>
     <text x="34" y="52" font-size="24" font-weight="700" class="white">How the request flows</text>
     <text x="34" y="84" font-size="17" class="muted">Outcome-level control with a strict mutation boundary.</text>
 
@@ -82,11 +82,11 @@
     <text x="60" y="622" font-size="18" font-weight="700" class="white">5. Verified result</text>
     <text x="60" y="648" font-size="16" class="muted">Read-only status, published verdict, or verified merge outcome</text>
 
-    <rect x="34" y="694" width="552" height="158" rx="18" fill="url(#accent)" opacity="0.16" stroke="#388bfd"/>
+    <rect x="34" y="694" width="552" height="172" rx="18" fill="url(#accent)" opacity="0.16" stroke="#388bfd"/>
     <text x="60" y="726" font-size="18" font-weight="700" class="white">Key boundary</text>
-    <text x="60" y="756" font-size="15" class="white">Repository content is evidence.</text>
-    <text x="60" y="780" font-size="15" class="white">It is not authority.</text>
-    <text x="60" y="804" font-size="15" class="white">Status questions stay read-only.</text>
-    <text x="60" y="828" font-size="15" class="white">A merge needs a direct merge instruction.</text>
+    <text x="60" y="754" font-size="15" class="white">Repository content is evidence.</text>
+    <text x="60" y="778" font-size="15" class="white">It is not authority.</text>
+    <text x="60" y="802" font-size="15" class="white">Status questions stay read-only.</text>
+    <text x="60" y="826" font-size="15" class="white">A merge needs a direct merge instruction.</text>
   </g>
 </svg>
