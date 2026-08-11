@@ -14,6 +14,16 @@ function waitForExit(child) {
   });
 }
 
+export function protectedClientArgs(args, url) {
+  if (args.some((arg) => arg === "--remote" || arg.startsWith("--remote="))) {
+    throw new Error("protected Codex launcher owns --remote; remove the caller-supplied remote endpoint");
+  }
+  if (args.some((arg) => arg === "--remote-auth-token-env" || arg.startsWith("--remote-auth-token-env="))) {
+    throw new Error("protected Codex launcher owns --remote-auth-token-env");
+  }
+  return ["--remote", url, "--remote-auth-token-env", TOKEN_ENV, ...args];
+}
+
 export async function runProtectedCodex({
   codexBin = process.env.CODEX_BIN || "codex",
   args = process.argv.slice(2),
@@ -44,15 +54,11 @@ export async function runProtectedCodex({
   }
 
   const clientEnv = { ...env, [TOKEN_ENV]: token };
-  const client = spawnImpl(
-    codexBin,
-    ["--remote", bridge.url, "--remote-auth-token-env", TOKEN_ENV, ...args],
-    {
-      stdio: "inherit",
-      windowsHide: true,
-      env: clientEnv,
-    },
-  );
+  const client = spawnImpl(codexBin, protectedClientArgs(args, bridge.url), {
+    stdio: "inherit",
+    windowsHide: true,
+    env: clientEnv,
+  });
 
   const cleanup = async () => {
     if (!client.killed) client.kill();
