@@ -8,12 +8,37 @@ function commandText(command) {
   return String(command || "").trim();
 }
 
+function classifyGhApi(value) {
+  if (!/\bgh\s+api\b/i.test(value)) return null;
+  const explicitGet = /(?:--method(?:=|\s+)get\b|-x\s*get\b)/i.test(value);
+  const explicitMutationMethod = /(?:--method(?:=|\s+)(?:post|put|patch|delete)\b|-x\s*(?:post|put|patch|delete)\b)/i.test(value);
+
+  if (/\bgh\s+api\s+graphql\b/i.test(value)) {
+    if (/\bmutation\b/i.test(value)) return { kind: "state-change" };
+    if (explicitMutationMethod && !/\bquery\s*=\s*['"]?\s*query\b/i.test(value)) {
+      return { kind: "neutral" };
+    }
+    if (explicitGet || /\bquery\s*=\s*['"]?\s*query\b/i.test(value)) {
+      return { kind: "evidence", volatility: "volatile" };
+    }
+    return { kind: "neutral" };
+  }
+
+  if (explicitMutationMethod) return { kind: "state-change" };
+  const hasBodyInput = /(?:^|\s)(?:-f|-F|--field|--raw-field|--input)(?:=|\s)/i.test(value);
+  if (hasBodyInput && !explicitGet) return { kind: "state-change" };
+  return { kind: "evidence", volatility: "volatile" };
+}
+
 function classifyCommand(command) {
   const raw = commandText(command);
   const value = raw.toLowerCase();
   if (!value) return { kind: "neutral" };
 
-  if (/\bgh\s+(?:pr\s+(?:checks|view|diff)|run\s+(?:view|list)|api\b)/i.test(value)) {
+  const ghApi = classifyGhApi(value);
+  if (ghApi) return ghApi;
+
+  if (/\bgh\s+(?:pr\s+(?:checks|view|diff)|run\s+(?:view|list))/i.test(value)) {
     return { kind: "evidence", volatility: "volatile" };
   }
 
