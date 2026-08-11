@@ -62,7 +62,11 @@ test("mixed read/write tool names stay neutral instead of falsely resetting prog
   );
 });
 
-test("read-looking shell commands with output writes are not treated as pure evidence", () => {
+test("read-looking shell redirection stays neutral while explicit write cmdlets are state changes", () => {
   assert.equal(classify("cat README.md > README.copy.md").kind, "neutral");
-  assert.equal(classify("Get-Content README.md | Set-Content README.copy.md").kind, "neutral");
+  assert.equal(
+    classify("Get-Content README.md | Set-Content README.copy.md").kind,
+    "state-change",
+  );
+  assert.equal(classify("Set-Content README.copy.md 'x'").kind, "state-change");
 });
