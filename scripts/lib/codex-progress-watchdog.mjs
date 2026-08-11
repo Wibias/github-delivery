@@ -1,11 +1,29 @@
-const TOOL_ITEM_TYPES = new Set([
-  "commandExecution",
-  "fileChange",
-  "mcpToolCall",
-  "dynamicToolCall",
-  "collabToolCall",
-  "webSearch",
-]);
+import {
+  classifyAppServerItem,
+  isSuccessfulAppServerItem,
+} from "./watchdog-progress-classifier.mjs";
+
+function maybeInterrupt(decision, params, context) {
+  const threadId = params.threadId;
+  const turnId = params.turnId || params.turn?.id;
+  if (
+    decision?.action !== "interrupt" &&
+    decision?.action !== "block"
+  ) {
+    return { decision: decision || { action: "allow" } };
+  }
+  if (!threadId || !turnId || context.interruptedTurns.has(turnId)) {
+    return { decision };
+  }
+  context.interruptedTurns.add(turnId);
+  return {
+    decision,
+    interrupt: {
+      method: "turn/interrupt",
+      params: { threadId, turnId },
+    },
+  };
+}
 
 export function observeCodexAppServerMessage(watchdog, message, context = {}) {
   if (!watchdog || typeof watchdog.observeAssistantDelta !== "function") {
@@ -15,41 +33,38 @@ export function observeCodexAppServerMessage(watchdog, message, context = {}) {
   if (!message || typeof message !== "object") return { decision: { action: "allow" } };
 
   const { method, params = {} } = message;
-  if (method === "turn/started") {
-    watchdog.recordExternalProgress({ kind: "turn_started" });
+  if (method === "item/agentMessage/delta") {
+    const decision = watchdog.observeAssistantDelta(params.delta || "");
+    return maybeInterrupt(decision, params, context);
+  }
+
+  if (method === "item/started") {
+    const classification = classifyAppServerItem(params.item);
+    if (classification.kind === "evidence") {
+      const decision = watchdog.chargeEvidenceAttempt();
+      if (decision.action === "block") {
+        return maybeInterrupt(
+          { ...decision, action: "interrupt" },
+          params,
+          context,
+        );
+      }
+      return { decision };
+    }
     return { decision: { action: "allow" } };
   }
 
-  if (method === "item/agentMessage/delta") {
-    const decision = watchdog.observeAssistantDelta(params.delta || "");
-    const threadId = params.threadId;
-    const turnId = params.turnId;
-    if (
-      decision.action === "interrupt" &&
-      threadId &&
-      turnId &&
-      !context.interruptedTurns.has(turnId)
-    ) {
-      context.interruptedTurns.add(turnId);
-      return {
-        decision,
-        interrupt: {
-          method: "turn/interrupt",
-          params: { threadId, turnId },
-        },
-      };
-    }
-    return { decision };
-  }
-
-  if (method === "item/started" || method === "item/completed") {
+  if (method === "item/completed") {
     const item = params.item;
-    if (item && TOOL_ITEM_TYPES.has(item.type)) {
-      watchdog.recordExternalProgress({ kind: method, toolName: item.type });
-      if (method === "item/completed" && item.type === "fileChange") {
-        watchdog.recordStateChange("codex_file_change_completed");
+    const classification = classifyAppServerItem(item);
+    if (isSuccessfulAppServerItem(item)) {
+      if (classification.kind === "state-change") {
+        watchdog.recordStateProgress("codex_state_change_completed");
+      } else if (classification.kind === "execution") {
+        watchdog.recordExecutionProgress({ kind: "codex_execution_completed" });
       }
     }
+    return { decision: { action: "allow" } };
   }
 
   if (method === "turn/completed" && params.turn?.id) {
