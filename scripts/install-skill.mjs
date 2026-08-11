@@ -68,15 +68,27 @@ export function installSkill(options) {
       : { action: "restore", apply: false, backup: options.restore, target: options.target };
   }
 
+  const sourceLauncherPath = join(options.source, "scripts", "codex-with-watchdog.mjs");
+  const installedLauncherPath = join(options.target, "scripts", "codex-with-watchdog.mjs");
+  const launcherBundled = existsSync(sourceLauncherPath);
+  const streamLaunchVerified = options.streamLaunchControlled === true && launcherBundled;
+
   const installation = options.apply
     ? applyInstallation(options)
     : { ...planInstallation(options), apply: false };
 
+  if (options.apply && launcherBundled && !existsSync(installedLauncherPath)) {
+    throw new Error("protected Codex launcher was not installed with the skill payload");
+  }
+
   const selection = selectWatchdogMode({
     host: options.host,
-    streamLaunchControlled: options.streamLaunchControlled,
+    streamLaunchControlled: streamLaunchVerified,
     lifecycleHooksSupported: options.lifecycleHooksSupported,
   });
+  if (options.streamLaunchControlled && !launcherBundled && selection.mode !== "stream") {
+    selection.degradationReason = "stream_launcher_unavailable";
+  }
 
   let hookResult = null;
   if (options.host === "codex" && options.lifecycleHooksSupported) {
@@ -87,11 +99,12 @@ export function installSkill(options) {
     });
   }
 
+  const launcherPath = selection.mode === "stream" ? installedLauncherPath : null;
   const receiptResult = writeActivationReceipt({
     codexHome: options.codexHome,
     mode: selection.mode,
     degradationReason: selection.degradationReason,
-    launcherPath: null,
+    launcherPath,
     apply: options.apply,
   });
 
@@ -103,7 +116,8 @@ export function installSkill(options) {
       receiptPath: receiptResult.path,
       receiptChanged: receiptResult.changed,
       hookResult,
-      launcherPath: null,
+      launcherPath,
+      streamLauncherPath: launcherBundled ? installedLauncherPath : null,
     },
   };
 }
