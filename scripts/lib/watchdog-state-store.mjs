@@ -1,13 +1,13 @@
 import { createHash, randomBytes } from "node:crypto";
 import {
+  chmodSync,
   closeSync,
-  existsSync,
+  lstatSync,
   mkdirSync,
   openSync,
   readFileSync,
   renameSync,
   rmSync,
-  statSync,
   writeFileSync,
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -23,6 +23,48 @@ function hash(value) {
 
 function safeAgentId(input = {}) {
   return input.agent_id || input.agentId || "main";
+}
+
+function currentUid() {
+  return typeof process.getuid === "function" ? process.getuid() : null;
+}
+
+function assertOwnedByCurrentUser(stat, path) {
+  const uid = currentUid();
+  if (uid !== null && stat.uid !== uid) {
+    throw new Error(`Refusing watchdog state path not owned by the current user: ${path}`);
+  }
+}
+
+function ensurePrivateDirectory(path) {
+  mkdirSync(path, { recursive: true, mode: 0o700 });
+  const stat = lstatSync(path);
+  if (stat.isSymbolicLink()) {
+    throw new Error(`Refusing symlinked watchdog state directory: ${path}`);
+  }
+  if (!stat.isDirectory()) {
+    throw new Error(`Watchdog state path is not a directory: ${path}`);
+  }
+  assertOwnedByCurrentUser(stat, path);
+  if (process.platform !== "win32") chmodSync(path, 0o700);
+}
+
+function safeExistingFile(path, label) {
+  let stat;
+  try {
+    stat = lstatSync(path);
+  } catch (error) {
+    if (error?.code === "ENOENT") return null;
+    throw error;
+  }
+  if (stat.isSymbolicLink()) {
+    throw new Error(`Refusing symlinked watchdog ${label}: ${path}`);
+  }
+  if (!stat.isFile()) {
+    throw new Error(`Watchdog ${label} is not a regular file: ${path}`);
+  }
+  assertOwnedByCurrentUser(stat, path);
+  return stat;
 }
 
 export function watchdogStateScope(input = {}) {
@@ -55,7 +97,9 @@ function acquireLock(lockPath, { lockWaitMs, staleLockMs }) {
     } catch (error) {
       if (error?.code !== "EEXIST") throw error;
       try {
-        const age = Date.now() - statSync(lockPath).mtimeMs;
+        const stat = safeExistingFile(lockPath, "lock file");
+        if (!stat) continue;
+        const age = Date.now() - stat.mtimeMs;
         if (age >= staleLockMs) {
           rmSync(lockPath, { force: true });
           continue;
@@ -73,7 +117,9 @@ function acquireLock(lockPath, { lockWaitMs, staleLockMs }) {
 }
 
 function readState(path) {
-  if (!existsSync(path)) return {};
+  const stat = safeExistingFile(path, "state file");
+  if (!stat) return {};
+  if (process.platform !== "win32") chmodSync(path, 0o600);
   let parsed;
   try {
     parsed = JSON.parse(readFileSync(path, "utf8"));
@@ -89,9 +135,11 @@ function readState(path) {
 function atomicWrite(path, state) {
   const tempPath = `${path}.tmp-${process.pid}-${randomBytes(6).toString("hex")}`;
   const payload = `${JSON.stringify(state)}\n`;
-  writeFileSync(tempPath, payload, { encoding: "utf8", mode: 0o600 });
+  writeFileSync(tempPath, payload, { encoding: "utf8", mode: 0o600, flag: "wx" });
   try {
+    safeExistingFile(path, "state file");
     renameSync(tempPath, path);
+    if (process.platform !== "win32") chmodSync(path, 0o600);
   } catch (error) {
     rmSync(tempPath, { force: true });
     throw error;
@@ -105,8 +153,9 @@ export function withWatchdogState(scope, reducer, options = {}) {
   if (typeof reducer !== "function") throw new Error("watchdog state reducer is required");
 
   const stateRoot = resolve(options.stateRoot);
+  ensurePrivateDirectory(stateRoot);
   const statePath = watchdogStatePath(stateRoot, scope);
-  mkdirSync(dirname(statePath), { recursive: true, mode: 0o700 });
+  ensurePrivateDirectory(dirname(statePath));
   const lockPath = `${statePath}.lock`;
   const lockOptions = {
     lockWaitMs: options.lockWaitMs ?? DEFAULT_LOCK_WAIT_MS,
@@ -128,8 +177,23 @@ export function withWatchdogState(scope, reducer, options = {}) {
 }
 
 export function removeWatchdogSessionState(stateRoot, sessionId) {
-  const directory = sessionStateDirectory(stateRoot, sessionId);
-  const existed = existsSync(directory);
+  const root = resolve(stateRoot);
+  ensurePrivateDirectory(root);
+  const directory = sessionStateDirectory(root, sessionId);
+  let stat;
+  try {
+    stat = lstatSync(directory);
+  } catch (error) {
+    if (error?.code === "ENOENT") return { existed: false, directory };
+    throw error;
+  }
+  if (stat.isSymbolicLink()) {
+    throw new Error(`Refusing symlinked watchdog session directory: ${directory}`);
+  }
+  if (!stat.isDirectory()) {
+    throw new Error(`Watchdog session state path is not a directory: ${directory}`);
+  }
+  assertOwnedByCurrentUser(stat, directory);
   rmSync(directory, { recursive: true, force: true });
-  return { existed, directory };
+  return { existed: true, directory };
 }
