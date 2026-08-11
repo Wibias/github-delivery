@@ -1,5 +1,14 @@
 import { spawnSync } from "node:child_process";
 import { createHash, timingSafeEqual } from "node:crypto";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+
+import { extractVerifiedReleaseZip } from "./release-zip.mjs";
+import {
+  planStableUpdate,
+  releaseAssetPlan,
+  verifyDownloadedAsset,
+} from "./stable-release-update.mjs";
 
 const DEFAULT_REPOSITORY = "Wibias/github-delivery";
 const RELEASE_WORKFLOW = "Wibias/github-delivery/.github/workflows/release.yml";
@@ -7,6 +16,11 @@ const API_ROOT = "https://api.github.com";
 const API_VERSION = "2022-11-28";
 const MAX_REDIRECTS = 5;
 const MAX_TAG_PEELS = 8;
+const DOWNLOAD_LIMITS = Object.freeze({
+  archive: 32 * 1024 * 1024,
+  manifest: 4 * 1024 * 1024,
+  checksums: 1024 * 1024,
+});
 
 function fail(code, detail = "") {
   throw new Error(detail ? `${code}: ${detail}` : code);
@@ -126,6 +140,23 @@ async function fetchJson(fetchImpl, url, errorCode) {
   } catch {
     fail(errorCode, "invalid JSON response");
   }
+}
+
+function uniqueAsset(release, name) {
+  const matches = release.assets.filter((asset) => asset?.name === name);
+  if (matches.length === 0) fail("stable_release_asset_missing", name);
+  if (matches.length > 1) fail("stable_release_asset_duplicate", name);
+  return matches[0];
+}
+
+function parseManifestBytes(bytes, version) {
+  let raw;
+  try {
+    raw = JSON.parse(bytes.toString("utf8"));
+  } catch {
+    fail("stable_release_manifest_invalid");
+  }
+  return validateReleaseManifest(raw, { version });
 }
 
 export function createGitHubReleaseClient({
@@ -342,9 +373,91 @@ export function verifyReleaseAttestation({
   return true;
 }
 
+export async function prepareVerifiedReleaseCandidate({
+  target,
+  workspace,
+  client = createGitHubReleaseClient(),
+  attestationRunner = undefined,
+  dependencies = {},
+} = {}) {
+  if (typeof target !== "string" || target.length === 0) fail("stable_release_target_invalid");
+  if (typeof workspace !== "string" || workspace.length === 0) fail("stable_release_workspace_invalid");
+  if (!client || typeof client.latestRelease !== "function" || typeof client.downloadAsset !== "function" || typeof client.resolveTagCommit !== "function") {
+    fail("stable_release_client_invalid");
+  }
+
+  const extract = dependencies.extractVerifiedReleaseZip || extractVerifiedReleaseZip;
+  const plan = dependencies.planStableUpdate || planStableUpdate;
+  const release = await client.latestRelease();
+  const assets = releaseAssetPlan(release);
+  const archiveAsset = uniqueAsset(release, assets.archive);
+  const manifestAsset = uniqueAsset(release, assets.manifest);
+  const checksumsAsset = uniqueAsset(release, assets.checksums);
+
+  const [archive, manifestBytes, checksums] = await Promise.all([
+    client.downloadAsset(archiveAsset, DOWNLOAD_LIMITS.archive),
+    client.downloadAsset(manifestAsset, DOWNLOAD_LIMITS.manifest),
+    client.downloadAsset(checksumsAsset, DOWNLOAD_LIMITS.checksums),
+  ]);
+  if (!Buffer.isBuffer(archive) || !Buffer.isBuffer(manifestBytes) || !Buffer.isBuffer(checksums)) {
+    fail("stable_release_download_invalid");
+  }
+
+  verifyGitHubAssetDigest(archiveAsset, archive);
+  verifyGitHubAssetDigest(manifestAsset, manifestBytes);
+  verifyGitHubAssetDigest(checksumsAsset, checksums);
+  verifyDownloadedAsset({ name: assets.archive, content: archive, checksums: checksums.toString("utf8") });
+  verifyDownloadedAsset({ name: assets.manifest, content: manifestBytes, checksums: checksums.toString("utf8") });
+
+  const manifest = parseManifestBytes(manifestBytes, assets.version);
+  const sourceCommit = await client.resolveTagCommit(assets.tag);
+  if (sourceCommit.toLowerCase() !== manifest.sourceCommit) {
+    fail("stable_release_source_commit_mismatch");
+  }
+
+  const root = resolve(workspace);
+  const downloads = join(root, "downloads");
+  const extraction = join(root, "extracted");
+  mkdirSync(downloads, { recursive: true, mode: 0o700 });
+  mkdirSync(extraction, { recursive: true, mode: 0o700 });
+  const archivePath = join(downloads, assets.archive);
+  writeFileSync(archivePath, archive, { mode: 0o600, flag: "wx" });
+
+  verifyReleaseAttestation({
+    archivePath,
+    tag: assets.tag,
+    sourceCommit,
+    ...(attestationRunner ? { runner: attestationRunner } : {}),
+  });
+
+  const extracted = extract({
+    archive,
+    manifest,
+    manifestBytes,
+    destination: extraction,
+  });
+  const updatePlan = plan({ releases: [release], target });
+
+  return {
+    schemaVersion: 1,
+    kind: "github-delivery/verified-release-candidate",
+    verified: true,
+    source: extracted.root,
+    archivePath,
+    manifest,
+    release: {
+      tag: assets.tag,
+      version: assets.version,
+      sourceCommit: manifest.sourceCommit,
+    },
+    plan: updatePlan,
+  };
+}
+
 export const releaseSelfUpdateDefaults = Object.freeze({
   repository: DEFAULT_REPOSITORY,
   releaseWorkflow: RELEASE_WORKFLOW,
   maxRedirects: MAX_REDIRECTS,
   maxTagPeels: MAX_TAG_PEELS,
+  downloadLimits: DOWNLOAD_LIMITS,
 });
