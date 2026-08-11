@@ -109,6 +109,8 @@ Inside the launched App Server/client process tree, the launcher sets the runtim
 
 Installing the launcher does **not** make an ordinary `codex` or IDE process use it automatically. Codex exposes remote App Server selection as a launch option; GitHub Delivery does not replace your global `codex` executable or silently rewrite editor startup configuration. A persistent host integration may use `--stream-launch-controlled` only when it genuinely controls future launches through this boundary.
 
+Codex currently documents `app-server` and its WebSocket transport as experimental and unsupported for production workloads. This launcher is therefore the strongest currently available Codex boundary for this failure mode, not a stable production host API. Use trusted lifecycle hooks plus the policy fallback when that experimental surface is inappropriate.
+
 ### Manual hook repair
 
 `scripts/install-codex-watchdog-hooks.mjs` remains available as a repair or non-standard-install tool. It is dry-run by default:
