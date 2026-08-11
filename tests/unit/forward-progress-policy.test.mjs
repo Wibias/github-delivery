@@ -27,3 +27,19 @@ test("prepared GitHub writes do not get a second ad-hoc preflight loop", () => {
   assert.match(skill, /GD-CORE-008/i);
   assert.match(skill, /bounded forward progress/i);
 });
+
+test("verification economy reuses passing evidence on unchanged code and state", () => {
+  assert.match(kernel, /GD-CORE-009/i);
+  assert.match(kernel, /reuse.*passing evidence|reuse.*valid evidence/i);
+  assert.match(kernel, /overlapping|narrower/i);
+  assert.match(kernel, /targeted.*aggregate|aggregate.*targeted/i);
+  assert.match(kernel, /failure|failed/i);
+  assert.match(kernel, /state.*change|inputs?.*change/i);
+  assert.match(skill, /GD-CORE-009/i);
+  assert.match(skill, /verification economy|evidence reuse/i);
+});
+
+test("deterministic tool calls are executed without micro-narration", () => {
+  assert.match(kernel, /do not narrate.*tool calls|execute.*without.*narrat/i);
+  assert.match(kernel, /phase change|material.*change|user input/i);
+});
