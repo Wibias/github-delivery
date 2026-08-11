@@ -5,10 +5,13 @@ import test from "node:test";
 import { validateWorkflowFile } from "../../scripts/lib/workflow-security.mjs";
 
 const workflow = readFileSync(new URL("../../.github/workflows/release.yml", import.meta.url), "utf8").replace(/\r\n?/g, "\n");
+const tagWorkflow = readFileSync(new URL("../../.github/workflows/create-release-tag.yml", import.meta.url), "utf8").replace(/\r\n?/g, "\n");
 
-test("release workflow keeps manual runs non-publishing", () => {
-  assert.match(workflow, /publish:\n[\s\S]*if: github\.event_name == 'push'/);
+test("release workflow publishes both pushed tags and tag-dispatched manual runs", () => {
   assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /publish:\n[\s\S]*startsWith\(github\.ref, 'refs\/tags\/v'\)/);
+  assert.match(workflow, /github\.event_name == 'push'/);
+  assert.match(workflow, /github\.event_name == 'workflow_dispatch'/);
 });
 
 test("release workflow uses least privilege and pinned actions", () => {
@@ -28,7 +31,7 @@ test("tag publish verifies protected-main lineage before validation and publicat
   assert.match(workflow, /Reverify tagged source belongs to protected main lineage[\s\S]*Rebuild from the tagged commit/);
 });
 
-test("tag publish rebuilds, attests, and refuses an existing release", () => {
+test("tag publish rebuilds, attests, refuses an existing release, and uses changelog notes", () => {
   assert.match(workflow, /Rebuild from the tagged commit/);
 
   const provenanceAttest = workflow.match(
@@ -47,6 +50,24 @@ test("tag publish rebuilds, attests, and refuses an existing release", () => {
 
   assert.match(workflow, /gh release view/);
   assert.match(workflow, /--verify-tag/);
+  assert.match(workflow, /--notes-file dist\/RELEASE_NOTES\.md/);
+});
+
+test("manual tag workflow reads package version, validates before tagging, and dispatches release on that tag", () => {
+  assert.match(tagWorkflow, /name: Create Release Tag/);
+  assert.match(tagWorkflow, /workflow_dispatch:/);
+  assert.match(tagWorkflow, /contents: write/);
+  assert.match(tagWorkflow, /actions: write/);
+  assert.match(tagWorkflow, /package\.json/);
+  assert.match(tagWorkflow, /Run repository checks[\s\S]*Prepare and verify release[\s\S]*Create release tag[\s\S]*Dispatch release workflow on tag/);
+  assert.match(tagWorkflow, /git\/refs/);
+  assert.match(tagWorkflow, /actions\/workflows\/release\.yml\/dispatches/);
+  assert.match(tagWorkflow, /ref="\$\{RELEASE_TAG\}"/);
+});
+
+test("manual tag workflow is accepted by repository workflow security", () => {
+  const errors = validateWorkflowFile(".github/workflows/create-release-tag.yml", tagWorkflow);
+  assert.deepEqual(errors, []);
 });
 
 test("workflow security rejects attacker-controlled GitHub data interpolated directly into run", () => {
