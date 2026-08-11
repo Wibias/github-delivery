@@ -1,28 +1,89 @@
 import { createProgressWatchdog } from "./agent-progress-watchdog.mjs";
 import { observeCodexAppServerMessage } from "./codex-progress-watchdog.mjs";
 
+function messageTurnId(message) {
+  return message?.params?.turnId || message?.params?.turn?.id || null;
+}
+
+function messageThreadId(message) {
+  return message?.params?.threadId || null;
+}
+
 export function createAppServerWatchdogRouter(options = {}) {
-  const watchdog = options.watchdog || createProgressWatchdog(options.watchdogOptions);
-  const context = { interruptedTurns: new Set() };
-  const privateIds = new Set();
+  const turns = new Map();
+  const privateIds = new Map();
   const prefix = options.internalRequestIdPrefix || `github-delivery-watchdog-${process.pid}`;
   let sequence = 0;
+  let providedWatchdogUsed = false;
+
+  function createTurnState(turnId) {
+    let watchdog;
+    if (options.watchdog && !providedWatchdogUsed) {
+      watchdog = options.watchdog;
+      providedWatchdogUsed = true;
+    } else if (typeof options.watchdogFactory === "function") {
+      watchdog = options.watchdogFactory({ turnId });
+    } else {
+      watchdog = createProgressWatchdog(options.watchdogOptions);
+    }
+    const state = {
+      watchdog,
+      context: { interruptedTurns: new Set() },
+      threadId: null,
+    };
+    turns.set(turnId, state);
+    return state;
+  }
+
+  function stateFor(message) {
+    const turnId = messageTurnId(message);
+    if (!turnId) return null;
+    const state = turns.get(turnId) || createTurnState(turnId);
+    const threadId = messageThreadId(message);
+    if (threadId) {
+      if (state.threadId && state.threadId !== threadId) {
+        throw new Error(
+          `Watchdog turn ${turnId} changed thread identity from ${state.threadId} to ${threadId}`,
+        );
+      }
+      state.threadId = threadId;
+    }
+    return state;
+  }
 
   function onServerMessage(message) {
     if (message && Object.hasOwn(message, "id") && privateIds.has(message.id)) {
+      const metadata = privateIds.get(message.id);
       privateIds.delete(message.id);
+      if (message.error && typeof options.onInternalRequestError === "function") {
+        options.onInternalRequestError({ message, metadata });
+      }
       return { forward: null, internalRequests: [] };
     }
 
-    const outcome = observeCodexAppServerMessage(watchdog, message, context);
+    const state = stateFor(message);
+    if (!state) return { forward: message, internalRequests: [] };
+
+    const outcome = observeCodexAppServerMessage(state.watchdog, message, state.context);
     const internalRequests = [];
     if (outcome.interrupt) {
       const id = `${prefix}-${++sequence}`;
-      privateIds.add(id);
+      privateIds.set(id, {
+        method: outcome.interrupt.method,
+        turnId: messageTurnId(message),
+        threadId: messageThreadId(message) || state.threadId,
+      });
       internalRequests.push({ id, ...outcome.interrupt });
+    }
+
+    if (message?.method === "turn/completed") {
+      turns.delete(messageTurnId(message));
     }
     return { forward: message, internalRequests };
   }
 
-  return { onServerMessage };
+  return {
+    onServerMessage,
+    activeTurnCount: () => turns.size,
+  };
 }
