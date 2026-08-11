@@ -137,6 +137,8 @@ Additional packaging requirements:
 - package execution itself does not mutate a skill installation before the user approves the shown plan;
 - package contents are not treated as the trusted skill release payload.
 
+The npm package may include the small set of installer/release-verification modules required to orchestrate a fresh install or an update, but it must not treat those packaged files as the skill payload being installed. The final target always comes from the separately downloaded and verified GitHub Release bundle.
+
 Before the first real publish, the release process must verify that the exact npm package name `github-delivery` can be published by the repository owner. If the name cannot be claimed, that is a release-blocking condition rather than a silent rename.
 
 ## CLI surface
@@ -204,7 +206,7 @@ npx github-delivery update
 npx github-delivery update --apply
 ```
 
-`update` delegates to the same verified update path introduced in PR #218.
+`update` uses the same verified update implementation introduced in PR #218. The npm bootstrap detects the intended installed target and passes that target explicitly to the shared update orchestration so update mode never mistakes the ephemeral npm package directory for the installed skill root.
 
 Default `update` is check/verify/plan only. `--apply` performs the existing verified backup/replacement/postcondition path.
 
@@ -230,7 +232,7 @@ It inspects the existing installation and host state, then guides the user throu
 
 For Codex hook trust, the CLI may explain the exact required `/hooks` action but must not bypass or fake the trust decision.
 
-If the exact hook definition is already trusted and unchanged, `setup` may invoke the existing same-version activation-refresh path with the corresponding verified trust assertion.
+When setup needs to refresh same-version hook/watchdog activation, it must execute the installer from the detected installed skill bundle or otherwise use that installed bundle as the explicit source. The ephemeral npm package is never substituted as the installed skill source. If the exact hook definition is already trusted and unchanged, setup may invoke the existing same-version activation-refresh path with the corresponding verified trust assertion.
 
 ### `doctor`
 
@@ -456,6 +458,8 @@ Cover:
 - missing installation reports actionable failure;
 - configured-but-untrusted hooks produce trust guidance without bypass;
 - unchanged trusted hooks can use the existing activation-refresh path;
+- setup uses the installed bundle as source for same-version activation refresh;
+- setup never uses the ephemeral npm package as the installed skill source;
 - setup does not replace the skill payload.
 
 ### Doctor
@@ -513,7 +517,7 @@ The feature is complete when all of the following are true:
 4. npm is not treated as the authoritative installed skill payload.
 5. Existing installs are detected and not silently reinstalled by bare invocation.
 6. `npx github-delivery setup` can finish/repair supported activation state without replacing the payload or bypassing hook trust.
-7. `npx github-delivery update` is dry-run by default and `--apply` reaches the existing verified self-update path.
+7. `npx github-delivery update` is dry-run by default and `--apply` reaches the existing verified self-update path with the installed target passed explicitly.
 8. `npx github-delivery doctor` is read-only and reports installation, integrity, prerequisite, hook/watchdog, config, and update state.
 9. No v1 command silently changes GitHub authentication, optional user settings, global PATH, or hook trust.
 10. The npm package has an explicit `bin`, a minimal publish allowlist, no lifecycle install scripts, and executes from outside a repository checkout.
