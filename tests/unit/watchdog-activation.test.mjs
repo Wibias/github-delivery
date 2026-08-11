@@ -77,7 +77,7 @@ test("normal Codex install configures hooks but does not falsely claim untrusted
   );
 });
 
-test("verified unchanged hook definitions may be reported as active after user trust", () => {
+test("verified unchanged hook definitions can be persisted as active without reinstalling the same skill", () => {
   const f = fixture();
   const first = runInstall(f, ["--lifecycle-hooks-supported", "--apply"]);
   assert.equal(first.status, 0, first.stderr);
@@ -85,12 +85,21 @@ test("verified unchanged hook definitions may be reported as active after user t
   const afterTrust = runInstall(f, [
     "--lifecycle-hooks-supported",
     "--hook-trust-verified",
+    "--apply",
   ]);
   assert.equal(afterTrust.status, 0, afterTrust.stderr);
   const result = JSON.parse(afterTrust.stdout);
+  assert.equal(result.action, "same-version");
+  assert.equal(result.unchanged, true);
   assert.equal(result.watchdog.mode, "hooks");
   assert.equal(result.watchdog.degradationReason, "streaming_interruption_unavailable");
   assert.equal(result.watchdog.hookTrustVerified, true);
+
+  const persisted = JSON.parse(
+    readFileSync(join(f.codexHome, "github-delivery", "watchdog-activation.json"), "utf8"),
+  );
+  assert.equal(persisted.mode, "hooks");
+  assert.equal(persisted.hookTrustVerified, true);
 });
 
 test("a hook definition change invalidates a claimed trust state", () => {
