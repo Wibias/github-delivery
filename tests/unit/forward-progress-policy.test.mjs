@@ -1,0 +1,28 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import test from "node:test";
+
+const kernel = readFileSync(
+  new URL("../../references/policy-kernel.md", import.meta.url),
+  "utf8",
+);
+const mutationPolicy = readFileSync(
+  new URL("../../references/policy/mutation.md", import.meta.url),
+  "utf8",
+);
+const skill = readFileSync(new URL("../../SKILL.md", import.meta.url), "utf8");
+
+test("global policy forces bounded forward progress instead of no-op reasoning loops", () => {
+  assert.match(kernel, /GD-CORE-008/i);
+  assert.match(kernel, /same next action/i);
+  assert.match(kernel, /tool call|state change|new evidence/i);
+  assert.match(kernel, /execute.*immediately|concrete blocker/i);
+  assert.match(kernel, /re-?verify|repeated verification|repeat.*verification/i);
+});
+
+test("prepared GitHub writes do not get a second ad-hoc preflight loop", () => {
+  assert.match(mutationPolicy, /prepared mutation request/i);
+  assert.match(mutationPolicy, /github-mutate\.mjs/i);
+  assert.match(mutationPolicy, /do not .*repeat.*preflight|do not .*duplicate.*preflight/i);
+  assert.match(skill, /forward progress|anti-loop|no-progress/i);
+});
