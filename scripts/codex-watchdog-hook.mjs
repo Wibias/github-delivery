@@ -4,12 +4,11 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
-  renameSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { evaluateCodexHook } from "./lib/codex-watchdog-hook.mjs";
@@ -40,10 +39,11 @@ function readState(path) {
 }
 
 function writeState(path, state) {
-  mkdirSync(resolve(path, ".."), { recursive: true, mode: 0o700 });
-  const temp = `${path}.${process.pid}.${Date.now()}.tmp`;
-  writeFileSync(temp, `${JSON.stringify(state)}\n`, { encoding: "utf8", mode: 0o600 });
-  renameSync(temp, path);
+  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+  writeFileSync(path, `${JSON.stringify(state)}\n`, {
+    encoding: "utf8",
+    mode: 0o600,
+  });
 }
 
 export function runCodexWatchdogHook(input, options = {}) {
