@@ -24,13 +24,16 @@ function inferHost(codexHome) {
     (process.env.CODEX_HOME || existsSync(codexHome) ? "codex" : "unknown");
 }
 
-export function parseInstallArgs(argv) {
+export function parseInstallArgs(argv, { installedRoot = resolve(import.meta.dirname, "..") } = {}) {
   const codexHome = defaultCodexHome();
   const options = {
     source: join(process.cwd(), "dist", "github-delivery"),
     target: join(homedir(), ".agents", "skills", "github-delivery"),
     backupRoot: undefined,
     apply: false,
+    update: false,
+    sourceExplicit: false,
+    targetExplicit: false,
     allowDowngrade: false,
     force: false,
     restore: null,
@@ -44,9 +47,13 @@ export function parseInstallArgs(argv) {
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
-    if (arg === "--source") options.source = argv[++index];
-    else if (arg === "--target") options.target = argv[++index];
-    else if (arg === "--backup-root") options.backupRoot = argv[++index];
+    if (arg === "--source") {
+      options.source = argv[++index];
+      options.sourceExplicit = true;
+    } else if (arg === "--target") {
+      options.target = argv[++index];
+      options.targetExplicit = true;
+    } else if (arg === "--backup-root") options.backupRoot = argv[++index];
     else if (arg === "--restore") options.restore = argv[++index];
     else if (arg === "--codex-home") options.codexHome = argv[++index];
     else if (arg === "--host") options.host = argv[++index];
@@ -55,10 +62,19 @@ export function parseInstallArgs(argv) {
     else if (arg === "--hook-trust-verified") options.hookTrustVerified = true;
     else if (arg === "--stream-launch-controlled") options.streamLaunchControlled = true;
     else if (arg === "--apply") options.apply = true;
+    else if (arg === "--update") options.update = true;
     else if (arg === "--allow-downgrade") options.allowDowngrade = true;
     else if (arg === "--force") options.force = true;
     else throw new Error(`unknown argument: ${arg}`);
   }
+
+  if (options.update) {
+    if (options.sourceExplicit) throw new Error("update_source_conflict");
+    if (options.restore) throw new Error("update_restore_conflict");
+    if (options.allowDowngrade) throw new Error("update_allow_downgrade_forbidden");
+    if (!options.targetExplicit) options.target = installedRoot;
+  }
+
   options.source = resolve(options.source);
   options.target = resolve(options.target);
   options.codexHome = resolve(options.codexHome);
