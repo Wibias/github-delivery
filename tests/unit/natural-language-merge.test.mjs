@@ -41,7 +41,8 @@ test("merge documentation requires merge before the success-looking thank-you", 
 test("the README presents natural language as the public API", () => {
   const readme = read("README.md");
   assert.match(readme, /merge PR #32/);
-  assert.match(readme, /do \*\*not\*\* need to invoke Node scripts yourself/i);
+  assert.match(readme, /\*\*Natural language is the public API\.\*\*/i);
+  assert.match(readme, /You normally do not invoke them yourself\./i);
   assert.match(
     readme,
     /\|\s*\*\*Merge\*\*\s*\|[^\n]*`references\/merge-pr\.md`\s*\|/i,

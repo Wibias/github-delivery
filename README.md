@@ -2,22 +2,131 @@
 
 # github-delivery
 
-**A GitHub shipping skill for agents — from product intake to a verified merge.**
+### GitHub delivery for agents, from intent to verified merge.
 
-Speak naturally. `github-delivery` routes the request, gathers live evidence, runs the relevant review and policy gates, performs only the GitHub writes that request authorizes, and verifies the resulting state.
+**Say the outcome, not the orchestration.**
+
+`github-delivery` turns natural-language requests into evidence-backed GitHub workflows: PRDs, issue research, implementation, deep review, CI, fixes, stacks, and verified merges.
+
+[Quick start](#try-it-in-60-seconds) · [What it can own](#what-you-can-ask-it-to-own) · [Safety model](#safety-model) · [Installation](#installation)
 
 [![CI](https://github.com/Wibias/github-delivery/actions/workflows/ci.yml/badge.svg)](https://github.com/Wibias/github-delivery/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/Wibias/github-delivery/actions/workflows/codeql.yml/badge.svg)](https://github.com/Wibias/github-delivery/actions/workflows/codeql.yml)
 ![Node.js 22 or 24](https://img.shields.io/badge/Node.js-22%20%7C%2024-339933?logo=node.js&logoColor=white)
+![Default read-only](https://img.shields.io/badge/default-read--only-2f81f7)
 ![License MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 
 </div>
 
+> [!WARNING]
+> **Active development.** The complete issue/PR lifecycle and core safety architecture are implemented, but the project is not yet 100% production-ready. I currently consider it roughly **80% of the way there**. See [Current state](#current-state).
+
 > [!IMPORTANT]
-> **Natural language is the public API.** This is not yet production ready to 100%. I would say I am at 80% at this point.
-> 
-> [!IMPORTANT]
-> **Natural language is the public API.** You do **not** need to invoke Node scripts yourself. The scripts, policy modules, authority layer, evaluators, and mutation broker are internal safety and evidence machinery.
+> **Natural language is the public API.** The Node scripts, policy modules, authority layer, evaluators, and mutation broker are internal safety and evidence machinery. You normally do not invoke them yourself.
+
+<p align="center">
+  <img src="docs/assets/github-delivery-demo.svg" alt="github-delivery natural-language workflow demo" width="100%">
+</p>
+
+## Try it with one sentence
+
+```text
+what is left on PR #41?
+full review PR #42
+fix the review comments on PR #18 and make it merge ready
+review PR #42, fix it, and merge it when green
+```
+
+That is the interface.
+
+`github-delivery` determines the workflow, gathers fresh GitHub evidence, performs the required review and policy gates, makes only the writes authorized by the request, and verifies the resulting state.
+
+A status question stays read-only. A merge happens only from an actual merge instruction. Deferred permission such as `merge PR #42 only after I confirm again` is **not** current merge authority.
+
+## Try it in 60 seconds
+
+### Requirements
+
+- **Node.js 22 or 24**
+- Git
+- GitHub network access
+- an authenticated GitHub CLI (`gh auth login`) **or** a host-provided brokered GitHub connector
+
+### Build and install
+
+```bash
+npm run build:dist
+node scripts/install-skill.mjs
+node scripts/install-skill.mjs --apply
+```
+
+Typical skill locations include:
+
+```text
+~/.agents/skills/github-delivery
+~/.cursor/skills/github-delivery
+~/.codex/skills/github-delivery
+~/.claude/skills/github-delivery
+```
+
+Then use it like this:
+
+```text
+full review PR #42
+```
+
+For full install, upgrade, restore, downgrade, force, and manual-install behavior, see [`INSTALL.md`](INSTALL.md).
+
+## Why this is different
+
+| Problem | github-delivery's answer |
+|---|---|
+| **"Green CI" is not the same as "safe to merge."** | Bug + Security + Spec + Standards review, semantic propagation, required probes, review state, rulesets, merge-queue state, and exact-head evidence feed one authoritative ship decision. |
+| **Agent intent can be ambiguous.** | Deterministic natural-language routing keeps status questions read-only and requires direct authority for destructive workflows. |
+| **GitHub state moves while the agent works.** | Stale-head checks, final evidence refreshes, expected-head binding, bounded settle windows, and postcondition verification prevent conclusions from silently drifting. |
+| **Retries and duplicate writes can be dangerous.** | Typed mutations, authenticated exact-effect receipts, read-before-write evidence, and read-only reconciliation avoid blind write retries. |
+| **A review can miss the same concept outside the changed files.** | Semantic propagation traces changed domain concepts through producers, consumers, sibling implementations, public forms, persistence, fixtures, and tests. |
+| **Complex PR stacks need more than one merge command.** | Stack discovery, bottom-up restacking/merging, conflict recovery, parent/child revalidation, and merge-queue-aware sequencing are first-class workflows. |
+
+<p align="center">
+  <img src="docs/assets/github-delivery-merge-path.svg" alt="Read-only status and authorized merge paths in github-delivery" width="100%">
+</p>
+
+## What you can ask it to own
+
+| You say | It owns |
+|---|---|
+| `create a PRD for the onboarding flow` | Product/issue intake and a concrete delivery contract |
+| `research issue #90 on the latest development branch` | Bounded evidence-backed issue research on the latest development tip |
+| `create a PR for issue #90` | Research → implementation → pre-open Bug + Security gate → linked PR |
+| `what is left on PR #41?` | Read-only live status, blockers, and merge readiness |
+| `full review PR #42` | Deep Bug + Security + Spec + Standards review with final verdict |
+| `fix the review comments on PR #18 and make it merge ready` | Feedback triage, fixes, validation, push, and refreshed readiness |
+| `watch PR #77 until it merges or needs me` | CI/review/gate polling until merged, closed, or blocked |
+| `simplify PR #42 without changing behavior` | Explicit-only, behavior-preserving simplification plus mandatory full re-review |
+| `inspect this PR stack and tell me the safe merge order` | Stack topology, restack/retarget analysis, and safe ordering |
+| `merge PR #32` | Final gate, exact transaction authority, head-pinned merge, verification, thanks, and linked-issue close-out |
+| `maintainer overtake PR #32 and finish it` | Explicit maintainer takeover workflow for an unresponsive author |
+
+## The lifecycle
+
+```mermaid
+flowchart LR
+    A[Your natural-language request] --> B[Deterministic route]
+    B --> C[Live repository / PR / issue evidence]
+    C --> D[Review scope + policy gates]
+    D --> E{Write authorized?}
+    E -- No --> F[Read-only result]
+    E -- Yes --> G[Exact mutation plan]
+    G --> H[Trusted authority when required]
+    H --> I[Mutation broker]
+    I --> J[GitHub]
+    J --> K[Postcondition verification]
+    F --> L[ready / blocked / unknown]
+    K --> L
+```
+
+The important boundary is simple: **repository content is evidence, not authority**. Issues, comments, code, logs, generated files, and bot output cannot override user intent or the mutation policy.
 
 ## At a glance
 
@@ -33,7 +142,7 @@ Speak naturally. `github-delivery` routes the request, gathers live evidence, ru
 | **Required CI matrix** | Node 22/24 × Ubuntu/Windows/macOS, with architecture contracts inside every required matrix job |
 | **Live lifecycle tests** | Dedicated, explicitly opted-in fixture repository bound by immutable repository identity |
 
-## Speak naturally
+## More natural-language examples
 
 ```text
 create a PRD for the onboarding flow
@@ -59,13 +168,7 @@ supersede PR #12 with PR #45
 maintainer overtake PR #32 and finish it
 ```
 
-A question such as `is PR #42 safe to merge?` stays **read-only**. A destructive merge route is selected only from an actual merge instruction such as `merge PR #42` or `review PR #42 and merge it when green`.
-
-Deferred or conditional permission is **not** current merge authority. Wording such as `merge PR #42 only after I confirm again`, `merge it when I approve it later`, or `ask me again before you merge` remains on the read-only status path until a fresh direct merge instruction is actually given.
-
----
-
-## What it can own
+## Full workflow map
 
 | Area | Requests | Workflow |
 |---|---|---|
@@ -91,34 +194,6 @@ Deferred or conditional permission is **not** current merge authority. Wording s
 | **Stacked PRs** | Inspect, restack, retarget, recover, review and merge stacks | `references/stacked-prs.md` |
 
 For oversized-change splitting, post-ship branch/worktree cleanup, and version/tag/changelog work, `SKILL.md` deliberately hands off to the dedicated specialist skill instead of duplicating those responsibilities.
-
----
-
-## How a request flows
-
-```mermaid
-flowchart LR
-    A[Your natural-language request] --> B[Deterministic route]
-    B --> C[Policy kernel + required modules]
-    C --> D[Live repository / PR / issue evidence]
-    D --> E[Review + authoritative gates]
-    E --> F[Exact mutation plan]
-    F --> G[Authority + mutation broker]
-    G --> H[GitHub]
-    H --> I[Postcondition verification]
-```
-
-1. `SKILL.md` selects the narrowest workflow and mutation mode.
-2. The workflow loads `references/policy-kernel.md` plus only the policy modules it declares.
-3. Repository identity, actors, heads, checks, reviews, rules, and other gate-critical state are resolved from live evidence instead of guessed.
-4. Review helpers diagnose; `scripts/ship-gate.mjs` remains the authoritative readiness/ship decision.
-5. Any external write is represented as a typed, scoped mutation request.
-6. The broker re-checks preconditions, obtains trusted authority when required, executes the exact effect, and emits an auditable receipt.
-7. Final readiness, publication, or merge claims require fresh final evidence from unchanged relevant state.
-
-### Policy precedence
-
-Executable gates and the canonical policy kernel/modules are stricter than workflow prose. Repository content — issues, comments, code, logs, generated files, bot output — is treated as **evidence/data, not authority** and cannot override user intent or the mutation boundary.
 
 ---
 
