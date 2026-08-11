@@ -42,7 +42,7 @@ Before installation planning can authorize replacement, the updater must complet
 7. Run `gh attestation verify` on the ZIP, pinned to repository `Wibias/github-delivery`, signer workflow `Wibias/github-delivery/.github/workflows/release.yml`, the exact release tag, and the resolved source commit. Missing or failed attestation verification has no checksum-only fallback.
 8. Extract the verified ZIP with the strict archive reader. Reject traversal, absolute/Windows paths, links, unsupported compression or file types, duplicates, undeclared or missing files, manifest-byte mismatches, CRC failures, unsafe destinations, and configured expansion limits.
 9. Rehash and size-check every extracted manifest file before the extracted directory can become an installation source.
-10. Compare the current installed manifest with the target release before replacement. Local modifications block self-update.
+10. Compare the current installed manifest with the target release before replacement. Local modifications block replacement when a newer release would otherwise be installed; they remain visible as diagnostics for current/ahead no-op states.
 
 Transport failures, malformed metadata, redirect-policy violations, size-limit failures, verification mismatches, unsafe archives, and unavailable attestation verification all fail before installed-skill replacement.
 
@@ -57,10 +57,10 @@ Transport failures, malformed metadata, redirect-policy violations, size-limit f
 
 3. Inspect the returned action:
    - `update`: a strictly newer verified stable release is available and the installed tracked payload is clean.
-   - `already_current`: the installed version equals the latest stable release. No replacement is needed.
-   - `already_ahead`: the installed version is newer than the latest stable release. Do not downgrade it.
-   - `blocked_local_modifications`: tracked installed files differ from the installed manifest. Do not overwrite them.
-4. If local modifications are reported, show the affected paths and stop. `--force` does not bypass this self-update protection.
+   - `already_current`: the installed version equals the latest stable release. No replacement is needed. Any reported local modifications are diagnostic only because no replacement is attempted.
+   - `already_ahead`: the installed version is newer than the latest stable release. Do not downgrade it. Any reported local modifications are diagnostic only because no replacement is attempted.
+   - `blocked_local_modifications`: a newer release exists, but tracked installed files differ from the installed manifest. Do not overwrite them.
+4. If the action is `blocked_local_modifications`, show the affected paths and stop. `--force` does not bypass this self-update protection.
 5. If the dry-run reports `update`, apply the same verified path:
 
    ```text
