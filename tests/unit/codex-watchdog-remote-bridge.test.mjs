@@ -9,6 +9,10 @@ function nextTurn() {
   return new Promise((resolve) => setImmediate(resolve));
 }
 
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function openWebSocket(url) {
   return new Promise((resolve, reject) => {
     const socket = new WebSocket(url);
@@ -39,6 +43,37 @@ function rawUpgrade(url) {
       );
     });
   });
+}
+
+function captureRequests(stream) {
+  let buffer = "";
+  const requests = [];
+  stream.setEncoding("utf8");
+  stream.on("data", (chunk) => {
+    buffer += chunk;
+    while (buffer.includes("\n")) {
+      const index = buffer.indexOf("\n");
+      const line = buffer.slice(0, index);
+      buffer = buffer.slice(index + 1);
+      if (!line.trim()) continue;
+      try {
+        requests.push(JSON.parse(line));
+      } catch {
+        // Ignore non-JSON fixture traffic.
+      }
+    }
+  });
+  return requests;
+}
+
+async function waitFor(predicate, { timeoutMs = 500 } = {}) {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    const value = predicate();
+    if (value) return value;
+    await delay(5);
+  }
+  throw new Error("timed out waiting for test condition");
 }
 
 test("protected bridge rejects a client that lacks its bearer token", async () => {
@@ -117,6 +152,117 @@ test("installed streaming boundary interrupts the observed Let me check type loo
   );
   await nextTurn();
   assert.equal((requests.match(/"method":"turn\/interrupt"/g) || []).length, 1);
+
+  client.close();
+  await bridge.close();
+});
+
+test("protected bridge fails closed when client opts out of required watchdog notifications", async () => {
+  const appServerInput = new PassThrough();
+  const appServerOutput = new PassThrough();
+  const bridge = await startCodexWatchdogRemoteBridge({ appServerInput, appServerOutput, token: null });
+  const client = await openWebSocket(bridge.url);
+
+  client.send(JSON.stringify({
+    id: 1,
+    method: "initialize",
+    params: {
+      capabilities: {
+        optOutNotificationMethods: ["item/agentMessage/delta"],
+      },
+    },
+  }));
+
+  const failure = await bridge.failure;
+  assert.equal(failure.code, "required_notification_opted_out");
+  assert.match(failure.message, /item\/agentMessage\/delta/);
+
+  client.close();
+  await bridge.close();
+});
+
+test("protected bridge fails closed when a non-empty completed agent message had no deltas", async () => {
+  const appServerInput = new PassThrough();
+  const appServerOutput = new PassThrough();
+  const bridge = await startCodexWatchdogRemoteBridge({ appServerInput, appServerOutput, token: null });
+  const client = await openWebSocket(bridge.url);
+
+  appServerOutput.write(`${JSON.stringify({
+    method: "item/completed",
+    params: {
+      threadId: "thr-health",
+      turnId: "turn-health",
+      item: { id: "msg-health", type: "agentMessage", text: "I produced text without deltas." },
+    },
+  })}\n`);
+
+  const failure = await bridge.failure;
+  assert.equal(failure.code, "agent_message_delta_missing");
+
+  client.close();
+  await bridge.close();
+});
+
+test("protected bridge fails closed when turn interrupt returns an error", async () => {
+  const appServerInput = new PassThrough();
+  const appServerOutput = new PassThrough();
+  const requests = captureRequests(appServerInput);
+  const bridge = await startCodexWatchdogRemoteBridge({ appServerInput, appServerOutput, token: null });
+  const client = await openWebSocket(bridge.url);
+
+  for (let index = 0; index < 3; index += 1) {
+    appServerOutput.write(`${JSON.stringify({
+      method: "item/agentMessage/delta",
+      params: {
+        threadId: "thr-error",
+        turnId: "turn-error",
+        itemId: "msg-error",
+        delta: "Let me read request-log.test.ts.\n",
+      },
+    })}\n`);
+  }
+
+  const interrupt = await waitFor(() => requests.find((request) => request.method === "turn/interrupt"));
+  appServerOutput.write(`${JSON.stringify({
+    id: interrupt.id,
+    error: { code: -32000, message: "cannot interrupt" },
+  })}\n`);
+
+  const failure = await bridge.failure;
+  assert.equal(failure.code, "interrupt_rejected");
+  assert.match(failure.message, /cannot interrupt/);
+
+  client.close();
+  await bridge.close();
+});
+
+test("protected bridge fails closed when turn interrupt is not acknowledged", async () => {
+  const appServerInput = new PassThrough();
+  const appServerOutput = new PassThrough();
+  const requests = captureRequests(appServerInput);
+  const bridge = await startCodexWatchdogRemoteBridge({
+    appServerInput,
+    appServerOutput,
+    token: null,
+    interruptAckTimeoutMs: 25,
+  });
+  const client = await openWebSocket(bridge.url);
+
+  for (let index = 0; index < 3; index += 1) {
+    appServerOutput.write(`${JSON.stringify({
+      method: "item/agentMessage/delta",
+      params: {
+        threadId: "thr-timeout",
+        turnId: "turn-timeout",
+        itemId: "msg-timeout",
+        delta: "Let me read request-log.test.ts.\n",
+      },
+    })}\n`);
+  }
+
+  await waitFor(() => requests.find((request) => request.method === "turn/interrupt"));
+  const failure = await bridge.failure;
+  assert.equal(failure.code, "interrupt_ack_timeout");
 
   client.close();
   await bridge.close();

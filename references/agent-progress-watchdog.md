@@ -4,7 +4,8 @@ GitHub Delivery uses a layered progress watchdog to reduce token waste without w
 
 ## What it protects against
 
-- repeated in-turn intentions such as `Let me read ...` or `Let me check ...` with no tool boundary;
+- repeated in-turn intentions such as `Let me read ...` or `Let me check ...` before a useful tool boundary;
+- read-exploration spirals where the model keeps choosing different reads/searches without reaching execution, a state change, or a concrete blocker;
 - exact reads repeated on unchanged state;
 - ad-hoc high-frequency CI/status polling;
 - oversized model-facing tool output when only a focused diagnostic excerpt is required;
@@ -30,6 +31,20 @@ Mode selection is strongest verified mode only:
 
 Codex requires non-managed command hooks to be reviewed and trusted before they run. Trust is tied to the current hook definition, so adding or changing the hook makes it review-pending again. GitHub Delivery therefore never treats `hooks.json` presence as proof that lifecycle enforcement is active and never enables `--dangerously-bypass-hook-trust` by default.
 
+## Progress model
+
+The watchdog does not treat every completed tool call as proof of forward progress. Each confidently classified tool/item belongs to one of these categories:
+
+- **evidence**: reads, searches, list/view/status/diff operations, hosted stream-visible WebSearch/image viewing, and read-like MCP/dynamic tools;
+- **execution**: focused tests, builds, lint/check/verification commands, and other confidently classified non-read execution;
+- **state change**: edits, writes, file changes, and confidently classified write-like tools/commands;
+- **delegate**: subagent/collaboration work;
+- **neutral**: unknown or non-progress protocol items.
+
+Evidence is useful, but it does not reset repeated-narration history. Execution resets the consecutive evidence streak and narration window without invalidating stable-read fingerprints. State progress also increments the state generation and invalidates stable-read fingerprints. Unknown tools are neutral rather than being allowed to reset the watchdog accidentally.
+
+A tool merely starting is not execution/state progress. In stream mode an evidence attempt is charged when the item starts so parallel or hanging reads cannot evade the exploration budget.
+
 ## Enforcement levels
 
 ### Policy only
@@ -46,17 +61,21 @@ This layer can:
 
 - block an exact stable duplicate read on unchanged state;
 - rate-limit identical volatile polls;
+- warn once at 8 consecutive supported evidence attempts without execution/state progress;
+- deny the 12th and later supported evidence attempt until execution/state progress occurs or a new turn begins;
 - reject an oversized `Agent`/subagent tool input and require a focused source-referenced brief;
 - compact oversized model-facing tool output while retaining failure/error/blocker signals;
 - detect a completed no-progress assistant or subagent message and request one corrective continuation;
 - fail closed if that corrective continuation stalls again;
-- delete per-session state at `SessionEnd`.
+- delete all hashed turn/agent state for a session at `SessionEnd`.
 
-The default subagent-input budget is 6,000 serialized characters. It is a context budget, not an authority or correctness gate.
+The 8/12 evidence limits are defaults and are intentionally turn-scoped. Exact duplicate/poll protection is independent and can block earlier. The default subagent-input budget is 6,000 serialised characters. These are context/progress budgets, not authority or correctness gates.
 
-Hook state is stored outside repository content. Session ids and read inputs are represented only by SHA-256 fingerprints; raw tool arguments are not persisted.
+Hook state is stored outside repository content under a hashed session directory. Every turn-scoped event includes `session_id + turn_id`; when Codex actually supplies `agent_id`, that value is included in the hashed state scope too. Current Codex `PreToolUse`/`PostToolUse` schemas document `turn_id` but do not document `agent_id`, so supported local tool activity without an exposed agent identifier intentionally shares one conservative evidence budget within that turn rather than inventing a subagent identity. `SubagentStop` does expose `agent_id` and can use the narrower scope. Sharing a tool budget can stop parallel subagent exploration earlier, but it cannot weaken the loop bound.
 
-Lifecycle hooks cannot reclaim tokens already emitted inside the assistant message that reaches `Stop` or `SubagentStop`.
+Updates use an exclusive per-scope lock with bounded acquisition, stale-lock recovery, restrictive permissions where supported, and atomic replacement. Malformed state fails explicitly rather than silently resetting protection. Persisted state contains only counters, generation values, timestamps and SHA-256 read fingerprints. Raw prompts, assistant text, tool arguments, tool output, bearer tokens and repository secrets are not persisted.
+
+Codex local tool hooks do not cover every host/tool surface. Hosted tools such as WebSearch are not assumed to pass through `PreToolUse`/`PostToolUse`, and lifecycle hooks cannot reclaim tokens already emitted inside the assistant message that reaches `Stop` or `SubagentStop`. Hook mode is therefore a deterministic supported-tool boundary, not a universal hard interrupt.
 
 The normal Codex installer path configures GitHub Delivery's hook entries automatically on `--apply`. Hook configuration is backup-first, preserves unrelated entries, rejects malformed or symlinked configuration, and is idempotent. `scripts/install-codex-watchdog-hooks.mjs` remains available for repair and non-standard installs.
 
@@ -77,20 +96,31 @@ The launcher:
 1. starts the real `codex app-server` on its normal stdio transport;
 2. creates a loopback-only authenticated bridge;
 3. starts the ordinary Codex client with the documented `--remote` and `--remote-auth-token-env` flags pointed at that bridge;
-4. forwards JSON-RPC traffic while observing `item/agentMessage/delta` notifications;
-5. issues one private `turn/interrupt` when repeated low-novelty intent narration crosses the watchdog threshold;
-6. consumes the private interrupt response rather than leaking it to the client;
-7. declares `SHIPPING_GITHUB_PROGRESS_WATCHDOG=stream` inside the launched process tree so runtime inspection sees the current protected session directly.
+4. keeps an independent watchdog for every active Codex turn;
+5. observes assistant deltas plus supported App Server item start/completion events, including hosted WebSearch visibility;
+6. preserves narration-stall history across evidence reads/searches instead of treating them as execution progress;
+7. issues one private `turn/interrupt` for repeated low-novelty narration or a hard evidence-budget breach;
+8. requires the private interrupt request to be acknowledged within a bounded interval;
+9. fails closed if a required watchdog notification is opted out, a non-empty completed agent message appears without its streaming deltas, the router fails, or an interrupt errors/times out;
+10. declares `SHIPPING_GITHUB_PROGRESS_WATCHDOG=stream` only inside the launched process tree.
 
-The bearer token is generated in memory for the launched client and is not persisted. The bridge binds only to loopback, validates the WebSocket v13 upgrade, requires the bearer token in normal launcher use, permits one client, and bounds individual frames. The protected launcher owns the remote endpoint flags and rejects caller-supplied replacements.
+The bearer token is generated in memory for the launched client and is not persisted. The bridge binds only to loopback, validates the WebSocket v13 upgrade, requires the bearer token in normal launcher use, permits one client, requires masked client frames, and bounds individual frames. The protected launcher owns the remote endpoint flags and rejects caller-supplied replacements.
 
-This is the only GitHub Delivery layer that can stop the targeted failure while an assistant message is still streaming. The incident regression includes the observed phrase family `Let me check the type`, `Let me check the NOUS_DEF type`, and `Let me check the OAuthProviderDef type`, and requires the interrupt before 500 emitted characters.
+A bridge enforcement failure destroys the protected client connection. The launcher races that failure against normal client exit and kills both the client and App Server process before returning an error. It must never leave a process running while continuing to claim `stream` protection after the enforcement contract is lost.
+
+This is the only GitHub Delivery layer that can stop the targeted failure while an assistant message is still streaming. Regression coverage includes both observed incident classes:
+
+- repeated `Let me check the type` / `Let me check the NOUS_DEF type` / `Let me check the OAuthProviderDef type` narration;
+- repeated `Let me read request-log.test.ts.` narration;
+- interleaved `narrate -> evidence read/search -> narrate -> different evidence read/search` exploration that previously reset the detector.
+
+The pure narration incident must interrupt before 500 emitted characters. Evidence activity does not grant a fresh narration window, and concurrent turns cannot reset one another.
 
 Installing the launcher does not silently reroute an already-running or ordinarily-launched Codex CLI/IDE process. A one-off protected session gets its `stream` declaration from the launcher itself. A persisted `stream` activation receipt is reserved for a host integration that explicitly asserts it controls future launches through this entry point.
 
 **Maturity:** Codex currently documents `app-server` and its WebSocket transport as experimental and unsupported for production workloads. GitHub Delivery therefore treats this launcher as the strongest available Codex enforcement boundary, not as a stable production host API. Lifecycle hooks and policy fallback remain available when that experimental streaming surface is inappropriate.
 
-The older `scripts/codex-app-server-watchdog-proxy.mjs` remains useful to custom stdio App Server clients. It provides the same delta watchdog for clients that already own the App Server protocol connection.
+The older `scripts/codex-app-server-watchdog-proxy.mjs` remains useful to custom stdio App Server clients. It now uses the same per-turn typed progress model; custom clients still own responsibility for the rest of their transport/process lifecycle.
 
 ## Read economy
 
@@ -100,11 +130,13 @@ Stable read fingerprint:
 SHA-256(state-generation + tool-name + canonical-tool-input)
 ```
 
-A repeated stable read on the same generation is blocked. Any relevant write/state change increments the generation and invalidates the read cache.
+A repeated stable read on the same generation is blocked. State progress increments the generation and invalidates the read cache. Execution progress does not invalidate it, because running a test does not make an unchanged file read novel.
 
 Volatile reads are rate-limited rather than cached forever. The default interval is 30 seconds. When pending required CI is the only blocker, `scripts/ci-wait.mjs` remains authoritative and manual polling is not a parallel waiting mechanism.
 
-Unknown tools are not denied by economy classification. This avoids suppressing evidence when a future host/tool is not yet classified.
+The consecutive evidence budget is separate from duplicate-read detection. Distinct reads still consume the turn budget, which closes the failure mode where an agent avoided dedupe simply by moving to a different file/search on every step. A read denied solely by the hard evidence budget is not committed to the read-fingerprint cache because that tool never ran.
+
+Unknown tools are not denied by economy classification and do not reset the watchdog merely by completing. This avoids both unsafe bypass and false blocking when a future host/tool is not yet classified.
 
 ## Output economy
 

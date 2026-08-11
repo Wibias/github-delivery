@@ -1,17 +1,15 @@
 #!/usr/bin/env node
-import { createHash } from "node:crypto";
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { evaluateCodexHook } from "./lib/codex-watchdog-hook.mjs";
+import {
+  removeWatchdogSessionState,
+  watchdogStatePath,
+  watchdogStateScope,
+  withWatchdogState,
+} from "./lib/watchdog-state-store.mjs";
 
 function defaultStateRoot() {
   return resolve(
@@ -20,47 +18,43 @@ function defaultStateRoot() {
   );
 }
 
-function sessionKey(sessionId) {
-  return createHash("sha256").update(String(sessionId || "unknown")).digest("hex");
-}
-
-export function statePathForSession(stateRoot, sessionId) {
-  return join(resolve(stateRoot), `${sessionKey(sessionId)}.json`);
-}
-
-function readState(path) {
-  if (!existsSync(path)) return {};
-  try {
-    const value = JSON.parse(readFileSync(path, "utf8"));
-    return value && typeof value === "object" ? value : {};
-  } catch {
-    return {};
-  }
-}
-
-function writeState(path, state) {
-  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
-  writeFileSync(path, `${JSON.stringify(state)}\n`, {
-    encoding: "utf8",
-    mode: 0o600,
+export function statePathForSession(
+  stateRoot,
+  sessionId,
+  turnId = "turn-1",
+  agentId = "main",
+) {
+  return watchdogStatePath(resolve(stateRoot), {
+    sessionId: String(sessionId || "unknown-session"),
+    turnId: String(turnId || "unknown-turn"),
+    agentId: String(agentId || "main"),
   });
 }
 
 export function runCodexWatchdogHook(input, options = {}) {
   if (!input || typeof input !== "object") throw new Error("hook input must be a JSON object");
   const stateRoot = resolve(options.stateRoot || defaultStateRoot());
-  const statePath = statePathForSession(stateRoot, input.session_id);
 
   if (input.hook_event_name === "SessionEnd") {
-    const existed = existsSync(statePath);
-    rmSync(statePath, { force: true });
-    return { output: null, stateRemoved: existed, statePath };
+    const removed = removeWatchdogSessionState(stateRoot, input.session_id || "unknown-session");
+    return {
+      output: null,
+      stateRemoved: removed.existed,
+      statePath: removed.directory,
+    };
   }
 
-  const state = readState(statePath);
-  const result = evaluateCodexHook(input, state, options);
-  writeState(statePath, result.state);
-  return { ...result, statePath, stateRemoved: false };
+  const scope = watchdogStateScope(input);
+  const result = withWatchdogState(
+    scope,
+    (state) => evaluateCodexHook(input, state, options),
+    {
+      stateRoot,
+      lockWaitMs: options.lockWaitMs,
+      staleLockMs: options.staleLockMs,
+    },
+  );
+  return { ...result, stateRemoved: false };
 }
 
 export function main({ stdin = process.stdin, stdout = process.stdout, stderr = process.stderr } = {}) {

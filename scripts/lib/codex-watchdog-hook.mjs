@@ -2,43 +2,15 @@ import {
   compactToolOutput,
   createProgressWatchdog,
 } from "./agent-progress-watchdog.mjs";
-
-const VOLATILE_NAME = /(checks?|workflow|run|status|mergeable|pull_request|pr_)/i;
-const READ_NAME = /(?:^|__|_)(fetch|get|list|search|read|view|status|diff|compare)(?:_|$)/i;
-const WRITE_NAME = /(?:^|__|_)(create|update|delete|remove|merge|reply|push|close|reopen|mark|set|add|apply|write)(?:_|$)/i;
-
-function bashClassification(command) {
-  const value = String(command || "").trim().toLowerCase();
-  if (!value) return { kind: "unknown" };
-
-  if (/\bgh\s+(?:pr\s+(?:checks|view)|run\s+view|api\b)/i.test(value)) {
-    return { kind: "read", volatility: "volatile" };
-  }
-  if (
-    /^(?:get-content\b|select-string\b|rg\b|grep\b|cat\b|git\s+(?:status|diff|log|show|branch|rev-parse)\b)/i.test(
-      value,
-    )
-  ) {
-    return { kind: "read", volatility: "stable" };
-  }
-  if (/\b(?:git\s+(?:commit|push|merge|rebase|checkout|switch|reset)|gh\s+(?:pr\s+(?:create|edit|merge|ready|close)|issue\s+(?:create|edit|close)))\b/i.test(value)) {
-    return { kind: "write" };
-  }
-  return { kind: "unknown" };
-}
+import { classifyHookTool } from "./watchdog-progress-classifier.mjs";
 
 export function classifyCodexTool(toolName, toolInput = {}) {
-  const name = String(toolName || "");
-  if (name === "Bash") return bashClassification(toolInput?.command);
-  if (/^(?:apply_patch|Edit|Write)$/i.test(name)) return { kind: "write" };
-  if (name === "Agent" || /spawn_agent/i.test(name)) return { kind: "delegate" };
-  if (WRITE_NAME.test(name)) return { kind: "write" };
-  if (READ_NAME.test(name)) {
-    return {
-      kind: "read",
-      volatility: VOLATILE_NAME.test(name) ? "volatile" : "stable",
-    };
+  const classification = classifyHookTool({ tool_name: toolName, tool_input: toolInput });
+  if (classification.kind === "evidence") {
+    return { kind: "read", volatility: classification.volatility || "stable" };
   }
+  if (classification.kind === "state-change") return { kind: "write" };
+  if (classification.kind === "delegate") return { kind: "delegate" };
   return { kind: "unknown" };
 }
 
@@ -47,7 +19,14 @@ function hydrate(state, options) {
   return createProgressWatchdog({
     stateGeneration: snapshot.stateGeneration,
     reads: snapshot.reads,
+    consecutiveEvidenceAttempts: snapshot.consecutiveEvidenceAttempts,
+    totalEvidenceAttempts: snapshot.totalEvidenceAttempts,
+    evidenceWarningIssued: snapshot.evidenceWarningIssued,
+    executionProgressCount: snapshot.executionProgressCount,
+    stateProgressCount: snapshot.stateProgressCount,
     volatileReadIntervalMs: options.volatileReadIntervalMs,
+    evidenceSoftLimit: options.evidenceSoftLimit,
+    evidenceHardLimit: options.evidenceHardLimit,
   });
 }
 
@@ -60,6 +39,14 @@ function duplicateReason(decision) {
     return `Repeated volatile poll blocked for ${decision.retryAfterMs}ms. Reuse the current snapshot; when pending CI is the only blocker use scripts/ci-wait.mjs instead of manual polling.`;
   }
   return "Duplicate read blocked on unchanged state. Reuse the valid evidence already captured; read again only after relevant state changes or the prior result becomes failed, ambiguous, or stale.";
+}
+
+function evidenceBudgetReason(decision) {
+  return `Evidence exploration budget exhausted after ${decision.consecutiveEvidenceAttempts} consecutive reads/searches without execution or state progress. Synthesise the evidence already gathered and take the next focused execution step, make the authorised change, or report the concrete blocker before reading more.`;
+}
+
+function evidenceWarning(decision) {
+  return `GitHub Delivery progress guard: ${decision.consecutiveEvidenceAttempts} consecutive evidence reads/searches have occurred without execution or state progress. Synthesise what is already known and choose the next focused action; any additional reading should be narrowly justified.`;
 }
 
 function inputChars(value) {
@@ -92,22 +79,43 @@ export function evaluateCodexHook(input, state = {}, options = {}) {
     volatileReadIntervalMs: options.volatileReadIntervalMs ?? 30_000,
     maxToolOutputChars: options.maxToolOutputChars ?? 4_000,
     maxSubagentInputChars: options.maxSubagentInputChars ?? 6_000,
+    evidenceSoftLimit: options.evidenceSoftLimit ?? 8,
+    evidenceHardLimit: options.evidenceHardLimit ?? 12,
   };
   const watchdog = hydrate(state, config);
   const event = input?.hook_event_name;
   let output = null;
 
   if (event === "PreToolUse") {
-    const classification = classifyCodexTool(input.tool_name, input.tool_input);
-    if (classification.kind === "read") {
-      const decision = watchdog.decideRead({
+    const classification = classifyHookTool(input);
+    if (classification.kind === "evidence") {
+      const read = {
         toolName: input.tool_name,
         input: input.tool_input,
-        volatility: classification.volatility,
+        volatility: classification.volatility || "stable",
         now: config.now,
-      });
-      if (decision.action === "block") {
-        output = { decision: "block", reason: duplicateReason(decision) };
+      };
+      const readDecision = watchdog.decideRead({ ...read, record: false });
+      if (readDecision.action === "block") {
+        output = { decision: "block", reason: duplicateReason(readDecision) };
+      } else {
+        const budgetDecision = watchdog.chargeEvidenceAttempt();
+        if (budgetDecision.action === "block") {
+          output = {
+            decision: "block",
+            reason: evidenceBudgetReason(budgetDecision),
+          };
+        } else {
+          watchdog.decideRead({ ...read, record: true });
+          if (budgetDecision.action === "warn") {
+            output = {
+              hookSpecificOutput: {
+                hookEventName: "PreToolUse",
+                additionalContext: evidenceWarning(budgetDecision),
+              },
+            };
+          }
+        }
       }
     } else if (
       classification.kind === "delegate" &&
@@ -119,9 +127,12 @@ export function evaluateCodexHook(input, state = {}, options = {}) {
       };
     }
   } else if (event === "PostToolUse") {
-    const classification = classifyCodexTool(input.tool_name, input.tool_input);
-    if (classification.kind === "write") watchdog.recordStateChange("tool_write_completed");
-    else watchdog.recordExternalProgress({ kind: "tool_completed", toolName: input.tool_name });
+    const classification = classifyHookTool(input);
+    if (classification.kind === "state-change") {
+      watchdog.recordStateProgress("tool_state_change_completed");
+    } else if (classification.kind === "execution") {
+      watchdog.recordExecutionProgress({ kind: "tool_execution_completed", toolName: input.tool_name });
+    }
 
     const compacted = compactToolOutput(input.tool_response ?? "", {
       maxChars: config.maxToolOutputChars,

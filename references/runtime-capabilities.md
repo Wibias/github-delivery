@@ -45,7 +45,11 @@ For the progress watchdog, an explicit environment declaration is authoritative 
 
 When no explicit runtime declaration exists, discovery reads `~/.codex/github-delivery/watchdog-activation.json` (or the equivalent under `CODEX_HOME`). Invalid or missing activation state never upgrades capability. A fresh Codex hook configuration is persisted as `none` with `hook_trust_required` until the expected unchanged non-managed hook definition has been explicitly confirmed trusted; file presence alone is not interpreted as active hooks.
 
-`hooks` means lifecycle-hook enforcement was explicitly verified for the expected definition. `stream` means the current process or host has a verified launch boundary capable of interrupting an in-flight no-progress turn. `none` means policy-only protection for that capability snapshot. See `references/agent-progress-watchdog.md` for their different guarantees.
+`hooks` means lifecycle-hook enforcement was explicitly verified for the expected definition. It provides per-turn supported-tool guardrails, including duplicate-read protection and bounded evidence exploration, but it does not claim hard interruption before a local tool boundary or coverage for hosted tools that bypass local hooks.
+
+`stream` means the current process or host owns the protected App Server launch boundary capable of interrupting an in-flight no-progress turn. The protected launcher monitors that contract at runtime and fails closed if required notification visibility is disabled/lost, the watchdog router fails, or a private `turn/interrupt` errors or is not acknowledged. A process must not continue to describe itself as protected `stream` after that enforcement boundary fails.
+
+`none` means policy-only protection for that capability snapshot. See `references/agent-progress-watchdog.md` for the different guarantees.
 
 ## Output contract
 
@@ -101,6 +105,8 @@ When no explicit runtime declaration exists, discovery reads `~/.codex/github-de
 - Bugbot is used only on Cursor when both host and capability declarations permit it. Every other host uses complementary lenses.
 - Subagents are used only when declared. Otherwise run the work in-session without claiming fan-out occurred.
 - `runtime.progressWatchdog` is `stream`, `hooks`, or `none`; the corresponding `contextEconomy` fallback is `streaming-watchdog`, `lifecycle-hooks`, or `policy-only`.
+- `hooks` is turn-scoped for supported local hook paths. Its evidence budget does not imply hosted WebSearch coverage or mid-generation interruption.
+- `stream` is a current controlled-runtime claim, not a promise that an ordinary `codex`/IDE launch is automatically protected. Runtime loss of the required stream contract is fatal to the protected launcher rather than a silent downgrade.
 - `progressWatchdogDegradationReason` can expose `hook_trust_required`, `streaming_interruption_unavailable`, or another concrete activation degradation instead of letting the workflow assume stronger enforcement.
 - `progress_watchdog_unavailable` is included in `degraded` when no runtime watchdog is active. A more specific activation reason can still be present in `runtime.progressWatchdogDegradationReason`.
 - Missing ruleset or review-thread evidence is degraded capability and must flow into an unknown gate result rather than being guessed.

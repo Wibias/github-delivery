@@ -49,6 +49,7 @@ export async function runProtectedCodex({
   args = process.argv.slice(2),
   env = process.env,
   spawnImpl = spawn,
+  bridgeStarter = startCodexWatchdogRemoteBridge,
   stderr = process.stderr,
 } = {}) {
   validateProtectedClientArgs(args);
@@ -63,7 +64,7 @@ export async function runProtectedCodex({
 
   let bridge;
   try {
-    bridge = await startCodexWatchdogRemoteBridge({
+    bridge = await bridgeStarter({
       appServerInput: appServer.stdin,
       appServerOutput: appServer.stdout,
       token,
@@ -102,11 +103,18 @@ export async function runProtectedCodex({
     process.once(signal, handler);
   }
 
+  const bridgeFailure = bridge.failure
+    ? bridge.failure.then((failure) => {
+        const code = failure?.code || "unknown_watchdog_failure";
+        const message = failure?.message || "protected stream enforcement failed";
+        throw new Error(`watchdog enforcement failed (${code}): ${message}`);
+      })
+    : new Promise(() => {});
+
   try {
-    return await waitForExit(client);
+    return await Promise.race([waitForExit(client), bridgeFailure]);
   } finally {
-    if (!appServer.killed) appServer.kill();
-    await bridge.close().catch(() => {});
+    await cleanup();
     for (const [signal, handler] of handlers) process.off(signal, handler);
   }
 }

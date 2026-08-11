@@ -80,6 +80,55 @@ All notable changes to `github-delivery` are documented here.
   the TLDR; a comment failing the gate must be repaired, never marked
   published.
 
+## [0.4.0] - 2026-08-11
+
+### Added
+
+- Added turn-scoped watchdog state and a typed progress model that separates
+  evidence acquisition from execution and state-changing progress. Distinct
+  reads/searches no longer reset narration-stall detection simply because a
+  tool completed.
+- Added a bounded evidence-exploration budget for supported Codex hook and
+  streaming paths: a model-visible warning at 8 consecutive evidence attempts
+  without execution/state progress and a hard read denial or stream interrupt
+  at 12. Exact duplicate stable reads and rapid repeated volatile polls remain
+  immediate blocks.
+- Added regressions for both production loop classes: pure repeated
+  `Let me read request-log.test.ts.` narration and interleaved
+  `narrate -> read -> narrate -> different read` exploration spirals.
+
+### Changed
+
+- Codex hook persistence is now scoped by `session_id + turn_id`, with
+  `agent_id` included when the host actually supplies it. Updates use bounded
+  exclusive locking, stale-lock recovery, atomic replacement, restrictive
+  permissions, ownership checks, and symlink rejection.
+- App Server streaming now keeps an independent watchdog per turn. Evidence is
+  charged when an item starts, while only successful execution/state progress
+  can reset the exploration/narration window. Concurrent turns therefore cannot
+  reset one another.
+- Progress classification is conservative by default: unknown or ambiguous
+  tools remain neutral instead of being counted as progress. `gh api` REST and
+  GraphQL mutations, explicit write cmdlets, mixed read/write names, and
+  read-looking shell commands with ambiguous redirection are handled without
+  falsely resetting the watchdog.
+
+### Fixed
+
+- Fixed the read-exploration failure where every completed non-write tool was
+  treated as progress, allowing dozens or hundreds of different reads to evade
+  the stall detector indefinitely.
+- Fixed cross-turn contamination in both hook persistence and the App Server
+  router.
+- Hardened protected stream mode to fail closed when required notifications are
+  disabled or disappear, the watchdog router fails, or a private
+  `turn/interrupt` is rejected or not acknowledged within the bounded timeout.
+  The protected launcher terminates its Codex process tree rather than
+  continuing under a false `stream` protection claim.
+- Hardened watchdog state storage against predictable temp-path redirection and
+  symlink/unowned path attacks without persisting prompts, assistant text, raw
+  tool inputs/outputs, bearer tokens, or repository secrets.
+
 ## [0.3.0] - 2026-08-11
 
 ### Added
