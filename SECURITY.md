@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Security fixes are applied to the latest `0.1.x` release and to the current `main` branch.
+Security fixes are applied to the latest `0.3.x` release and to the current `main` branch.
 
 ## System and scope
 
