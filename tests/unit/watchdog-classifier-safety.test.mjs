@@ -44,3 +44,25 @@ test("GraphQL reads remain evidence while literal mutations are state changes", 
 test("opaque GraphQL input files stay neutral instead of falsely resetting progress", () => {
   assert.equal(classify("gh api graphql --input request.json").kind, "neutral");
 });
+
+test("mixed read/write tool names stay neutral instead of falsely resetting progress", () => {
+  assert.equal(
+    classifyHookTool({
+      tool_name: "mcp__provider__get_update_status",
+      tool_input: {},
+    }).kind,
+    "neutral",
+  );
+  assert.equal(
+    classifyHookTool({
+      tool_name: "mcp__provider__update_issue_status",
+      tool_input: {},
+    }).kind,
+    "neutral",
+  );
+});
+
+test("read-looking shell commands with output writes are not treated as pure evidence", () => {
+  assert.equal(classify("cat README.md > README.copy.md").kind, "neutral");
+  assert.equal(classify("Get-Content README.md | Set-Content README.copy.md").kind, "neutral");
+});
