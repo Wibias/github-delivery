@@ -268,7 +268,13 @@ export function createProgressWatchdog(options = {}) {
     recordStateProgress();
   }
 
-  function decideRead({ toolName, input, volatility = "stable", now = Date.now() }) {
+  function decideRead({
+    toolName,
+    input,
+    volatility = "stable",
+    now = Date.now(),
+    record = true,
+  }) {
     if (!toolName) throw new Error("toolName is required");
     if (volatility !== "stable" && volatility !== "volatile") {
       throw new Error("volatility must be stable or volatile");
@@ -276,7 +282,7 @@ export function createProgressWatchdog(options = {}) {
     const fingerprint = fingerprintRead(stateGeneration, toolName, input);
     const prior = reads.get(fingerprint);
     if (!prior) {
-      reads.set(fingerprint, { lastAllowedAt: now, volatility });
+      if (record) reads.set(fingerprint, { lastAllowedAt: now, volatility });
       return { action: "allow", fingerprint, stateGeneration };
     }
 
@@ -299,7 +305,7 @@ export function createProgressWatchdog(options = {}) {
         stateGeneration,
       };
     }
-    reads.set(fingerprint, { lastAllowedAt: now, volatility });
+    if (record) reads.set(fingerprint, { lastAllowedAt: now, volatility });
     return { action: "allow", fingerprint, stateGeneration };
   }
 
