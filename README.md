@@ -91,7 +91,7 @@ Lifecycle hooks stop duplicate reads/polls and recover from completed no-progres
 node ~/.agents/skills/github-delivery/scripts/codex-with-watchdog.mjs
 ```
 
-The protected launcher declares `stream` only inside the process tree it actually controls. Plain `codex` and IDE sessions are not silently rerouted or falsely reported as streaming-protected. See [Agent progress watchdog](#agent-progress-watchdog) and [`INSTALL.md`](INSTALL.md).
+The protected launcher declares `stream` only inside the process tree it actually controls. Plain `codex` and IDE sessions are not silently rerouted or falsely reported as streaming-protected. Codex currently documents `app-server` and its WebSocket transport as experimental and unsupported for production workloads, so this is the strongest current boundary for the failure mode rather than a stable production host API. See [Agent progress watchdog](#agent-progress-watchdog) and [`INSTALL.md`](INSTALL.md).
 
 ## Why this is different
 
@@ -486,6 +486,8 @@ The watchdog is deliberately separate from mutation authority. It can interrupt,
 | **Protected Codex stream** | The installed `codex-with-watchdog.mjs` launch boundary observes streamed assistant deltas and issues one private `turn/interrupt` when repeated low-novelty intent narration crosses the watchdog threshold. This is the only layer that can stop the targeted failure while the message is still streaming. |
 
 A configured hook is not automatically an active hook: Codex ties trust to the exact hook definition and skips a new or changed non-managed hook until it is reviewed in `/hooks`. GitHub Delivery records `hook_trust_required` rather than falsely reporting `hooks` in that state. The protected launcher independently marks its own process tree `stream`, so a protected session does not depend on machine-wide activation guesswork.
+
+Codex currently marks App Server/WebSocket transport experimental. The protected launcher is intentionally a strongest-current-boundary option rather than a claim that this host surface is production-stable.
 
 ### Read and context economy
 
