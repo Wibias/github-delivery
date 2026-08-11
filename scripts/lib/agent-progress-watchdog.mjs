@@ -6,6 +6,8 @@ const DEFAULTS = Object.freeze({
   lowNoveltyMinimum: 6,
   lowNoveltyUniqueMaximum: 3,
   volatileReadIntervalMs: 30_000,
+  evidenceSoftLimit: 8,
+  evidenceHardLimit: 12,
 });
 
 const INTENT_PREFIX = /^\s*(?:(?:now|next|first|then|actually|meanwhile)[,:]?\s+)?(?:let me|i(?:'|’)ll|i will|i need to|i'm going to|i am going to)\s+/i;
@@ -111,12 +113,26 @@ export function compactToolOutput(value, { maxChars = 4_000 } = {}) {
   };
 }
 
+function nonNegativeInteger(value, fallback = 0) {
+  return Number.isInteger(value) && value >= 0 ? value : fallback;
+}
+
 export function createProgressWatchdog(options = {}) {
   const config = { ...DEFAULTS, ...options };
+  if (!Number.isInteger(config.evidenceSoftLimit) || config.evidenceSoftLimit < 1) {
+    throw new Error("evidenceSoftLimit must be a positive integer");
+  }
+  if (!Number.isInteger(config.evidenceHardLimit) || config.evidenceHardLimit < config.evidenceSoftLimit) {
+    throw new Error("evidenceHardLimit must be an integer >= evidenceSoftLimit");
+  }
+
   let pendingNarration = "";
-  let stateGeneration = Number.isInteger(options.stateGeneration)
-    ? options.stateGeneration
-    : 0;
+  let stateGeneration = nonNegativeInteger(options.stateGeneration);
+  let consecutiveEvidenceAttempts = nonNegativeInteger(options.consecutiveEvidenceAttempts);
+  let totalEvidenceAttempts = nonNegativeInteger(options.totalEvidenceAttempts);
+  let evidenceWarningIssued = Boolean(options.evidenceWarningIssued);
+  let executionProgressCount = nonNegativeInteger(options.executionProgressCount);
+  let stateProgressCount = nonNegativeInteger(options.stateProgressCount);
   const intentCounts = new Map();
   const recentIntents = [];
   const reads = new Map();
@@ -129,6 +145,11 @@ export function createProgressWatchdog(options = {}) {
     pendingNarration = "";
     intentCounts.clear();
     recentIntents.length = 0;
+  }
+
+  function resetEvidenceStreak() {
+    consecutiveEvidenceAttempts = 0;
+    evidenceWarningIssued = false;
   }
 
   function processClause(clause) {
@@ -188,14 +209,63 @@ export function createProgressWatchdog(options = {}) {
     return { action: "allow" };
   }
 
-  function recordExternalProgress() {
+  function chargeEvidenceAttempt() {
+    totalEvidenceAttempts += 1;
+    consecutiveEvidenceAttempts += 1;
+
+    if (consecutiveEvidenceAttempts >= config.evidenceHardLimit) {
+      return {
+        action: "block",
+        reason: "evidence_budget_exhausted",
+        consecutiveEvidenceAttempts,
+        totalEvidenceAttempts,
+        softLimit: config.evidenceSoftLimit,
+        hardLimit: config.evidenceHardLimit,
+      };
+    }
+
+    if (
+      consecutiveEvidenceAttempts >= config.evidenceSoftLimit &&
+      !evidenceWarningIssued
+    ) {
+      evidenceWarningIssued = true;
+      return {
+        action: "warn",
+        reason: "evidence_budget_warning",
+        consecutiveEvidenceAttempts,
+        totalEvidenceAttempts,
+        softLimit: config.evidenceSoftLimit,
+        hardLimit: config.evidenceHardLimit,
+      };
+    }
+
+    return {
+      action: "allow",
+      consecutiveEvidenceAttempts,
+      totalEvidenceAttempts,
+    };
+  }
+
+  function recordExecutionProgress() {
+    executionProgressCount += 1;
+    resetEvidenceStreak();
     resetNarration();
   }
 
-  function recordStateChange() {
+  function recordStateProgress() {
     stateGeneration += 1;
+    stateProgressCount += 1;
     reads.clear();
+    resetEvidenceStreak();
     resetNarration();
+  }
+
+  function recordExternalProgress() {
+    recordExecutionProgress();
+  }
+
+  function recordStateChange() {
+    recordStateProgress();
   }
 
   function decideRead({ toolName, input, volatility = "stable", now = Date.now() }) {
@@ -235,14 +305,22 @@ export function createProgressWatchdog(options = {}) {
 
   function snapshot() {
     return {
-      schemaVersion: 1,
+      schemaVersion: 2,
       stateGeneration,
       reads: Object.fromEntries(reads),
+      consecutiveEvidenceAttempts,
+      totalEvidenceAttempts,
+      evidenceWarningIssued,
+      executionProgressCount,
+      stateProgressCount,
     };
   }
 
   return {
     observeAssistantDelta,
+    chargeEvidenceAttempt,
+    recordExecutionProgress,
+    recordStateProgress,
     recordExternalProgress,
     recordStateChange,
     decideRead,
