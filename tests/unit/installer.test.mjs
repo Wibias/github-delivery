@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 
+import { parseInstallArgs } from "../../scripts/install-skill.mjs";
 import {
   applyInstallation,
   planInstallation,
@@ -29,6 +30,41 @@ test("install CLI entry point runs from a file path", () => {
   const plan = JSON.parse(result.stdout);
   assert.equal(plan.apply, false);
   assert.equal(typeof plan.allowed, "boolean");
+});
+
+test("installer parses self-update from the running installed bundle root", () => {
+  const root = resolve("/virtual/installed/github-delivery");
+  const options = parseInstallArgs(["--update"], { installedRoot: root });
+  assert.equal(options.update, true);
+  assert.equal(options.apply, false);
+  assert.equal(options.target, root);
+  assert.equal(options.targetExplicit, false);
+  assert.equal(options.sourceExplicit, false);
+});
+
+test("self-update keeps an explicit target override", () => {
+  const installedRoot = resolve("/virtual/installed/github-delivery");
+  const target = resolve("/virtual/custom/github-delivery");
+  const options = parseInstallArgs(["--update", "--target", target], { installedRoot });
+  assert.equal(options.update, true);
+  assert.equal(options.target, target);
+  assert.equal(options.targetExplicit, true);
+});
+
+test("self-update rejects source, restore, and downgrade escape hatches", () => {
+  const context = { installedRoot: resolve("/virtual/installed/github-delivery") };
+  assert.throws(
+    () => parseInstallArgs(["--update", "--source", resolve("/tmp/source")], context),
+    /update_source_conflict/,
+  );
+  assert.throws(
+    () => parseInstallArgs(["--update", "--restore", resolve("/tmp/backup")], context),
+    /update_restore_conflict/,
+  );
+  assert.throws(
+    () => parseInstallArgs(["--update", "--allow-downgrade"], context),
+    /update_allow_downgrade_forbidden/,
+  );
 });
 
 test("plans a new install without mutating the target", () => {
