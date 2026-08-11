@@ -43,14 +43,17 @@ function runInstall(f, extra = []) {
   );
 }
 
-test("normal Codex install activates lifecycle watchdog without a second installer", () => {
+test("normal Codex install configures hooks but does not falsely claim untrusted hooks are active", () => {
   const f = fixture();
   const result = runInstall(f, ["--lifecycle-hooks-supported", "--apply"]);
   assert.equal(result.status, 0, result.stderr);
 
   const receipt = JSON.parse(result.stdout);
-  assert.equal(receipt.watchdog.mode, "hooks");
-  assert.equal(receipt.watchdog.degradationReason, "streaming_interruption_unavailable");
+  assert.equal(receipt.watchdog.mode, "none");
+  assert.equal(receipt.watchdog.degradationReason, "hook_trust_required");
+  assert.equal(receipt.watchdog.hooksConfigured, true);
+  assert.equal(receipt.watchdog.hookTrustVerified, false);
+  assert.equal(receipt.watchdog.hookTrustRequired, true);
   assert.equal(readFileSync(join(f.target, "marker.txt"), "utf8"), "installed\n");
 
   const hooksPath = join(f.codexHome, "hooks.json");
@@ -62,18 +65,52 @@ test("normal Codex install activates lifecycle watchdog without a second install
     assert.equal(commands.filter((command) => command.includes("codex-watchdog-hook.mjs")).length, 1);
   }
 
-  assert.equal(existsSync(join(f.codexHome, "github-delivery", "watchdog-activation.json")), true);
+  const persisted = JSON.parse(
+    readFileSync(join(f.codexHome, "github-delivery", "watchdog-activation.json"), "utf8"),
+  );
+  assert.equal(persisted.mode, "none");
+  assert.equal(persisted.hooksConfigured, true);
+  assert.equal(persisted.hookTrustVerified, false);
   assert.equal(
     receipt.watchdog.streamLauncherPath,
     join(f.target, "scripts", "codex-with-watchdog.mjs"),
   );
 });
 
+test("verified unchanged hook definitions may be reported as active after user trust", () => {
+  const f = fixture();
+  const first = runInstall(f, ["--lifecycle-hooks-supported", "--apply"]);
+  assert.equal(first.status, 0, first.stderr);
+
+  const afterTrust = runInstall(f, [
+    "--lifecycle-hooks-supported",
+    "--hook-trust-verified",
+  ]);
+  assert.equal(afterTrust.status, 0, afterTrust.stderr);
+  const result = JSON.parse(afterTrust.stdout);
+  assert.equal(result.watchdog.mode, "hooks");
+  assert.equal(result.watchdog.degradationReason, "streaming_interruption_unavailable");
+  assert.equal(result.watchdog.hookTrustVerified, true);
+});
+
+test("a hook definition change invalidates a claimed trust state", () => {
+  const f = fixture();
+  const result = runInstall(f, [
+    "--lifecycle-hooks-supported",
+    "--hook-trust-verified",
+  ]);
+  assert.equal(result.status, 0, result.stderr);
+  const planned = JSON.parse(result.stdout);
+  assert.equal(planned.watchdog.mode, "none");
+  assert.equal(planned.watchdog.degradationReason, "hook_trust_required");
+  assert.equal(planned.watchdog.hookTrustVerified, false);
+});
+
 test("stream mode is selected only when the installed launch boundary is explicitly controllable", () => {
   const f = fixture();
   const withoutBoundary = runInstall(f, ["--lifecycle-hooks-supported"]);
   assert.equal(withoutBoundary.status, 0, withoutBoundary.stderr);
-  assert.equal(JSON.parse(withoutBoundary.stdout).watchdog.mode, "hooks");
+  assert.equal(JSON.parse(withoutBoundary.stdout).watchdog.mode, "none");
 
   const withBoundary = runInstall(f, [
     "--lifecycle-hooks-supported",
