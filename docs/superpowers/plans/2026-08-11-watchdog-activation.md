@@ -1,5 +1,7 @@
 # Automatic Watchdog Activation Implementation Plan
 
+> **Implementation note:** During execution, the official Codex hook documentation exposed an additional trust boundary: a newly configured or changed non-managed command hook is skipped until its exact definition is reviewed/trusted. The approved design spec was updated accordingly. This plan therefore executes `stream > trusted hooks > none`, with fresh hook configuration reported as `none / hook_trust_required`, and uses the installed `scripts/codex-with-watchdog.mjs` protected remote launcher for in-flight interruption. The detailed task text below records the original implementation decomposition; the updated spec and final code/tests are authoritative where the trust discovery changed an interface or filename.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make a standard supported Codex install/upgrade automatically activate the strongest watchdog mode it can prove, persist the effective mode, and prove the observed repeated `Let me check...` narration is interrupted in streaming mode before the configured output budget is exceeded.
