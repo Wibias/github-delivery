@@ -47,10 +47,14 @@ test("tag releases require an exact package version match", () => {
   assert.throws(() => validateReleaseContext({ eventName: "push", ref: "refs/tags/v0.2.0", version: "0.1.0" }), /does not match package version/);
 });
 
-test("manual workflow runs are always dry-run", () => {
+test("manual branch runs stay dry-run while tag-dispatched runs publish", () => {
   assert.deepEqual(validateReleaseContext({ eventName: "workflow_dispatch", ref: "refs/heads/main", version: "0.1.0" }), {
     version: "0.1.0", tag: "v0.1.0", publish: false,
   });
+  assert.deepEqual(validateReleaseContext({ eventName: "workflow_dispatch", ref: "refs/tags/v0.1.0", version: "0.1.0" }), {
+    version: "0.1.0", tag: "v0.1.0", publish: true,
+  });
+  assert.throws(() => validateReleaseContext({ eventName: "workflow_dispatch", ref: "refs/tags/v0.2.0", version: "0.1.0" }), /does not match package version/);
 });
 
 test("release source must be the comparison base and an ancestor of the default branch", () => {
