@@ -342,7 +342,15 @@ export function compareDirectories(first, second) {
       differences.push({ path, reason: "missing" });
       continue;
     }
-    if (!readFileSync(join(first, ...path.split("/"))).equals(readFileSync(join(second, ...path.split("/"))))) differences.push({ path, reason: "content" });
+    const firstPath = join(first, ...path.split("/"));
+    const secondPath = join(second, ...path.split("/"));
+    const firstInfo = lstatSync(firstPath);
+    const secondInfo = lstatSync(secondPath);
+    if (firstInfo.isSymbolicLink() || secondInfo.isSymbolicLink()) {
+      differences.push({ path, reason: "type" });
+      continue;
+    }
+    if (!readFileSync(firstPath).equals(readFileSync(secondPath))) differences.push({ path, reason: "content" });
   }
   return differences;
 }
@@ -379,12 +387,28 @@ export function planInstallation({ source, target, allowDowngrade = false, force
   const comparison = compareVersions(sourcePackage.version, targetPackage.version);
   if (comparison > 0) return { action: "upgrade", allowed: true, source, target, sourceVersion: sourcePackage.version, targetVersion: targetPackage.version };
   if (comparison < 0) return { action: "downgrade", allowed: allowDowngrade, source, target, sourceVersion: sourcePackage.version, targetVersion: targetPackage.version };
-  return { action: "same-version", allowed: force, source, target, sourceVersion: sourcePackage.version, targetVersion: targetPackage.version };
+  const differences = compareDirectories(source, target);
+  if (differences.length === 0) {
+    return { action: "same-version", allowed: true, unchanged: true, source, target, sourceVersion: sourcePackage.version, targetVersion: targetPackage.version };
+  }
+  return { action: "same-version", allowed: false, unchanged: false, source, target, sourceVersion: sourcePackage.version, targetVersion: targetPackage.version, differences };
 }
 
 export function applyInstallation({ source, target, backupRoot, allowDowngrade = false, force = false } = {}) {
   const plan = planInstallation({ source, target, allowDowngrade, force });
   if (!plan.allowed) throw new Error(`installation is not allowed: ${plan.action}`);
+  if (plan.action === "same-version" && plan.unchanged === true) {
+    return {
+      schemaVersion: 1,
+      kind: "github-delivery/install-receipt",
+      action: plan.action,
+      sourceVersion: plan.sourceVersion,
+      previousVersion: plan.targetVersion,
+      target: plan.target,
+      backupPath: null,
+      unchanged: true,
+    };
+  }
   let backupPath = null;
   if (existsSync(plan.target)) {
     const root = resolve(backupRoot || join(dirname(plan.target), ".github-delivery-backups"));
