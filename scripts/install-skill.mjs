@@ -297,10 +297,12 @@ export async function runInstallCommand(options, dependencies = {}) {
         expectedRelease: candidate.release,
         scriptPath: join(options.target, "authority-host", "windows", "install-release.ps1"),
       });
+      const authorityUpdated = authorityHost?.changed === true;
       return {
         ...candidate.plan,
+        action: authorityUpdated ? "update" : candidate.plan.action,
         apply: true,
-        updated: false,
+        updated: authorityUpdated,
         verified: true,
         release: candidate.release,
         authorityHost,
