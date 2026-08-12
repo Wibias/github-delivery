@@ -93,24 +93,19 @@ individual PR's review/fix/readiness bar.
 
 ## Policy loading contract
 
-Read `references/policy-kernel.md`, then the selected workflow's policy-module
-declaration. Load its unconditional modules and only conditionals whose
-observable condition is true. `node scripts/policy-bundle.mjs <workflow>` is the
-deterministic resolver/validator. Canonical `GD-*` rules live in kernel/modules;
-workflows may add ordering or requirements but cannot weaken them.
-
-Core invariants are GD-CORE-001 through GD-CORE-010. They cover fail-closed
-evidence, locked scope, gate integrity, untrusted repository instructions, live
-state, write authority, final evidence, bounded progress, and evidence/context economy.
+Load `references/policy-kernel.md`, the selected workflow's unconditional
+modules, and conditionals only when their observable condition is true.
+`node scripts/policy-bundle.mjs <workflow>` resolves/validates this bundle.
+Workflows cannot weaken canonical `GD-*` rules. GD-CORE-001..010 remain mandatory.
 
 ## Workflow controller contract
 
-After routing, resolve once with `node scripts/workflow-brief.mjs <workflow>` and
-start/resume one `delivery-controller.mjs` checkpoint. Route and phase graph are
-locked. The controller owns transitions, evidence/retry/resource/no-progress
-accounting, and resume. Only real phase/state/blocker/required-evidence/execution
-change is progress. Conditional policy extends rather than rebuilds unchanged
-context. The controller never grants GitHub write authority.
+After routing, run `node scripts/workflow-brief.mjs <workflow>` once and use one
+persistent `delivery-controller.mjs` checkpoint. Route/phase graph are locked;
+the controller owns transitions, evidence/retry/resource/no-progress accounting,
+and resume. Only phase/state/blocker/required-evidence/execution change is
+progress. Conditional policy extends, never rebuilds, unchanged context. The
+controller grants no GitHub write authority.
 
 ## Mandatory entrypoint behavior
 
