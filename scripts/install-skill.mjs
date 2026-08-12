@@ -230,12 +230,20 @@ function planAuthorityForRelease(candidate, dependencies = {}) {
   const readConfig = dependencies.readUserConfig || readUserConfig;
   const readAuthority = dependencies.readInstalledAuthorityHost || readInstalledAuthorityHost;
   const planAuthority = dependencies.planAuthorityHostUpdate || planAuthorityHostUpdate;
+  const installed = readAuthority();
+  if (!installed?.supported) {
+    return planAuthority({
+      mode: "off",
+      targetVersion: candidate.release.version,
+      installed,
+    });
+  }
   const config = readConfig();
   const mode = resolveAuthorityMode({ config: config.config, env: process.env });
   return planAuthority({
     mode,
     targetVersion: candidate.release.version,
-    installed: readAuthority(),
+    installed,
   });
 }
 
@@ -261,6 +269,17 @@ export async function runInstallCommand(options, dependencies = {}) {
       throw new Error("stable_release_candidate_invalid");
     }
 
+    if (candidate.plan.action === "already_ahead") {
+      return {
+        ...candidate.plan,
+        apply: Boolean(options.apply),
+        updated: false,
+        verified: true,
+        release: candidate.release,
+        authorityHost: { action: "skipped_skill_ahead", changed: false },
+      };
+    }
+
     const authorityPlan = planAuthorityForRelease(candidate, dependencies);
     if (!options.apply) {
       return {
@@ -270,17 +289,6 @@ export async function runInstallCommand(options, dependencies = {}) {
         verified: true,
         release: candidate.release,
         authorityHost: authorityPlan,
-      };
-    }
-
-    if (candidate.plan.action === "already_ahead") {
-      return {
-        ...candidate.plan,
-        apply: true,
-        updated: false,
-        verified: true,
-        release: candidate.release,
-        authorityHost: { action: "skipped_skill_ahead", changed: false },
       };
     }
 
