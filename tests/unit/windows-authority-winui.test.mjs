@@ -27,7 +27,8 @@ test("source installer preserves self-contained deployment and delegates to the 
   assert.doesNotMatch(installer, /--self-contained false/);
   assert.match(releaseInstaller, /authority-host-version\.json/);
   assert.match(releaseInstaller, /authority-host-install\.json/);
-  assert.match(releaseInstaller, /app[\\/]v/);
+  assert.match(releaseInstaller, /Join-Path \$InstallDir 'app'/);
+  assert.match(releaseInstaller, /Join-Path \$appRoot \('v' \+ \$ExpectedVersion\)/);
   assert.match(releaseInstaller, /authority\.db/);
   assert.match(releaseInstaller, /trust-store\.json/);
   assert.doesNotMatch(releaseInstaller, /dotnet publish|dotnet\.Source publish/);
