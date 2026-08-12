@@ -15,7 +15,7 @@ description: >
 # GitHub Delivery
 
 Own GitHub work from product intake through merged PR. Natural language is the
-public API; scripts and policy modules are internal evidence/safety machinery.
+public API; scripts and policy modules are internal evidence/context economy machinery.
 
 ## Route
 
