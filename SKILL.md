@@ -15,15 +15,14 @@ description: >
 # GitHub Delivery
 
 Own GitHub work from product intake through merged PR. Natural language is the
-public API; internals enforce evidence/context economy.
+public API; internals enforce bounded progress and evidence/context economy.
 
 ## Route
 
 Match the request, then load **only** the selected workflow plus the policy
 modules declared at the top of that workflow. Do **not** load
 `references/shared-rules.md` as mandatory context; it is now a compatibility
-index. Every routed workflow includes `policy-kernel` plus only the domains it
-needs.
+index. Each route includes `policy-kernel` plus only needed domains.
 
 **Full-review routing is explicit:** when the user asks for a full review, route
 to `references/full-review-pr.md`; bot-fix, CodeRabbit, Codex, security, or
