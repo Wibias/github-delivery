@@ -13,11 +13,11 @@ const DEFAULTS = Object.freeze({
   noProgressTokenSoftLimit: 4_000,
   noProgressTokenHardLimit: 8_000,
   toolEmissionIntentThreshold: 6,
-  protocolArtifactThreshold: 3,
+  protocolArtifactThreshold: 2,
 });
 
 const INTENT_PREFIX = /^\s*(?:(?:now|next|first|then|actually|meanwhile)[,:]?\s+)?(?:let me|i(?:'|’)ll|i will|i need to|i'm going to|i am going to)\s+/i;
-const TOOL_EMISSION_INTENT = /^\s*(?:(?:now|next|then|actually|enough|finally|stop narrating)[,:.!]?\s+)?(?:(?:let me|i(?:'|’)ll|i will|i need to|i(?:'|’)m going to|i am going to)\s+)?(?:(?:just|actually)\s+)?(?:run|running|execute|executing|invoke|invoking|call|calling|issue|issuing|emit|emitting|grep|search|read|open|inspect|apply|patch|use)\b/i;
+const TOOL_EMISSION_INTENT = /^\s*(?:(?:now|next|then|actually|enough|finally|stop narrating)[,:.!]?\s+)?(?:(?:let me|i(?:'|’)ll|i will|i need to|i(?:'|’)m going to|i am going to)\s+)?(?:(?:just|actually)\s+)?(?:run|running|execute|executing|invoke|invoking|call|calling|issue|issuing|emit|emitting|grep|search|read|open|inspect|apply|patch|use|add|adding|wire|wiring|edit|editing|write|writing|modify|modifying|update|updating|remove|removing|delete|deleting|fix|fixing|change|changing)\b/i;
 const TOOL_PROTOCOL_ARTIFACT = /<\/?(?:atool|invoke|tool_calls?|function_calls?)\b[^>]*>/gi;
 const FAILURE_SIGNAL = /\b(error|errors|fail|failed|failure|failing|blocked|blocker|exception|traceback|denied|timeout|timed out|exit(?: code)?|conclusion|status|unsponsored_surface)\b/i;
 
@@ -281,7 +281,7 @@ export function createProgressWatchdog(options = {}) {
 
     const protocolArtifacts = delta.match(TOOL_PROTOCOL_ARTIFACT);
     if (protocolArtifacts?.length) {
-      protocolArtifactCount += protocolArtifacts.length;
+      protocolArtifactCount += 1;
       if (protocolArtifactCount >= config.protocolArtifactThreshold) {
         return {
           action: "interrupt",
