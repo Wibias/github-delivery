@@ -185,9 +185,17 @@ export async function reconcileStableAuthorityHost({
   const readConfig = dependencies.readUserConfig || readUserConfig;
   const install = dependencies.installVerifiedAuthorityHost || installVerifiedAuthorityHost;
   const installed = readInstalled({ platform, env, home });
-  if (!installed.supported) return { action: "unsupported", changed: false, installed };
   const config = readConfig({ platform, env, home });
   const mode = resolveAuthorityMode({ config: config.config, env });
+  if (!installed.supported) {
+    return {
+      action: "unsupported",
+      required: mode === "high-assurance" || mode === "all",
+      changed: false,
+      installed,
+      mode,
+    };
+  }
 
   if (!installed.installed && !installed.configured && mode === "off") {
     return { action: "disabled", required: false, changed: false, installed, mode, currentVersion: null, targetVersion: expectedRelease?.version || null };
