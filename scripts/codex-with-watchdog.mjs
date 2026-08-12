@@ -35,9 +35,23 @@ export function protectedClientArgs(args, url) {
   return ["--remote", url, "--remote-auth-token-env", TOKEN_ENV, ...args];
 }
 
-export function protectedRuntimeEnv(env = process.env) {
+function sanitizedInheritedEnv(env, platformName) {
+  const runtimeEnv = { ...env };
+  if (platformName === "win32") {
+    // PowerShell 7 can export a PSModulePath that prevents a descendant Windows
+    // PowerShell process from finding inbox modules such as Get-FileHash. Codex's
+    // Windows self-updater can launch powershell.exe, so let that shell rebuild
+    // its native module path instead of inheriting a path for a different host.
+    for (const key of Object.keys(runtimeEnv)) {
+      if (key.toLowerCase() === "psmodulepath") delete runtimeEnv[key];
+    }
+  }
+  return runtimeEnv;
+}
+
+export function protectedRuntimeEnv(env = process.env, platformName = process.platform) {
   return {
-    ...env,
+    ...sanitizedInheritedEnv(env, platformName),
     SHIPPING_GITHUB_HOST: "codex",
     SHIPPING_GITHUB_PROGRESS_WATCHDOG: "stream",
     SHIPPING_GITHUB_STREAM_LAUNCH_CONTROLLED: "true",
