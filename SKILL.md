@@ -108,35 +108,16 @@ state, write authority, final evidence, bounded progress, and evidence/context e
 
 ## Workflow controller contract
 
-After routing, every GitHub Delivery workflow uses one persistent controller
-checkpoint. The controller route is locked; workflow prose cannot silently
-reroute the run after new evidence appears.
-
-1. Resolve the selected workflow once with
-   `node scripts/workflow-brief.mjs <workflow>`. Treat the returned workflow
-   packet as the canonical workflow + unconditional policy context for that
-   state. Do not re-read those files during the same state generation.
-2. Start the checkpoint with
-   `node scripts/delivery-controller.mjs start <workflow> --repo OWNER/REPO --checkpoint <file>`
-   plus known `--issue`, `--pr`, `--base`, and `--head` values.
-3. Advance phases only with `delivery-controller.mjs transition`. Illegal or
-   backward transitions are hard stops, not invitations to choose another route.
-4. Record evidence actions, retries, ref changes, blockers, resource usage, and
-   no-progress cycles through the controller. `interrupt` is a hard stop;
-   `restrict-evidence` forbids additional exploratory reads until real progress
-   or a required missing evidence dimension is identified.
-5. A cycle counts as progress only when a phase advances, relevant state
-   changes, a blocker disappears, required missing evidence is produced, or a
-   required execution completes. Changed narration, a restated plan, a no-op
-   tool, or another spelling of the same read is not progress.
-6. Resume from the existing checkpoint after interruption or restart. Do not
-   repeat completed phases. Relevant base/head changes create a new state
-   generation and invalidate only state-bound evidence.
-7. Conditional policy modules may extend the packet only when their declared
-   observable condition becomes true. Do not rebuild the unconditional packet.
-
-The controller is orchestration enforcement, not GitHub write authority. All
-existing mutation-mode, confirmation, and final-gate rules still apply.
+After routing, resolve the workflow once with `node scripts/workflow-brief.mjs
+<workflow>` and start/resume one persistent checkpoint with
+`node scripts/delivery-controller.mjs`. The route is locked. Advance phases only
+through controller transitions; illegal/backward transitions stop. Record
+evidence/retries/ref changes/blockers/resource and no-progress signals there.
+Only phase/state/blocker/required-evidence/execution change counts as progress;
+narration, restated plans, no-ops, and rephrased reads do not. Resume the same
+checkpoint after interruption. Conditional policy may extend the packet only
+when its observable condition becomes true; do not rebuild unchanged context.
+The controller never grants GitHub write authority.
 
 ## Mandatory entrypoint behavior
 
