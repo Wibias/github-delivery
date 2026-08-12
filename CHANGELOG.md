@@ -95,6 +95,83 @@ All notable changes to `github-delivery` are documented here.
   the TLDR; a comment failing the gate must be repaired, never marked
   published.
 
+## [0.5.0] - 2026-08-12
+
+### Added
+
+- Added a zero-clone npm bootstrap for `npx github-delivery` with guided
+  install/setup, explicit `install`, `setup`, `doctor`, `update`, and
+  `update --apply` commands, an exact npm package-surface validator, and
+  Trusted Publishing integration in the protected release workflow. The npm
+  artifact remains a thin bootstrap only; the installed skill payload still
+  comes exclusively from the separately verified stable GitHub Release.
+- Added complete protected-stream visibility for generated assistant messages,
+  reasoning summaries, supported raw reasoning, and plan deltas, plus sanitized
+  App Server replay/telemetry primitives. Protected mode now requires the
+  plan/diff/token signals its enforcement depends on instead of claiming
+  `stream` while those notifications are unavailable.
+- Added hard no-progress generation bounds using Codex cumulative output-token
+  telemetry and a generated-character fallback. Material diff changes,
+  completed plan steps, and successful execution are real progress; merely
+  starting a tool is not. Repeated imminent tool intent and malformed tool
+  protocol output such as `<atool>...</atool>` are explicitly bounded, including
+  across generated-text channel changes and unique wording.
+- Added a semantic evidence registry keyed by resource + state generation.
+  Owned helpers publish structured `gdEffect`/coverage metadata, and equivalent
+  reads of the same GitHub Actions run or authoritative helper output can be
+  reused instead of becoming new evidence merely because shell filters differ.
+- Added a persistent delivery workflow controller with route locking, explicit
+  phase graphs, checkpoints/resume, blocker/evidence/ref state, per-phase and
+  workflow budgets, bounded retries, and measurable no-progress escalation.
+  Routed workflows now consume one-shot workflow/policy packets instead of
+  repeatedly rediscovering their route and policy surface.
+- Added a release-blocking reliability gate that replays the real
+  Baseline-is-green/tool-emission stall, malformed protocol output,
+  cross-channel narration loops, and repeated CI-evidence acquisition. A
+  false-positive corpus also protects legitimate tool-rich investigations and
+  long final verdicts, with a separate finalization allowance rather than a
+  blanket relaxation of active-workflow bounds.
+
+### Changed
+
+- Successful `PostToolUse` results are no longer replaced or truncated by the
+  watchdog. Evidence compaction now belongs at the source/helper where the
+  contract is known, preventing a protection mechanism from destroying a valid
+  result and provoking a second read through another command shape.
+- Windows/PowerShell progress classification now covers `git -C`,
+  `Get-ChildItem`, grouped/compound commands and owned GitHub Delivery helpers
+  more accurately while retaining conservative neutral handling for ambiguous
+  operations.
+- Protected-stream runtime reporting now lets a verified live `stream`
+  declaration supersede stale hook-era degradation metadata, eliminating the
+  contradictory `stream` + `streaming_interruption_unavailable` capability
+  report.
+- Final answer generation uses larger dedicated character/output-token budgets
+  after the plan is complete, while malformed protocol/tool-emission detection
+  remains active and any new real tool start exits finalization mode.
+- Same-version installs with a byte-identical payload are now successful
+  unchanged no-ops; same-version payload drift remains fail-closed, including
+  with `--force`.
+
+### Fixed
+
+- Fixed the v0.4 protected-stream blind spot where large loops emitted through
+  reasoning or plan channels could bypass a detector that watched only
+  `item/agentMessage/delta`.
+- Fixed tool-call emission stalls in which the model repeatedly says variants
+  of `run`, `execute`, `wire`, `add`, `edit`, or similar actions without ever
+  producing a real tool item, including repeated malformed `<atool>` protocol
+  scaffolding.
+- Fixed CI/read spirals that re-fetched the same underlying evidence with new
+  filters or PowerShell command shapes after authoritative evidence was already
+  available.
+- Fixed the destructive output-compaction feedback loop where a successful read
+  could be replaced by hook feedback and immediately re-read through a different
+  tool/command.
+- Fixed the protected Windows Codex launcher inheriting PowerShell 7's
+  `PSModulePath` into Windows PowerShell, which could break inbox-module
+  resolution during Codex self-update.
+
 ## [0.4.0] - 2026-08-11
 
 ### Added

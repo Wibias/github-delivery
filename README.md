@@ -6,7 +6,7 @@
 
 **Say the outcome, not the orchestration.**
 
-`github-delivery` turns natural-language requests into evidence-backed GitHub workflows: PRDs, issue research, implementation, deep review, CI, fixes, stacks, verified merges, and verified stable self-update. Its layered progress watchdog also cuts repeated narration, duplicate unchanged reads, manual polling, oversized tool output, and bloated subagent context without weakening GitHub authority gates.
+`github-delivery` turns natural-language requests into evidence-backed GitHub workflows: PRDs, issue research, implementation, deep review, CI, fixes, stacks, verified merges, and verified stable self-update. Its v0.5 progress stack combines a persistent workflow controller, semantic evidence reuse, and hard cross-channel Codex generation bounds to stop narration/read/tool-emission loops without weakening GitHub authority gates.
 
 [Quick start](#try-it-in-60-seconds) · [Self-update](#update-an-installed-release) · [Progress watchdog](#agent-progress-watchdog) · [What it can own](#what-you-can-ask-it-to-own) · [Safety model](#safety-model) · [Installation](#installation)
 
@@ -154,22 +154,22 @@ On a detected Codex install, the normal apply path configures GitHub Delivery's 
 npx github-delivery setup
 ```
 
-Trusted lifecycle hooks use turn-scoped state, keep evidence reads/searches from resetting the no-progress detector, warn after **8 consecutive evidence attempts** without execution/state progress, and deny the **12th** supported evidence attempt until the turn makes real progress. Exact duplicate reads and rapid repeated polls remain immediate blocks.
+Trusted lifecycle hooks use turn-scoped state, keep evidence reads/searches from resetting the no-progress detector, warn after **8 consecutive evidence attempts** without execution/state progress, and deny the **12th** supported evidence attempt until the turn makes real progress. Exact duplicate reads, rapid repeated polls, and supported semantically covered evidence are blocked independently. Successful `PostToolUse` results are never replaced or truncated by the generic watchdog.
 
-Hooks still cannot interrupt assistant text before a local tool boundary. To stop a pure repeated-narration loop while it is being generated, and to bound hosted/read-exploration activity visible through App Server, launch Codex through the installed protected streaming boundary:
+Hooks still cannot interrupt assistant text before a local tool boundary. To stop in-flight narration/tool-emission loops and to bound hosted activity visible through App Server, launch Codex through the installed protected streaming boundary:
 
 ```bash
 node ~/.agents/skills/github-delivery/scripts/codex-with-watchdog.mjs
 ```
 
-The protected launcher keeps watchdog state per turn and fails closed if required stream notifications disappear or a requested `turn/interrupt` cannot be confirmed. It declares `stream` only inside the process tree it actually controls. Plain `codex` and IDE sessions are not silently rerouted or falsely reported as streaming-protected. Codex currently documents `app-server` and its WebSocket transport as experimental and unsupported for production workloads, so this is the strongest current boundary for the failure mode rather than a stable production host API. See [Agent progress watchdog](#agent-progress-watchdog) and [`INSTALL.md`](INSTALL.md).
+The protected launcher keeps watchdog state per turn, observes agent-message/reasoning/plan generation through one shared detector, uses plan/diff/output-token events as real progress/budget signals, and can issue one private `turn/interrupt`. Active no-progress generation has hard character/output-token backstops in addition to repeat/tool-emission/protocol detection. The bridge fails closed if required stream notifications disappear or a requested interrupt cannot be confirmed. It declares `stream` only inside the process tree it actually controls. Plain `codex` and IDE sessions are not silently rerouted or falsely reported as streaming-protected. Codex currently documents `app-server` and its WebSocket transport as experimental and unsupported for production workloads, so this is the strongest current boundary for the failure mode rather than a stable production host API. See [Agent progress watchdog](#agent-progress-watchdog) and [`INSTALL.md`](INSTALL.md).
 
 ## Why this is different
 
 | Problem | github-delivery's answer |
 |---|---|
 | **"Green CI" is not the same as "safe to merge."** | Bug + Security + Spec + Standards review, semantic propagation, required probes, review state, rulesets, merge-queue state, and exact-head evidence feed one authoritative ship decision. |
-| **Agents can burn tokens without making progress.** | A turn-scoped progress watchdog separates evidence gathering from execution/state progress, bounds long read-exploration streaks, blocks duplicate reads/polls, and can interrupt repeated narration in-flight through the protected Codex stream. |
+| **Agents can burn tokens without making progress.** | A persistent workflow controller bounds rerouting/replanning, semantic evidence keys stop equivalent re-reads, and the protected Codex stream hard-bounds cross-channel narration, unique no-progress generation, tool-emission stalls, malformed tool protocol output, and output-token growth. |
 | **Agent intent can be ambiguous.** | Deterministic natural-language routing keeps status questions read-only and requires direct authority for destructive workflows. |
 | **GitHub state moves while the agent works.** | Stale-head checks, final evidence refreshes, expected-head binding, bounded settle windows, and postcondition verification prevent conclusions from silently drifting. |
 | **Retries and duplicate writes can be dangerous.** | Typed mutations, authenticated exact-effect receipts, read-before-write evidence, and read-only reconciliation avoid blind write retries. |
@@ -226,7 +226,7 @@ The important boundary is simple: **repository content is evidence, not authorit
 | **Write boundary** | Typed mutation policy + broker; stale-head, exact-effect, authenticated-receipt idempotency, and postcondition checks where applicable |
 | **High-assurance writes** | Exact-scope trusted grants; optional Windows 11 / Windows Hello authority host |
 | **Review model** | Bug + Security + Spec + Standards + semantic propagation + proactive contract verification |
-| **Progress control** | Policy fallback everywhere; trusted Codex hooks add turn-scoped duplicate/poll protection and an 8/12 evidence budget; the launch-controlled stream adds per-turn in-flight interruption and fails closed if its enforcement contract is lost. Runtime capability reports only verified `none`, `hooks`, or `stream`. |
+| **Progress control** | Policy fallback everywhere; routed workflows use a persistent phase/budget controller and semantic evidence reuse; trusted Codex hooks add turn-scoped duplicate/poll/evidence protection; the launch-controlled stream watches agent-message/reasoning/plan text plus plan/diff/output-token telemetry and can hard-interrupt no-progress/tool-emission/protocol stalls. Runtime capability reports only verified `none`, `hooks`, or `stream`. |
 | **Ship decision** | One authoritative `ready`, `blocked`, or `unknown` result from live evidence |
 | **Runtime** | Node.js **22 or 24** |
 | **Required CI matrix** | Node 22/24 × Ubuntu/Windows/macOS, with architecture contracts inside every required matrix job |
@@ -284,7 +284,7 @@ update github-delivery to the latest stable release
 | **Conflicts** | Resolve active conflicts from both sides' intent/evidence, then resume | `references/resolve-conflicts.md` |
 | **Stacked PRs** | Inspect, restack, retarget, recover, review and merge stacks | `references/stacked-prs.md` |
 | **Update installed skill** | Check/apply the latest verified stable GitHub Release without a repository checkout | `references/update.md` |
-| **Agent progress watchdog** | Runtime no-progress, read, polling, output, and subagent-context economy | `references/agent-progress-watchdog.md` |
+| **Agent progress watchdog** | Runtime generation bounds, semantic evidence economy, polling/tool-emission protection, and workflow convergence | `references/agent-progress-watchdog.md` |
 
 For oversized-change splitting, post-ship branch/worktree cleanup, and version/tag/changelog work, `SKILL.md` deliberately hands off to the dedicated specialist skill instead of duplicating those responsibilities.
 
@@ -359,14 +359,18 @@ Base updates, scoped code pushes, and simplification edits are performed only wh
 
 ### 6. Progress and context economy cannot weaken the gates
 
-The progress watchdog is defence in depth around agent execution. It does **not** grant GitHub mutation authority, execute writes on the agent's behalf, or turn omitted/unknown evidence into success.
+The progress stack is defence in depth around agent execution. It does **not** grant GitHub mutation authority, execute writes on the agent's behalf, or turn omitted/unknown evidence into success.
 
 - Stable read fingerprints bind state generation + tool + canonical input; exact duplicates are blocked only while that state remains unchanged.
+- Supported authoritative evidence also gets semantic resource/coverage identities, so changing a shell filter does not manufacture new evidence for the same already-covered resource.
 - Evidence reads/searches do not reset the turn's narration detector. Supported hook paths warn at 8 consecutive evidence attempts without execution/state progress and deny the 12th until real progress occurs.
-- Volatile status reads are rate-limited rather than cached forever. A relevant state change invalidates the stable-read cache.
+- Volatile status reads are rate-limited rather than cached forever. A relevant state change invalidates state-bound read/evidence caches.
 - Unknown or ambiguous tools remain neutral rather than being counted as execution/state progress merely because they completed.
-- Oversized model-facing output is compacted with bounded head/tail, retained failure-signalling lines, and explicit omission metadata.
+- A real tool **start** clears only the "tool was never emitted" signal; it does not erase narration/no-progress history until execution/state/plan/diff progress is proved.
+- Protected stream mode shares one detector across agent-message, reasoning-summary, supported raw-reasoning, and plan text, with hard generated-character and output-token backstops since the last real progress.
+- Successful lifecycle-hook tool results are left intact. Output economy is source/helper-owned so watchdog feedback cannot destroy evidence and provoke a second read.
 - Oversized subagent inputs are rejected by the Codex hook adapter with a **6,000-character default budget** so large parent context is referenced rather than recopied.
+- Routed workflows use a persistent phase controller: rewording narration is not controller progress, and route/phase/evidence/retry/token/wall-time budgets bound orchestration drift independently of the per-turn stream watchdog.
 
 ---
 
@@ -550,17 +554,18 @@ There is no recursive simplification loop.
 
 ## Agent progress watchdog
 
-GitHub Delivery has a layered progress watchdog for two real failure modes that policy prose alone cannot reliably stop: a model can repeat the same intent before emitting a tool call, or it can alternate narration with dozens of different reads/searches while never reaching execution, a state change, or a concrete blocker.
+GitHub Delivery v0.5 treats convergence as a layered runtime + workflow problem rather than a prompt-only rule. The target failure classes include repeated narration, long unique no-progress generation, channel hopping, read/evidence spirals, tool-call emission stalls (`Run`, `exec`, `Let me wire...` with no real tool), and malformed protocol output such as repeated `<atool>...</atool>`.
 
-The watchdog is deliberately separate from mutation authority. It can interrupt, block, rate-limit, compact, or request a focused retry; it cannot authorize or execute a GitHub write.
+The watchdog is deliberately separate from mutation authority. It can interrupt, block, rate-limit, reuse evidence, or request a focused retry; it cannot authorize or execute a GitHub write.
 
 | Enforcement level | What it does |
 |---|---|
 | **Policy only** | `GD-CORE-008` through `GD-CORE-010` provide the universal fallback for bounded progress and evidence/context economy when the host exposes no verified interception surface. |
-| **Codex lifecycle hooks** | The normal install configures `PreToolUse`, `PostToolUse`, `Stop`, `SubagentStop`, and `SessionEnd`. After Codex's explicit non-managed hook trust review, supported tool activity is tracked per turn, exact duplicate reads/polls are blocked, evidence does not reset narration history, the 8th consecutive evidence attempt warns, and the 12th is denied until execution/state progress occurs. Output compaction, focused subagent briefs, and bounded Stop recovery remain in place. |
-| **Protected Codex stream** | The installed `codex-with-watchdog.mjs` boundary keeps an independent watchdog per turn, observes streamed assistant deltas and App Server item activity, and issues a private `turn/interrupt` for repeated narration or a hard evidence-budget breach. If required notifications disappear or the interrupt cannot be confirmed, the protected session fails closed instead of continuing under a false `stream` claim. |
+| **Codex lifecycle hooks** | The normal install configures `PreToolUse`, `PostToolUse`, `Stop`, `SubagentStop`, and `SessionEnd`. After Codex's explicit non-managed hook trust review, supported tool activity is tracked per turn, exact duplicate reads/polls and already-covered semantic evidence can be blocked, evidence does not reset narration history, the 8th consecutive evidence attempt warns, and the 12th is denied until execution/state progress occurs. Successful tool output is preserved; oversized subagent briefs and bounded Stop recovery remain enforced. |
+| **Protected Codex stream** | The installed `codex-with-watchdog.mjs` boundary keeps an independent watchdog per turn and shares one detector across agent-message, reasoning-summary, supported raw-reasoning, and plan text. It consumes plan/diff/output-token telemetry, bounds unique generation and tool-emission/protocol stalls, and issues a private `turn/interrupt` when a hard bound is crossed. Required notification or interrupt-contract loss fails closed. |
+| **Workflow controller** | Every routed workflow is locked to an explicit phase graph with checkpointed refs/blockers/evidence/attempts/usage. Only phase/state/blocker/evidence/execution progress resets orchestration no-progress counters; narration changes do not. Phase/workflow retries, evidence actions, tokens, steps and wall time are bounded independently of the per-turn watchdog. |
 
-A configured hook is not automatically an active hook: Codex ties trust to the exact hook definition and skips a new or changed non-managed hook until it is reviewed in `/hooks`. GitHub Delivery records `hook_trust_required` rather than falsely reporting `hooks` in that state. The protected launcher independently marks its own process tree `stream`, so a protected session does not depend on machine-wide activation guesswork.
+A configured hook is not automatically an active hook: Codex ties trust to the exact hook definition and skips a new or changed non-managed hook until it is reviewed in `/hooks`. GitHub Delivery records `hook_trust_required` rather than falsely reporting `hooks` in that state. The protected launcher independently marks its own process tree `stream`, so a protected session does not depend on machine-wide activation guesswork. A verified live stream declaration also supersedes stale hook-era degradation metadata.
 
 The hard interruption boundary is intentionally narrower than the hook boundary. Local lifecycle hooks cannot stop text that is still being generated before a tool call, and hosted tools such as WebSearch do not universally pass through local tool hooks. The controlled App Server stream is therefore the strongest available boundary for those cases. Codex currently marks App Server/WebSocket transport experimental, so this is not presented as a production-stable universal host API.
 
@@ -569,14 +574,29 @@ The hard interruption boundary is intentionally narrower than the hook boundary.
 - Evidence acquisition is not treated as execution progress. Reads/searches consume the turn's exploration budget and do **not** reset narration-stall history.
 - The default supported evidence budget warns at **8** consecutive attempts and blocks/interrupts at **12** until execution/state progress occurs or a new turn begins.
 - Stable reads use `SHA-256(state-generation + tool-name + canonical-tool-input)` and are reusable until relevant state changes.
+- Supported authoritative GitHub/helper evidence additionally uses semantic resource + coverage keys, so different `Select-String` filters over the same Actions run do not automatically become new evidence.
 - Volatile reads remain refreshable; the default identical-poll interval is **30 seconds**.
-- Hook persistence is scoped by `session_id + turn_id`, plus `agent_id` when Codex supplies it, and stores only counters/hashes using locked atomic state updates with ownership and symlink checks.
+- Hook persistence is scoped by `session_id + turn_id`, plus `agent_id` when Codex supplies it, and stores only counters/hashes/metadata using locked atomic state updates with ownership and symlink checks.
 - Unknown or ambiguous tools remain neutral instead of accidentally resetting the watchdog.
+- A runtime tool start clears only pending tool-emission state; it is not progress until execution/state/plan/diff evidence proves progress.
+- Protected stream active-work defaults warn/hard-stop at **6k/12k generated characters** and **4k/8k generated output tokens** since the last real progress. Six imminent execution clauses without a tool start or two malformed protocol-emission chunks are hard stalls. Exact/low-novelty detection may interrupt earlier.
+- Completed-plan final responses use a larger dedicated allowance (**40k/64k characters**, **12k/16k output tokens**) so legitimate verdicts are not killed by active-workflow limits. Tool/protocol stall detection remains active, and a new real tool start exits finalization mode.
+- `turn/diff/updated` material changes and increased completed `turn/plan/updated` steps are real progress; unchanged/no-op signals are not.
 - Pending-only required CI is delegated to `scripts/ci-wait.mjs` instead of parallel manual polling loops.
-- Oversized tool output keeps a bounded head/tail plus unique failure/error/blocker/status signals and explicit omitted-character metadata.
+- Successful `PostToolUse` output is never generically truncated/replaced. Prefer authoritative helpers that emit compact structured evidence at the source, then escalate status → failing component → focused excerpt → full raw output only when required.
 - Codex hook mode uses a **6,000 serialized-character** default subagent-input budget and requires focused briefs that reference source files rather than copying large parent context.
 
-For operator details, hook trust, host integration, and the protected streaming boundary, see [`references/agent-progress-watchdog.md`](references/agent-progress-watchdog.md).
+### Workflow convergence
+
+The persistent delivery controller makes the outer workflow bounded even when a model keeps changing its prose. Default controller limits are a no-progress warning/restrict/interrupt sequence at **2/3/4 cycles**, **3** phase retries, **80** workflow steps, **30** evidence actions, **12,000** tokens per phase, **50,000** per workflow, and **30 minutes** wall time. Route selection is locked to the selected workflow graph, and checkpoints preserve completed phases and still-valid evidence across resume.
+
+`workflow-brief.mjs` and workflow profiles resolve the selected workflow/policy packet once. Conditional policy is added only when its observable condition becomes true rather than by repeatedly rereading the policy tree.
+
+### Release-blocking replay gate
+
+`npm run reliability:gate` replays sanitized versions of the real incidents plus false-positive controls. It covers Baseline-is-green/tool-emission stalls, malformed `<atool>` generation, cross-channel narration, repeated filtered reads of one Actions run, long unique no-progress generation, output-token exhaustion, legitimate tool-rich investigations, and long completed-plan final verdicts. A new real incident is expected to become a deterministic replay fixture rather than remain only a transcript.
+
+For operator details, exact budget semantics, hook trust, host integration, evidence coverage, workflow-controller behavior, and the protected streaming boundary, see [`references/agent-progress-watchdog.md`](references/agent-progress-watchdog.md).
 
 ---
 
@@ -613,6 +633,10 @@ See [`docs/live-integration.md`](docs/live-integration.md) and [`docs/live-githu
 | `references/policy-kernel.md` | Canonical cross-workflow invariants |
 | `references/policy/*.md` | Focused mutation, evidence, review, CI, Git, issue, publication, release, and stack policy modules |
 | `scripts/policy-bundle.mjs` | Deterministic workflow → policy-module resolution and architecture validation |
+| `scripts/delivery-controller.mjs` | Persistent workflow-controller CLI for start/transition/cycle/retry/evidence/usage/ref/blocker operations |
+| `scripts/lib/delivery-workflow-controller.mjs` | Route/phase graph enforcement, checkpointed progress state, and phase/workflow budgets |
+| `scripts/lib/delivery-workflow-profiles.mjs` | Routed workflow → legal phase graph/profile mapping |
+| `scripts/workflow-brief.mjs` | One-shot selected workflow + policy packet for controller-driven execution |
 | `scripts/ship-gate-snapshot.mjs` | Capture one paginated evidence snapshot |
 | `scripts/ship-gate.mjs` | Produce the authoritative `ready` / `blocked` / `unknown` decision |
 | `scripts/lib/merge-boundary.mjs` | Bind head/base/rules fingerprints and aggregate strict ruleset enforcement |
@@ -628,11 +652,14 @@ See [`docs/live-integration.md`](docs/live-integration.md) and [`docs/live-githu
 | `scripts/github-authorize.mjs` | Attach exact-scope trusted authority grants and verdict provenance |
 | `authority-host/windows/` | Optional Windows 11 / Windows Hello local trusted-authority issuer |
 | `scripts/lib/github-retry.mjs` | Bounded retry policy for proven GitHub reads only |
-| `scripts/lib/agent-progress-watchdog.mjs` | Host-agnostic narration-stall detection, evidence budgets, read fingerprints, state generations, and output economy |
+| `scripts/lib/agent-progress-watchdog.mjs` | Shared narration/tool-emission/protocol detection, evidence budgets, generated-character/output-token bounds, read fingerprints and progress generations |
+| `scripts/lib/watchdog-evidence-registry.mjs` | Semantic evidence identities, authoritative coverage and state-generation reuse |
 | `scripts/lib/watchdog-progress-classifier.mjs` | Conservative evidence/execution/state-change classification shared by hooks and App Server routing |
 | `scripts/lib/watchdog-state-store.mjs` | Turn-scoped locked/atomic watchdog persistence with ownership and symlink hardening |
 | `scripts/lib/watchdog-activation.mjs` | Truthful `none` / trusted `hooks` / controlled `stream` activation selection and non-sensitive receipt state |
-| `scripts/codex-watchdog-hook.mjs` | Codex lifecycle-hook entrypoint for turn-scoped tool-boundary enforcement and bounded Stop recovery |
+| `scripts/codex-watchdog-hook.mjs` | Codex lifecycle-hook entrypoint for duplicate/semantic evidence enforcement, evidence budgets and bounded Stop recovery without replacing successful tool output |
+| `scripts/lib/codex-progress-watchdog.mjs` | App Server generated-text/token/plan/diff progress routing, hard turn bounds and finalization allowance |
+| `scripts/lib/codex-watchdog-replay.mjs` | Sanitized deterministic App Server incident replay |
 | `scripts/lib/codex-watchdog-remote-bridge.mjs` | Authenticated loopback bridge with per-turn streaming enforcement, private interrupt acknowledgement, and fail-closed health checks |
 | `scripts/codex-with-watchdog.mjs` | Protected Codex launcher and current-session `stream` capability declaration |
 | `scripts/codex-app-server-watchdog-proxy.mjs` | Per-turn streaming router for custom App Server clients with private in-flight `turn/interrupt` handling |
@@ -653,7 +680,7 @@ See [`docs/live-integration.md`](docs/live-integration.md) and [`docs/live-githu
 | `scripts/install-skill.mjs` | Dry-run/apply install plus the single verified `--update` mutation path, backups, hooks, and postconditions |
 | `scripts/prepare-release.mjs` | Verify release identity, checksums, SBOM, notes and provenance subjects |
 
-The architecture intentionally uses **progressive disclosure**: a routed workflow loads the policy kernel plus only the modules it declares, instead of dumping every rule into every agent turn. `GD-CORE-009` and `GD-CORE-010` extend that idea into execution: prefer authoritative aggregate reads, reuse valid state snapshots, escalate diagnostics from status → failing component → focused excerpt → full raw output only when required, and pass subagents focused briefs with source references instead of copied context. Architecture validation ensures these context reductions do not remove required safety contracts.
+The architecture intentionally uses **progressive disclosure**: a routed workflow resolves one workflow/policy packet and follows its controller graph instead of dumping every rule into every agent turn or repeatedly reconsidering routing. `GD-CORE-009` and `GD-CORE-010` extend that idea into execution: prefer authoritative aggregate reads, reuse valid state/evidence snapshots, escalate diagnostics from status → failing component → focused excerpt → full raw output only when required, and pass subagents focused briefs with source references instead of copied context. Architecture validation ensures these context reductions do not remove required safety contracts.
 
 ---
 
@@ -753,13 +780,13 @@ npx github-delivery setup
 
 For manual/recovery use from the installed bundle, the equivalent low-level activation refresh remains available through `node scripts/install-skill.mjs --hook-trust-verified --apply` after the exact hooks have been reviewed and trusted.
 
-Trusted hooks provide turn-scoped supported-tool guardrails, including the 8/12 evidence-exploration budget, but they cannot interrupt assistant text before a local tool boundary. For in-flight repeated narration and hosted/read-exploration activity visible through App Server, use the protected launcher:
+Trusted hooks provide turn-scoped supported-tool guardrails, including duplicate/semantic evidence protection and the 8/12 evidence-exploration budget, but they cannot interrupt assistant text before a local tool boundary. For in-flight generated-text/tool-emission activity visible through App Server, use the protected launcher:
 
 ```bash
 node ~/.agents/skills/github-delivery/scripts/codex-with-watchdog.mjs
 ```
 
-The launcher starts the real App Server over stdio, interposes an authenticated loopback remote bridge, keeps watchdog state per turn, and marks only its own launched process tree as `stream`. If required stream notifications disappear or a private interrupt cannot be confirmed, it fails closed and terminates the protected process tree. Ordinary `codex` and IDE sessions are not silently rerouted. The standalone `scripts/install-codex-watchdog-hooks.mjs` remains available for repair/non-standard installs.
+The launcher starts the real App Server over stdio, interposes an authenticated loopback remote bridge, keeps watchdog state per turn, observes required generated-text/plan/diff/token notifications, and marks only its own launched process tree as `stream`. If required stream notifications disappear or a private interrupt cannot be confirmed, it fails closed and terminates the protected process tree. Ordinary `codex` and IDE sessions are not silently rerouted. The standalone `scripts/install-codex-watchdog-hooks.mjs` remains available for repair/non-standard installs.
 
 ### Optional Windows authority host
 
@@ -798,10 +825,12 @@ Repository controls also include:
 - Dependency Review;
 - repository/workflow policy validation;
 - deterministic distribution checks;
+- exact npm package-surface validation plus the release-blocking `npm run reliability:gate`;
 - offline routing, regression and review-scope evaluations;
 - documentation/policy contracts;
 - mutation-boundary and architecture regression tests;
-- progress-watchdog regressions for pure narration stalls, interleaved read-exploration loops, turn isolation, evidence budgets, duplicate reads/polling, output compaction, subagent budgets, secure state persistence, hook trust/configuration, protected-stream health/interrupt failure, and safe installation;
+- progress-watchdog regressions for cross-channel narration, unique generation, tool-emission/protocol stalls, output-token/character bounds, plan/diff progress, interleaved/semantic evidence loops, turn isolation, duplicate reads/polling, subagent budgets, secure state persistence, hook trust/configuration, protected-stream health/interrupt failure, finalization false positives, and safe installation;
+- persistent workflow-controller tests for route locking, legal phase transitions, checkpoints/resume, measurable progress and phase/workflow budgets;
 - OpenSSF Scorecard;
 - release checksum/SBOM/provenance verification.
 
@@ -819,6 +848,6 @@ Do not publish suspected vulnerability details in a public issue or pull request
 
 ## Current state
 
-The complete issue/PR delivery lifecycle and its safety architecture are implemented: evidence-backed routing and ship gates, deferred-intent-safe merge routing, brokered lifecycle mutations, trusted exact-scope authority and durable verdict provenance, Windows Hello protection for high-assurance thread actions, deep review, semantic propagation, deterministic probes with non-bypassable required evidence, pre-open review, safe simplification, repository-qualified stacks, conflict recovery, merge-queue semantics, aggregated strict-ruleset enforcement, authenticated exact-effect idempotency receipts, ambiguous-merge readback reconciliation, safe read retries, layered progress/context economy with trust-aware Codex hook configuration and a protected streaming launch boundary, issue close-out, deterministic release packaging, verified latest-stable self-update, repository controls, and dedicated live lifecycle fixtures.
+The complete issue/PR delivery lifecycle and its safety architecture are implemented: evidence-backed routing and ship gates, deferred-intent-safe merge routing, brokered lifecycle mutations, trusted exact-scope authority and durable verdict provenance, Windows Hello protection for high-assurance thread actions, deep review, semantic propagation, deterministic probes with non-bypassable required evidence, pre-open review, safe simplification, repository-qualified stacks, conflict recovery, merge-queue semantics, aggregated strict-ruleset enforcement, authenticated exact-effect idempotency receipts, ambiguous-merge readback reconciliation, safe read retries, verified npm/npx bootstrap + latest-stable release installation, persistent route/phase workflow convergence, semantic evidence coverage/reuse, trust-aware Codex hook configuration, hard cross-channel protected-stream generation bounds with deterministic incident replay, issue close-out, deterministic release packaging, verified latest-stable self-update, repository controls, and dedicated live lifecycle fixtures.
 
-Remaining work is primarily **operational** rather than a missing architecture layer: keep live repository rules/security settings aligned with the documented policy, provision and maintain the dedicated live fixture target/credential, run release acceptance for new versions, keep host integrations explicitly configured where runtime watchdog enforcement is desired, and extend the regression corpus as GitHub and agent hosts evolve.
+Remaining work is primarily **operational** rather than a missing architecture layer: keep live repository rules/security settings aligned with the documented policy, provision and maintain the dedicated live fixture target/credential, run release acceptance for new versions, keep host integrations explicitly configured where runtime watchdog enforcement is desired, perform the npm registry's one-time package bootstrap/Trusted-Publisher setup when required for the first publication, and extend the regression corpus as GitHub and agent hosts evolve.
