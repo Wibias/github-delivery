@@ -5,6 +5,8 @@ import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
+import { parseNpmPackJson } from "./lib/npm-pack-json.mjs";
+
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const NPM = process.platform === "win32" ? "npm.cmd" : "npm";
 
@@ -31,16 +33,6 @@ function fail(message) {
   process.exit(1);
 }
 
-function parsePackJson(stdout) {
-  const text = String(stdout || "").trim();
-  const first = text.indexOf("[");
-  const last = text.lastIndexOf("]");
-  if (first === -1 || last === -1 || last < first) {
-    throw new Error("npm_pack_json_missing");
-  }
-  return JSON.parse(text.slice(first, last + 1));
-}
-
 function sameStrings(actual, expected) {
   return actual.length === expected.length
     && actual.every((value, index) => value === expected[index]);
@@ -51,12 +43,12 @@ try {
   assert.equal(pkg.name, "github-delivery");
   assert.equal(pkg.private, undefined);
   assert.deepEqual(pkg.bin, {
-    "github-delivery": "./scripts/github-delivery-cli.mjs",
+    "github-delivery": "scripts/github-delivery-cli.mjs",
   });
   assert.equal(pkg.license, "MIT");
   assert.deepEqual(pkg.repository, {
     type: "git",
-    url: "https://github.com/Wibias/github-delivery.git",
+    url: "git+https://github.com/Wibias/github-delivery.git",
   });
   assert.equal(pkg.publishConfig?.access, "public");
   assert.equal(pkg.publishConfig?.registry, "https://registry.npmjs.org/");
@@ -83,7 +75,7 @@ try {
     },
   });
   assert.equal(packResult.status, 0, packResult.stderr || packResult.stdout);
-  const [pack] = parsePackJson(packResult.stdout);
+  const [pack] = parseNpmPackJson(packResult.stdout);
   assert(pack, "npm pack returned no package metadata");
 
   const actual = pack.files.map((entry) => entry.path).sort();
