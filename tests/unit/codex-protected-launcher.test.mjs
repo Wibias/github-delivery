@@ -39,6 +39,24 @@ test("protected launcher declares stream capability only inside its launched run
   assert.equal(env.SHIPPING_GITHUB_STREAM_LAUNCH_CONTROLLED, "true");
 });
 
+test("protected launcher removes inherited PowerShell module paths on Windows", () => {
+  const env = protectedRuntimeEnv(
+    {
+      EXISTING: "keep",
+      PsMoDuLePaTh: "C:\\Program Files\\PowerShell\\7\\Modules",
+    },
+    "win32",
+  );
+
+  assert.equal(env.EXISTING, "keep");
+  assert.equal(Object.keys(env).some((key) => key.toLowerCase() === "psmodulepath"), false);
+});
+
+test("protected launcher preserves PowerShell module paths outside Windows", () => {
+  const env = protectedRuntimeEnv({ PSModulePath: "/opt/powershell/modules" }, "linux");
+  assert.equal(env.PSModulePath, "/opt/powershell/modules");
+});
+
 function fakeChild({ piped = false } = {}) {
   const child = new EventEmitter();
   child.killed = false;
