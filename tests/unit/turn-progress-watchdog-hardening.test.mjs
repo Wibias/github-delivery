@@ -14,6 +14,13 @@ function narration(router, turnId, text, threadId = "thr-1") {
   });
 }
 
+function generatedText(router, method, turnId, text, threadId = "thr-stream") {
+  return router.onServerMessage({
+    method,
+    params: { threadId, turnId, itemId: `item-${turnId}`, delta: text },
+  });
+}
+
 function evidenceItem(router, turnId, id, type = "webSearch", threadId = "thr-1") {
   router.onServerMessage({
     method: "item/started",
@@ -141,4 +148,53 @@ test("pure request-log narration incident is interrupted before 500 characters",
   assert.ok(tripped, "expected the repeated narration turn to be interrupted");
   assert.ok(emitted < 500, `watchdog allowed ${emitted} characters before interruption`);
   assert.equal(tripped.internalRequests.length, 1);
+});
+
+for (const method of [
+  "item/reasoning/summaryTextDelta",
+  "item/reasoning/textDelta",
+  "item/plan/delta",
+]) {
+  test(`${method} participates in repeated generated-text detection`, () => {
+    const router = createAppServerWatchdogRouter({ internalRequestIdPrefix: "gd-all-text" });
+    let tripped = null;
+    for (let index = 0; index < 12; index += 1) {
+      const result = generatedText(
+        router,
+        method,
+        "turn-generated-text",
+        "Let me run the command now.\n",
+      );
+      if (result.internalRequests.length) {
+        tripped = result;
+        break;
+      }
+    }
+    assert.ok(tripped, `expected ${method} loop to be interrupted`);
+    assert.equal(tripped.internalRequests[0].method, "turn/interrupt");
+  });
+}
+
+test("switching generated-text channels cannot reset repeated intent detection", () => {
+  const router = createAppServerWatchdogRouter({ internalRequestIdPrefix: "gd-cross-channel" });
+  const methods = [
+    "item/reasoning/summaryTextDelta",
+    "item/agentMessage/delta",
+    "item/plan/delta",
+    "item/reasoning/textDelta",
+  ];
+  let tripped = null;
+  for (let index = 0; index < 16; index += 1) {
+    const result = generatedText(
+      router,
+      methods[index % methods.length],
+      "turn-cross-channel",
+      "Let me execute the grep.\n",
+    );
+    if (result.internalRequests.length) {
+      tripped = result;
+      break;
+    }
+  }
+  assert.ok(tripped, "expected cross-channel generated-text loop to be interrupted");
 });
