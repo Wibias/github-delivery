@@ -46,10 +46,31 @@ function verifiedCandidate(root, target) {
   };
 }
 
+const UNSUPPORTED_AUTHORITY = Object.freeze({
+  supported: false,
+  installed: false,
+  legacy: false,
+  version: null,
+  sourceCommit: null,
+});
+const UNSUPPORTED_AUTHORITY_RESULT = Object.freeze({
+  action: "unsupported",
+  changed: false,
+  installed: UNSUPPORTED_AUTHORITY,
+});
+
+function authorityTestDependencies() {
+  return {
+    readInstalledAuthorityHost: () => ({ ...UNSUPPORTED_AUTHORITY }),
+    reconcileStableAuthorityHost: async () => ({ ...UNSUPPORTED_AUTHORITY_RESULT }),
+  };
+}
+
 function workspaceDependencies(root) {
   return {
     makeWorkspace: () => join(root, "workspace"),
     removeWorkspace: () => {},
+    ...authorityTestDependencies(),
   };
 }
 
@@ -63,6 +84,7 @@ test("release self-update dry-run never mutates the installed target", async () 
   }, {
     makeWorkspace: () => join(root, "workspace"),
     removeWorkspace: (workspace) => { removedWorkspace = workspace; },
+    ...authorityTestDependencies(),
     prepareVerifiedReleaseCandidate: async ({ target: candidateTarget, workspace }) => {
       assert.equal(candidateTarget, target);
       assert.equal(workspace, join(root, "workspace"));
@@ -84,31 +106,59 @@ test("release self-update dry-run never mutates the installed target", async () 
   assert.equal(result.apply, false);
   assert.equal(result.updated, false);
   assert.equal(result.release.sourceCommit, "a".repeat(40));
+  assert.equal(result.authorityHost.action, "unsupported");
   assert.equal(removedWorkspace, join(root, "workspace"));
 }));
 
-test("already-current and already-ahead releases are no-ops even with apply", async () => {
-  for (const action of ["already_current", "already_ahead"]) {
-    await withFixture(async ({ root, target }) => {
-      const candidate = verifiedCandidate(root, target);
-      candidate.plan.action = action;
-      candidate.plan.safeToReplace = false;
-      let installCalls = 0;
-      const result = await runInstallCommand({ update: true, apply: true, target }, {
-        ...workspaceDependencies(root),
-        prepareVerifiedReleaseCandidate: async () => candidate,
-        installSkill: () => { installCalls += 1; },
-        readUserConfig: () => { throw new Error("no-op must not read config"); },
-        verifyInstalledRelease: () => { throw new Error("no-op must not verify post-install state"); },
-      });
-      assert.equal(installCalls, 0);
-      assert.equal(result.action, action);
-      assert.equal(result.apply, true);
-      assert.equal(result.updated, false);
-      assert.equal(readFileSync(join(target, "marker.txt"), "utf8"), "old\n");
-    });
-  }
-});
+test("already-current release still reconciles Authority while leaving the skill untouched", async () => withFixture(async ({ root, target }) => {
+  const candidate = verifiedCandidate(root, target);
+  candidate.plan.action = "already_current";
+  candidate.plan.safeToReplace = false;
+  let installCalls = 0;
+  let authorityCalls = 0;
+  const authorityHost = { action: "upgrade_legacy", changed: true, installed: { supported: true, installed: true, version: "0.5.0" } };
+  const result = await runInstallCommand({ update: true, apply: true, target }, {
+    ...workspaceDependencies(root),
+    prepareVerifiedReleaseCandidate: async () => candidate,
+    installSkill: () => { installCalls += 1; },
+    readUserConfig: () => { throw new Error("unsupported authority planning must not read config"); },
+    verifyInstalledRelease: () => { throw new Error("already-current skill must not verify post-install state"); },
+    async reconcileStableAuthorityHost(options) {
+      authorityCalls += 1;
+      assert.equal(options.expectedRelease, candidate.release);
+      assert.equal(options.scriptPath, join(target, "authority-host", "windows", "install-release.ps1"));
+      return authorityHost;
+    },
+  });
+  assert.equal(installCalls, 0);
+  assert.equal(authorityCalls, 1);
+  assert.equal(result.action, "already_current");
+  assert.equal(result.updated, false);
+  assert.deepEqual(result.authorityHost, authorityHost);
+  assert.equal(readFileSync(join(target, "marker.txt"), "utf8"), "old\n");
+}));
+
+test("already-ahead release remains a complete no-op including Authority", async () => withFixture(async ({ root, target }) => {
+  const candidate = verifiedCandidate(root, target);
+  candidate.plan.action = "already_ahead";
+  candidate.plan.safeToReplace = false;
+  let installCalls = 0;
+  let authorityCalls = 0;
+  const result = await runInstallCommand({ update: true, apply: true, target }, {
+    ...workspaceDependencies(root),
+    prepareVerifiedReleaseCandidate: async () => candidate,
+    installSkill: () => { installCalls += 1; },
+    readUserConfig: () => { throw new Error("ahead no-op must not read config"); },
+    reconcileStableAuthorityHost: async () => { authorityCalls += 1; throw new Error("ahead no-op must not reconcile authority"); },
+    verifyInstalledRelease: () => { throw new Error("ahead no-op must not verify post-install state"); },
+  });
+  assert.equal(installCalls, 0);
+  assert.equal(authorityCalls, 0);
+  assert.equal(result.action, "already_ahead");
+  assert.equal(result.updated, false);
+  assert.equal(result.authorityHost.action, "skipped_skill_ahead");
+  assert.equal(readFileSync(join(target, "marker.txt"), "utf8"), "old\n");
+}));
 
 test("local modifications block replacement and force cannot bypass the update plan", async () => withFixture(async ({ root, target }) => {
   const candidate = verifiedCandidate(root, target);
@@ -153,6 +203,7 @@ test("release self-update apply installs only the verified candidate then verifi
   };
   let configReads = 0;
   let verifyCalls = 0;
+  let authorityCalls = 0;
   let removedWorkspace = null;
 
   const result = await runInstallCommand({
@@ -164,6 +215,7 @@ test("release self-update apply installs only the verified candidate then verifi
   }, {
     makeWorkspace: () => join(root, "workspace"),
     removeWorkspace: (workspace) => { removedWorkspace = workspace; },
+    ...authorityTestDependencies(),
     prepareVerifiedReleaseCandidate: async () => candidate,
     readUserConfig: () => {
       configReads += 1;
@@ -192,11 +244,18 @@ test("release self-update apply installs only the verified candidate then verifi
       assert.deepEqual(manifest, candidate.manifest);
       return { clean: true };
     },
+    async reconcileStableAuthorityHost(options) {
+      authorityCalls += 1;
+      assert.equal(options.expectedRelease, candidate.release);
+      assert.equal(options.scriptPath, join(target, "authority-host", "windows", "install-release.ps1"));
+      return { ...UNSUPPORTED_AUTHORITY_RESULT };
+    },
   });
 
   assert.equal(readFileSync(join(target, "marker.txt"), "utf8"), "new\n");
   assert.equal(configReads, 2);
   assert.equal(verifyCalls, 1);
+  assert.equal(authorityCalls, 1);
   assert.equal(result.action, "update");
   assert.equal(result.apply, true);
   assert.equal(result.updated, true);
@@ -205,6 +264,7 @@ test("release self-update apply installs only the verified candidate then verifi
   assert.equal(result.backupPath, backupPath);
   assert.equal(result.release.sourceCommit, "a".repeat(40));
   assert.equal(result.watchdog.hookTrustRequired, true);
+  assert.equal(result.authorityHost.action, "unsupported");
   assert.equal(removedWorkspace, join(root, "workspace"));
 }));
 
