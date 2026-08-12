@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -12,6 +13,8 @@ internal sealed partial class ControlCenterWindow : Window
     {
         public override string ToString() => Display;
     }
+
+    private sealed record HostVersionInfo(string Version, string SourceCommit);
 
     private readonly StateStore _store;
 
@@ -58,20 +61,62 @@ internal sealed partial class ControlCenterWindow : Window
         DeniedTodayCount.Text = todayEvents.Count(entry => entry.EventType == "approval_denied").ToString(CultureInfo.InvariantCulture);
         ExpiredTodayCount.Text = todayEvents.Count(entry => entry.EventType.EndsWith("_expired", StringComparison.Ordinal)).ToString(CultureInfo.InvariantCulture);
 
+        RefreshConfiguration();
+        RefreshInstallationStatus();
+        DiagnosticsUpdated.Text = $"Updated {DateTimeOffset.Now:t}";
+    }
+
+    private void RefreshConfiguration()
+    {
         try
         {
-            var mode = UserConfigStore.Read();
-            var display = UserConfigStore.DisplayMode(mode.AuthorityMode);
+            var config = UserConfigStore.Read();
+            var display = UserConfigStore.DisplayMode(config.AuthorityMode);
             ProtectionModeText.Text = display;
             ProtectionModeSidebar.Text = display;
-            DiagnosticsUpdated.Text = $"Updated {DateTimeOffset.Now:t}";
+            OffModeRadio.IsChecked = config.AuthorityMode == "off";
+            SensitiveModeRadio.IsChecked = config.AuthorityMode == "high-assurance";
+            AllModeRadio.IsChecked = config.AuthorityMode == "all";
+            ConfigPathText.Text = UserConfigStore.ConfigPath;
         }
         catch (Exception error)
         {
             ProtectionModeText.Text = "Configuration error";
             ProtectionModeSidebar.Text = "Configuration error";
-            DiagnosticsUpdated.Text = error.Message;
+            SettingsStatusText.Text = error.Message;
+            ConfigPathText.Text = UserConfigStore.ConfigPath;
         }
+    }
+
+    private void RefreshInstallationStatus()
+    {
+        try
+        {
+            var info = ReadHostVersionInfo();
+            HostVersionText.Text = info?.Version ?? "Legacy / unversioned";
+            HostSourceText.Text = info?.SourceCommit ?? "No release metadata found";
+        }
+        catch (Exception error)
+        {
+            HostVersionText.Text = "Version metadata error";
+            HostSourceText.Text = error.Message;
+        }
+    }
+
+    private static HostVersionInfo? ReadHostVersionInfo()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "authority-host-version.json");
+        if (!File.Exists(path)) return null;
+        using var document = JsonDocument.Parse(File.ReadAllText(path));
+        var root = document.RootElement;
+        if (root.GetProperty("schemaVersion").GetInt32() != 1 ||
+            root.GetProperty("kind").GetString() != "github-delivery/authority-host-version")
+            throw new InvalidOperationException("authority_host_version_metadata_invalid");
+        var version = root.GetProperty("version").GetString();
+        var sourceCommit = root.GetProperty("sourceCommit").GetString();
+        if (string.IsNullOrWhiteSpace(version) || string.IsNullOrWhiteSpace(sourceCommit))
+            throw new InvalidOperationException("authority_host_version_metadata_invalid");
+        return new HostVersionInfo(version, sourceCommit);
     }
 
     private static string FormatAuditEvent(AuditEventRecord entry)
@@ -90,6 +135,15 @@ internal sealed partial class ControlCenterWindow : Window
         return $"{lease.Repo}  •  {lease.Branch}  •  {minutes} min remaining";
     }
 
+    private void Navigation_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
+    {
+        var tag = (args.SelectedItem as NavigationViewItem)?.Tag?.ToString();
+        var showSettings = string.Equals(tag, "settings", StringComparison.Ordinal);
+        SettingsPage.Visibility = showSettings ? Visibility.Visible : Visibility.Collapsed;
+        OverviewPage.Visibility = showSettings ? Visibility.Collapsed : Visibility.Visible;
+        if (showSettings) Refresh();
+    }
+
     private void GrantList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         RevokeGrantButton.IsEnabled = GrantList.SelectedItem is BranchLeaseListItem item && !string.IsNullOrEmpty(item.LeaseId);
@@ -100,6 +154,25 @@ internal sealed partial class ControlCenterWindow : Window
         if (GrantList.SelectedItem is not BranchLeaseListItem item || string.IsNullOrEmpty(item.LeaseId)) return;
         _store.RevokeBranchLease(item.LeaseId, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
         Refresh();
+    }
+
+    private void ApplyProtectionMode_Click(object sender, RoutedEventArgs e)
+    {
+        var mode = SensitiveModeRadio.IsChecked == true
+            ? "high-assurance"
+            : AllModeRadio.IsChecked == true
+                ? "all"
+                : "off";
+        try
+        {
+            UserConfigStore.WriteAuthorityMode(mode);
+            SettingsStatusText.Text = $"Saved: {UserConfigStore.DisplayMode(mode)}";
+            Refresh();
+        }
+        catch (Exception error)
+        {
+            SettingsStatusText.Text = $"Could not save: {error.Message}";
+        }
     }
 
     private void OpenSettings_Click(object sender, RoutedEventArgs e)
