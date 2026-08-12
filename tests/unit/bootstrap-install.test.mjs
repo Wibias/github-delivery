@@ -25,6 +25,12 @@ function verifiedPayload(workspace, version = "0.5.0") {
   };
 }
 
+const AUTHORITY_NOOP = Object.freeze({
+  action: "unsupported",
+  changed: false,
+  installed: { supported: false, installed: false },
+});
+
 function dependencies(overrides = {}) {
   return {
     makeWorkspace: () => "/tmp/github-delivery-bootstrap-test",
@@ -44,8 +50,9 @@ function dependencies(overrides = {}) {
         watchdog: { mode: "none", hookTrustRequired: false },
       };
     },
-    readUserConfig: () => ({ config: { strictAuthority: false } }),
+    readUserConfig: () => ({ config: { schemaVersion: 1, authorityMode: "off" } }),
     verifyInstalledRelease: () => ({ clean: true, modifications: [] }),
+    reconcileStableAuthorityHost: async () => ({ ...AUTHORITY_NOOP }),
     confirmApply: async () => true,
     ...overrides,
   };
@@ -60,7 +67,7 @@ test("confirmApply defaults to no for blank, EOF, and anything except an explici
   }
 });
 
-test("guided install verifies a release and performs a dry-run before asking to apply", async () => {
+test("guided install verifies a release, performs a dry-run, then reconciles Authority after apply", async () => {
   const events = [];
   const target = resolve("/tmp/skills/github-delivery");
   const result = await runGuidedInstall({
@@ -88,6 +95,12 @@ test("guided install verifies a release and performs a dry-run before asking to 
         events.push("verify-installed");
         return { clean: true };
       },
+      async reconcileStableAuthorityHost(options) {
+        events.push("reconcile-authority");
+        assert.deepEqual(options.expectedRelease, verifiedPayload("/tmp").release);
+        assert.equal(options.scriptPath, join(target, "authority-host", "windows", "install-release.ps1"));
+        return { ...AUTHORITY_NOOP };
+      },
     }),
   });
 
@@ -97,13 +110,15 @@ test("guided install verifies a release and performs a dry-run before asking to 
     "confirm:true",
     "install:true",
     "verify-installed",
+    "reconcile-authority",
   ]);
   assert.equal(result.action, "install");
   assert.equal(result.apply, true);
   assert.equal(result.verified, true);
+  assert.equal(result.authorityHost.action, "unsupported");
 });
 
-test("declining the shown dry-run cleans up and never calls installer apply", async () => {
+test("declining the shown dry-run cleans up and never calls installer apply or Authority reconciliation", async () => {
   const events = [];
   const target = resolve("/tmp/skills/github-delivery");
   const deps = dependencies({
@@ -133,6 +148,9 @@ test("declining the shown dry-run cleans up and never calls installer apply", as
     verifyInstalledRelease() {
       throw new Error("cancelled install must not verify a non-existent install");
     },
+    reconcileStableAuthorityHost() {
+      throw new Error("cancelled install must not reconcile Authority");
+    },
   });
 
   const result = await runGuidedInstall({ target, dependencies: deps });
@@ -153,16 +171,17 @@ test("declining the shown dry-run cleans up and never calls installer apply", as
   ]);
 });
 
-test("accepted install requires post-install manifest verification and unchanged user config", async () => {
+test("accepted install requires post-install manifest verification, unchanged user config, and Authority reconciliation", async () => {
   let configReads = 0;
   let verified = 0;
+  let authorityCalls = 0;
   const target = resolve("/tmp/skills/github-delivery");
   const result = await runGuidedInstall({
     target,
     dependencies: dependencies({
       readUserConfig() {
         configReads += 1;
-        return { config: { strictAuthority: false } };
+        return { config: { schemaVersion: 1, authorityMode: "off" } };
       },
       installSkill(options) {
         return {
@@ -179,15 +198,21 @@ test("accepted install requires post-install manifest verification and unchanged
         assert.equal(options.manifest.version, "0.5.0");
         return { clean: true };
       },
+      async reconcileStableAuthorityHost() {
+        authorityCalls += 1;
+        return { ...AUTHORITY_NOOP };
+      },
     }),
   });
   assert.equal(configReads, 2);
   assert.equal(verified, 1);
+  assert.equal(authorityCalls, 1);
   assert.equal(result.backupPath, "/tmp/backup");
 });
 
-test("post-install config drift fails closed and keeps the installer backup path on the error", async () => {
+test("post-install config drift fails closed before Authority reconciliation and keeps backup path", async () => {
   let configReads = 0;
+  let authorityCalls = 0;
   const target = resolve("/tmp/skills/github-delivery");
   await assert.rejects(
     runGuidedInstall({
@@ -195,7 +220,7 @@ test("post-install config drift fails closed and keeps the installer backup path
       dependencies: dependencies({
         readUserConfig() {
           configReads += 1;
-          return { config: { strictAuthority: configReads > 1 } };
+          return { config: { schemaVersion: 1, authorityMode: configReads > 1 ? "all" : "off" } };
         },
         installSkill(options) {
           return {
@@ -206,6 +231,10 @@ test("post-install config drift fails closed and keeps the installer backup path
             watchdog: null,
           };
         },
+        reconcileStableAuthorityHost() {
+          authorityCalls += 1;
+          return { ...AUTHORITY_NOOP };
+        },
       }),
     }),
     (error) => {
@@ -214,6 +243,7 @@ test("post-install config drift fails closed and keeps the installer backup path
       return true;
     },
   );
+  assert.equal(authorityCalls, 0);
 });
 
 test("explicit install refuses to silently reinstall an already valid installation", async () => {
