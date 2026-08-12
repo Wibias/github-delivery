@@ -15,7 +15,7 @@ description: >
 # GitHub Delivery
 
 Own GitHub work from product intake through merged PR. Natural language is the
-public API; scripts and policy modules are internal evidence/context economy machinery.
+public API; internals enforce evidence/context economy.
 
 ## Route
 
@@ -96,7 +96,7 @@ individual PR's review/fix/readiness bar.
 Load `references/policy-kernel.md`, the selected workflow's unconditional
 modules, and conditionals only when their observable condition is true.
 `node scripts/policy-bundle.mjs <workflow>` resolves/validates this bundle.
-Workflows cannot weaken `GD-*` rules. GD-CORE-001..010 remain mandatory.
+Workflows cannot weaken `GD-*` rules. GD-CORE-001 through GD-CORE-010 remain mandatory.
 
 ## Workflow controller contract
 
