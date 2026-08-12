@@ -216,7 +216,7 @@ Extract an archive and copy the resulting `github-delivery` directory into the h
 
 The optional Windows 11 Authority host turns local Windows Hello approvals into short-lived, exact-scope trusted grants for high-assurance mutations. It does not automatically enable a stricter global protection mode.
 
-For a normal stable installation, do **not** build it manually. Use:
+For a normal stable installation, the **guided setup** is managed by the github-delivery bootstrap; do **not** build the Authority host manually. Use:
 
 ```bash
 npx github-delivery setup
