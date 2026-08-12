@@ -59,7 +59,7 @@ export function readInstalledAuthorityHost({
   readFile = readFileSync,
 } = {}) {
   const root = authorityHostInstallRoot({ platform, env, home });
-  if (!root) return { supported: false, installed: false, legacy: false, root: null, version: null, sourceCommit: null };
+  if (!root) return { supported: false, configured: false, installed: false, legacy: false, root: null, version: null, sourceCommit: null };
   const recordPath = win32Path.join(root, "authority-host-install.json");
   if (exists(recordPath)) {
     let record;
@@ -71,6 +71,7 @@ export function readInstalledAuthorityHost({
     const exePath = win32Path.join(root, ...record.appDir.split("/"), "GitHubDeliveryAuthority.exe");
     return {
       supported: true,
+      configured: true,
       installed: exists(exePath),
       legacy: false,
       root,
@@ -86,6 +87,7 @@ export function readInstalledAuthorityHost({
   if (exists(legacyExe)) {
     return {
       supported: true,
+      configured: true,
       installed: true,
       legacy: true,
       root,
@@ -96,15 +98,18 @@ export function readInstalledAuthorityHost({
       record: null,
     };
   }
-  return { supported: true, installed: false, legacy: false, root, recordPath, exePath: null, version: null, sourceCommit: null, record: null };
+  return { supported: true, configured: false, installed: false, legacy: false, root, recordPath, exePath: null, version: null, sourceCommit: null, record: null };
 }
 
 export function planAuthorityHostUpdate({ mode, targetVersion, installed } = {}) {
   if (!installed?.supported) return { action: "unsupported", required: false, currentVersion: null, targetVersion: targetVersion || null };
-  if (!installed.installed && mode === "off") {
-    return { action: "disabled", required: false, currentVersion: null, targetVersion: targetVersion || null };
-  }
   if (!/^\d+\.\d+\.\d+$/.test(String(targetVersion || ""))) fail("authority_host_target_version_invalid");
+  if (!installed.installed && installed.configured) {
+    return { action: "repair", required: true, currentVersion: installed.version || null, targetVersion };
+  }
+  if (!installed.installed && mode === "off") {
+    return { action: "disabled", required: false, currentVersion: null, targetVersion };
+  }
   if (!installed.installed) return { action: "install", required: true, currentVersion: null, targetVersion };
   if (installed.legacy || !installed.version) return { action: "upgrade_legacy", required: true, currentVersion: null, targetVersion };
   const comparison = compareStableVersions(installed.version, targetVersion);
@@ -184,7 +189,7 @@ export async function reconcileStableAuthorityHost({
   const config = readConfig({ platform, env, home });
   const mode = resolveAuthorityMode({ config: config.config, env });
 
-  if (!installed.installed && mode === "off") {
+  if (!installed.installed && !installed.configured && mode === "off") {
     return { action: "disabled", required: false, changed: false, installed, mode, currentVersion: null, targetVersion: expectedRelease?.version || null };
   }
 
