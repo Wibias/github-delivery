@@ -105,3 +105,45 @@ test("semantic evidence coverage is invalidated by a relevant state generation c
     },
   );
 });
+
+test("hook blocks a differently filtered second read after the first run evidence completed", () => {
+  const common = {
+    session_id: "session-semantic",
+    turn_id: "turn-semantic",
+    tool_name: "Bash",
+  };
+  const firstInput = {
+    ...common,
+    hook_event_name: "PreToolUse",
+    tool_input: {
+      command: "gh -R o/r run view 31542325111 --log-failed | Select-String timeout",
+    },
+  };
+  const firstPre = evaluateCodexHook(firstInput, {}, { now: 1_000 });
+  assert.equal(firstPre.output, null);
+
+  const firstPost = evaluateCodexHook(
+    {
+      ...firstInput,
+      hook_event_name: "PostToolUse",
+      tool_response: "failure log evidence",
+    },
+    firstPre.state,
+    { now: 1_100 },
+  );
+  assert.equal(firstPost.output, null);
+
+  const secondPre = evaluateCodexHook(
+    {
+      ...common,
+      hook_event_name: "PreToolUse",
+      tool_input: {
+        command: "gh -R o/r run view 31542325111 --log-failed | Select-String SIGSEGV",
+      },
+    },
+    firstPost.state,
+    { now: 1_200 },
+  );
+  assert.equal(secondPre.output?.decision, "block");
+  assert.match(secondPre.output?.reason || "", /already covered|authoritative evidence/i);
+});
