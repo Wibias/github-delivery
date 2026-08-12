@@ -11,9 +11,21 @@ import { runBootstrap } from "../../scripts/lib/bootstrap-command.mjs";
 
 const TARGET = resolve("/tmp/github-delivery-installed");
 const CODEX_HOME = resolve("/tmp/codex-home");
+const AUTHORITY_NOOP = Object.freeze({
+  action: "unsupported",
+  changed: false,
+  installed: { supported: false, installed: false },
+});
 
 function validInstallation(version = "0.4.0") {
   return [{ target: TARGET, valid: true, version, reason: null }];
+}
+
+function authorityNoopDependencies(extra = {}) {
+  return {
+    reconcileStableAuthorityHost: async () => ({ ...AUTHORITY_NOOP }),
+    ...extra,
+  };
 }
 
 test("update always delegates through the installed target explicitly", async () => {
@@ -60,13 +72,20 @@ test("setup fails clearly when no valid installed skill exists", async () => {
   );
 });
 
-test("setup leaves a healthy activation untouched", async () => {
+test("setup leaves a healthy activation untouched after authority reconciliation", async () => {
   let mutations = 0;
+  let authorityCalls = 0;
+  const authorityHost = { action: "already_current", changed: false, installed: { supported: true, installed: true, version: "0.5.1" } };
   const result = await runBootstrapSetup({
     target: TARGET,
     codexHome: CODEX_HOME,
     dependencies: {
       discoverInstallations: () => validInstallation(),
+      async reconcileStableAuthorityHost(options) {
+        authorityCalls += 1;
+        assert.equal(options.scriptPath, join(TARGET, "authority-host", "windows", "install-release.ps1"));
+        return authorityHost;
+      },
       readActivationReceipt: () => ({
         schemaVersion: 1,
         mode: "hooks",
@@ -85,6 +104,7 @@ test("setup leaves a healthy activation untouched", async () => {
     },
   });
 
+  assert.equal(authorityCalls, 1);
   assert.equal(mutations, 0);
   assert.deepEqual(result, {
     action: "setup",
@@ -92,7 +112,28 @@ test("setup leaves a healthy activation untouched", async () => {
     target: TARGET,
     watchdog: "hooks",
     changed: false,
+    authorityHost,
   });
+});
+
+test("setup surfaces an authority-host repair even when watchdog activation is already healthy", async () => {
+  const authorityHost = {
+    action: "upgrade_legacy",
+    changed: true,
+    installed: { supported: true, installed: true, legacy: false, version: "0.5.1" },
+  };
+  const result = await runBootstrapSetup({
+    target: TARGET,
+    codexHome: CODEX_HOME,
+    dependencies: {
+      discoverInstallations: () => validInstallation("0.5.1"),
+      reconcileStableAuthorityHost: async () => authorityHost,
+      readActivationReceipt: () => ({ mode: "hooks", hooksConfigured: true, hookTrustVerified: true }),
+    },
+  });
+  assert.equal(result.status, "ready");
+  assert.equal(result.changed, true);
+  assert.deepEqual(result.authorityHost, authorityHost);
 });
 
 test("setup never applies a trust assertion when the installed hook definition would change", async () => {
@@ -101,7 +142,7 @@ test("setup never applies a trust assertion when the installed hook definition w
   const result = await runBootstrapSetup({
     target: TARGET,
     codexHome: CODEX_HOME,
-    dependencies: {
+    dependencies: authorityNoopDependencies({
       discoverInstallations: () => validInstallation(),
       readActivationReceipt: () => ({
         schemaVersion: 1,
@@ -124,13 +165,14 @@ test("setup never applies a trust assertion when the installed hook definition w
         installerLoads += 1;
         throw new Error("changed hooks must not reach activation apply");
       },
-    },
+    }),
   });
 
   assert.equal(confirmed, 0);
   assert.equal(installerLoads, 0);
   assert.equal(result.status, "hook_trust_required");
   assert.equal(result.hookDefinitionChanged, true);
+  assert.deepEqual(result.authorityHost, AUTHORITY_NOOP);
   assert.match(result.guidance, /\/hooks/);
 });
 
@@ -139,7 +181,7 @@ test("setup refreshes activation only through the installer inside the installed
   const result = await runBootstrapSetup({
     target: TARGET,
     codexHome: CODEX_HOME,
-    dependencies: {
+    dependencies: authorityNoopDependencies({
       discoverInstallations: () => validInstallation(),
       readActivationReceipt: () => ({
         schemaVersion: 1,
@@ -180,7 +222,7 @@ test("setup refreshes activation only through the installer inside the installed
           },
         };
       },
-    },
+    }),
   });
 
   assert.deepEqual(events.slice(0, 2), ["inspect", "confirm"]);
@@ -188,9 +230,10 @@ test("setup refreshes activation only through the installer inside the installed
   assert.equal(events.at(-1), "run");
   assert.equal(result.status, "ready");
   assert.equal(result.watchdog, "hooks");
+  assert.deepEqual(result.authorityHost, AUTHORITY_NOOP);
 });
 
-test("doctor is read-only and reports integrity, activation, config, and update relation", async () => {
+test("doctor is read-only and reports integrity, activation, config, authority host, and update relation", async () => {
   const mutations = [];
   const manifest = {
     schemaVersion: 1,
@@ -209,6 +252,7 @@ test("doctor is read-only and reports integrity, activation, config, and update 
       readInstalledManifest: () => manifest,
       compareInstalledManifest: () => ({ clean: false, modifications: [{ path: "SKILL.md", reason: "changed" }] }),
       readUserConfig: () => ({ source: "default", config: { schemaVersion: 1, authorityMode: "off" } }),
+      readInstalledAuthorityHost: () => ({ supported: true, installed: true, legacy: true, version: null, sourceCommit: null }),
       readActivationReceipt: () => ({ mode: "none", degradationReason: "hook_trust_required", hooksConfigured: true, hookTrustVerified: false }),
       async latestRelease() {
         return { tag_name: "v0.5.0", draft: false, prerelease: false, assets: [] };
@@ -225,7 +269,11 @@ test("doctor is read-only and reports integrity, activation, config, and update 
   assert.equal(report.installed.version, "0.4.0");
   assert.equal(report.integrity.clean, false);
   assert.equal(report.config.ok, true);
+  assert.equal(report.config.effectiveAuthorityMode, "off");
   assert.equal(report.activation.degradationReason, "hook_trust_required");
+  assert.equal(report.authorityHost.ok, true);
+  assert.equal(report.authorityHost.legacy, true);
+  assert.equal(report.authorityHost.relation, "update");
   assert.deepEqual(report.latest, { version: "0.5.0", relation: "update", error: null });
 });
 
