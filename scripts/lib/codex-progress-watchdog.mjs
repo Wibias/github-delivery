@@ -3,6 +3,17 @@ import {
   isSuccessfulAppServerItem,
 } from "./watchdog-progress-classifier.mjs";
 
+const GENERATED_TEXT_METHODS = new Set([
+  "item/agentMessage/delta",
+  "item/reasoning/summaryTextDelta",
+  "item/reasoning/textDelta",
+  "item/plan/delta",
+]);
+
+export function isCodexGeneratedTextMethod(method) {
+  return GENERATED_TEXT_METHODS.has(String(method || ""));
+}
+
 function maybeInterrupt(decision, params, context) {
   const threadId = params.threadId;
   const turnId = params.turnId || params.turn?.id;
@@ -33,7 +44,7 @@ export function observeCodexAppServerMessage(watchdog, message, context = {}) {
   if (!message || typeof message !== "object") return { decision: { action: "allow" } };
 
   const { method, params = {} } = message;
-  if (method === "item/agentMessage/delta") {
+  if (isCodexGeneratedTextMethod(method)) {
     const decision = watchdog.observeAssistantDelta(params.delta || "");
     return maybeInterrupt(decision, params, context);
   }
