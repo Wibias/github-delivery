@@ -1,7 +1,8 @@
+import { createProgressWatchdog } from "./agent-progress-watchdog.mjs";
 import {
-  compactToolOutput,
-  createProgressWatchdog,
-} from "./agent-progress-watchdog.mjs";
+  createEvidenceRegistry,
+  deriveShellEvidenceDescriptor,
+} from "./watchdog-evidence-registry.mjs";
 import { classifyHookTool } from "./watchdog-progress-classifier.mjs";
 
 export function classifyCodexTool(toolName, toolInput = {}) {
@@ -17,21 +18,22 @@ export function classifyCodexTool(toolName, toolInput = {}) {
 function hydrate(state, options) {
   const snapshot = state?.watchdog || state || {};
   return createProgressWatchdog({
-    stateGeneration: snapshot.stateGeneration,
-    reads: snapshot.reads,
-    consecutiveEvidenceAttempts: snapshot.consecutiveEvidenceAttempts,
-    totalEvidenceAttempts: snapshot.totalEvidenceAttempts,
-    evidenceWarningIssued: snapshot.evidenceWarningIssued,
-    executionProgressCount: snapshot.executionProgressCount,
-    stateProgressCount: snapshot.stateProgressCount,
+    ...snapshot,
     volatileReadIntervalMs: options.volatileReadIntervalMs,
     evidenceSoftLimit: options.evidenceSoftLimit,
     evidenceHardLimit: options.evidenceHardLimit,
   });
 }
 
-function stateOf(watchdog) {
-  return { watchdog: watchdog.snapshot() };
+function hydrateEvidence(state) {
+  return createEvidenceRegistry(state?.evidenceRegistry || null);
+}
+
+function stateOf(watchdog, evidenceRegistry) {
+  return {
+    watchdog: watchdog.snapshot(),
+    evidenceRegistry: evidenceRegistry.snapshot(),
+  };
 }
 
 function duplicateReason(decision) {
@@ -39,6 +41,10 @@ function duplicateReason(decision) {
     return `Repeated volatile poll blocked for ${decision.retryAfterMs}ms. Reuse the current snapshot; when pending CI is the only blocker use scripts/ci-wait.mjs instead of manual polling.`;
   }
   return "Duplicate read blocked on unchanged state. Reuse the valid evidence already captured; read again only after relevant state changes or the prior result becomes failed, ambiguous, or stale.";
+}
+
+function coveredEvidenceReason(descriptor) {
+  return `Authoritative evidence for ${descriptor.key} already covers this request in the current state. Reuse the captured evidence instead of re-reading the same resource with another filter or command shape.`;
 }
 
 function evidenceBudgetReason(decision) {
@@ -55,6 +61,21 @@ function inputChars(value) {
   } catch {
     return String(value ?? "").length;
   }
+}
+
+function shellEvidenceDescriptor(input) {
+  const name = String(input?.tool_name || input?.toolName || "");
+  if (name !== "Bash" && !/(?:^|__)shell(?:_|$)/i.test(name)) return null;
+  const toolInput = input?.tool_input ?? input?.toolInput ?? {};
+  return deriveShellEvidenceDescriptor(toolInput?.command);
+}
+
+function responseExplicitlyFailed(response) {
+  if (!response || typeof response !== "object") return false;
+  if (response.error) return true;
+  if (response.success === false || response.ok === false) return true;
+  const status = String(response.status || response.conclusion || "").toLowerCase();
+  return ["failed", "failure", "error", "cancelled", "canceled", "rejected"].includes(status);
 }
 
 function stopDecision(watchdog, input) {
@@ -77,43 +98,57 @@ export function evaluateCodexHook(input, state = {}, options = {}) {
   const config = {
     now: options.now ?? Date.now(),
     volatileReadIntervalMs: options.volatileReadIntervalMs ?? 30_000,
-    maxToolOutputChars: options.maxToolOutputChars ?? 4_000,
     maxSubagentInputChars: options.maxSubagentInputChars ?? 6_000,
     evidenceSoftLimit: options.evidenceSoftLimit ?? 8,
     evidenceHardLimit: options.evidenceHardLimit ?? 12,
   };
   const watchdog = hydrate(state, config);
+  const evidenceRegistry = hydrateEvidence(state);
   const event = input?.hook_event_name;
   let output = null;
 
   if (event === "PreToolUse") {
     const classification = classifyHookTool(input);
     if (classification.kind === "evidence") {
-      const read = {
-        toolName: input.tool_name,
-        input: input.tool_input,
-        volatility: classification.volatility || "stable",
-        now: config.now,
-      };
-      const readDecision = watchdog.decideRead({ ...read, record: false });
-      if (readDecision.action === "block") {
-        output = { decision: "block", reason: duplicateReason(readDecision) };
+      const descriptor = shellEvidenceDescriptor(input);
+      const generation = watchdog.snapshot().stateGeneration;
+      const coverageDecision = descriptor
+        ? evidenceRegistry.decide({
+            stateGeneration: generation,
+            key: descriptor.key,
+            requires: descriptor.covers,
+          })
+        : { action: "allow" };
+
+      if (coverageDecision.action === "block") {
+        output = { decision: "block", reason: coveredEvidenceReason(descriptor) };
       } else {
-        const budgetDecision = watchdog.chargeEvidenceAttempt();
-        if (budgetDecision.action === "block") {
-          output = {
-            decision: "block",
-            reason: evidenceBudgetReason(budgetDecision),
-          };
+        const read = {
+          toolName: input.tool_name,
+          input: input.tool_input,
+          volatility: classification.volatility || "stable",
+          now: config.now,
+        };
+        const readDecision = watchdog.decideRead({ ...read, record: false });
+        if (readDecision.action === "block") {
+          output = { decision: "block", reason: duplicateReason(readDecision) };
         } else {
-          watchdog.decideRead({ ...read, record: true });
-          if (budgetDecision.action === "warn") {
+          const budgetDecision = watchdog.chargeEvidenceAttempt();
+          if (budgetDecision.action === "block") {
             output = {
-              hookSpecificOutput: {
-                hookEventName: "PreToolUse",
-                additionalContext: evidenceWarning(budgetDecision),
-              },
+              decision: "block",
+              reason: evidenceBudgetReason(budgetDecision),
             };
+          } else {
+            watchdog.decideRead({ ...read, record: true });
+            if (budgetDecision.action === "warn") {
+              output = {
+                hookSpecificOutput: {
+                  hookEventName: "PreToolUse",
+                  additionalContext: evidenceWarning(budgetDecision),
+                },
+              };
+            }
           }
         }
       }
@@ -132,20 +167,23 @@ export function evaluateCodexHook(input, state = {}, options = {}) {
       watchdog.recordStateProgress("tool_state_change_completed");
     } else if (classification.kind === "execution") {
       watchdog.recordExecutionProgress({ kind: "tool_execution_completed", toolName: input.tool_name });
+    } else if (classification.kind === "evidence" && !responseExplicitlyFailed(input.tool_response)) {
+      const descriptor = shellEvidenceDescriptor(input);
+      if (descriptor) {
+        evidenceRegistry.record({
+          stateGeneration: watchdog.snapshot().stateGeneration,
+          key: descriptor.key,
+          covers: descriptor.covers,
+          authoritative: descriptor.authoritative,
+        });
+      }
     }
-
-    const compacted = compactToolOutput(input.tool_response ?? "", {
-      maxChars: config.maxToolOutputChars,
-    });
-    if (compacted.truncated) {
-      output = {
-        continue: false,
-        stopReason: `tool_output_compacted: ${compacted.originalChars} chars -> ${compacted.text.length} chars; omitted ${compacted.omittedChars}. Omitted content is not positive evidence.\n${compacted.text}`,
-      };
-    }
+    // PostToolUse must never replace or truncate a successful tool result. Doing
+    // so destroys evidence after the tool ran and can cause the model to re-read
+    // the same source with another command. Compact at the source/helper instead.
   } else if (event === "Stop" || event === "SubagentStop") {
     output = stopDecision(watchdog, input);
   }
 
-  return { output, state: stateOf(watchdog) };
+  return { output, state: stateOf(watchdog, evidenceRegistry) };
 }
