@@ -5,6 +5,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 $project = Join-Path $PSScriptRoot 'GitHubDeliveryAuthority\GitHubDeliveryAuthority.csproj'
 $publish = Join-Path $env:TEMP ('github-delivery-authority-publish-' + [guid]::NewGuid().ToString('N'))
 $releaseInstaller = Join-Path $PSScriptRoot 'install-release.ps1'
@@ -57,7 +58,8 @@ try {
         platform = 'win32'
         arch = 'x64'
     }
-    $versionInfo | ConvertTo-Json | Set-Content -Path (Join-Path $publish 'authority-host-version.json') -Encoding UTF8
+    $versionJson = ($versionInfo | ConvertTo-Json) + [Environment]::NewLine
+    [IO.File]::WriteAllText((Join-Path $publish 'authority-host-version.json'), $versionJson, $utf8NoBom)
 
     & $releaseInstaller -SourceDir $publish -ExpectedVersion $version -ExpectedSourceCommit $sourceCommit -InstallDir $InstallDir -PipeName $PipeName
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
