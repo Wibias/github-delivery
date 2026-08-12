@@ -14,6 +14,7 @@ import { pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 
 import { captureLiveSnapshot } from "./lib/live-snapshot.mjs";
+import { ownedHelperEffect } from "./lib/watchdog-evidence-registry.mjs";
 
 const USAGE = "Usage: node scripts/ci-forensics.mjs OWNER/REPO PR_NUMBER [--log-lines N] [--annotations N] [--json]";
 
@@ -142,6 +143,10 @@ async function main() {
   const summary = {
     schemaVersion: 1,
     kind: "github-delivery/ci-forensics",
+    gdEffect: {
+      ...ownedHelperEffect("ci-forensics.mjs"),
+      key: `pr-ci:${args.repo}:${args.pr}`,
+    },
     repo: args.repo,
     pr: args.pr,
     headOid: snapshot.headOid,
