@@ -24,6 +24,7 @@ import {
 } from "./lib/snapshot-input.mjs";
 import { combineShipGateResults } from "./lib/ship-gate-policy.mjs";
 import { validateWorkflowMutationMode } from "./lib/workflow-mode.mjs";
+import { ownedHelperEffect } from "./lib/watchdog-evidence-registry.mjs";
 
 const usage =
   "Usage: node scripts/ship-gate.mjs OWNER/REPO PR_NUMBER [--snapshot FILE] [--expected-head SHA] [--max-age-seconds N] [--mutation-mode MODE] [--workflow WORKFLOW]";
@@ -82,6 +83,11 @@ try {
   output.workflow = args.workflow;
   output.evidenceMode = replay ? "snapshot_replay" : "live_capture";
   output.authoritative = !replay;
+  output.gdEffect = {
+    ...ownedHelperEffect("ship-gate.mjs"),
+    key: `pr-ship-gate:${args.repo}:${args.pr}`,
+    authoritative: !replay,
+  };
   if (replay && output.ready) {
     output.replayDecision = output.decision;
     output.decision = "unknown";
