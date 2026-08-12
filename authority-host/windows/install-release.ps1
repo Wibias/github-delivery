@@ -11,6 +11,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
 if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
     throw 'GitHub Delivery Authority can only be installed on Windows.'
@@ -103,7 +104,8 @@ try {
     }
     $recordPath = Join-Path $InstallDir 'authority-host-install.json'
     $recordTemp = $recordPath + '.' + [guid]::NewGuid().ToString('N') + '.tmp'
-    $installRecord | ConvertTo-Json | Set-Content -Path $recordTemp -Encoding UTF8
+    $recordJson = ($installRecord | ConvertTo-Json) + [Environment]::NewLine
+    [IO.File]::WriteAllText($recordTemp, $recordJson, $utf8NoBom)
     Move-Item -Force $recordTemp $recordPath
 
     # Remove only the obsolete root-level launcher from the legacy layout. State
