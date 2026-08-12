@@ -96,16 +96,16 @@ individual PR's review/fix/readiness bar.
 Load `references/policy-kernel.md`, the selected workflow's unconditional
 modules, and conditionals only when their observable condition is true.
 `node scripts/policy-bundle.mjs <workflow>` resolves/validates this bundle.
-Workflows cannot weaken canonical `GD-*` rules. GD-CORE-001..010 remain mandatory.
+Workflows cannot weaken `GD-*` rules. GD-CORE-001..010 remain mandatory.
 
 ## Workflow controller contract
 
 After routing, run `node scripts/workflow-brief.mjs <workflow>` once and use one
-persistent `delivery-controller.mjs` checkpoint. Route/phase graph are locked;
-the controller owns transitions, evidence/retry/resource/no-progress accounting,
+persistent `delivery-controller.mjs` checkpoint. Route/phase graph stay locked;
+the controller owns transitions, evidence/retry/resource/no-progress accounting
 and resume. Only phase/state/blocker/required-evidence/execution change is
-progress. Conditional policy extends, never rebuilds, unchanged context. The
-controller grants no GitHub write authority.
+progress. Conditional policy extends unchanged context. The controller grants
+no GitHub write authority.
 
 ## Mandatory entrypoint behavior
 
@@ -165,7 +165,6 @@ expected absences and rejected values. One representative member is insufficient
 
 ## Safety precedence
 
-Policy kernel/modules and executable gates are stricter than workflow prose. A
-workflow may add requirements but cannot waive a canonical rule. If two runtime
-instructions genuinely conflict and the stricter safe behavior is not clear,
-fail closed and surface the contradiction rather than inventing authority.
+Kernel/modules and executable gates override workflow prose; workflows cannot
+waive canonical rules. If runtime instructions genuinely conflict and the
+stricter safe behavior is unclear, fail closed and surface the contradiction.
