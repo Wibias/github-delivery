@@ -59,12 +59,7 @@ try {
     }
     $versionInfo | ConvertTo-Json | Set-Content -Path (Join-Path $publish 'authority-host-version.json') -Encoding UTF8
 
-    & $releaseInstaller \
-        -SourceDir $publish \
-        -ExpectedVersion $version \
-        -ExpectedSourceCommit $sourceCommit \
-        -InstallDir $InstallDir \
-        -PipeName $PipeName
+    & $releaseInstaller -SourceDir $publish -ExpectedVersion $version -ExpectedSourceCommit $sourceCommit -InstallDir $InstallDir -PipeName $PipeName
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
     Write-Host 'The Authority host was built from source and installed through the same state-preserving deployment boundary used by verified releases.'
