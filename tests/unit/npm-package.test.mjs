@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -112,6 +112,7 @@ test("a real packed tarball runs --help after an offline local install", () => {
   try {
     const packDir = join(root, "pack");
     const installDir = join(root, "install");
+    mkdirSync(packDir, { recursive: true });
     writeFileSync(join(root, "package.json"), "{}\n", "utf8");
 
     const packResult = runNpm([
