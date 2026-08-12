@@ -110,7 +110,7 @@ test("release self-update dry-run never mutates the installed target", async () 
   assert.equal(removedWorkspace, join(root, "workspace"));
 }));
 
-test("already-current release still reconciles Authority while leaving the skill untouched", async () => withFixture(async ({ root, target }) => {
+test("already-current release reports an Authority-only repair as an applied update", async () => withFixture(async ({ root, target }) => {
   const candidate = verifiedCandidate(root, target);
   candidate.plan.action = "already_current";
   candidate.plan.safeToReplace = false;
@@ -132,8 +132,8 @@ test("already-current release still reconciles Authority while leaving the skill
   });
   assert.equal(installCalls, 0);
   assert.equal(authorityCalls, 1);
-  assert.equal(result.action, "already_current");
-  assert.equal(result.updated, false);
+  assert.equal(result.action, "update");
+  assert.equal(result.updated, true);
   assert.deepEqual(result.authorityHost, authorityHost);
   assert.equal(readFileSync(join(target, "marker.txt"), "utf8"), "old\n");
 }));
