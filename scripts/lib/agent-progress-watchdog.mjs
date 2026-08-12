@@ -8,9 +8,17 @@ const DEFAULTS = Object.freeze({
   volatileReadIntervalMs: 30_000,
   evidenceSoftLimit: 8,
   evidenceHardLimit: 12,
+  generatedCharSoftLimit: 6_000,
+  generatedCharHardLimit: 12_000,
+  noProgressTokenSoftLimit: 4_000,
+  noProgressTokenHardLimit: 8_000,
+  toolEmissionIntentThreshold: 6,
+  protocolArtifactThreshold: 3,
 });
 
 const INTENT_PREFIX = /^\s*(?:(?:now|next|first|then|actually|meanwhile)[,:]?\s+)?(?:let me|i(?:'|’)ll|i will|i need to|i'm going to|i am going to)\s+/i;
+const TOOL_EMISSION_INTENT = /^\s*(?:(?:now|next|then|actually|enough|finally|stop narrating)[,:.!]?\s+)?(?:(?:let me|i(?:'|’)ll|i will|i need to|i(?:'|’)m going to|i am going to)\s+)?(?:(?:just|actually)\s+)?(?:run|running|execute|executing|invoke|invoking|call|calling|issue|issuing|emit|emitting|grep|search|read|open|inspect|apply|patch|use)\b/i;
+const TOOL_PROTOCOL_ARTIFACT = /<\/?(?:atool|invoke|tool_calls?|function_calls?)\b[^>]*>/gi;
 const FAILURE_SIGNAL = /\b(error|errors|fail|failed|failure|failing|blocked|blocker|exception|traceback|denied|timeout|timed out|exit(?: code)?|conclusion|status|unsponsored_surface)\b/i;
 
 function stableValue(value) {
@@ -31,6 +39,10 @@ function fingerprintRead(stateGeneration, toolName, input) {
   return createHash("sha256")
     .update(`${stateGeneration}\0${toolName}\0${stableStringify(input ?? null)}`)
     .digest("hex");
+}
+
+function fingerprintText(value) {
+  return createHash("sha256").update(String(value || "")).digest("hex");
 }
 
 function normalizeIntent(clause) {
@@ -117,13 +129,25 @@ function nonNegativeInteger(value, fallback = 0) {
   return Number.isInteger(value) && value >= 0 ? value : fallback;
 }
 
+function validateBudget(config, softName, hardName) {
+  if (!Number.isInteger(config[softName]) || config[softName] < 1) {
+    throw new Error(`${softName} must be a positive integer`);
+  }
+  if (!Number.isInteger(config[hardName]) || config[hardName] < config[softName]) {
+    throw new Error(`${hardName} must be an integer >= ${softName}`);
+  }
+}
+
 export function createProgressWatchdog(options = {}) {
   const config = { ...DEFAULTS, ...options };
-  if (!Number.isInteger(config.evidenceSoftLimit) || config.evidenceSoftLimit < 1) {
-    throw new Error("evidenceSoftLimit must be a positive integer");
+  validateBudget(config, "evidenceSoftLimit", "evidenceHardLimit");
+  validateBudget(config, "generatedCharSoftLimit", "generatedCharHardLimit");
+  validateBudget(config, "noProgressTokenSoftLimit", "noProgressTokenHardLimit");
+  if (!Number.isInteger(config.toolEmissionIntentThreshold) || config.toolEmissionIntentThreshold < 2) {
+    throw new Error("toolEmissionIntentThreshold must be an integer >= 2");
   }
-  if (!Number.isInteger(config.evidenceHardLimit) || config.evidenceHardLimit < config.evidenceSoftLimit) {
-    throw new Error("evidenceHardLimit must be an integer >= evidenceSoftLimit");
+  if (!Number.isInteger(config.protocolArtifactThreshold) || config.protocolArtifactThreshold < 1) {
+    throw new Error("protocolArtifactThreshold must be a positive integer");
   }
 
   let pendingNarration = "";
@@ -133,6 +157,20 @@ export function createProgressWatchdog(options = {}) {
   let evidenceWarningIssued = Boolean(options.evidenceWarningIssued);
   let executionProgressCount = nonNegativeInteger(options.executionProgressCount);
   let stateProgressCount = nonNegativeInteger(options.stateProgressCount);
+  let workflowProgressCount = nonNegativeInteger(options.workflowProgressCount);
+  let generatedCharsSinceProgress = nonNegativeInteger(options.generatedCharsSinceProgress);
+  let toolEmissionIntentCount = nonNegativeInteger(options.toolEmissionIntentCount);
+  let protocolArtifactCount = nonNegativeInteger(options.protocolArtifactCount);
+  let latestGeneratedTokens = Number.isInteger(options.latestGeneratedTokens)
+    ? options.latestGeneratedTokens
+    : null;
+  let generatedTokenBaseline = Number.isInteger(options.generatedTokenBaseline)
+    ? options.generatedTokenBaseline
+    : latestGeneratedTokens;
+  let lastDiffFingerprint = typeof options.lastDiffFingerprint === "string"
+    ? options.lastDiffFingerprint
+    : null;
+  let maxCompletedPlanSteps = nonNegativeInteger(options.maxCompletedPlanSteps);
   const intentCounts = new Map();
   const recentIntents = [];
   const reads = new Map();
@@ -147,12 +185,60 @@ export function createProgressWatchdog(options = {}) {
     recentIntents.length = 0;
   }
 
+  function resetToolEmissionStall() {
+    toolEmissionIntentCount = 0;
+    protocolArtifactCount = 0;
+    resetNarration();
+  }
+
+  function resetNoProgressBudgets() {
+    generatedCharsSinceProgress = 0;
+    generatedTokenBaseline = latestGeneratedTokens;
+    resetToolEmissionStall();
+  }
+
   function resetEvidenceStreak() {
     consecutiveEvidenceAttempts = 0;
     evidenceWarningIssued = false;
   }
 
+  function generatedBudgetDecision() {
+    if (generatedCharsSinceProgress >= config.generatedCharHardLimit) {
+      return {
+        action: "interrupt",
+        reason: "no_progress_generation_budget_exhausted",
+        details: {
+          generatedCharsSinceProgress,
+          hardLimit: config.generatedCharHardLimit,
+        },
+      };
+    }
+    if (generatedCharsSinceProgress >= config.generatedCharSoftLimit) {
+      return {
+        action: "warn",
+        reason: "no_progress_generation_budget_warning",
+        details: {
+          generatedCharsSinceProgress,
+          softLimit: config.generatedCharSoftLimit,
+          hardLimit: config.generatedCharHardLimit,
+        },
+      };
+    }
+    return { action: "allow" };
+  }
+
   function processClause(clause) {
+    if (clause.length <= 200 && TOOL_EMISSION_INTENT.test(clause)) {
+      toolEmissionIntentCount += 1;
+      if (toolEmissionIntentCount >= config.toolEmissionIntentThreshold) {
+        return {
+          action: "interrupt",
+          reason: "tool_emission_stall",
+          details: { toolEmissionIntentCount },
+        };
+      }
+    }
+
     const intent = normalizeIntent(clause);
     if (!intent) return { action: "allow" };
     const count = (intentCounts.get(intent) || 0) + 1;
@@ -186,19 +272,35 @@ export function createProgressWatchdog(options = {}) {
 
   function observeAssistantDelta(delta) {
     if (typeof delta !== "string" || delta.length === 0) return { action: "allow" };
-    pendingNarration += delta;
+    generatedCharsSinceProgress += delta.length;
 
+    const protocolArtifacts = delta.match(TOOL_PROTOCOL_ARTIFACT);
+    if (protocolArtifacts?.length) {
+      protocolArtifactCount += protocolArtifacts.length;
+      if (protocolArtifactCount >= config.protocolArtifactThreshold) {
+        return {
+          action: "interrupt",
+          reason: "tool_protocol_emission_stall",
+          details: { protocolArtifactCount },
+        };
+      }
+    }
+
+    const charBudget = generatedBudgetDecision();
+    if (charBudget.action === "interrupt") return charBudget;
+
+    pendingNarration += delta;
     const hasTerminator = /[\n.!?]/.test(pendingNarration);
     if (!hasTerminator) {
       if (pendingNarration.length > 4_000) pendingNarration = pendingNarration.slice(-4_000);
-      return { action: "allow" };
+      return charBudget;
     }
 
     let lastBoundary = -1;
     for (let index = 0; index < pendingNarration.length; index += 1) {
       if (/[\n.!?]/.test(pendingNarration[index])) lastBoundary = index;
     }
-    if (lastBoundary < 0) return { action: "allow" };
+    if (lastBoundary < 0) return charBudget;
 
     const complete = pendingNarration.slice(0, lastBoundary + 1);
     pendingNarration = pendingNarration.slice(lastBoundary + 1);
@@ -206,7 +308,67 @@ export function createProgressWatchdog(options = {}) {
       const decision = processClause(clause);
       if (decision.action === "interrupt") return decision;
     }
-    return { action: "allow" };
+    return charBudget;
+  }
+
+  function observeTokenUsage(generatedTokens) {
+    if (!Number.isInteger(generatedTokens) || generatedTokens < 0) {
+      return { action: "allow" };
+    }
+    if (latestGeneratedTokens === null || generatedTokens < latestGeneratedTokens) {
+      latestGeneratedTokens = generatedTokens;
+      generatedTokenBaseline = generatedTokens;
+      return { action: "allow", generatedTokensSinceProgress: 0 };
+    }
+    latestGeneratedTokens = generatedTokens;
+    if (generatedTokenBaseline === null) generatedTokenBaseline = generatedTokens;
+    const generatedTokensSinceProgress = Math.max(0, generatedTokens - generatedTokenBaseline);
+    if (generatedTokensSinceProgress >= config.noProgressTokenHardLimit) {
+      return {
+        action: "interrupt",
+        reason: "no_progress_token_budget_exhausted",
+        details: {
+          generatedTokensSinceProgress,
+          hardLimit: config.noProgressTokenHardLimit,
+        },
+      };
+    }
+    if (generatedTokensSinceProgress >= config.noProgressTokenSoftLimit) {
+      return {
+        action: "warn",
+        reason: "no_progress_token_budget_warning",
+        details: {
+          generatedTokensSinceProgress,
+          softLimit: config.noProgressTokenSoftLimit,
+          hardLimit: config.noProgressTokenHardLimit,
+        },
+      };
+    }
+    return { action: "allow", generatedTokensSinceProgress };
+  }
+
+  function observeDiffProgress(diff) {
+    const value = String(diff || "");
+    const fingerprint = fingerprintText(value);
+    if (lastDiffFingerprint === null) {
+      lastDiffFingerprint = fingerprint;
+      if (!value.trim()) return { progressed: false };
+      recordStateProgress();
+      return { progressed: true };
+    }
+    if (fingerprint === lastDiffFingerprint) return { progressed: false };
+    lastDiffFingerprint = fingerprint;
+    recordStateProgress();
+    return { progressed: true };
+  }
+
+  function observePlanProgress(plan) {
+    if (!Array.isArray(plan)) return { progressed: false };
+    const completed = plan.filter((entry) => String(entry?.status || "") === "completed").length;
+    if (completed <= maxCompletedPlanSteps) return { progressed: false };
+    maxCompletedPlanSteps = completed;
+    recordWorkflowProgress();
+    return { progressed: true, completedPlanSteps: completed };
   }
 
   function chargeEvidenceAttempt() {
@@ -246,10 +408,20 @@ export function createProgressWatchdog(options = {}) {
     };
   }
 
+  function recordToolStart() {
+    resetToolEmissionStall();
+  }
+
   function recordExecutionProgress() {
     executionProgressCount += 1;
     resetEvidenceStreak();
-    resetNarration();
+    resetNoProgressBudgets();
+  }
+
+  function recordWorkflowProgress() {
+    workflowProgressCount += 1;
+    resetEvidenceStreak();
+    resetNoProgressBudgets();
   }
 
   function recordStateProgress() {
@@ -257,7 +429,7 @@ export function createProgressWatchdog(options = {}) {
     stateProgressCount += 1;
     reads.clear();
     resetEvidenceStreak();
-    resetNarration();
+    resetNoProgressBudgets();
   }
 
   function recordExternalProgress() {
@@ -319,13 +491,26 @@ export function createProgressWatchdog(options = {}) {
       evidenceWarningIssued,
       executionProgressCount,
       stateProgressCount,
+      workflowProgressCount,
+      generatedCharsSinceProgress,
+      toolEmissionIntentCount,
+      protocolArtifactCount,
+      latestGeneratedTokens,
+      generatedTokenBaseline,
+      lastDiffFingerprint,
+      maxCompletedPlanSteps,
     };
   }
 
   return {
     observeAssistantDelta,
+    observeTokenUsage,
+    observeDiffProgress,
+    observePlanProgress,
     chargeEvidenceAttempt,
+    recordToolStart,
     recordExecutionProgress,
+    recordWorkflowProgress,
     recordStateProgress,
     recordExternalProgress,
     recordStateChange,
