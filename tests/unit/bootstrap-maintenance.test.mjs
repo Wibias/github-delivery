@@ -226,7 +226,7 @@ test("doctor is read-only and reports integrity, activation, config, and update 
   assert.equal(report.integrity.clean, false);
   assert.equal(report.config.ok, true);
   assert.equal(report.activation.degradationReason, "hook_trust_required");
-  assert.deepEqual(report.latest, { version: "0.5.0", relation: "update" });
+  assert.deepEqual(report.latest, { version: "0.5.0", relation: "update", error: null });
 });
 
 test("bare bootstrap starts fresh install when no valid installation exists", async () => {
