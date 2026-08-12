@@ -72,10 +72,58 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  authority_host:
+    name: Build Windows authority host release asset
+    needs: validate
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+
+      - name: Resolve release version
+        id: release_version
+        shell: pwsh
+        run: |
+          $Version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ($Version -notmatch '^\d+\.\d+\.\d+$') { throw 'package version must be semantic x.y.z' }
+          "version=$Version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Restore and publish Windows authority host
+        shell: pwsh
+        run: |
+          $Project = 'authority-host/windows/GitHubDeliveryAuthority/GitHubDeliveryAuthority.csproj'
+          $PublishDir = Join-Path $env:RUNNER_TEMP 'github-delivery-authority-publish'
+          dotnet restore $Project --locked-mode
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet publish $Project --configuration Release --runtime win-x64 --self-contained true --no-restore --output $PublishDir
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/build-authority-host-release.mjs --publish-dir "$PublishDir" --out-dir "dist/authority-host" --version "${{ steps.release_version.outputs.version }}" --source-commit "${{ github.sha }}"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload Windows authority host release subject
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: github-delivery-authority-${{ github.sha }}
+          path: |
+            dist/authority-host/github-delivery-authority-v*.zip
+            dist/authority-host/github-delivery-authority-v*.json
+          if-no-files-found: error
+          retention-days: 14
+
   publish:
     name: Publish attested release
     if: startsWith(github.ref, 'refs/tags/v') && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-    needs: validate
+    needs:
+      - validate
+      - authority_host
     runs-on: ubuntu-latest
     environment: release
     permissions:
@@ -116,12 +164,23 @@ jobs:
             --ref "${GITHUB_REF}" \
             --source-commit "${GITHUB_SHA}"
 
+      - name: Download Windows authority host release subject
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: github-delivery-authority-${{ github.sha }}
+          path: dist/authority-host
+
       - name: Attest release provenance
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-path: |
             dist/github-delivery-v*.zip
             dist/github-delivery-v*.tar.gz
+
+      - name: Attest Windows authority host
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: dist/authority-host/github-delivery-authority-v*.zip
 
       - name: Attest release SBOM
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
@@ -152,6 +211,8 @@ jobs:
             dist/manifest.json \
             dist/SHA256SUMS \
             dist/sbom.spdx.json \
+            dist/authority-host/github-delivery-authority-v*.zip \
+            dist/authority-host/github-delivery-authority-v*.json \
             --verify-tag \
             --title "github-delivery ${GITHUB_REF_NAME}" \
             --notes-file dist/RELEASE_NOTES.md
