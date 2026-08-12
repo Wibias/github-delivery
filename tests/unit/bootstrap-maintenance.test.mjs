@@ -273,7 +273,8 @@ test("doctor is read-only and reports integrity, activation, config, authority h
   assert.equal(report.activation.degradationReason, "hook_trust_required");
   assert.equal(report.authorityHost.ok, true);
   assert.equal(report.authorityHost.legacy, true);
-  assert.equal(report.authorityHost.relation, "update");
+  assert.equal(report.authorityHost.relation, "legacy");
+  assert.equal(report.authorityHost.requiredByMode, false);
   assert.deepEqual(report.latest, { version: "0.5.0", relation: "update", error: null });
 });
 
