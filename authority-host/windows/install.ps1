@@ -7,6 +7,8 @@ param(
 $ErrorActionPreference = 'Stop'
 $project = Join-Path $PSScriptRoot 'GitHubDeliveryAuthority\GitHubDeliveryAuthority.csproj'
 $publish = Join-Path $env:TEMP ('github-delivery-authority-publish-' + [guid]::NewGuid().ToString('N'))
+$releaseInstaller = Join-Path $PSScriptRoot 'install-release.ps1'
+$repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 
 if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
     throw 'GitHub Delivery Authority can only be installed on Windows 11.'
@@ -19,12 +21,12 @@ if ($windowsBuild -lt 22000) {
 
 $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
 if (-not $dotnet) {
-    throw 'The .NET 8 SDK is required. Install the .NET 8 SDK, then run this installer again.'
+    throw 'The .NET 8 SDK is required only when installing the Authority host from source. Stable npx install/update uses the prebuilt verified release component.'
 }
 
 $installedSdks = @(& $dotnet.Source --list-sdks)
 if (-not ($installedSdks | Where-Object { $_ -match '^8\.' })) {
-    throw 'The .NET 8 SDK is required. Install an 8.x SDK, then run this installer again.'
+    throw 'The .NET 8 SDK is required when installing the Authority host from source. Install an 8.x SDK, then run this installer again.'
 }
 
 try {
@@ -33,49 +35,41 @@ try {
         throw "dotnet publish failed with exit code $LASTEXITCODE."
     }
 
-    New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
-    $installRoot = [IO.Path]::GetFullPath($InstallDir).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+    $package = Get-Content (Join-Path $repoRoot 'package.json') -Raw | ConvertFrom-Json
+    $version = [string]$package.version
+    if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Repository package version is invalid.' }
 
-    $installedProcesses = Get-Process -Name 'GitHubDeliveryAuthority' -ErrorAction SilentlyContinue | Where-Object {
-        try {
-            $processPath = $_.Path
-            if (-not $processPath) { return $false }
-            [IO.Path]::GetFullPath($processPath).StartsWith($installRoot, [StringComparison]::OrdinalIgnoreCase)
-        }
-        catch {
-            $false
-        }
+    $sourceCommit = $null
+    $git = Get-Command git -ErrorAction SilentlyContinue
+    if ($git) {
+        $candidate = (& $git.Source -C $repoRoot rev-parse HEAD 2>$null | Select-Object -First 1)
+        if ($candidate -match '^[0-9a-fA-F]{40}$') { $sourceCommit = $candidate.ToLowerInvariant() }
+    }
+    if (-not $sourceCommit) {
+        throw 'A git source commit is required to install the Authority host from source.'
     }
 
-    foreach ($process in $installedProcesses) {
-        Stop-Process -Id $process.Id -Force
-        Wait-Process -Id $process.Id -ErrorAction SilentlyContinue
+    $versionInfo = [ordered]@{
+        schemaVersion = 1
+        kind = 'github-delivery/authority-host-version'
+        version = $version
+        sourceCommit = $sourceCommit
+        platform = 'win32'
+        arch = 'x64'
     }
+    $versionInfo | ConvertTo-Json | Set-Content -Path (Join-Path $publish 'authority-host-version.json') -Encoding UTF8
 
-    Copy-Item (Join-Path $publish '*') $InstallDir -Recurse -Force
+    & $releaseInstaller \
+        -SourceDir $publish \
+        -ExpectedVersion $version \
+        -ExpectedSourceCommit $sourceCommit \
+        -InstallDir $InstallDir \
+        -PipeName $PipeName
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-    $exe = Join-Path $InstallDir 'GitHubDeliveryAuthority.exe'
-    $startup = [Environment]::GetFolderPath('Startup')
-    $shortcutPath = Join-Path $startup 'GitHub Delivery Authority.lnk'
-    $shell = New-Object -ComObject WScript.Shell
-    $shortcut = $shell.CreateShortcut($shortcutPath)
-    $shortcut.TargetPath = $exe
-    $shortcut.WorkingDirectory = $InstallDir
-    $shortcut.Save()
-
-    [Environment]::SetEnvironmentVariable(
-        'GITHUB_DELIVERY_AUTHORITY_TRUST_STORE',
-        (Join-Path $InstallDir 'trust-store.json'),
-        'User')
-    [Environment]::SetEnvironmentVariable('GITHUB_DELIVERY_AUTHORITY_PIPE', $PipeName, 'User')
-    $env:GITHUB_DELIVERY_AUTHORITY_TRUST_STORE = Join-Path $InstallDir 'trust-store.json'
-    $env:GITHUB_DELIVERY_AUTHORITY_PIPE = $PipeName
-
-    Start-Process $exe -ArgumentList '--setup'
-    Write-Host "Installed GitHub Delivery Authority to $InstallDir"
-    Write-Host 'The setup window will check Windows Hello, test it, and guide you through the first repository.'
+    Write-Host 'The Authority host was built from source and installed through the same state-preserving deployment boundary used by verified releases.'
     Write-Host 'A Windows Hello PIN is sufficient; fingerprint or face hardware is not required.'
-    Write-Host 'Strict trusted-authority mode was NOT enabled automatically.'
+    Write-Host 'The user-selected github-delivery protection mode was NOT changed.'
 }
 finally {
     Remove-Item $publish -Recurse -Force -ErrorAction SilentlyContinue
