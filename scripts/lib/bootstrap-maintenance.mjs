@@ -4,6 +4,10 @@ import { pathToFileURL } from "node:url";
 
 import { installCodexWatchdogHooks } from "../install-codex-watchdog-hooks.mjs";
 import { parseInstallArgs, runInstallCommand } from "../install-skill.mjs";
+import {
+  readInstalledAuthorityHost,
+  reconcileStableAuthorityHost,
+} from "./authority-host-install.mjs";
 import { confirmApply } from "./bootstrap-install.mjs";
 import {
   checkBootstrapEnvironment,
@@ -15,7 +19,7 @@ import {
   compareStableVersions,
   readInstalledManifest,
 } from "./stable-release-update.mjs";
-import { readUserConfig } from "./user-config.mjs";
+import { readUserConfig, resolveAuthorityMode } from "./user-config.mjs";
 import { readActivationReceipt } from "./watchdog-activation.mjs";
 
 function fail(code) {
@@ -76,6 +80,10 @@ export async function runBootstrapSetup({
 
   const discover = dependencies.discoverInstallations || discoverInstallations;
   requireValidInstallation(target, discover);
+  const reconcileAuthority = dependencies.reconcileStableAuthorityHost || reconcileStableAuthorityHost;
+  const authorityHost = await reconcileAuthority({
+    scriptPath: join(target, "authority-host", "windows", "install-release.ps1"),
+  });
 
   const readReceipt = dependencies.readActivationReceipt || readActivationReceipt;
   const receipt = readReceipt({ codexHome });
@@ -85,7 +93,8 @@ export async function runBootstrapSetup({
       status: "ready",
       target,
       watchdog: receipt.mode,
-      changed: false,
+      changed: authorityHost?.changed === true,
+      authorityHost,
     };
   }
 
@@ -101,7 +110,8 @@ export async function runBootstrapSetup({
       status: "hook_trust_required",
       target,
       watchdog: receipt?.mode || "none",
-      changed: false,
+      changed: authorityHost?.changed === true,
+      authorityHost,
       hookDefinitionChanged: true,
       guidance: trustGuidance(true),
     };
@@ -118,7 +128,8 @@ export async function runBootstrapSetup({
       status: "hook_trust_required",
       target,
       watchdog: receipt?.mode || "none",
-      changed: false,
+      changed: authorityHost?.changed === true,
+      authorityHost,
       hookDefinitionChanged: false,
       guidance: trustGuidance(false),
     };
@@ -146,7 +157,8 @@ export async function runBootstrapSetup({
     status: watchdog === "hooks" || watchdog === "stream" ? "ready" : "hook_trust_required",
     target,
     watchdog,
-    changed: result?.watchdog?.receiptChanged === true,
+    changed: result?.watchdog?.receiptChanged === true || authorityHost?.changed === true,
+    authorityHost,
     guidance: watchdog === "hooks" || watchdog === "stream" ? null : trustGuidance(false),
     result,
   };
@@ -169,6 +181,7 @@ export async function runBootstrapDoctor({
   const readManifest = dependencies.readInstalledManifest || readInstalledManifest;
   const compareManifest = dependencies.compareInstalledManifest || compareInstalledManifest;
   const readConfig = dependencies.readUserConfig || readUserConfig;
+  const readAuthority = dependencies.readInstalledAuthorityHost || readInstalledAuthorityHost;
   const readReceipt = dependencies.readActivationReceipt || readActivationReceipt;
   const latestRelease = dependencies.latestRelease || (() => createGitHubReleaseClient().latestRelease());
 
@@ -186,7 +199,8 @@ export async function runBootstrapDoctor({
     installations: found,
     installed: { ok: Boolean(selected), version: selected?.version || null },
     integrity: { ok: false, clean: null, modifications: [], error: null },
-    config: { ok: false, source: null, error: null },
+    config: { ok: false, source: null, effectiveAuthorityMode: null, error: null },
+    authorityHost: { ok: false, supported: process.platform === "win32", installed: false, legacy: false, version: null, sourceCommit: null, relation: null, error: null },
     activation: readReceipt({ codexHome: resolve(codexHome) }),
     latest: { version: null, relation: null, error: null },
   };
@@ -209,9 +223,30 @@ export async function runBootstrapDoctor({
 
   try {
     const config = readConfig();
-    report.config = { ok: true, source: config?.source || null, error: null };
+    report.config = {
+      ok: true,
+      source: config?.source || null,
+      effectiveAuthorityMode: resolveAuthorityMode({ config: config.config, env: process.env }),
+      error: null,
+    };
   } catch (error) {
     report.config.error = String(error?.message || error);
+  }
+
+  try {
+    const authority = readAuthority();
+    report.authorityHost = {
+      ok: true,
+      supported: authority.supported,
+      installed: authority.installed,
+      legacy: authority.legacy,
+      version: authority.version,
+      sourceCommit: authority.sourceCommit,
+      relation: null,
+      error: null,
+    };
+  } catch (error) {
+    report.authorityHost.error = String(error?.message || error);
   }
 
   try {
@@ -221,6 +256,11 @@ export async function runBootstrapDoctor({
     if (!match) fail("stable_release_tag_invalid");
     report.latest.version = match[1];
     if (manifest?.version) report.latest.relation = relation(manifest.version, match[1]);
+    if (report.authorityHost.ok && report.authorityHost.supported && report.authorityHost.installed) {
+      report.authorityHost.relation = report.authorityHost.legacy || !report.authorityHost.version
+        ? "update"
+        : relation(report.authorityHost.version, match[1]);
+    }
   } catch (error) {
     report.latest.error = String(error?.message || error);
   }
