@@ -93,6 +93,7 @@ jobs:
         with:
           node-version: 22
           package-manager-cache: false
+          registry-url: https://registry.npmjs.org
 
       - name: Reverify tagged source belongs to protected main lineage
         env:
@@ -127,6 +128,15 @@ jobs:
         with:
           subject-path: dist/github-delivery-v*.zip
           sbom-path: dist/sbom.spdx.json
+
+      - name: Validate npm package
+        run: npm run package:check
+
+      - name: Install trusted-publishing npm CLI
+        run: npm install --global npm@11.5.1
+
+      - name: Publish npm package
+        run: npm publish --access public
 
       - name: Publish GitHub Release
         env:
