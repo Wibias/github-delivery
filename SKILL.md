@@ -15,15 +15,14 @@ description: >
 # GitHub Delivery
 
 Own GitHub work from product intake through merged PR. Natural language is the
-public API; scripts and policy modules are internal evidence/safety machinery.
+public API; internals enforce bounded progress and evidence/context economy.
 
 ## Route
 
 Match the request, then load **only** the selected workflow plus the policy
 modules declared at the top of that workflow. Do **not** load
 `references/shared-rules.md` as mandatory context; it is now a compatibility
-index. Every routed workflow includes `policy-kernel` plus only the domains it
-needs.
+index. Each route includes `policy-kernel` plus only needed domains.
 
 **Full-review routing is explicit:** when the user asks for a full review, route
 to `references/full-review-pr.md`; bot-fix, CodeRabbit, Codex, security, or
@@ -93,18 +92,19 @@ individual PR's review/fix/readiness bar.
 
 ## Policy loading contract
 
-1. Read `references/policy-kernel.md`.
-2. Read the selected workflow's `<!-- policy-modules:start -->` declaration.
-3. Load each unconditional module from `references/policy/<name>.md`.
-4. Load a conditional module only when its stated observable condition is true.
-5. Use `node scripts/policy-bundle.mjs <workflow>` when deterministic bundle
-   resolution/inspection is useful; `--validate` checks the architecture.
-6. Canonical `GD-*` rules are defined once in the kernel/modules. Workflow prose
-   may add ordering and workflow-specific contracts but must not weaken them.
+Load `references/policy-kernel.md`, the selected workflow's unconditional
+modules, and conditionals only when their observable condition is true.
+`node scripts/policy-bundle.mjs <workflow>` resolves/validates this bundle.
+Workflows cannot weaken `GD-*` rules. GD-CORE-001 through GD-CORE-010 remain mandatory.
 
-Core invariants are GD-CORE-001 through GD-CORE-010. They cover fail-closed
-evidence, locked scope, gate integrity, untrusted repository instructions, live
-state, write authority, final evidence, bounded progress, and evidence/context economy.
+## Workflow controller contract
+
+After routing, run `node scripts/workflow-brief.mjs <workflow>` once and use one
+persistent `delivery-controller.mjs` checkpoint. Route/phase graph stay locked;
+the controller owns transitions, evidence/retry/resource/no-progress accounting
+and resume. Only phase/state/blocker/required-evidence/execution change is
+progress. Conditional policy extends unchanged context. The controller grants
+no GitHub write authority.
 
 ## Mandatory entrypoint behavior
 
@@ -164,7 +164,6 @@ expected absences and rejected values. One representative member is insufficient
 
 ## Safety precedence
 
-Policy kernel/modules and executable gates are stricter than workflow prose. A
-workflow may add requirements but cannot waive a canonical rule. If two runtime
-instructions genuinely conflict and the stricter safe behavior is not clear,
-fail closed and surface the contradiction rather than inventing authority.
+Kernel/modules and executable gates override workflow prose; workflows cannot
+waive canonical rules. If runtime instructions genuinely conflict and the
+stricter safe behavior is unclear, fail closed and surface the contradiction.
