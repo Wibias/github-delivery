@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { pathToFileURL } from "node:url";
+import { realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 import { parseBootstrapArgs } from "./lib/bootstrap-cli.mjs";
 import { runBootstrap } from "./lib/bootstrap-command.mjs";
@@ -9,6 +10,15 @@ export const HELP_TEXT = `GitHub Delivery\n\nUsage:\n  github-delivery\n  github
 function printResult(result, stdout = process.stdout) {
   if (!result || result.action === "help") return;
   stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+}
+
+function isDirectExecution(entry = process.argv[1]) {
+  if (!entry) return false;
+  try {
+    return realpathSync(entry) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
 }
 
 export async function main(argv = process.argv.slice(2), dependencies = {}) {
@@ -23,7 +33,7 @@ export async function main(argv = process.argv.slice(2), dependencies = {}) {
   return result;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectExecution()) {
   main().catch((error) => {
     process.stderr.write(`${String(error?.message || error)}\n`);
     process.exitCode = 1;
