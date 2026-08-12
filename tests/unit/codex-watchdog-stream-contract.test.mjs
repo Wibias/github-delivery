@@ -95,3 +95,59 @@ test("watchdog replay summary does not retain generated text", () => {
 
   assert.doesNotMatch(JSON.stringify(result), /secret text/);
 });
+
+test("router emits sanitized telemetry for progress inputs without retaining payload text", () => {
+  const telemetry = [];
+  const router = createAppServerWatchdogRouter({
+    internalRequestIdPrefix: "gd-telemetry",
+    onTelemetry: (event) => telemetry.push(event),
+  });
+
+  router.onServerMessage({
+    method: "item/reasoning/summaryTextDelta",
+    params: {
+      threadId: "thr-telemetry",
+      turnId: "turn-telemetry",
+      itemId: "reasoning-telemetry",
+      delta: "private generated text",
+    },
+  });
+  router.onServerMessage({
+    method: "turn/diff/updated",
+    params: {
+      threadId: "thr-telemetry",
+      turnId: "turn-telemetry",
+      diff: "private diff contents",
+    },
+  });
+  router.onServerMessage({
+    method: "thread/tokenUsage/updated",
+    params: {
+      threadId: "thr-telemetry",
+      turnId: "turn-telemetry",
+      tokenUsage: { totalTokens: 1234 },
+    },
+  });
+
+  assert.deepEqual(
+    telemetry.map(({ method, threadId, turnId }) => ({ method, threadId, turnId })),
+    [
+      {
+        method: "item/reasoning/summaryTextDelta",
+        threadId: "thr-telemetry",
+        turnId: "turn-telemetry",
+      },
+      {
+        method: "turn/diff/updated",
+        threadId: "thr-telemetry",
+        turnId: "turn-telemetry",
+      },
+      {
+        method: "thread/tokenUsage/updated",
+        threadId: "thr-telemetry",
+        turnId: "turn-telemetry",
+      },
+    ],
+  );
+  assert.doesNotMatch(JSON.stringify(telemetry), /private generated text|private diff contents/);
+});
