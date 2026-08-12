@@ -5,6 +5,8 @@ import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 
+import { parseNpmPackJson } from "../../scripts/lib/npm-pack-json.mjs";
+
 const ROOT = resolve(import.meta.dirname, "../..");
 const NPM = process.platform === "win32" ? "npm.cmd" : "npm";
 
@@ -43,23 +45,23 @@ function runNpm(args, cwd = ROOT) {
   });
 }
 
-function parsePackJson(stdout) {
-  const text = String(stdout || "").trim();
-  const first = text.indexOf("[");
-  const last = text.lastIndexOf("]");
-  if (first === -1 || last === -1 || last < first) {
-    throw new Error(`npm_pack_json_missing:${text.slice(0, 400)}`);
-  }
-  return JSON.parse(text.slice(first, last + 1));
-}
-
 function dryRunPack() {
   const result = runNpm(["pack", "--dry-run", "--json", "--ignore-scripts"]);
   assert.equal(result.status, 0, result.stderr || result.stdout);
-  const [pack] = parsePackJson(result.stdout);
+  const [pack] = parseNpmPackJson(result.stdout);
   assert(pack, "npm pack returned no package metadata");
   return pack;
 }
+
+test("npm pack parser accepts npm 11 array and npm 12 keyed-object output", () => {
+  const pack = {
+    name: "github-delivery",
+    version: "0.5.0",
+    files: [{ path: "package.json" }],
+  };
+  assert.deepEqual(parseNpmPackJson(JSON.stringify([pack])), [pack]);
+  assert.deepEqual(parseNpmPackJson(JSON.stringify({ "github-delivery": pack })), [pack]);
+});
 
 test("package metadata exposes only the supported public npx bootstrap", () => {
   const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
@@ -67,12 +69,12 @@ test("package metadata exposes only the supported public npx bootstrap", () => {
   assert.equal(pkg.name, "github-delivery");
   assert.equal(pkg.private, undefined);
   assert.deepEqual(pkg.bin, {
-    "github-delivery": "./scripts/github-delivery-cli.mjs",
+    "github-delivery": "scripts/github-delivery-cli.mjs",
   });
   assert.equal(pkg.license, "MIT");
   assert.deepEqual(pkg.repository, {
     type: "git",
-    url: "https://github.com/Wibias/github-delivery.git",
+    url: "git+https://github.com/Wibias/github-delivery.git",
   });
   assert.equal(pkg.publishConfig?.access, "public");
   assert.equal(pkg.publishConfig?.registry, "https://registry.npmjs.org/");
@@ -123,7 +125,7 @@ test("a real packed tarball runs --help after an offline local install", () => {
       packDir,
     ]);
     assert.equal(packResult.status, 0, packResult.stderr || packResult.stdout);
-    const [pack] = parsePackJson(packResult.stdout);
+    const [pack] = parseNpmPackJson(packResult.stdout);
     const tarball = join(packDir, pack.filename);
 
     const installResult = runNpm([
