@@ -9,6 +9,24 @@ function messageThreadId(message) {
   return message?.params?.threadId || null;
 }
 
+function emitTelemetry(options, message, outcome = null) {
+  if (typeof options.onTelemetry !== "function" || !message?.method) return;
+  const event = {
+    schemaVersion: 1,
+    kind: "github-delivery/watchdog-stream-event",
+    method: String(message.method),
+    threadId: messageThreadId(message),
+    turnId: messageTurnId(message),
+    decision: outcome?.decision?.action || "allow",
+    interrupted: Boolean(outcome?.interrupt),
+  };
+  try {
+    options.onTelemetry(event);
+  } catch {
+    // Telemetry is diagnostic only and must never change enforcement behavior.
+  }
+}
+
 export function createAppServerWatchdogRouter(options = {}) {
   const turns = new Map();
   const privateIds = new Map();
@@ -62,9 +80,13 @@ export function createAppServerWatchdogRouter(options = {}) {
     }
 
     const state = stateFor(message);
-    if (!state) return { forward: message, internalRequests: [] };
+    if (!state) {
+      emitTelemetry(options, message);
+      return { forward: message, internalRequests: [] };
+    }
 
     const outcome = observeCodexAppServerMessage(state.watchdog, message, state.context);
+    emitTelemetry(options, message, outcome);
     const internalRequests = [];
     if (outcome.interrupt) {
       const id = `${prefix}-${++sequence}`;

@@ -9,10 +9,16 @@ const MAX_FRAME_BYTES = 16 * 1024 * 1024;
 const DEFAULT_INTERRUPT_ACK_TIMEOUT_MS = 2_000;
 const REQUIRED_NOTIFICATIONS = new Set([
   "item/agentMessage/delta",
+  "item/reasoning/summaryTextDelta",
+  "item/reasoning/textDelta",
+  "item/plan/delta",
   "item/started",
   "item/completed",
   "turn/started",
   "turn/completed",
+  "turn/plan/updated",
+  "turn/diff/updated",
+  "thread/tokenUsage/updated",
 ]);
 
 function safeEqual(left, right) {
