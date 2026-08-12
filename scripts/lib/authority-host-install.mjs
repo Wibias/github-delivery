@@ -13,6 +13,16 @@ function fail(code, detail = "") {
   throw new Error(detail ? `${code}:${detail}` : code);
 }
 
+function validExpectedRelease(value) {
+  return Boolean(
+    value &&
+    /^v\d+\.\d+\.\d+$/.test(String(value.tag || "")) &&
+    /^\d+\.\d+\.\d+$/.test(String(value.version || "")) &&
+    value.tag === `v${value.version}` &&
+    /^[0-9a-f]{40}$/i.test(String(value.sourceCommit || "")),
+  );
+}
+
 export function authorityHostInstallRoot({
   platform = process.platform,
   env = process.env,
@@ -90,11 +100,11 @@ export function readInstalledAuthorityHost({
 }
 
 export function planAuthorityHostUpdate({ mode, targetVersion, installed } = {}) {
-  if (!installed?.supported) return { action: "unsupported", required: false, currentVersion: null, targetVersion };
-  if (!/^\d+\.\d+\.\d+$/.test(String(targetVersion || ""))) fail("authority_host_target_version_invalid");
+  if (!installed?.supported) return { action: "unsupported", required: false, currentVersion: null, targetVersion: targetVersion || null };
   if (!installed.installed && mode === "off") {
-    return { action: "disabled", required: false, currentVersion: null, targetVersion };
+    return { action: "disabled", required: false, currentVersion: null, targetVersion: targetVersion || null };
   }
+  if (!/^\d+\.\d+\.\d+$/.test(String(targetVersion || ""))) fail("authority_host_target_version_invalid");
   if (!installed.installed) return { action: "install", required: true, currentVersion: null, targetVersion };
   if (installed.legacy || !installed.version) return { action: "upgrade_legacy", required: true, currentVersion: null, targetVersion };
   const comparison = compareStableVersions(installed.version, targetVersion);
@@ -142,22 +152,30 @@ function makeWorkspace() {
   return mkdtempSync(join(tmpdir(), "github-delivery-authority-update-"));
 }
 
+export async function resolveLatestAuthorityExpectedRelease(client = createGitHubReleaseClient()) {
+  const release = await client.latestRelease();
+  const tag = String(release?.tag_name || "");
+  const match = /^v(\d+\.\d+\.\d+)$/.exec(tag);
+  if (!match) fail("authority_host_release_tag_invalid");
+  const sourceCommit = await client.resolveTagCommit(tag);
+  if (!/^[0-9a-f]{40}$/i.test(String(sourceCommit || ""))) fail("authority_host_release_source_commit_invalid");
+  return {
+    expectedRelease: { tag, version: match[1], sourceCommit: sourceCommit.toLowerCase() },
+    release,
+  };
+}
+
 export async function reconcileStableAuthorityHost({
-  expectedRelease,
+  expectedRelease = null,
   platform = process.platform,
   env = process.env,
   home = homedir(),
   client = createGitHubReleaseClient(),
   attestationRunner = undefined,
   installRunner = spawnSync,
+  scriptPath = defaultInstallScript(),
   dependencies = {},
 } = {}) {
-  if (!expectedRelease || !/^v\d+\.\d+\.\d+$/.test(String(expectedRelease.tag || "")) ||
-      !/^\d+\.\d+\.\d+$/.test(String(expectedRelease.version || "")) ||
-      !/^[0-9a-f]{40}$/i.test(String(expectedRelease.sourceCommit || ""))) {
-    fail("authority_host_expected_release_invalid");
-  }
-
   const readInstalled = dependencies.readInstalledAuthorityHost || readInstalledAuthorityHost;
   const readConfig = dependencies.readUserConfig || readUserConfig;
   const install = dependencies.installVerifiedAuthorityHost || installVerifiedAuthorityHost;
@@ -165,23 +183,36 @@ export async function reconcileStableAuthorityHost({
   if (!installed.supported) return { action: "unsupported", changed: false, installed };
   const config = readConfig({ platform, env, home });
   const mode = resolveAuthorityMode({ config: config.config, env });
+
+  if (!installed.installed && mode === "off") {
+    return { action: "disabled", required: false, changed: false, installed, mode, currentVersion: null, targetVersion: expectedRelease?.version || null };
+  }
+
+  let releaseMetadata = null;
+  if (expectedRelease !== null && !validExpectedRelease(expectedRelease)) fail("authority_host_expected_release_invalid");
+  if (expectedRelease === null) {
+    const resolved = await (dependencies.resolveLatestAuthorityExpectedRelease || resolveLatestAuthorityExpectedRelease)(client);
+    expectedRelease = resolved.expectedRelease;
+    releaseMetadata = resolved.release;
+  }
+
   const plan = planAuthorityHostUpdate({ mode, targetVersion: expectedRelease.version, installed });
   if (!plan.required) return { ...plan, changed: false, installed, mode };
 
-  const release = await client.latestRelease();
-  if (release?.tag_name !== expectedRelease.tag) fail("authority_host_release_changed_during_update");
+  if (!releaseMetadata) releaseMetadata = await client.latestRelease();
+  if (releaseMetadata?.tag_name !== expectedRelease.tag) fail("authority_host_release_changed_during_update");
   const workspace = (dependencies.makeWorkspace || makeWorkspace)();
   try {
     const acquire = dependencies.acquireVerifiedAuthorityHostPayload || acquireVerifiedAuthorityHostPayload;
     const payload = await acquire({
-      release,
+      release: releaseMetadata,
       workspace,
       client,
       expectedVersion: expectedRelease.version,
       expectedSourceCommit: expectedRelease.sourceCommit,
       attestationRunner,
     });
-    const result = install({ payload, runner: installRunner });
+    const result = install({ payload, runner: installRunner, scriptPath });
     const after = readInstalled({ platform, env, home });
     if (!after.installed || after.version !== expectedRelease.version || after.sourceCommit !== expectedRelease.sourceCommit.toLowerCase()) {
       fail("authority_host_postinstall_verification_failed");
