@@ -37,19 +37,7 @@ jobs:
           package-manager-cache: false
 
       - name: Run checks
-        shell: bash
-        run: |
-          set -o pipefail
-          npm run check 2>&1 | tee ci-check.log
-
-      - name: Upload check failure diagnostics
-        if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: ci-check-${{ matrix.os }}-node-${{ matrix.node }}-${{ github.sha }}
-          path: ci-check.log
-          if-no-files-found: ignore
-          retention-days: 1
+        run: npm run check
 
       - name: Verify architecture contracts
         run: >-
