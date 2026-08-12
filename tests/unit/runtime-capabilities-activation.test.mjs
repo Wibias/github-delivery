@@ -39,11 +39,12 @@ test("persisted hook activation reports its streaming limitation", () => {
   assert.equal(result.fallbacks.contextEconomy, "lifecycle-hooks");
 });
 
-test("explicit runtime declaration can override persisted activation for controlled hosts", () => {
+test("explicit live stream runtime overrides stale persisted hook degradation", () => {
   const result = buildRuntimeCapabilities({
     probes: { node: true },
     activation: { mode: "hooks", degradationReason: "streaming_interruption_unavailable" },
     declarations: { progressWatchdog: "stream" },
   });
   assert.equal(result.runtime.progressWatchdog, "stream");
+  assert.equal(result.runtime.progressWatchdogDegradationReason, null);
 });
