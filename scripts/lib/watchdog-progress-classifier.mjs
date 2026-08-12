@@ -1,8 +1,13 @@
+import { deriveShellEvidenceDescriptor } from "./watchdog-evidence-registry.mjs";
+
 const VOLATILE_NAME = /(checks?|workflow|runs?|status|mergeable|pull_request|pr_|queue|jobs?)/i;
 const EVIDENCE_NAME = /(?:^|__|_)(fetch|get|list|search|read|view|status|diff|compare|find|inspect|lookup|show|logs?|checks?)(?:_|$)/i;
 const STATE_CHANGE_NAME = /(?:^|__|_)(create|update|delete|remove|merge|reply|push|close|reopen|mark|set|add|apply|write|edit|patch|commit|move|rename|archive|restore|publish)(?:_|$)/i;
 const DELEGATE_NAME = /(?:^|__|_)(agent|spawn_agent|delegate|collab)(?:_|$)/i;
 const EXPLICIT_SHELL_WRITE = /\b(?:set-content|add-content|out-file|clear-content|new-item|remove-item|move-item|copy-item|rename-item)\b/i;
+const GIT_WRITE = /\bgit(?:\.exe)?(?:\s+-C\s+(?:"[^"]+"|'[^']+'|\S+))?\s+(?:commit|push|merge|rebase|checkout|switch|reset|restore|clean|add|rm|mv)\b/i;
+const GIT_READ = /(?:^|[;|&(]\s*|\s)git(?:\.exe)?(?:\s+-C\s+(?:"[^"]+"|'[^']+'|\S+))?\s+(?:status|diff|log|show|branch|rev-parse)\b/i;
+const POWERSHELL_READ = /(?:^|[;|&(]\s*)(?:get-content|get-childitem|select-string|rg|grep|cat|head|tail|findstr|type|ls|dir|pwd)\b/i;
 
 function commandText(command) {
   if (Array.isArray(command)) return command.join(" ");
@@ -14,11 +19,11 @@ function hasOutputRedirection(value) {
 }
 
 function classifyGhApi(value) {
-  if (!/\bgh\s+api\b/i.test(value)) return null;
+  if (!/\bgh(?:\.exe)?\s+api\b/i.test(value)) return null;
   const explicitGet = /(?:--method(?:=|\s+)get\b|-x\s*get\b)/i.test(value);
   const explicitMutationMethod = /(?:--method(?:=|\s+)(?:post|put|patch|delete)\b|-x\s*(?:post|put|patch|delete)\b)/i.test(value);
 
-  if (/\bgh\s+api\s+graphql\b/i.test(value)) {
+  if (/\bgh(?:\.exe)?\s+api\s+graphql\b/i.test(value)) {
     if (/\bmutation\b/i.test(value)) return { kind: "state-change" };
     if (explicitMutationMethod && !/\bquery\s*=\s*['"]?\s*query\b/i.test(value)) {
       return { kind: "neutral" };
@@ -48,25 +53,31 @@ function classifyCommand(command) {
     return ghApi;
   }
 
-  if (EXPLICIT_SHELL_WRITE.test(value)) return { kind: "state-change" };
+  if (EXPLICIT_SHELL_WRITE.test(value) || GIT_WRITE.test(value)) {
+    return { kind: "state-change" };
+  }
 
-  if (/\bgh\s+(?:pr\s+(?:checks|view|diff)|run\s+(?:view|list))/i.test(value)) {
+  if (
+    /\bgh(?:\.exe)?\b[\s\S]*?\b(?:pr\s+(?:checks|view|diff)|run\s+(?:view|list))\b/i.test(value)
+  ) {
     return hasOutputRedirection(value)
       ? { kind: "neutral" }
       : { kind: "evidence", volatility: "volatile" };
   }
 
-  if (
-    /^(?:get-content\b|select-string\b|rg\b|grep\b|cat\b|head\b|tail\b|findstr\b|type\b|ls\b|dir\b|pwd\b|git\s+(?:status|diff|log|show|branch|rev-parse)\b)/i.test(
-      value,
-    )
-  ) {
+  const ownedEvidence = deriveShellEvidenceDescriptor(raw);
+  if (ownedEvidence?.effect === "evidence") {
+    const volatile = /^(?:pr-ci|pr-ship-gate|github-actions-run):/.test(ownedEvidence.key);
+    return { kind: "evidence", volatility: volatile ? "volatile" : "stable" };
+  }
+
+  if (POWERSHELL_READ.test(value) || GIT_READ.test(value)) {
     if (hasOutputRedirection(value)) return { kind: "neutral" };
     return { kind: "evidence", volatility: "stable" };
   }
 
   if (
-    /\b(?:git\s+(?:commit|push|merge|rebase|checkout|switch|reset|restore|clean|add|rm|mv)|gh\s+(?:pr\s+(?:create|edit|merge|ready|close|reopen)|issue\s+(?:create|edit|close|reopen)|release\s+(?:create|edit|delete)))\b/i.test(
+    /\bgh(?:\.exe)?\s+(?:pr\s+(?:create|edit|merge|ready|close|reopen)|issue\s+(?:create|edit|close|reopen)|release\s+(?:create|edit|delete))\b/i.test(
       value,
     )
   ) {
