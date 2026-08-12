@@ -51,28 +51,91 @@ A status question stays read-only. A merge happens only from an actual merge ins
 - **Node.js 22 or 24**
 - Git
 - GitHub network access
-- an authenticated GitHub CLI (`gh auth login`) **or** a host-provided brokered GitHub connector
+- an authenticated GitHub CLI (`gh auth login`) for release verification during `npx` install/update
 
-### Download the repository
+A host-provided brokered GitHub connector can still satisfy normal GitHub workflow access after installation, but the `npx` bootstrap itself verifies the published release with the GitHub CLI and does not change your authentication.
 
-The quickest path is to clone the repository and enter its root directory:
+### Guided install
+
+The recommended zero-clone path is:
+
+```bash
+npx github-delivery
+```
+
+Bare invocation launches the guided setup. It checks the environment, detects valid existing installations, verifies the latest published stable GitHub Release, shows the install plan, and asks before any skill-target mutation. Confirmation defaults to **No**.
+
+The npm package is only the bootstrap. The installed skill payload still comes from the fixed upstream's separately verified stable GitHub Release; npm is not a second authoritative skill payload source.
+
+On a fresh machine, the guided flow installs the verified release and then walks through any remaining host setup. With an existing valid installation, it offers **Update / Repair setup / Exit** rather than silently reinstalling or updating.
+
+Explicit commands are also available:
+
+```bash
+npx github-delivery install
+npx github-delivery setup
+npx github-delivery doctor
+npx github-delivery update
+npx github-delivery update --apply
+```
+
+Then use the skill naturally:
+
+```text
+full review PR #42
+```
+
+For full install, upgrade, restore, downgrade, force, self-update, and manual-install behavior, see [`INSTALL.md`](INSTALL.md).
+
+### Update an installed release
+
+Check first:
+
+```bash
+npx github-delivery update
+```
+
+Apply only after reviewing the verified plan:
+
+```bash
+npx github-delivery update --apply
+```
+
+The first command is a dry-run. Self-update accepts only the fixed upstream's latest published stable `vX.Y.Z` GitHub Release and replaces nothing until the release assets, checksums, manifest, exact tag/source commit, constrained GitHub artifact attestation, and strict ZIP extraction all verify. Local tracked modifications block replacement even with `--force`; same-version and already-ahead installations are safe no-ops; downgrades are never performed through `update`.
+
+The compatibility `scripts/update-skill.mjs` command and the installed `node scripts/install-skill.mjs --update` path still forward to the same verified updater. See [`references/update.md`](references/update.md) and [`INSTALL.md`](INSTALL.md).
+
+### Finish setup or diagnose an installation
+
+After installing, repairing host integration, or reviewing changed Codex hooks, run:
+
+```bash
+npx github-delivery setup
+```
+
+`setup` works only against an existing valid installation. It never substitutes the ephemeral npm package for the installed skill source and never bypasses Codex hook trust.
+
+For a read-only health report:
+
+```bash
+npx github-delivery doctor
+```
+
+`doctor` reports environment prerequisites, detected installation/version, manifest integrity and local tracked modifications, persistent configuration readability, Codex activation/watchdog state, latest stable version, and update relation without repairing or changing credentials.
+
+### Manual / repository install
+
+For repository development, non-standard targets, or manual recovery, the existing installer remains supported:
 
 ```bash
 git clone https://github.com/Wibias/github-delivery.git
 cd github-delivery
-```
-
-If you prefer not to use Git, download the source archive from the [latest GitHub release](https://github.com/Wibias/github-delivery/releases/latest), extract it, and open a terminal in the extracted repository root.
-
-### Build and install
-
-Run these commands **from the repository root**, the directory containing `package.json` and `scripts/`:
-
-```bash
 npm run build:dist
 node scripts/install-skill.mjs
 node scripts/install-skill.mjs --apply
 ```
+
+Re-running the normal installer with the **same version and byte-identical payload is intentionally idempotent**: it succeeds as an unchanged no-op with no backup or replacement. A same-version payload that differs from the installed files still fails closed, including with `--force`.
 
 Typical skill locations include:
 
@@ -83,32 +146,12 @@ Typical skill locations include:
 ~/.claude/skills/github-delivery
 ```
 
-Then use it like this:
-
-```text
-full review PR #42
-```
-
-For full install, upgrade, restore, downgrade, force, self-update, and manual-install behavior, see [`INSTALL.md`](INSTALL.md).
-
-### Update an installed release
-
-An installed release can check and update itself without cloning the repository again:
-
-```bash
-cd ~/.agents/skills/github-delivery
-node scripts/install-skill.mjs --update
-node scripts/install-skill.mjs --update --apply
-```
-
-The first command is a dry-run. Self-update accepts only the fixed upstream's latest published stable `vX.Y.Z` GitHub Release and replaces nothing until the release assets, checksums, manifest, exact tag/source commit, constrained GitHub artifact attestation, and strict ZIP extraction all verify. Local tracked modifications block replacement even with `--force`; same-version and already-ahead installations are safe no-ops; downgrades are never performed through `--update`. The compatibility `scripts/update-skill.mjs` command forwards to this same verified path. See [`references/update.md`](references/update.md) and [`INSTALL.md`](INSTALL.md).
-
 ### Codex progress watchdog
 
-On a detected Codex install, the normal `--apply` path configures GitHub Delivery's lifecycle-hook entries automatically. Codex requires new or changed non-managed hooks to be reviewed and trusted before they run, so open `/hooks`, review the exact GitHub Delivery definitions, and trust them. Then record that unchanged trusted definition without reinstalling the skill:
+On a detected Codex install, the normal apply path configures GitHub Delivery's lifecycle-hook entries automatically. Codex requires new or changed non-managed hooks to be reviewed and trusted before they run, so open `/hooks`, review the exact GitHub Delivery definitions, and trust them. Then finish/refresh activation through the installed skill with:
 
 ```bash
-node scripts/install-skill.mjs --hook-trust-verified --apply
+npx github-delivery setup
 ```
 
 Trusted lifecycle hooks use turn-scoped state, keep evidence reads/searches from resetting the no-progress detector, warn after **8 consecutive evidence attempts** without execution/state progress, and deny the **12th** supported evidence attempt until the turn makes real progress. Exact duplicate reads and rapid repeated polls remain immediate blocks.
@@ -621,7 +664,38 @@ The architecture intentionally uses **progressive disclosure**: a routed workflo
 - **Node.js 22 or 24**
 - Git
 - GitHub network access
-- an authenticated GitHub CLI (`gh auth login`) **or** a host-provided brokered GitHub connector
+- an authenticated GitHub CLI (`gh auth login`) for `npx` install/update release verification
+
+### Recommended: guided `npx` install
+
+```bash
+npx github-delivery
+```
+
+This is the primary install/setup entrypoint. It is dry-run-first, shows the target and planned changes, defaults confirmation to No, and installs only a separately verified stable GitHub Release from `Wibias/github-delivery`.
+
+Useful explicit commands:
+
+```bash
+npx github-delivery install
+npx github-delivery setup
+npx github-delivery doctor
+npx github-delivery update
+npx github-delivery update --apply
+```
+
+`install` is for a fresh target. `setup` repairs or finishes activation against an existing installation. `doctor` is read-only. `update` verifies and plans only; `update --apply` performs the verified replacement.
+
+Typical skill locations include:
+
+```text
+~/.agents/skills/github-delivery
+~/.cursor/skills/github-delivery
+~/.codex/skills/github-delivery
+~/.claude/skills/github-delivery
+```
+
+### Manual / repository install
 
 Build a deterministic bundle:
 
@@ -635,20 +709,29 @@ Or verify reproducibility while building release artifacts:
 npm run dist:check
 ```
 
-The installer is dry-run first. Full install, upgrade, backup, restore, downgrade, force, watchdog trust refresh, verified stable self-update, and manual-install behavior is documented in [`INSTALL.md`](INSTALL.md).
+The low-level installer remains dry-run first:
 
-Typical skill locations include:
-
-```text
-~/.agents/skills/github-delivery
-~/.cursor/skills/github-delivery
-~/.codex/skills/github-delivery
-~/.claude/skills/github-delivery
+```bash
+node scripts/install-skill.mjs
+node scripts/install-skill.mjs --apply
 ```
+
+A repeated normal install of the **same version with a byte-identical payload is a successful unchanged no-op**: it creates no backup and performs no replacement. A different payload carrying the same version is still rejected, including with `--force`. This lets the documented install command be safely repeated without weakening same-version mismatch protection.
+
+Full install, upgrade, backup, restore, downgrade, force, watchdog trust refresh, verified stable self-update, and manual-install behavior is documented in [`INSTALL.md`](INSTALL.md).
 
 ### Update an installed release
 
-From the installed bundle, check first and apply second:
+Recommended:
+
+```bash
+npx github-delivery update
+npx github-delivery update --apply
+```
+
+The first command is check/verify/plan only. The second applies through the same verified update machinery.
+
+The installed-bundle interface remains available for manual or recovery use:
 
 ```bash
 cd ~/.agents/skills/github-delivery
@@ -662,11 +745,13 @@ Self-update is fail-closed and latest-stable only. It verifies release digests/c
 
 On Codex, the normal installer configures the lifecycle-hook definitions along with the skill. Codex still requires explicit review/trust of new or changed non-managed hooks in `/hooks`; GitHub Delivery does not bypass that trust gate.
 
-After trusting the unchanged definitions, persist the verified hook mode with:
+After trusting the unchanged definitions, finish or refresh activation with:
 
 ```bash
-node scripts/install-skill.mjs --hook-trust-verified --apply
+npx github-delivery setup
 ```
+
+For manual/recovery use from the installed bundle, the equivalent low-level activation refresh remains available through `node scripts/install-skill.mjs --hook-trust-verified --apply` after the exact hooks have been reviewed and trusted.
 
 Trusted hooks provide turn-scoped supported-tool guardrails, including the 8/12 evidence-exploration budget, but they cannot interrupt assistant text before a local tool boundary. For in-flight repeated narration and hosted/read-exploration activity visible through App Server, use the protected launcher:
 
