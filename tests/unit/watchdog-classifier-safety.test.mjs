@@ -70,3 +70,28 @@ test("read-looking shell redirection stays neutral while explicit write cmdlets 
   );
   assert.equal(classify("Set-Content README.copy.md 'x'").kind, "state-change");
 });
+
+test("Windows PowerShell read forms from real incidents are evidence", () => {
+  const commands = [
+    "Get-ChildItem -LiteralPath 'D:\\repo\\src' -Recurse",
+    "(Get-Content -LiteralPath 'D:\\repo\\src\\core.ts' | Select-Object -First 40)",
+    "Write-Output 'status'; git -C 'D:\\repo' status --short",
+    "git -C 'D:\\repo' diff -- src/core.ts",
+    "git -C 'D:\\repo' log -5 --oneline",
+  ];
+  for (const command of commands) {
+    assert.equal(classify(command).kind, "evidence", command);
+  }
+});
+
+test("GitHub Delivery owned evidence helpers are classified explicitly", () => {
+  const evidenceHelpers = [
+    "node scripts/ci-forensics.mjs o/r 42",
+    "node scripts/runtime-capabilities.mjs --repo o/r",
+    "node scripts/review-brief.mjs o/r 42 --json",
+    "node scripts/ship-gate.mjs o/r 42 --json",
+  ];
+  for (const command of evidenceHelpers) {
+    assert.equal(classify(command).kind, "evidence", command);
+  }
+});

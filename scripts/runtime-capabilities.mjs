@@ -6,6 +6,7 @@ import { join, resolve } from "node:path";
 
 import { buildRuntimeCapabilities } from "./lib/runtime-capabilities.mjs";
 import { readActivationReceipt } from "./lib/watchdog-activation.mjs";
+import { ownedHelperEffect } from "./lib/watchdog-evidence-registry.mjs";
 
 const usage =
   "Usage: node scripts/runtime-capabilities.mjs [--repo OWNER/REPO] [--input FILE]";
@@ -134,6 +135,10 @@ try {
     ? JSON.parse(readFileSync(args.input, "utf8"))
     : liveInput(args.repo);
   const output = buildRuntimeCapabilities({ ...input, repo: input.repo ?? args.repo });
+  output.gdEffect = {
+    ...ownedHelperEffect("runtime-capabilities.mjs"),
+    key: `runtime-capabilities:${output.repo || "current"}`,
+  };
   process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
   if (!output.readyForReadOnly) process.exitCode = 2;
 } catch (error) {

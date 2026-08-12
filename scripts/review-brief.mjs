@@ -16,6 +16,7 @@ import { collectPrReviewInput, planReviewScope } from "./lib/review-scope.mjs";
 import { projectBugScope, projectSecurityScope } from "./lib/review-scope-compat.mjs";
 import { planReviewDepthExecution } from "./lib/review-depth-execution.mjs";
 import { extractRequiredProbeBlocks } from "./lib/probe-blocks.mjs";
+import { ownedHelperEffect } from "./lib/watchdog-evidence-registry.mjs";
 
 const USAGE =
   "Usage: node scripts/review-brief.mjs OWNER/REPO PR_NUMBER [--max-hunk-lines N] [--no-reference-map] [--json]";
@@ -171,6 +172,10 @@ async function main() {
     const out = {
       schemaVersion: 1,
       kind: "github-delivery/review-brief",
+      gdEffect: {
+        ...ownedHelperEffect("review-brief.mjs"),
+        key: `pr-review-brief:${args.repo}:${args.pr}`,
+      },
       repo: args.repo,
       pr: args.pr,
       headRefOid: plan.headRefOid,

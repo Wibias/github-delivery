@@ -80,12 +80,11 @@ test("PreToolUse allows a focused subagent brief", () => {
   assert.equal(result.output, null);
 });
 
-test("PostToolUse replaces only oversized model-facing output with a bounded excerpt", () => {
-  const toolResponse = [
-    ...Array.from({ length: 300 }, (_, index) => `ordinary output ${index}`),
-    "ERROR unsponsored_surface",
-    "exit code: 1",
-  ].join("\n");
+test("PostToolUse preserves oversized model-facing output", () => {
+  const toolResponse = Array.from(
+    { length: 300 },
+    (_, index) => `ordinary output ${index}`,
+  ).join("\n");
   const result = evaluateCodexHook(
     {
       hook_event_name: "PostToolUse",
@@ -99,10 +98,7 @@ test("PostToolUse replaces only oversized model-facing output with a bounded exc
     { maxToolOutputChars: 900 },
   );
 
-  assert.equal(result.output.continue, false);
-  assert.match(result.output.stopReason, /tool_output_compacted/);
-  assert.match(result.output.stopReason, /ERROR unsponsored_surface/);
-  assert.ok(result.output.stopReason.length < 1_200);
+  assert.equal(result.output, null);
 });
 
 test("Stop requests one corrective continuation for a narration stall", () => {
