@@ -5,6 +5,7 @@ import { isDeepStrictEqual } from "node:util";
 import { createInterface } from "node:readline/promises";
 
 import { installSkill, parseInstallArgs } from "../install-skill.mjs";
+import { reconcileStableAuthorityHost } from "./authority-host-install.mjs";
 import { acquireVerifiedReleasePayload } from "./release-self-update.mjs";
 import {
   compareInstalledManifest,
@@ -54,7 +55,9 @@ function validPayload(payload) {
     && payload.source.length > 0
     && payload.manifest?.kind === "github-delivery/distribution-manifest"
     && payload.manifest?.name === "github-delivery"
-    && typeof payload.release?.version === "string",
+    && typeof payload.release?.version === "string"
+    && typeof payload.release?.tag === "string"
+    && typeof payload.release?.sourceCommit === "string",
   );
 }
 
@@ -113,6 +116,7 @@ export async function runGuidedInstall({
   const readConfig = dependencies.readUserConfig || readUserConfig;
   const verify = dependencies.verifyInstalledRelease || verifyInstalledRelease;
   const confirm = dependencies.confirmApply || confirmApply;
+  const reconcileAuthority = dependencies.reconcileStableAuthorityHost || reconcileStableAuthorityHost;
   const workspace = make();
   let installation = null;
 
@@ -165,6 +169,11 @@ export async function runGuidedInstall({
       fail("stable_install_user_config_changed_unexpectedly");
     }
 
+    const authorityHost = await reconcileAuthority({
+      expectedRelease: payload.release,
+      scriptPath: join(target, "authority-host", "windows", "install-release.ps1"),
+    });
+
     return {
       action: "install",
       apply: true,
@@ -174,6 +183,7 @@ export async function runGuidedInstall({
       target,
       backupPath: installation?.backupPath || null,
       watchdog: installation?.watchdog || null,
+      authorityHost,
     };
   } catch (error) {
     if (installation?.backupPath && error && typeof error === "object") {
