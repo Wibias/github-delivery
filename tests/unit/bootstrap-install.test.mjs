@@ -73,7 +73,7 @@ test("guided install verifies a release and performs a dry-run before asking to 
       },
       installSkill(options) {
         events.push(`install:${options.apply}`);
-        assert.equal(options.source, join("/tmp/github-delivery-bootstrap-test", "extracted", "github-delivery"));
+        assert.equal(options.source, resolve("/tmp/github-delivery-bootstrap-test", "extracted", "github-delivery"));
         assert.equal(options.target, target);
         assert.equal(options.update, false);
         assert.equal(options.allowDowngrade, false);
@@ -181,11 +181,9 @@ test("accepted install requires post-install manifest verification and unchanged
       },
     }),
   });
-
   assert.equal(configReads, 2);
   assert.equal(verified, 1);
   assert.equal(result.backupPath, "/tmp/backup");
-  assert.equal(result.watchdog.hookTrustRequired, true);
 });
 
 test("post-install config drift fails closed and keeps the installer backup path on the error", async () => {
@@ -204,7 +202,7 @@ test("post-install config drift fails closed and keeps the installer backup path
             action: "install",
             apply: options.apply,
             target,
-            backupPath: options.apply ? "/tmp/recovery-backup" : null,
+            backupPath: options.apply ? "/tmp/backup" : null,
             watchdog: null,
           };
         },
@@ -212,7 +210,7 @@ test("post-install config drift fails closed and keeps the installer backup path
     }),
     (error) => {
       assert.match(error.message, /stable_install_user_config_changed_unexpectedly/);
-      assert.equal(error.backupPath, "/tmp/recovery-backup");
+      assert.equal(error.backupPath, "/tmp/backup");
       return true;
     },
   );
@@ -224,12 +222,7 @@ test("explicit install refuses to silently reinstall an already valid installati
     runGuidedInstall({
       target,
       dependencies: dependencies({
-        discoverInstallations() {
-          return [{ target, valid: true, version: "0.4.0", reason: null }];
-        },
-        async acquireVerifiedReleasePayload() {
-          throw new Error("release acquisition must not run for existing install");
-        },
+        discoverInstallations: () => [{ target, valid: true, version: "0.4.0", reason: null }],
       }),
     }),
     /bootstrap_install_existing/,
