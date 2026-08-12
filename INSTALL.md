@@ -57,7 +57,7 @@ node scripts/install-skill.mjs --update
 node scripts/install-skill.mjs --update --apply
 ```
 
-The first command is a dry-run. It discovers and fully verifies the latest published stable `Wibias/github-delivery` GitHub Release, compares it with the installed copy, and prints the update plan without replacing the installed skill. Add `--apply` only after inspecting that plan.
+The first command is a dry-run. It discovers and fully verifies the latest published stable `Wibias/github-delivery` GitHub Release, compares it with the installed copy, and prints the update plan without replacing the installed skill. On supported Windows systems it also reports the separately installed Authority-host component plan. Add `--apply` only after inspecting that plan.
 
 Unless `--target` is explicitly provided, release self-update targets the root of the installed bundle that is executing `install-skill.mjs`. The compatibility command below reaches the same implementation and security boundary:
 
@@ -72,11 +72,11 @@ The compatibility wrapper does not contain its own downloader or installer. It f
 
 Self-update accepts only the latest published, non-draft, non-prerelease release from the fixed upstream repository, with a strict `vX.Y.Z` tag. It never falls back to `main`, another branch, a fork, an arbitrary URL, or GitHub's generated source archive.
 
-Self-update never downgrades. If the installed version is already current, or is newer than the latest published stable release, `--apply` is a no-op. `--update` rejects `--source`, `--restore`, and `--allow-downgrade` so those separate local install/recovery controls cannot weaken release provenance.
+Self-update never downgrades the installed skill. An installed skill newer than the latest published stable release is a complete no-op, including Authority reconciliation. If the skill itself is already current, `--update --apply` may still repair or update an installed/required Windows Authority host that is stale or legacy. A versioned Authority host newer than stable is never automatically downgraded. `--update` rejects `--source`, `--restore`, and `--allow-downgrade` so those separate local install/recovery controls cannot weaken release provenance.
 
 ### Verification before replacement
 
-The downloaded release is not trusted merely because it came from a GitHub Release page. Before the existing installer can replace anything, self-update requires the complete chain below:
+The downloaded release is not trusted merely because it came from a GitHub Release page. Before the existing installer can replace anything, self-update requires the complete skill chain below:
 
 1. Valid latest-stable Release metadata and exactly one version-matching ZIP, `manifest.json`, and `SHA256SUMS` asset.
 2. GitHub `sha256:` asset-digest verification for each required asset when GitHub exposes a digest.
@@ -88,15 +88,21 @@ The downloaded release is not trusted merely because it came from a GitHub Relea
 8. Rehashing and byte-count verification of every extracted manifest file before that directory can become an installation source.
 9. Comparison of the current installed payload with its installed manifest. Local tracked modifications block replacement, and `--force` does not bypass this self-update guard.
 
-Redirects remain HTTPS-only and downloads are size bounded. Verification failures occur before the installed skill is replaced.
+Stable GitHub Releases also publish a separately versioned self-contained Windows Authority-host archive plus metadata. When the Authority component needs installation/repair/update, the updater additionally requires exact versioned asset identity, Windows/x64 metadata, metadata SHA-256 equality, the same exact tagged source commit, GitHub asset digest when available, a `release.yml` attestation bound to the same tag/source, and strict bounded Authority ZIP extraction. No unverified Authority binary is installed.
 
-### Apply, backup, and recovery
+Redirects remain HTTPS-only and downloads are size bounded. Verification failures occur before the corresponding installed component is replaced.
 
-For a clean, strictly newer verified release, `--update --apply` passes the verified extracted directory into the existing installer. The existing backup and replacement implementation remains authoritative rather than introducing a second mutation path.
+### Apply, backup, Authority state, and recovery
+
+For a clean, strictly newer verified skill release, `--update --apply` passes the verified extracted directory into the existing installer. The existing backup and replacement implementation remains authoritative rather than introducing a second skill mutation path.
 
 After replacement, self-update verifies that the installed `manifest.json` is exactly the verified release manifest, rechecks every tracked file, and rereads persistent user configuration. The user configuration must remain unchanged.
 
-If replacement succeeded but a post-install verification fails, the command fails instead of claiming success and reports the preserved backup path. Restore it with the normal restore command documented below.
+On Windows, the same update operation then reconciles the Authority component when required or already installed. Its verified release runtime is installed beneath `%LOCALAPPDATA%\GitHubDeliveryAuthority\app\vX.Y.Z`; the root `authority-host-install.json` selects the active version. `authority.db`, `trust-store.json`, and `%LOCALAPPDATA%\github-delivery\config.json` are persistent state and are not release-owned files, so Authority replacement preserves them. A configured install whose executable is missing is repaired rather than mistaken for a deliberate absence.
+
+If the effective protection mode is `off` and Authority has never been installed, setup/update does not download or install the component. If Authority is already installed, stable update keeps it aligned even while mode is `off`. A host ahead of stable remains untouched.
+
+If skill replacement succeeded but a post-install verification fails, the command fails instead of claiming success and reports the preserved skill backup path. Restore it with the normal restore command documented below. Authority replacement likewise fails closed until its installed version/source metadata and executable verify; `doctor` then exposes any remaining component mismatch rather than reporting a clean fully-current state.
 
 Persistent user settings are not reset or migrated silently. After an update, inspect any new configuration options and decide explicitly whether to adopt them.
 
@@ -208,20 +214,29 @@ Extract an archive and copy the resulting `github-delivery` directory into the h
 
 ## Optional Windows authority host
 
-The optional Windows 11 authority host turns local Windows Hello approvals into short-lived, exact-scope trusted grants for high-assurance mutations. It is not required for ordinary installation and does not automatically enable global strict-authority enforcement.
+The optional Windows 11 Authority host turns local Windows Hello approvals into short-lived, exact-scope trusted grants for high-assurance mutations. It does not automatically enable a stricter global protection mode.
 
-Install it from the repository root with:
+For a normal stable installation, do **not** build it manually. Use:
+
+```bash
+npx github-delivery setup
+npx github-delivery doctor
+```
+
+Stable GitHub Releases include a separately verified self-contained Windows Authority-host asset, and the managed setup/update path does **not** require the .NET SDK. The Control Center's **Settings** page exposes **Off**, **Sensitive actions** (recommended), and **Every GitHub write**, backed by the same persistent `authorityMode` configuration used by the CLI.
+
+A **Windows Hello PIN** is sufficient. Biometric hardware is not required when a Hello PIN is available. If Hello is missing or not configured, the setup UI can take you to **Settings > Accounts > Sign-in options** and let you check readiness again.
+
+For repository development or a source build, use:
 
 ```powershell
 .\authority-host\windows\install.ps1
 ```
 
-The installer requires Windows 11 build 22000 or newer and a .NET 8 SDK, then opens a **guided setup**. That flow checks Windows Hello readiness, runs a real verification test, asks for the first trusted repository, and requires a fresh Hello approval before the repository is allowlisted.
+That source/development installer requires Windows 11 build 22000 or newer and a .NET 8 SDK. After building locally it delegates deployment to the same state-preserving release installer used by the managed component path.
 
-A **Windows Hello PIN** is sufficient. Biometric hardware is not required when a Hello PIN is available. If Hello is missing or not configured, the setup UI can take you to **Settings > Accounts > Sign-in options** and let you check readiness again.
-
-See [`authority-host/windows/README.md`](authority-host/windows/README.md) for the full prerequisite, recovery, upgrade, and security behavior.
+See [`authority-host/windows/README.md`](authority-host/windows/README.md) for the full stable lifecycle, source prerequisites, recovery, upgrade, Settings, and security behavior.
 
 ## Uninstall
 
-Remove only the installed `github-delivery` directory. Keep its latest backup until the replacement version has completed at least one real workflow successfully.
+Remove only the installed `github-delivery` directory. Keep its latest backup until the replacement version has completed at least one real workflow successfully. If the Windows Authority host is installed, it is a separate stateful component under `%LOCALAPPDATA%\GitHubDeliveryAuthority`; removing the skill directory does not implicitly delete its authority database, trust store, or host installation.
