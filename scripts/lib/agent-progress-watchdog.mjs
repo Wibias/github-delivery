@@ -185,9 +185,14 @@ export function createProgressWatchdog(options = {}) {
     recentIntents.length = 0;
   }
 
-  function resetToolEmissionStall() {
+  function resetToolEmissionSignals() {
     toolEmissionIntentCount = 0;
     protocolArtifactCount = 0;
+    pendingNarration = "";
+  }
+
+  function resetToolEmissionStall() {
+    resetToolEmissionSignals();
     resetNarration();
   }
 
@@ -409,7 +414,7 @@ export function createProgressWatchdog(options = {}) {
   }
 
   function recordToolStart() {
-    resetToolEmissionStall();
+    resetToolEmissionSignals();
   }
 
   function recordExecutionProgress() {
