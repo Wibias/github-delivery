@@ -106,6 +106,38 @@ Core invariants are GD-CORE-001 through GD-CORE-010. They cover fail-closed
 evidence, locked scope, gate integrity, untrusted repository instructions, live
 state, write authority, final evidence, bounded progress, and evidence/context economy.
 
+## Workflow controller contract
+
+After routing, every GitHub Delivery workflow uses one persistent controller
+checkpoint. The controller route is locked; workflow prose cannot silently
+reroute the run after new evidence appears.
+
+1. Resolve the selected workflow once with
+   `node scripts/workflow-brief.mjs <workflow>`. Treat the returned workflow
+   packet as the canonical workflow + unconditional policy context for that
+   state. Do not re-read those files during the same state generation.
+2. Start the checkpoint with
+   `node scripts/delivery-controller.mjs start <workflow> --repo OWNER/REPO --checkpoint <file>`
+   plus known `--issue`, `--pr`, `--base`, and `--head` values.
+3. Advance phases only with `delivery-controller.mjs transition`. Illegal or
+   backward transitions are hard stops, not invitations to choose another route.
+4. Record evidence actions, retries, ref changes, blockers, resource usage, and
+   no-progress cycles through the controller. `interrupt` is a hard stop;
+   `restrict-evidence` forbids additional exploratory reads until real progress
+   or a required missing evidence dimension is identified.
+5. A cycle counts as progress only when a phase advances, relevant state
+   changes, a blocker disappears, required missing evidence is produced, or a
+   required execution completes. Changed narration, a restated plan, a no-op
+   tool, or another spelling of the same read is not progress.
+6. Resume from the existing checkpoint after interruption or restart. Do not
+   repeat completed phases. Relevant base/head changes create a new state
+   generation and invalidate only state-bound evidence.
+7. Conditional policy modules may extend the packet only when their declared
+   observable condition becomes true. Do not rebuild the unconditional packet.
+
+The controller is orchestration enforcement, not GitHub write authority. All
+existing mutation-mode, confirmation, and final-gate rules still apply.
+
 ## Mandatory entrypoint behavior
 
 - **Default mutation mode is read-only.** Available profiles are `read-only`,
