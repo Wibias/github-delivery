@@ -26,13 +26,28 @@ node scripts/github-delivery-config.mjs --authority-mode high-assurance
 node scripts/github-delivery-config.mjs --authority-mode all
 ```
 
+On Windows, the same stored preference is available in **Control Center > Settings** as **Off**, **Sensitive actions**, and **Every GitHub write**. Both paths write the same persistent user configuration; environment-variable overrides can still make the effective mode stricter than the stored preference.
+
 The config is global for the user's github-delivery installation and lives outside the installed skill directory.
 
 ## Windows Authority host
 
-If the selected mode is `high-assurance` or `all`, install or verify the Windows Authority host on supported Windows systems using `authority-host/windows/install.ps1`, then run its readiness/self-test path. A Windows Hello PIN is sufficient; biometric hardware is not required.
+For normal stable installations, use the managed lifecycle:
 
-If the selected mode is `off`, do not make the authority host a prerequisite. An already installed host may remain installed for later use.
+```bash
+npx github-delivery setup
+npx github-delivery doctor
+npx github-delivery update
+npx github-delivery update --apply
+```
+
+Stable GitHub Releases contain a separately verified, self-contained `win-x64` Authority-host asset. Stable setup/update verifies the component's version, tagged source commit, archive digest, bounded extraction, and release-workflow attestation before installation, so users do **not** need the .NET SDK for the managed Authority install/update path.
+
+If the effective mode is `high-assurance` or `all`, `setup` installs or repairs the verified Authority host on supported Windows systems. If the selected mode is `off` and the host has never been installed, setup/update does not install it. Once the host is already installed, stable update keeps it aligned with the skill even when the current mode is `off`; a host newer than stable is never automatically downgraded.
+
+`authority-host/windows/install.ps1` remains the repository/development source-install path. It requires Windows 11 plus the .NET 8 SDK and delegates deployment to the same state-preserving release installer semantics after building locally.
+
+A Windows Hello PIN is sufficient; biometric hardware is not required.
 
 ## Completion
 
@@ -41,7 +56,10 @@ Show:
 - installed skill version/path;
 - config path;
 - stored and effective protection mode;
-- authority-host readiness when applicable;
+- Authority-host version/status and stable relation when applicable;
+- whether the effective mode requires Authority;
 - any unresolved prerequisites or diagnostics.
+
+`doctor` is read-only and reports the skill and Authority host separately. Authority relations distinguish `missing`, `legacy`, `update`, `already_current`, and `already_ahead` where applicable.
 
 Do not perform unrelated GitHub mutations as part of setup/configuration.
