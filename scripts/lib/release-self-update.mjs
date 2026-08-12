@@ -373,21 +373,18 @@ export function verifyReleaseAttestation({
   return true;
 }
 
-export async function prepareVerifiedReleaseCandidate({
-  target,
+export async function acquireVerifiedReleasePayload({
   workspace,
   client = createGitHubReleaseClient(),
   attestationRunner = undefined,
   dependencies = {},
 } = {}) {
-  if (typeof target !== "string" || target.length === 0) fail("stable_release_target_invalid");
   if (typeof workspace !== "string" || workspace.length === 0) fail("stable_release_workspace_invalid");
   if (!client || typeof client.latestRelease !== "function" || typeof client.downloadAsset !== "function" || typeof client.resolveTagCommit !== "function") {
     fail("stable_release_client_invalid");
   }
 
   const extract = dependencies.extractVerifiedReleaseZip || extractVerifiedReleaseZip;
-  const plan = dependencies.planStableUpdate || planStableUpdate;
   const release = await client.latestRelease();
   const assets = releaseAssetPlan(release);
   const archiveAsset = uniqueAsset(release, assets.archive);
@@ -436,11 +433,10 @@ export async function prepareVerifiedReleaseCandidate({
     manifestBytes,
     destination: extraction,
   });
-  const updatePlan = plan({ releases: [release], target });
 
   return {
     schemaVersion: 1,
-    kind: "github-delivery/verified-release-candidate",
+    kind: "github-delivery/verified-release-payload",
     verified: true,
     source: extracted.root,
     archivePath,
@@ -450,6 +446,37 @@ export async function prepareVerifiedReleaseCandidate({
       version: assets.version,
       sourceCommit: manifest.sourceCommit,
     },
+    releaseMetadata: release,
+  };
+}
+
+export async function prepareVerifiedReleaseCandidate({
+  target,
+  workspace,
+  client = createGitHubReleaseClient(),
+  attestationRunner = undefined,
+  dependencies = {},
+} = {}) {
+  if (typeof target !== "string" || target.length === 0) fail("stable_release_target_invalid");
+  if (typeof workspace !== "string" || workspace.length === 0) fail("stable_release_workspace_invalid");
+
+  const acquire = dependencies.acquireVerifiedReleasePayload || acquireVerifiedReleasePayload;
+  const plan = dependencies.planStableUpdate || planStableUpdate;
+  const payload = await acquire({
+    workspace,
+    client,
+    attestationRunner,
+    dependencies,
+  });
+  if (!payload?.verified || !payload?.releaseMetadata) {
+    fail("stable_release_candidate_invalid");
+  }
+  const updatePlan = plan({ releases: [payload.releaseMetadata], target });
+  const { releaseMetadata, ...verifiedPayload } = payload;
+
+  return {
+    ...verifiedPayload,
+    kind: "github-delivery/verified-release-candidate",
     plan: updatePlan,
   };
 }
