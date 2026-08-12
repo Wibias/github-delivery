@@ -37,14 +37,15 @@ export function buildRuntimeCapabilities({
   };
   const declaredWatchdog = declarations.progressWatchdog;
   const installedWatchdog = activation?.mode;
+  const hasDeclaredWatchdog =
+    declaredWatchdog !== undefined && declaredWatchdog !== null && declaredWatchdog !== "";
+  const effectiveWatchdog = watchdogMode(hasDeclaredWatchdog ? declaredWatchdog : installedWatchdog);
   const runtime = {
-    progressWatchdog: watchdogMode(
-      declaredWatchdog === undefined || declaredWatchdog === null || declaredWatchdog === ""
-        ? installedWatchdog
-        : declaredWatchdog,
-    ),
+    progressWatchdog: effectiveWatchdog,
     progressWatchdogDegradationReason:
-      activation?.degradationReason || null,
+      hasDeclaredWatchdog && effectiveWatchdog === "stream"
+        ? null
+        : activation?.degradationReason || null,
     progressWatchdogLauncherPath:
       typeof activation?.launcherPath === "string" ? activation.launcherPath : null,
   };
