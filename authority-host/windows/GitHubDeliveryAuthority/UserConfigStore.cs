@@ -43,7 +43,11 @@ internal static class UserConfigStore
         Directory.CreateDirectory(directory);
 
         var temporaryPath = $"{ConfigPath}.{Environment.ProcessId}.{Guid.NewGuid():N}.tmp";
-        var json = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true }) + Environment.NewLine;
+        var json = JsonSerializer.Serialize(config, new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        }) + Environment.NewLine;
         File.WriteAllText(temporaryPath, json);
         try
         {
