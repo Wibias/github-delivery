@@ -4,6 +4,8 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-08-12
+
 ### Added
 
 - First-class stable Windows Authority-host delivery and Control Center settings.
