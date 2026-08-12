@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   planAuthorityHostUpdate,
   readInstalledAuthorityHost,
+  reconcileStableAuthorityHost,
 } from "../../scripts/lib/authority-host-install.mjs";
 
 const winEnv = { LOCALAPPDATA: "C:\\Users\\me\\AppData\\Local" };
@@ -90,4 +91,43 @@ test("installed authority host detection distinguishes versioned and legacy layo
   assert.equal(legacy.installed, true);
   assert.equal(legacy.legacy, true);
   assert.equal(legacy.version, null);
+});
+
+test("unsupported systems report when the configured mode requires Authority", async () => {
+  const result = await reconcileStableAuthorityHost({
+    platform: "linux",
+    dependencies: {
+      readInstalledAuthorityHost: () => ({
+        supported: false,
+        configured: false,
+        installed: false,
+        legacy: false,
+        version: null,
+        sourceCommit: null,
+      }),
+      readUserConfig: () => ({
+        source: "file",
+        config: { schemaVersion: 1, authorityMode: "high-assurance" },
+      }),
+    },
+    client: {
+      latestRelease() { throw new Error("unsupported host must not fetch release assets"); },
+      resolveTagCommit() { throw new Error("unsupported host must not resolve tags"); },
+    },
+  });
+
+  assert.deepEqual(result, {
+    action: "unsupported",
+    required: true,
+    changed: false,
+    installed: {
+      supported: false,
+      configured: false,
+      installed: false,
+      legacy: false,
+      version: null,
+      sourceCommit: null,
+    },
+    mode: "high-assurance",
+  });
 });
