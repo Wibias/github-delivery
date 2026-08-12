@@ -4,7 +4,24 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-08-12
+
 ### Added
+
+- First-class stable Windows Authority-host delivery and Control Center settings.
+  Releases now build a self-contained `win-x64` Authority component from the
+  exact tagged commit, publish versioned ZIP + metadata assets, and attest the
+  archive through the protected `release.yml` identity. Stable `setup`,
+  `doctor`, and `update --apply` can verify/install/repair/upgrade that component
+  without a local .NET SDK while preserving `authority.db`, `trust-store.json`,
+  and persistent user config. An absent host remains absent when protection is
+  `off`; an already-installed host is kept aligned even when the skill itself
+  is current; ahead hosts are not automatically downgraded. The WinUI Control
+  Center Settings view now writes the existing `off` / `high-assurance` / `all`
+  preference and reports stored/effective mode plus Authority version/source
+  status. `doctor` reports `missing`, `legacy`, `update`, `already_current`, or
+  `already_ahead` component relations and whether the active mode requires the
+  host.
 
 - Verified stable self-update for installed skills. `node scripts/install-skill.mjs
   --update` now performs a non-mutating check against the fixed upstream's
@@ -13,13 +30,14 @@ All notable changes to `github-delivery` are documented here.
   when exposed, `SHA256SUMS`, the distribution manifest, tag-to-source-commit
   binding, a workflow/tag/commit-constrained GitHub artifact attestation, and a
   strict bounded ZIP extraction all verify successfully. Local installed
-  modifications block replacement even with `--force`; current/ahead versions
-  are no-ops; update mode cannot use `--source`, `--restore`, or
-  `--allow-downgrade`; post-install manifest verification and persistent user
-  config preservation fail closed and surface the backup path after a completed
-  replacement. `scripts/update-skill.mjs` is now only a compatibility forwarder
-  to the same verified installer path, so there is one release trust chain and
-  one mutation boundary.
+  modifications block skill replacement even with `--force`; an already-ahead
+  skill is a complete no-op, while an already-current skill can still reconcile
+  a stale/legacy Authority component; update mode cannot use `--source`,
+  `--restore`, or `--allow-downgrade`; post-install manifest verification and
+  persistent user config preservation fail closed and surface the backup path
+  after a completed skill replacement. `scripts/update-skill.mjs` is now only a
+  compatibility forwarder to the same verified installer path, so there is one
+  release trust chain and one skill mutation boundary.
 
 - Supersede and maintainer-overtake lifecycle actions. A new
   `references/supersede-pr.md` workflow closes an obsolete open PR in favor of

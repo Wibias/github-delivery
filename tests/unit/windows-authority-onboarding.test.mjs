@@ -6,17 +6,24 @@ function read(path) {
   return readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
 }
 
-test("Windows authority installer enforces supported platform and guided setup", () => {
+test("Windows authority installers enforce supported platform and guided setup", () => {
   const installer = read("authority-host/windows/install.ps1");
+  const releaseInstaller = read("authority-host/windows/install-release.ps1");
   const program = read("authority-host/windows/GitHubDeliveryAuthority/Program.cs");
+  const appHost = read("authority-host/windows/GitHubDeliveryAuthority/AuthorityAppHost.cs");
 
   assert.match(installer, /22000/);
   assert.match(installer, /--list-sdks/);
   assert.match(installer, /8\./);
-  assert.match(installer, /Get-Process/);
-  assert.match(installer, /--setup/);
+  assert.match(installer, /install-release\.ps1/);
   assert.match(installer, /PIN/i);
+
+  assert.match(releaseInstaller, /Get-Process/);
+  assert.match(releaseInstaller, /Start-Process \$installedExe/);
+
   assert.match(program, /args\.Contains\("--setup",\s*StringComparer\.Ordinal\)/);
+  assert.match(appHost, /ShouldShowSetup\(_forceSetup,\s*_store\.ListAllowedRepositories\(\)\.Count\)/);
+  assert.match(appHost, /forceSetup\s*\|\|\s*allowedRepositoryCount\s*==\s*0/);
 });
 
 test("Windows authority documentation explains Hello setup and recovery", () => {

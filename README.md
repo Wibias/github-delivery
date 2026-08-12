@@ -67,6 +67,8 @@ Bare invocation launches the guided setup. It checks the environment, detects va
 
 The npm package is only the bootstrap. The installed skill payload still comes from the fixed upstream's separately verified stable GitHub Release; npm is not a second authoritative skill payload source.
 
+On supported Windows systems, stable GitHub Releases also carry a **separately verified, self-contained Authority host component** built from the same tagged commit. Managed setup/update can install or repair that component without a local .NET SDK. It is not silently installed for a user whose protection mode is `off` and who has never installed Authority.
+
 On a fresh machine, the guided flow installs the verified release and then walks through any remaining host setup. With an existing valid installation, it offers **Update / Repair setup / Exit** rather than silently reinstalling or updating.
 
 Explicit commands are also available:
@@ -101,7 +103,9 @@ Apply only after reviewing the verified plan:
 npx github-delivery update --apply
 ```
 
-The first command is a dry-run. Self-update accepts only the fixed upstream's latest published stable `vX.Y.Z` GitHub Release and replaces nothing until the release assets, checksums, manifest, exact tag/source commit, constrained GitHub artifact attestation, and strict ZIP extraction all verify. Local tracked modifications block replacement even with `--force`; same-version and already-ahead installations are safe no-ops; downgrades are never performed through `update`.
+The first command is a dry-run. Self-update accepts only the fixed upstream's latest published stable `vX.Y.Z` GitHub Release and replaces nothing until the release assets, checksums, manifest, exact tag/source commit, constrained GitHub artifact attestation, and strict ZIP extraction all verify. Local tracked modifications block skill replacement even with `--force`; skill downgrades are never performed through `update`.
+
+On Windows, the same update reports the Authority host separately. An already-installed or required stale/legacy Authority host is acquired from its own versioned, attested release asset and kept aligned with the stable skill version. That repair can happen even when the skill itself is already current. If Authority was never installed and protection is `off`, it remains absent; if the installed Authority host is ahead of stable, it is not automatically downgraded.
 
 The compatibility `scripts/update-skill.mjs` command and the installed `node scripts/install-skill.mjs --update` path still forward to the same verified updater. See [`references/update.md`](references/update.md) and [`INSTALL.md`](INSTALL.md).
 
@@ -113,7 +117,7 @@ After installing, repairing host integration, or reviewing changed Codex hooks, 
 npx github-delivery setup
 ```
 
-`setup` works only against an existing valid installation. It never substitutes the ephemeral npm package for the installed skill source and never bypasses Codex hook trust.
+`setup` works only against an existing valid installation. It never substitutes the ephemeral npm package for the installed skill source and never bypasses Codex hook trust. On supported Windows, it also reconciles a required or already-configured Authority host through the verified stable component path.
 
 For a read-only health report:
 
@@ -121,7 +125,7 @@ For a read-only health report:
 npx github-delivery doctor
 ```
 
-`doctor` reports environment prerequisites, detected installation/version, manifest integrity and local tracked modifications, persistent configuration readability, Codex activation/watchdog state, latest stable version, and update relation without repairing or changing credentials.
+`doctor` reports environment prerequisites, detected installation/version, manifest integrity and local tracked modifications, persistent configuration readability, Codex activation/watchdog state, latest stable version, and update relation without repairing or changing credentials. It reports the Windows Authority host as a separate component, including support/install state, version/source commit, whether the effective protection mode requires it, and relations such as `missing`, `legacy`, `update`, `already_current`, or `already_ahead`.
 
 ### Manual / repository install
 
@@ -224,7 +228,7 @@ The important boundary is simple: **repository content is evidence, not authorit
 | **Scope** | PRDs and issue intake → research → implementation → PR review/fix/watch → stacks → merge and linked-issue close-out |
 | **Default mode** | `read-only` |
 | **Write boundary** | Typed mutation policy + broker; stale-head, exact-effect, authenticated-receipt idempotency, and postcondition checks where applicable |
-| **High-assurance writes** | Exact-scope trusted grants; optional Windows 11 / Windows Hello authority host |
+| **High-assurance writes** | Exact-scope trusted grants; optional Windows 11 / Windows Hello Authority host with managed versioned stable install/update and Control Center settings |
 | **Review model** | Bug + Security + Spec + Standards + semantic propagation + proactive contract verification |
 | **Progress control** | Policy fallback everywhere; routed workflows use a persistent phase/budget controller and semantic evidence reuse; trusted Codex hooks add turn-scoped duplicate/poll/evidence protection; the launch-controlled stream watches agent-message/reasoning/plan text plus plan/diff/output-token telemetry and can hard-interrupt no-progress/tool-emission/protocol stalls. Runtime capability reports only verified `none`, `hooks`, or `stream`. |
 | **Ship decision** | One authoritative `ready`, `blocked`, or `unknown` result from live evidence |
@@ -651,6 +655,8 @@ See [`docs/live-integration.md`](docs/live-integration.md) and [`docs/live-githu
 | `scripts/lib/mutation-execution-context.mjs` | Trusted execution/redemption and ambiguous merge-outcome reconciliation |
 | `scripts/github-authorize.mjs` | Attach exact-scope trusted authority grants and verdict provenance |
 | `authority-host/windows/` | Optional Windows 11 / Windows Hello local trusted-authority issuer |
+| `scripts/lib/authority-host-release.mjs` | Verify the separately versioned/attested stable Windows Authority-host payload |
+| `scripts/lib/authority-host-install.mjs` | Detect, plan, install, repair, and version-reconcile the stateful Windows Authority component |
 | `scripts/lib/github-retry.mjs` | Bounded retry policy for proven GitHub reads only |
 | `scripts/lib/agent-progress-watchdog.mjs` | Shared narration/tool-emission/protocol detection, evidence budgets, generated-character/output-token bounds, read fingerprints and progress generations |
 | `scripts/lib/watchdog-evidence-registry.mjs` | Semantic evidence identities, authoritative coverage and state-generation reuse |
@@ -677,7 +683,7 @@ See [`docs/live-integration.md`](docs/live-integration.md) and [`docs/live-githu
 | `scripts/lib/release-self-update.mjs` | Discover, download, verify, attest, bind, and prepare the latest stable release candidate |
 | `scripts/lib/release-zip.mjs` | Strict bounded ZIP validation/extraction against the separately verified distribution manifest |
 | `scripts/lib/stable-release-update.mjs` | Stable-version selection, installed-manifest drift checks, checksums, and safe update planning |
-| `scripts/install-skill.mjs` | Dry-run/apply install plus the single verified `--update` mutation path, backups, hooks, and postconditions |
+| `scripts/install-skill.mjs` | Dry-run/apply install plus the single verified `--update` mutation path, backups, hooks, Authority reconciliation, and postconditions |
 | `scripts/prepare-release.mjs` | Verify release identity, checksums, SBOM, notes and provenance subjects |
 
 The architecture intentionally uses **progressive disclosure**: a routed workflow resolves one workflow/policy packet and follows its controller graph instead of dumping every rule into every agent turn or repeatedly reconsidering routing. `GD-CORE-009` and `GD-CORE-010` extend that idea into execution: prefer authoritative aggregate reads, reuse valid state/evidence snapshots, escalate diagnostics from status → failing component → focused excerpt → full raw output only when required, and pass subagents focused briefs with source references instead of copied context. Architecture validation ensures these context reductions do not remove required safety contracts.
@@ -711,7 +717,7 @@ npx github-delivery update
 npx github-delivery update --apply
 ```
 
-`install` is for a fresh target. `setup` repairs or finishes activation against an existing installation. `doctor` is read-only. `update` verifies and plans only; `update --apply` performs the verified replacement.
+`install` is for a fresh target. `setup` repairs or finishes activation against an existing installation. `doctor` is read-only. `update` verifies and plans only; `update --apply` performs the verified replacement. On supported Windows, setup/update also manages the separately verified Authority host when required or already installed, without requiring the .NET SDK.
 
 Typical skill locations include:
 
@@ -766,7 +772,9 @@ node scripts/install-skill.mjs --update
 node scripts/install-skill.mjs --update --apply
 ```
 
-Self-update is fail-closed and latest-stable only. It verifies release digests/checksums, the manifest, the release-tag commit binding, GitHub artifact attestation, and a strict bounded ZIP before the existing backup/replacement installer can run. Local tracked modifications block replacement, no update downgrade is permitted, and the final installed manifest plus persistent user config are verified after replacement. A post-install failure surfaces the backup path for recovery.
+Self-update is fail-closed and latest-stable only. It verifies release digests/checksums, the manifest, the release-tag commit binding, GitHub artifact attestation, and a strict bounded ZIP before the existing backup/replacement installer can run. Local tracked skill modifications block skill replacement, no skill update downgrade is permitted, and the final installed manifest plus persistent user config are verified after replacement. A post-install skill failure surfaces the backup path for recovery.
+
+When a Windows Authority host is required or already installed, the updater separately verifies its versioned archive + metadata + exact tag/source + release-workflow attestation before installation. Persistent Authority database/trust state is kept outside the versioned runtime directory and survives upgrades. An absent Authority host remains absent when protection is `off`; an ahead host is not downgraded.
 
 ### Codex progress watchdog
 
@@ -799,7 +807,13 @@ The launcher starts the real App Server over stdio, interposes an authenticated 
 - 60-second grants with one-time redemption;
 - current-user Named Pipe API — no arbitrary signing endpoint and no private key material exposed to the agent.
 
-It is optional and does **not** automatically enable global strict-authority mode. See [`authority-host/windows/README.md`](authority-host/windows/README.md).
+The stable user path is managed through `npx github-delivery setup` / `update --apply`; it uses a separately built, versioned, attested self-contained `win-x64` release component and does **not** require a local .NET SDK. If the component is already installed, stable update keeps it aligned with the skill while preserving `authority.db`, `trust-store.json`, and persistent user config. If protection is `off` and Authority has never been installed, it stays uninstalled.
+
+The Control Center now has a functional **Settings** destination for **Off**, **Sensitive actions** (recommended), and **Every GitHub write**. It writes the same persistent `authorityMode` preference as the CLI and shows stored/effective mode plus Authority version/source status.
+
+The repository `authority-host/windows/install.ps1` path remains available specifically for source/development builds and requires the .NET 8 SDK.
+
+Authority is optional and does **not** automatically enable global strict-authority mode. See [`authority-host/windows/README.md`](authority-host/windows/README.md).
 
 ---
 
@@ -848,6 +862,6 @@ Do not publish suspected vulnerability details in a public issue or pull request
 
 ## Current state
 
-The complete issue/PR delivery lifecycle and its safety architecture are implemented: evidence-backed routing and ship gates, deferred-intent-safe merge routing, brokered lifecycle mutations, trusted exact-scope authority and durable verdict provenance, Windows Hello protection for high-assurance thread actions, deep review, semantic propagation, deterministic probes with non-bypassable required evidence, pre-open review, safe simplification, repository-qualified stacks, conflict recovery, merge-queue semantics, aggregated strict-ruleset enforcement, authenticated exact-effect idempotency receipts, ambiguous-merge readback reconciliation, safe read retries, verified npm/npx bootstrap + latest-stable release installation, persistent route/phase workflow convergence, semantic evidence coverage/reuse, trust-aware Codex hook configuration, hard cross-channel protected-stream generation bounds with deterministic incident replay, issue close-out, deterministic release packaging, verified latest-stable self-update, repository controls, and dedicated live lifecycle fixtures.
+The complete issue/PR delivery lifecycle and its safety architecture are implemented: evidence-backed routing and ship gates, deferred-intent-safe merge routing, brokered lifecycle mutations, trusted exact-scope authority and durable verdict provenance, Windows Hello protection for high-assurance thread actions, a managed versioned/attested Windows Authority release component with state-preserving stable updates and functional Control Center protection settings, deep review, semantic propagation, deterministic probes with non-bypassable required evidence, pre-open review, safe simplification, repository-qualified stacks, conflict recovery, merge-queue semantics, aggregated strict-ruleset enforcement, authenticated exact-effect idempotency receipts, ambiguous-merge readback reconciliation, safe read retries, verified npm/npx bootstrap + latest-stable release installation, persistent route/phase workflow convergence, semantic evidence coverage/reuse, trust-aware Codex hook configuration, hard cross-channel protected-stream generation bounds with deterministic incident replay, issue close-out, deterministic release packaging, verified latest-stable self-update, repository controls, and dedicated live lifecycle fixtures.
 
 Remaining work is primarily **operational** rather than a missing architecture layer: keep live repository rules/security settings aligned with the documented policy, provision and maintain the dedicated live fixture target/credential, run release acceptance for new versions, keep host integrations explicitly configured where runtime watchdog enforcement is desired, perform the npm registry's one-time package bootstrap/Trusted-Publisher setup when required for the first publication, and extend the regression corpus as GitHub and agent hosts evolve.

@@ -44,35 +44,79 @@ The audit ledger does **not** store authority grant tokens, private key material
 - Windows 11 build 22000 or newer.
 - Windows Hello for any protection mode or administrative action that needs OS-backed approval. A **Windows Hello PIN is sufficient**; fingerprint or face hardware is not required.
 - TPM recommended for the Microsoft Platform Crypto Provider.
-- .NET 8 SDK to build/install from source.
+- Node.js/GitHub prerequisites from the normal github-delivery installation.
+- **No .NET SDK is required for the stable managed Authority install/update path.**
+- .NET 8 SDK is required only when building/installing the Authority host from repository source with `install.ps1`.
 
-The installer publishes an unpackaged, self-contained `win-x64` WinUI 3 application. Users do not need a separate Windows App SDK runtime installation for the published host.
+Stable releases publish an unpackaged, self-contained `win-x64` WinUI 3 application. Users do not need a separate Windows App SDK runtime installation for the published host.
 
 If Windows Hello is not ready, the setup UI can open **Settings > Accounts > Sign-in options** so you can configure or repair the PIN before continuing.
 
-## Install
+## Stable managed install and update
 
-From PowerShell at the repository root:
+The normal user-facing path is the github-delivery bootstrap:
+
+```powershell
+npx github-delivery setup
+npx github-delivery doctor
+npx github-delivery update
+npx github-delivery update --apply
+```
+
+Every stable GitHub Release carries a separate Authority-host archive and metadata file built from the exact tagged source commit. Before any Authority runtime files are replaced, github-delivery verifies the component version/source identity, GitHub asset digest when available, metadata SHA-256, exact release/tag source binding, the `release.yml` artifact attestation, and a strict bounded ZIP extraction.
+
+The managed installer keeps persistent state at:
+
+```text
+%LOCALAPPDATA%\GitHubDeliveryAuthority
+```
+
+Release-owned runtime files live in a versioned application directory such as:
+
+```text
+%LOCALAPPDATA%\GitHubDeliveryAuthority\app\v0.5.1
+```
+
+The root `authority-host-install.json` identifies the active release. `authority.db` and `trust-store.json` stay outside the versioned runtime directory and are preserved across replacement, as is `%LOCALAPPDATA%\github-delivery\config.json`.
+
+Managed lifecycle rules are deliberate:
+
+- `off` + no Authority host ever installed: do not download or install the component;
+- `high-assurance` / `all` + missing host: `setup` installs the verified stable component on supported Windows x64;
+- an already-installed or legacy host can be repaired/upgraded even if the current mode is `off`;
+- a versioned host already equal to stable is unchanged;
+- a host ahead of the stable release is reported as `already_ahead` and is never automatically downgraded;
+- a configured install record whose executable is missing is treated as a broken install and repaired rather than mistaken for an intentional absence.
+
+`doctor` is read-only and reports the skill and Authority host separately, including support/install state, version/source commit, whether the current mode requires Authority, and relations such as `missing`, `legacy`, `update`, `already_current`, or `already_ahead`.
+
+### Control Center Settings
+
+Open **Control Center > Settings** to choose the same persistent protection preference used by the Node CLI:
+
+- **Off** -> `off`
+- **Sensitive actions** -> `high-assurance` (**Recommended**)
+- **Every GitHub write** -> `all`
+
+The page shows the stored/effective protection mode plus installed Authority version/source metadata. If an environment override changes the effective mode, the UI warns that **Apply** changes the stored preference but does not override the active environment policy.
+
+## Repository / source installation
+
+For repository development, use PowerShell from the repository root:
 
 ```powershell
 .\authority-host\windows\install.ps1
 ```
 
-The installer fails early unless it finds:
+This is **not** the normal stable binary-distribution path. The source installer fails early unless it finds:
 
 1. Windows 11 build 22000 or newer;
 2. the `dotnet` command;
 3. at least one installed .NET 8 SDK.
 
-It then:
+It builds the self-contained host into a temporary publish directory, stamps local version/source metadata, and then delegates deployment to `install-release.ps1` so source and stable installs share one state-preserving process/shortcut/environment replacement boundary.
 
-1. publishes the self-contained host under `%LOCALAPPDATA%\GitHubDeliveryAuthority`;
-2. stops only a running `GitHubDeliveryAuthority` process whose executable is inside that install directory;
-3. copies the new files and creates a per-user Startup shortcut;
-4. sets `GITHUB_DELIVERY_AUTHORITY_TRUST_STORE` to the generated public-key trust store;
-5. sets `GITHUB_DELIVERY_AUTHORITY_PIPE=github-delivery-authority-v1`;
-6. starts the host with `--setup`;
-7. leaves the user-selected github-delivery protection policy unchanged.
+`install-release.ps1` does not call `dotnet`. It stops only a running `GitHubDeliveryAuthority` process whose resolved executable path is inside the selected install root, deploys a versioned runtime, recreates the per-user Startup shortcut, sets `GITHUB_DELIVERY_AUTHORITY_TRUST_STORE` and `GITHUB_DELIVERY_AUTHORITY_PIPE=github-delivery-authority-v1` at User scope, verifies the installed metadata, and starts the host.
 
 ### First-run setup
 
@@ -103,9 +147,11 @@ For `DeviceNotPresent` and `NotConfiguredForUser`, the UI can open `ms-settings:
 
 ## Upgrade behavior
 
-Running `install.ps1` again performs the same prerequisite checks, publishes the replacement self-contained build, stops only the installed authority-host instance under the selected install directory, replaces the application files, and starts the new host with `--setup`.
+For stable users, `npx github-delivery update` reports the skill plan and Authority-host plan independently. `npx github-delivery update --apply` keeps an already-installed Authority host aligned with the verified stable release; this remains true when the skill itself is already current, so a stale/legacy host can be the only component changed by an update.
 
-Existing SQLite authority state remains in the configured install directory. Global github-delivery protection configuration is stored outside the skill installation and is not silently changed by an authority-host upgrade.
+The release installer preserves `authority.db`, `trust-store.json`, persistent github-delivery config, and unrelated user state. It does not claim success until the active install record and executable match the intended release version/source commit.
+
+For source development, rerunning `install.ps1` rebuilds locally and delegates to the same release installer boundary.
 
 ## Use from github-delivery
 
@@ -117,7 +163,7 @@ node scripts/github-authorize.mjs --request batch.json --out authorized.json
 
 The output contains the same broker requests with one `authorityGrant` attached to each operation. Execute individual requests through `scripts/github-mutate.mjs` as usual. Grants that declare `redemption: required` are atomically consumed by the host immediately before the GitHub mutation.
 
-The preferred user-facing configuration path is the prompt-driven setup/settings workflow documented by the repository. The legacy environment switch remains a compatibility override that forces the equivalent of `all`:
+The preferred user-facing configuration path is **Control Center > Settings** or the prompt-driven setup/configuration workflow documented by the repository. The legacy environment switch remains a compatibility override that forces the equivalent of `all`:
 
 ```powershell
 $env:GITHUB_DELIVERY_REQUIRE_TRUSTED_AUTHORITY = '1'

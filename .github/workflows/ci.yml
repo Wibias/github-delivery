@@ -52,6 +52,8 @@ jobs:
         run: |
           $Installer = Get-Content authority-host/windows/install.ps1 -Raw
           [void][scriptblock]::Create($Installer)
+          $ReleaseInstaller = Get-Content authority-host/windows/install-release.ps1 -Raw
+          [void][scriptblock]::Create($ReleaseInstaller)
 
       - name: Restore Windows authority host in locked mode
         if: runner.os == 'Windows'

@@ -18,11 +18,20 @@ test("authority host is unpackaged self-contained WinUI 3, not WinForms", () => 
   assert.doesNotMatch(project, /UseWindowsForms/);
 });
 
-test("installer preserves the self-contained deployment contract and CI publishes it", () => {
+test("source installer preserves self-contained deployment and delegates to the release installer", () => {
   const installer = read("authority-host/windows/install.ps1");
+  const releaseInstaller = read("authority-host/windows/install-release.ps1");
   const workflow = read(".github/workflows/ci.yml");
   assert.match(installer, /dotnet\.Source publish[\s\S]*--self-contained true/);
+  assert.match(installer, /install-release\.ps1/);
   assert.doesNotMatch(installer, /--self-contained false/);
+  assert.match(releaseInstaller, /authority-host-version\.json/);
+  assert.match(releaseInstaller, /authority-host-install\.json/);
+  assert.match(releaseInstaller, /Join-Path \$InstallDir 'app'/);
+  assert.match(releaseInstaller, /Join-Path \$appRoot \('v' \+ \$ExpectedVersion\)/);
+  assert.match(releaseInstaller, /authority\.db/);
+  assert.match(releaseInstaller, /trust-store\.json/);
+  assert.doesNotMatch(releaseInstaller, /dotnet publish|dotnet\.Source publish/);
   assert.match(workflow, /Publish Windows authority host/);
   assert.match(workflow, /dotnet publish[\s\S]*--self-contained true/);
 });
@@ -44,6 +53,27 @@ test("control center implements the selected activity-first audit design in ligh
   for (const nav of ["Overview", "Activity", "Allowlist", "Temporary grants", "Diagnostics", "Settings"]) {
     assert.match(window, new RegExp(`Content=\\"${nav}\\"`));
   }
+});
+
+test("settings page exposes and persists exactly the three authority protection modes", () => {
+  const window = read(`${root}/ControlCenterWindow.xaml`);
+  const code = read(`${root}/ControlCenterWindow.xaml.cs`);
+  const store = read(`${root}/UserConfigStore.cs`);
+
+  for (const phrase of [
+    "Sensitive actions (Recommended)",
+    "Every GitHub write",
+    "No Windows Hello prompts.",
+    "Delivery Authority",
+    "Source commit",
+    "Config file",
+  ]) assert.match(window, new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(window, /SelectionChanged="Navigation_SelectionChanged"/);
+  assert.match(window, /Click="ApplyProtectionMode_Click"/);
+  assert.match(code, /UserConfigStore\.WriteAuthorityMode\(mode\)/);
+  assert.match(code, /authority-host-version\.json/);
+  assert.match(store, /WriteAuthorityMode\(string mode\)/);
+  for (const mode of ["off", "high-assurance", "all"]) assert.match(store, new RegExp(`\\"${mode}\\"`));
 });
 
 test("approval UI uses the refined design without GitHub or Windows brand logos", () => {
