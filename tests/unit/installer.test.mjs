@@ -90,6 +90,41 @@ test("plans upgrades and blocks downgrades unless explicitly allowed", () => {
   assert.equal(planInstallation({ source, target, allowDowngrade: true }).action, "downgrade");
 });
 
+test("same-version identical installs are idempotent no-ops", () => {
+  const root = mkdtempSync(join(tmpdir(), "github-delivery-install-test-"));
+  const source = join(root, "source");
+  const target = join(root, "target");
+  skill(source, "0.2.0", "identical");
+  skill(target, "0.2.0", "identical");
+
+  const plan = planInstallation({ source, target });
+  assert.equal(plan.action, "same-version");
+  assert.equal(plan.allowed, true);
+  assert.equal(plan.unchanged, true);
+
+  const receipt = applyInstallation({ source, target });
+  assert.equal(receipt.action, "same-version");
+  assert.equal(receipt.unchanged, true);
+  assert.equal(receipt.backupPath, null);
+  assert.equal(readFileSync(join(target, "marker.txt"), "utf8"), "identical");
+});
+
+test("same-version installs with different payloads fail closed even with force", () => {
+  const root = mkdtempSync(join(tmpdir(), "github-delivery-install-test-"));
+  const source = join(root, "source");
+  const target = join(root, "target");
+  skill(source, "0.2.0", "source");
+  skill(target, "0.2.0", "target");
+
+  const plan = planInstallation({ source, target });
+  assert.equal(plan.action, "same-version");
+  assert.equal(plan.allowed, false);
+  assert.equal(plan.unchanged, false);
+  assert.equal(planInstallation({ source, target, force: true }).allowed, false);
+  assert.throws(() => applyInstallation({ source, target }), /installation is not allowed: same-version/);
+  assert.throws(() => applyInstallation({ source, target, force: true }), /installation is not allowed: same-version/);
+});
+
 test("classifies symlink targets as conflicts", { skip: process.platform === "win32" }, () => {
   const root = mkdtempSync(join(tmpdir(), "github-delivery-install-test-"));
   const source = join(root, "source");

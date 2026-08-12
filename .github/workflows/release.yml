@@ -30,7 +30,7 @@ jobs:
           package-manager-cache: false
 
       - name: Verify tagged source belongs to protected main lineage
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_REPOSITORY: ${{ github.repository }}
@@ -57,7 +57,7 @@ jobs:
           --ref "${{ github.ref }}"
           --source-commit "${{ github.sha }}"
 
-      - name: Upload verified dry-run evidence
+      - name: Upload verified release evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: github-delivery-release-${{ github.sha }}
@@ -74,7 +74,7 @@ jobs:
 
   publish:
     name: Publish attested release
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     needs: validate
     runs-on: ubuntu-latest
     environment: release

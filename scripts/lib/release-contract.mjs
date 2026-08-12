@@ -24,11 +24,14 @@ function requireCommit(value, label = "source commit") {
 export function validateReleaseContext({ eventName, ref, version }) {
   version = requireVersion(version);
   const tag = `v${version}`;
-  if (eventName === "workflow_dispatch") return { version, tag, publish: false };
-  if (eventName !== "push" || !String(ref).startsWith("refs/tags/")) {
+  const releaseRef = String(ref || "");
+  if (eventName === "workflow_dispatch" && !releaseRef.startsWith("refs/tags/")) {
+    return { version, tag, publish: false };
+  }
+  if (!new Set(["push", "workflow_dispatch"]).has(eventName) || !releaseRef.startsWith("refs/tags/")) {
     throw new Error(`unsupported release context: ${eventName} ${ref}`);
   }
-  const actualTag = String(ref).slice("refs/tags/".length);
+  const actualTag = releaseRef.slice("refs/tags/".length);
   if (actualTag !== tag) throw new Error(`release tag ${actualTag} does not match package version ${version}`);
   return { version, tag, publish: true };
 }

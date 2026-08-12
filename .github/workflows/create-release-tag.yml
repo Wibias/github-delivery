@@ -1,0 +1,186 @@
+name: Create Release Tag
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: create-release-tag
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  create:
+    name: Validate and create release tag
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+
+      - name: Resolve release metadata
+        id: release
+        env:
+          RELEASE_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_REF}" != "refs/heads/${RELEASE_DEFAULT_BRANCH}" ]; then
+            echo "manual releases must run from ${RELEASE_DEFAULT_BRANCH}, got ${GITHUB_REF}" >&2
+            exit 1
+          fi
+          version="$(node --input-type=module -e 'import { readFileSync } from "node:fs"; const { version } = JSON.parse(readFileSync("package.json", "utf8")); if (!/^\d+\.\d+\.\d+$/.test(version || "") || version === "0.0.0") { console.error(`invalid release version: ${version}`); process.exit(1); } process.stdout.write(version);')"
+          printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
+          printf 'tag=v%s\n' "$version" >> "$GITHUB_OUTPUT"
+
+      - name: Verify release target before validation
+        id: preflight
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_REPOSITORY: ${{ github.repository }}
+          RELEASE_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          RELEASE_SOURCE_COMMIT: ${{ github.sha }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { appendFileSync } from "node:fs";
+
+          const {
+            GH_TOKEN: token,
+            GITHUB_API_URL: apiUrl,
+            GITHUB_OUTPUT: output,
+            RELEASE_REPOSITORY: repository,
+            RELEASE_DEFAULT_BRANCH: branch,
+            RELEASE_SOURCE_COMMIT: sourceCommit,
+            RELEASE_TAG: tag,
+          } = process.env;
+          const headers = {
+            Accept: "application/vnd.github+json",
+            Authorization: `Bearer ${token}`,
+            "X-GitHub-Api-Version": "2022-11-28",
+          };
+          async function request(path) {
+            return fetch(`${apiUrl}${path}`, { headers });
+          }
+          const branchResponse = await request(`/repos/${repository}/git/ref/heads/${encodeURIComponent(branch)}`);
+          if (!branchResponse.ok) throw new Error(`cannot resolve ${branch}: HTTP ${branchResponse.status}`);
+          const branchRef = await branchResponse.json();
+          if (branchRef.object?.sha !== sourceCommit) {
+            throw new Error(`release source ${sourceCommit} is not current ${branch} HEAD ${branchRef.object?.sha || "missing"}`);
+          }
+          const tagResponse = await request(`/repos/${repository}/git/ref/tags/${encodeURIComponent(tag)}`);
+          if (tagResponse.status === 404) {
+            appendFileSync(output, "tag_exists=false\n");
+          } else if (tagResponse.ok) {
+            const tagRef = await tagResponse.json();
+            if (tagRef.object?.type !== "commit" || tagRef.object?.sha !== sourceCommit) {
+              throw new Error(`existing tag ${tag} does not point directly to release source ${sourceCommit}`);
+            }
+            appendFileSync(output, "tag_exists=true\n");
+          } else {
+            throw new Error(`cannot inspect tag ${tag}: HTTP ${tagResponse.status}`);
+          }
+          NODE
+
+      - name: Run repository checks
+        run: npm run check
+
+      - name: Build release subjects
+        env:
+          SOURCE_COMMIT: ${{ github.sha }}
+        run: npm run build:dist -- --source-commit "${SOURCE_COMMIT}"
+
+      - name: Prepare and verify release
+        env:
+          RELEASE_EVENT_NAME: ${{ github.event_name }}
+          RELEASE_REF: ${{ github.ref }}
+          RELEASE_SOURCE_COMMIT: ${{ github.sha }}
+        run: >-
+          node scripts/prepare-release.mjs
+          --event "$RELEASE_EVENT_NAME"
+          --ref "$RELEASE_REF"
+          --source-commit "$RELEASE_SOURCE_COMMIT"
+
+      - name: Reverify release target before tagging
+        id: target
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_REPOSITORY: ${{ github.repository }}
+          RELEASE_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          RELEASE_SOURCE_COMMIT: ${{ github.sha }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { appendFileSync } from "node:fs";
+
+          const {
+            GH_TOKEN: token,
+            GITHUB_API_URL: apiUrl,
+            GITHUB_OUTPUT: output,
+            RELEASE_REPOSITORY: repository,
+            RELEASE_DEFAULT_BRANCH: branch,
+            RELEASE_SOURCE_COMMIT: sourceCommit,
+            RELEASE_TAG: tag,
+          } = process.env;
+          const headers = {
+            Accept: "application/vnd.github+json",
+            Authorization: `Bearer ${token}`,
+            "X-GitHub-Api-Version": "2022-11-28",
+          };
+          async function request(path) {
+            return fetch(`${apiUrl}${path}`, { headers });
+          }
+          const branchResponse = await request(`/repos/${repository}/git/ref/heads/${encodeURIComponent(branch)}`);
+          if (!branchResponse.ok) throw new Error(`cannot resolve ${branch}: HTTP ${branchResponse.status}`);
+          const branchRef = await branchResponse.json();
+          if (branchRef.object?.sha !== sourceCommit) {
+            throw new Error(`release source ${sourceCommit} is not current ${branch} HEAD ${branchRef.object?.sha || "missing"}`);
+          }
+          const tagResponse = await request(`/repos/${repository}/git/ref/tags/${encodeURIComponent(tag)}`);
+          if (tagResponse.status === 404) {
+            appendFileSync(output, "tag_exists=false\n");
+          } else if (tagResponse.ok) {
+            const tagRef = await tagResponse.json();
+            if (tagRef.object?.type !== "commit" || tagRef.object?.sha !== sourceCommit) {
+              throw new Error(`existing tag ${tag} does not point directly to release source ${sourceCommit}`);
+            }
+            appendFileSync(output, "tag_exists=true\n");
+          } else {
+            throw new Error(`cannot inspect tag ${tag}: HTTP ${tagResponse.status}`);
+          }
+          NODE
+
+      - name: Create release tag
+        if: steps.target.outputs.tag_exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_REPOSITORY: ${{ github.repository }}
+          RELEASE_SOURCE_COMMIT: ${{ github.sha }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: >-
+          gh api --method POST
+          "repos/${RELEASE_REPOSITORY}/git/refs"
+          -f ref="refs/tags/${RELEASE_TAG}"
+          -f sha="${RELEASE_SOURCE_COMMIT}"
+
+      - name: Dispatch release workflow on tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_REPOSITORY: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: >-
+          gh api --method POST
+          "repos/${RELEASE_REPOSITORY}/actions/workflows/release.yml/dispatches"
+          -f ref="${RELEASE_TAG}"
