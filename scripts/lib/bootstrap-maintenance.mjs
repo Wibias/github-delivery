@@ -43,6 +43,10 @@ function readyReceipt(receipt) {
   return receipt.mode === "hooks" && receipt.hookTrustVerified === true;
 }
 
+function modeRequiresAuthority(mode) {
+  return mode === "high-assurance" || mode === "all";
+}
+
 function trustGuidance(changed) {
   return changed
     ? "The installed GitHub Delivery hook definition changed. Open /hooks in Codex, review the exact new definition, and trust it before running setup again."
@@ -84,6 +88,9 @@ export async function runBootstrapSetup({
   const authorityHost = await reconcileAuthority({
     scriptPath: join(target, "authority-host", "windows", "install-release.ps1"),
   });
+  if (authorityHost?.action === "unsupported" && authorityHost?.required === true) {
+    fail("bootstrap_setup_authority_host_unsupported");
+  }
 
   const readReceipt = dependencies.readActivationReceipt || readActivationReceipt;
   const receipt = readReceipt({ codexHome });
@@ -200,7 +207,17 @@ export async function runBootstrapDoctor({
     installed: { ok: Boolean(selected), version: selected?.version || null },
     integrity: { ok: false, clean: null, modifications: [], error: null },
     config: { ok: false, source: null, effectiveAuthorityMode: null, error: null },
-    authorityHost: { ok: false, supported: process.platform === "win32", installed: false, legacy: false, version: null, sourceCommit: null, relation: null, error: null },
+    authorityHost: {
+      ok: false,
+      supported: process.platform === "win32",
+      installed: false,
+      legacy: false,
+      version: null,
+      sourceCommit: null,
+      relation: null,
+      requiredByMode: false,
+      error: null,
+    },
     activation: readReceipt({ codexHome: resolve(codexHome) }),
     latest: { version: null, relation: null, error: null },
   };
@@ -223,18 +240,24 @@ export async function runBootstrapDoctor({
 
   try {
     const config = readConfig();
+    const effectiveAuthorityMode = resolveAuthorityMode({ config: config.config, env: process.env });
     report.config = {
       ok: true,
       source: config?.source || null,
-      effectiveAuthorityMode: resolveAuthorityMode({ config: config.config, env: process.env }),
+      effectiveAuthorityMode,
       error: null,
     };
+    report.authorityHost.requiredByMode = modeRequiresAuthority(effectiveAuthorityMode);
   } catch (error) {
     report.config.error = String(error?.message || error);
   }
 
   try {
     const authority = readAuthority();
+    const requiredByMode = report.authorityHost.requiredByMode;
+    const authorityRelation = authority.supported
+      ? (!authority.installed ? "missing" : (authority.legacy || !authority.version ? "legacy" : null))
+      : null;
     report.authorityHost = {
       ok: true,
       supported: authority.supported,
@@ -242,8 +265,9 @@ export async function runBootstrapDoctor({
       legacy: authority.legacy,
       version: authority.version,
       sourceCommit: authority.sourceCommit,
-      relation: null,
-      error: null,
+      relation: authorityRelation,
+      requiredByMode,
+      error: !authority.supported && requiredByMode ? "authority_host_required_unsupported" : null,
     };
   } catch (error) {
     report.authorityHost.error = String(error?.message || error);
@@ -256,10 +280,14 @@ export async function runBootstrapDoctor({
     if (!match) fail("stable_release_tag_invalid");
     report.latest.version = match[1];
     if (manifest?.version) report.latest.relation = relation(manifest.version, match[1]);
-    if (report.authorityHost.ok && report.authorityHost.supported && report.authorityHost.installed) {
-      report.authorityHost.relation = report.authorityHost.legacy || !report.authorityHost.version
-        ? "update"
-        : relation(report.authorityHost.version, match[1]);
+    if (
+      report.authorityHost.ok &&
+      report.authorityHost.supported &&
+      report.authorityHost.installed &&
+      !report.authorityHost.legacy &&
+      report.authorityHost.version
+    ) {
+      report.authorityHost.relation = relation(report.authorityHost.version, match[1]);
     }
   } catch (error) {
     report.latest.error = String(error?.message || error);
