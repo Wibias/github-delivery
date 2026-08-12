@@ -73,7 +73,7 @@ test("guided install verifies a release and performs a dry-run before asking to 
       },
       installSkill(options) {
         events.push(`install:${options.apply}`);
-        assert.equal(options.source, "/tmp/github-delivery-bootstrap-test/extracted/github-delivery");
+        assert.equal(options.source, join("/tmp/github-delivery-bootstrap-test", "extracted", "github-delivery"));
         assert.equal(options.target, target);
         assert.equal(options.update, false);
         assert.equal(options.allowDowngrade, false);
