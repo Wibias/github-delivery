@@ -7,12 +7,17 @@ import { pathToFileURL } from "node:url";
 
 import { installCodexWatchdogHooks } from "./install-codex-watchdog-hooks.mjs";
 import { applyInstallation, planInstallation, restoreBackup } from "./lib/distribution.mjs";
+import {
+  planAuthorityHostUpdate,
+  readInstalledAuthorityHost,
+  reconcileStableAuthorityHost,
+} from "./lib/authority-host-install.mjs";
 import { prepareVerifiedReleaseCandidate } from "./lib/release-self-update.mjs";
 import {
   compareInstalledManifest,
   readInstalledManifest,
 } from "./lib/stable-release-update.mjs";
-import { readUserConfig } from "./lib/user-config.mjs";
+import { readUserConfig, resolveAuthorityMode } from "./lib/user-config.mjs";
 import {
   selectWatchdogMode,
   writeActivationReceipt,
@@ -221,6 +226,19 @@ function sameUserConfig(before, after) {
   return isDeepStrictEqual(before?.config, after?.config);
 }
 
+function planAuthorityForRelease(candidate, dependencies = {}) {
+  const readConfig = dependencies.readUserConfig || readUserConfig;
+  const readAuthority = dependencies.readInstalledAuthorityHost || readInstalledAuthorityHost;
+  const planAuthority = dependencies.planAuthorityHostUpdate || planAuthorityHostUpdate;
+  const config = readConfig();
+  const mode = resolveAuthorityMode({ config: config.config, env: process.env });
+  return planAuthority({
+    mode,
+    targetVersion: candidate.release.version,
+    installed: readAuthority(),
+  });
+}
+
 export async function runInstallCommand(options, dependencies = {}) {
   const install = dependencies.installSkill || installSkill;
   if (!options.update) return install(options);
@@ -230,6 +248,7 @@ export async function runInstallCommand(options, dependencies = {}) {
   const removeWorkspace = dependencies.removeWorkspace || removeReleaseUpdateWorkspace;
   const readConfig = dependencies.readUserConfig || readUserConfig;
   const verifyRelease = dependencies.verifyInstalledRelease || verifyInstalledRelease;
+  const reconcileAuthority = dependencies.reconcileStableAuthorityHost || reconcileStableAuthorityHost;
   const workspace = makeWorkspace();
   let installation = null;
 
@@ -242,6 +261,7 @@ export async function runInstallCommand(options, dependencies = {}) {
       throw new Error("stable_release_candidate_invalid");
     }
 
+    const authorityPlan = planAuthorityForRelease(candidate, dependencies);
     if (!options.apply) {
       return {
         ...candidate.plan,
@@ -249,16 +269,33 @@ export async function runInstallCommand(options, dependencies = {}) {
         updated: false,
         verified: true,
         release: candidate.release,
+        authorityHost: authorityPlan,
       };
     }
 
-    if (candidate.plan.action === "already_current" || candidate.plan.action === "already_ahead") {
+    if (candidate.plan.action === "already_ahead") {
       return {
         ...candidate.plan,
         apply: true,
         updated: false,
         verified: true,
         release: candidate.release,
+        authorityHost: { action: "skipped_skill_ahead", changed: false },
+      };
+    }
+
+    if (candidate.plan.action === "already_current") {
+      const authorityHost = await reconcileAuthority({
+        expectedRelease: candidate.release,
+        scriptPath: join(options.target, "authority-host", "windows", "install-release.ps1"),
+      });
+      return {
+        ...candidate.plan,
+        apply: true,
+        updated: false,
+        verified: true,
+        release: candidate.release,
+        authorityHost,
       };
     }
     if (candidate.plan.action !== "update" || candidate.plan.safeToReplace !== true) {
@@ -281,6 +318,11 @@ export async function runInstallCommand(options, dependencies = {}) {
       throw new Error("stable_update_user_config_changed_unexpectedly");
     }
 
+    const authorityHost = await reconcileAuthority({
+      expectedRelease: candidate.release,
+      scriptPath: join(options.target, "authority-host", "windows", "install-release.ps1"),
+    });
+
     return {
       action: "update",
       apply: true,
@@ -292,6 +334,7 @@ export async function runInstallCommand(options, dependencies = {}) {
       backupPath: installation?.backupPath || null,
       release: candidate.release,
       watchdog: installation?.watchdog || null,
+      authorityHost,
     };
   } catch (error) {
     if (installation?.backupPath && error && typeof error === "object") {
