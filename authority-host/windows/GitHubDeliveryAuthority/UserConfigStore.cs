@@ -25,7 +25,7 @@ internal static class UserConfigStore
             var root = document.RootElement;
             if (root.GetProperty("schemaVersion").GetInt32() != 1) throw new InvalidOperationException("github_delivery_config_schema_version_unsupported");
             var mode = root.GetProperty("authorityMode").GetString() ?? "";
-            if (mode is not ("off" or "high-assurance" or "all")) throw new InvalidOperationException("github_delivery_config_authority_mode_invalid");
+            ValidateMode(mode);
             return new DeliveryUserConfig(1, mode);
         }
         catch (JsonException error)
@@ -34,11 +34,39 @@ internal static class UserConfigStore
         }
     }
 
+    public static DeliveryUserConfig WriteAuthorityMode(string mode)
+    {
+        ValidateMode(mode);
+        var config = new DeliveryUserConfig(1, mode);
+        var directory = Path.GetDirectoryName(ConfigPath);
+        if (string.IsNullOrWhiteSpace(directory)) throw new InvalidOperationException("github_delivery_config_path_invalid");
+        Directory.CreateDirectory(directory);
+
+        var temporaryPath = $"{ConfigPath}.{Environment.ProcessId}.{Guid.NewGuid():N}.tmp";
+        var json = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true }) + Environment.NewLine;
+        File.WriteAllText(temporaryPath, json);
+        try
+        {
+            File.Move(temporaryPath, ConfigPath, true);
+        }
+        finally
+        {
+            if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
+        }
+        return config;
+    }
+
     public static string DisplayMode(string mode) => mode switch
     {
-        "off" => "Hello off",
+        "off" => "Off",
         "high-assurance" => "Sensitive actions",
-        "all" => "Hello on",
+        "all" => "Every GitHub write",
         _ => "Invalid configuration",
     };
+
+    private static void ValidateMode(string mode)
+    {
+        if (mode is not ("off" or "high-assurance" or "all"))
+            throw new InvalidOperationException("github_delivery_config_authority_mode_invalid");
+    }
 }
