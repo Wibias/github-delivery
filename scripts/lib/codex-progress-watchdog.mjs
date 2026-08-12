@@ -1,3 +1,4 @@
+import { createProgressWatchdog } from "./agent-progress-watchdog.mjs";
 import {
   classifyAppServerItem,
   isSuccessfulAppServerItem,
@@ -19,6 +20,13 @@ const RUNTIME_WORK_ITEM_TYPES = new Set([
   "webSearch",
   "imageView",
 ]);
+
+const FINALIZATION_WATCHDOG_OPTIONS = Object.freeze({
+  generatedCharSoftLimit: 40_000,
+  generatedCharHardLimit: 64_000,
+  noProgressTokenSoftLimit: 12_000,
+  noProgressTokenHardLimit: 16_000,
+});
 
 export function isCodexGeneratedTextMethod(method) {
   return GENERATED_TEXT_METHODS.has(String(method || ""));
@@ -59,6 +67,25 @@ function maybeInterrupt(decision, params, context) {
   };
 }
 
+function planIsComplete(plan) {
+  return (
+    Array.isArray(plan) &&
+    plan.length > 0 &&
+    plan.every((entry) => String(entry?.status || "").toLowerCase() === "completed")
+  );
+}
+
+function finalizationWatchdog(context) {
+  if (!context.finalizationWatchdog) {
+    context.finalizationWatchdog = createProgressWatchdog(FINALIZATION_WATCHDOG_OPTIONS);
+  }
+  return context.finalizationWatchdog;
+}
+
+function activeTextWatchdog(watchdog, context) {
+  return context.finalizing ? finalizationWatchdog(context) : watchdog;
+}
+
 export function observeCodexAppServerMessage(watchdog, message, context = {}) {
   if (!watchdog || typeof watchdog.observeAssistantDelta !== "function") {
     throw new Error("watchdog is required");
@@ -68,12 +95,14 @@ export function observeCodexAppServerMessage(watchdog, message, context = {}) {
 
   const { method, params = {} } = message;
   if (isCodexGeneratedTextMethod(method)) {
-    const decision = watchdog.observeAssistantDelta(params.delta || "");
+    const decision = activeTextWatchdog(watchdog, context).observeAssistantDelta(params.delta || "");
     return maybeInterrupt(decision, params, context);
   }
 
   if (method === "thread/tokenUsage/updated") {
-    const decision = watchdog.observeTokenUsage(generatedOutputTokens(params));
+    const decision = activeTextWatchdog(watchdog, context).observeTokenUsage(
+      generatedOutputTokens(params),
+    );
     return maybeInterrupt(decision, params, context);
   }
 
@@ -84,6 +113,14 @@ export function observeCodexAppServerMessage(watchdog, message, context = {}) {
 
   if (method === "turn/plan/updated") {
     watchdog.observePlanProgress(params.plan || []);
+    const complete = planIsComplete(params.plan);
+    if (complete && !context.finalizing) {
+      context.finalizing = true;
+      context.finalizationWatchdog = createProgressWatchdog(FINALIZATION_WATCHDOG_OPTIONS);
+    } else if (!complete && context.finalizing) {
+      context.finalizing = false;
+      context.finalizationWatchdog = null;
+    }
     return { decision: { action: "allow" } };
   }
 
@@ -91,6 +128,8 @@ export function observeCodexAppServerMessage(watchdog, message, context = {}) {
     const item = params.item;
     if (RUNTIME_WORK_ITEM_TYPES.has(String(item?.type || ""))) {
       watchdog.recordToolStart({ type: item.type, id: item.id || null });
+      context.finalizing = false;
+      context.finalizationWatchdog = null;
     }
     const classification = classifyAppServerItem(item);
     if (classification.kind === "evidence") {
@@ -122,6 +161,8 @@ export function observeCodexAppServerMessage(watchdog, message, context = {}) {
 
   if (method === "turn/completed" && params.turn?.id) {
     context.interruptedTurns.delete(params.turn.id);
+    context.finalizing = false;
+    context.finalizationWatchdog = null;
   }
 
   return { decision: { action: "allow" } };

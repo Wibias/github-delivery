@@ -34,12 +34,13 @@
   },
   "scripts": {
     "test": "node --test \"tests/unit/*.test.mjs\"",
+    "reliability:gate": "node --test tests/unit/reliability-regression-gate.test.mjs",
     "evals:offline": "node scripts/validate-evals.mjs",
     "evals:behavioural:compare": "node scripts/compare-behavioural-evals.mjs",
     "build:dist": "node scripts/build-dist.mjs",
     "dist:check": "node scripts/build-dist.mjs --verify-reproducible",
     "package:check": "node scripts/validate-npm-package.mjs",
-    "check": "node scripts/check-syntax.mjs && node scripts/policy-bundle.mjs --validate && node scripts/pre-open-gate.mjs --self-test && npm run security:repo && npm run dist:check && npm run package:check && npm run evals:offline && npm test",
+    "check": "node scripts/check-syntax.mjs && node scripts/policy-bundle.mjs --validate && node scripts/pre-open-gate.mjs --self-test && npm run security:repo && npm run dist:check && npm run package:check && npm run evals:offline && npm run reliability:gate && npm test",
     "release:prepare": "node scripts/prepare-release.mjs",
     "security:repo": "node scripts/validate-repository-security.mjs"
   }

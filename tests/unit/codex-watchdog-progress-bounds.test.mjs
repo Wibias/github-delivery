@@ -12,7 +12,7 @@ function router(options = {}) {
       generatedCharSoftLimit: 80,
       generatedCharHardLimit: 160,
       toolEmissionIntentThreshold: 3,
-      protocolArtifactThreshold: 3,
+      protocolArtifactThreshold: 2,
       ...options,
     },
   });
