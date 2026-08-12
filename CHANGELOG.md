@@ -95,6 +95,12 @@ All notable changes to `github-delivery` are documented here.
   the TLDR; a comment failing the gate must be repaired, never marked
   published.
 
+## [0.5.1] - 2026-08-12
+
+### Added
+
+- Version Bump
+
 ## [0.5.0] - 2026-08-12
 
 ### Added
