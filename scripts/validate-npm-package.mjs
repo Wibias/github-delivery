@@ -14,6 +14,8 @@ const RUNTIME_FILES = [
   "scripts/github-delivery-cli.mjs",
   "scripts/install-codex-watchdog-hooks.mjs",
   "scripts/install-skill.mjs",
+  "scripts/lib/authority-host-install.mjs",
+  "scripts/lib/authority-host-release.mjs",
   "scripts/lib/bootstrap-cli.mjs",
   "scripts/lib/bootstrap-command.mjs",
   "scripts/lib/bootstrap-install.mjs",
