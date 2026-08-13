@@ -15,6 +15,8 @@ import {
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { gzipSync } from "node:zlib";
 
+import { inspectLegacyManifestlessInstallation } from "./bootstrap-cli.mjs";
+
 const ROOT_FILES = [
   "SKILL.md",
   "README.md",
@@ -374,7 +376,13 @@ function installedPackage(path) {
   return value;
 }
 
-export function planInstallation({ source, target, allowDowngrade = false, force = false } = {}) {
+export function planInstallation({
+  source,
+  target,
+  allowDowngrade = false,
+  force = false,
+  legacyManifestlessMigration = false,
+} = {}) {
   source = resolve(source);
   target = resolve(target);
   const sourcePackage = installedPackage(source);
@@ -385,6 +393,19 @@ export function planInstallation({ source, target, allowDowngrade = false, force
   let targetPackage;
   try { targetPackage = installedPackage(target); } catch { return { action: "conflict", allowed: false, source, target, sourceVersion: sourcePackage.version, targetVersion: null }; }
   const comparison = compareVersions(sourcePackage.version, targetPackage.version);
+
+  if (legacyManifestlessMigration) {
+    const legacy = inspectLegacyManifestlessInstallation({ target });
+    const sourceManaged = existsSync(join(source, "manifest.json"));
+    if (!legacy || legacy.version !== targetPackage.version || !sourceManaged) {
+      return { action: "conflict", allowed: false, source, target, sourceVersion: sourcePackage.version, targetVersion: targetPackage.version };
+    }
+    if (comparison < 0) {
+      return { action: "downgrade", allowed: false, source, target, sourceVersion: sourcePackage.version, targetVersion: targetPackage.version };
+    }
+    return { action: "migrate-legacy", allowed: true, source, target, sourceVersion: sourcePackage.version, targetVersion: targetPackage.version };
+  }
+
   if (comparison > 0) return { action: "upgrade", allowed: true, source, target, sourceVersion: sourcePackage.version, targetVersion: targetPackage.version };
   if (comparison < 0) return { action: "downgrade", allowed: allowDowngrade, source, target, sourceVersion: sourcePackage.version, targetVersion: targetPackage.version };
   const differences = compareDirectories(source, target);
@@ -394,8 +415,21 @@ export function planInstallation({ source, target, allowDowngrade = false, force
   return { action: "same-version", allowed: false, unchanged: false, source, target, sourceVersion: sourcePackage.version, targetVersion: targetPackage.version, differences };
 }
 
-export function applyInstallation({ source, target, backupRoot, allowDowngrade = false, force = false } = {}) {
-  const plan = planInstallation({ source, target, allowDowngrade, force });
+export function applyInstallation({
+  source,
+  target,
+  backupRoot,
+  allowDowngrade = false,
+  force = false,
+  legacyManifestlessMigration = false,
+} = {}) {
+  const plan = planInstallation({
+    source,
+    target,
+    allowDowngrade,
+    force,
+    legacyManifestlessMigration,
+  });
   if (!plan.allowed) throw new Error(`installation is not allowed: ${plan.action}`);
   if (plan.action === "same-version" && plan.unchanged === true) {
     return {
