@@ -4,6 +4,7 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 
 const PUBLIC_COMMANDS = new Set(["install", "setup", "update", "doctor"]);
+const SUPPORTED_NODE_MAJORS = new Set([22, 24, 26]);
 const VERSION_PATTERN = /^\d+\.\d+\.\d+$/;
 
 function fail(code) {
@@ -62,6 +63,7 @@ export function parseBootstrapArgs(argv = []) {
   let apply = false;
   let target = null;
   let help = false;
+  let json = false;
   let index = 0;
 
   if (values[0] === "help" || values[0] === "--help" || values[0] === "-h") {
@@ -81,6 +83,9 @@ export function parseBootstrapArgs(argv = []) {
     } else if (arg === "--apply") {
       if (command !== "update") fail("bootstrap_apply_update_only");
       apply = true;
+    } else if (arg === "--json") {
+      if (command !== "doctor") fail("bootstrap_json_doctor_only");
+      json = true;
     } else if (arg === "--target") {
       const value = values[++index];
       if (!value || value.startsWith("--")) fail("bootstrap_target_missing");
@@ -90,7 +95,9 @@ export function parseBootstrapArgs(argv = []) {
     }
   }
 
-  return { command, apply, target, help };
+  const result = { command, apply, target, help };
+  if (json) result.json = true;
+  return result;
 }
 
 export function checkBootstrapEnvironment({
@@ -99,7 +106,7 @@ export function checkBootstrapEnvironment({
 } = {}) {
   const version = String(nodeVersion || "").replace(/^v/, "");
   const major = Number(version.split(".")[0]);
-  const node = { ok: major === 22 || major === 24, version };
+  const node = { ok: SUPPORTED_NODE_MAJORS.has(major), version };
   const git = runProbe(spawn, "git", ["--version"]);
   const gh = runProbe(spawn, "gh", ["--version"]);
   const ghAuth = gh.ok

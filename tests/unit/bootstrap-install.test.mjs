@@ -33,6 +33,13 @@ const AUTHORITY_NOOP = Object.freeze({
 
 function dependencies(overrides = {}) {
   return {
+    checkBootstrapEnvironment: () => ({
+      ok: true,
+      node: { ok: true, version: "24.0.0" },
+      git: { ok: true, detail: "git available" },
+      gh: { ok: true, detail: "gh available" },
+      ghAuth: { ok: true, detail: "logged in" },
+    }),
     makeWorkspace: () => "/tmp/github-delivery-bootstrap-test",
     removeWorkspace() {},
     discoverInstallations: () => [],

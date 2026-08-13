@@ -12,7 +12,7 @@ import {
   readInstalledManifest,
 } from "./stable-release-update.mjs";
 import { readUserConfig } from "./user-config.mjs";
-import { discoverInstallations } from "./bootstrap-cli.mjs";
+import { checkBootstrapEnvironment, discoverInstallations } from "./bootstrap-cli.mjs";
 
 function fail(code) {
   throw new Error(code);
@@ -83,6 +83,18 @@ export async function confirmApply(
   return /^(?:y|yes)$/i.test(String(answer ?? "").trim());
 }
 
+function renderEnvironmentCheck(environment, output) {
+  if (!output || typeof output.write !== "function") return;
+  output.write("\nEnvironment check\n");
+  const nodeVersion = environment?.node?.version || "unknown";
+  output.write(environment?.node?.ok
+    ? `  Node.js ${nodeVersion}: supported\n`
+    : `  Node.js ${nodeVersion}: not supported (supported majors: 22, 24, 26)\n`);
+  output.write(`  Git: ${environment?.git?.ok ? "available" : "unavailable"}\n`);
+  output.write(`  GitHub CLI: ${environment?.gh?.ok ? "available" : "unavailable"}\n`);
+  output.write(`  GitHub authentication: ${environment?.ghAuth?.ok ? "ready" : "not ready"}\n\n`);
+}
+
 function renderPlan(plan, output) {
   if (!output || typeof output.write !== "function") return;
   const version = plan.sourceVersion || plan.release?.version || "unknown";
@@ -93,6 +105,31 @@ function renderPlan(plan, output) {
     output.write("  Codex watchdog hooks: configure\n");
   }
   output.write("\n");
+}
+
+function renderProtectionPostflight(watchdog, output) {
+  if (!output || typeof output.write !== "function") return;
+  const mode = watchdog?.mode || "none";
+  output.write("\nRuntime protection\n");
+  if (mode === "stream") {
+    output.write("  Loop interruption: active (protected stream)\n\n");
+    return;
+  }
+  if (mode === "hooks") {
+    output.write("  Codex hooks: active\n");
+    output.write("  Streaming loop interruption: not active\n\n");
+    return;
+  }
+
+  output.write("  LOOP INTERRUPTION NOT ACTIVE\n");
+  if (watchdog?.hookTrustRequired === true || (watchdog?.hooksConfigured === true && watchdog?.hookTrustVerified !== true)) {
+    output.write("  Codex hooks are installed but still require trust.\n");
+    output.write("  Action required:\n");
+    output.write("    1. Open /hooks in Codex and review/trust the GitHub Delivery hooks.\n");
+    output.write("    2. Run: npx github-delivery setup\n\n");
+    return;
+  }
+  output.write("  Run: npx github-delivery setup\n\n");
 }
 
 export async function runGuidedInstall({
@@ -108,6 +145,11 @@ export async function runGuidedInstall({
   const discover = dependencies.discoverInstallations || discoverInstallations;
   const found = discover({ explicitTarget: target });
   if (found.some((entry) => entry.valid === true)) fail("bootstrap_install_existing");
+
+  const checkEnvironment = dependencies.checkBootstrapEnvironment || checkBootstrapEnvironment;
+  const environment = checkEnvironment();
+  renderEnvironmentCheck(environment, output);
+  if (!environment?.ok) fail("bootstrap_environment_invalid");
 
   const make = dependencies.makeWorkspace || makeWorkspace;
   const remove = dependencies.removeWorkspace || removeWorkspace;
@@ -173,6 +215,7 @@ export async function runGuidedInstall({
       expectedRelease: payload.release,
       scriptPath: join(target, "authority-host", "windows", "install-release.ps1"),
     });
+    renderProtectionPostflight(installation?.watchdog, output);
 
     return {
       action: "install",
