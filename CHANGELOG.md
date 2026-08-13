@@ -256,8 +256,8 @@ All notable changes to `github-delivery` are documented here.
   The protected launcher terminates its Codex process tree rather than
   continuing under a false `stream` protection claim.
 - Hardened watchdog state storage against predictable temp-path redirection and
-  symlink/unowned path attacks without persisting prompts, conversations, bearer
-  tokens, or raw tool inputs/outputs.
+  symlink/unowned path attacks without persisting prompts, assistant text, raw
+  tool inputs/outputs, bearer tokens, or repository secrets.
 
 ## [0.3.0] - 2026-08-11
 
