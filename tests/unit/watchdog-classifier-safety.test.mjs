@@ -95,3 +95,36 @@ test("GitHub Delivery owned evidence helpers are classified explicitly", () => {
     assert.equal(classify(command).kind, "evidence", command);
   }
 });
+
+test("Bun validation commands count as execution progress while dev does not", () => {
+  const executionCommands = [
+    "bun test",
+    "bun test tests/unit/watchdog-classifier-safety.test.mjs",
+    "bun run test",
+    "bun run check",
+    "bun run lint",
+    "bun run lint:gui",
+    "bun run build",
+    "bun run build:gui",
+    "bun run typecheck",
+    "bun run verify",
+  ];
+
+  for (const command of executionCommands) {
+    assert.equal(classify(command).kind, "execution", command);
+  }
+
+  assert.equal(classify("bun run dev").kind, "neutral");
+});
+
+test("PowerShell assignment-prefixed reads from real incidents are evidence", () => {
+  const commands = [
+    "$c=Get-Content -LiteralPath 'C:\\repo\\src\\component.ts'; $c[430..565]",
+    "$c = Get-Content -LiteralPath 'C:\\repo\\src\\component.ts'; $c[65..95]",
+    "$lines=Get-Content 'C:\\repo\\tests\\component.test.ts'; $lines[1..70]",
+  ];
+
+  for (const command of commands) {
+    assert.equal(classify(command).kind, "evidence", command);
+  }
+});

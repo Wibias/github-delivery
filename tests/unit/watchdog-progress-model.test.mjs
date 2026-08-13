@@ -190,3 +190,147 @@ test("shared classifier is conservative about progress", () => {
   assert.equal(classifyAppServerItem({ type: "fileChange" }).kind, "state-change");
   assert.equal(classifyAppServerItem({ type: "reasoning" }).kind, "neutral");
 });
+
+test("incident: OpenCodex GUI read exploration warns at 8 and blocks the 12th evidence read", () => {
+  const commands = [
+    "$c=Get-Content -LiteralPath 'C:\\repo\\gui\\src\\pages\\dashboard-overview-sections.tsx'; $c[430..565]",
+    "$c=Get-Content -LiteralPath 'C:\\repo\\gui\\src\\pages\\dashboard-overview-sections.tsx'; $c[545..630]",
+    "Select-String -Path 'C:\\repo\\gui\\src\\pages\\dashboard-shared.ts' -Pattern 'visionEnabledPatch|SidecarPatch'",
+    "$c=Get-Content -LiteralPath 'C:\\repo\\gui\\src\\pages\\dashboard-shared.ts'; $c[65..95]",
+    "$c=Get-Content -LiteralPath 'C:\\repo\\gui\\src\\pages\\dashboard-shared.ts'; $c[190..260]",
+    "Get-ChildItem -LiteralPath 'C:\\repo\\gui\\src\\i18n' -Filter '*.ts' | Select-Object -ExpandProperty Name",
+    "Select-String -Path 'C:\\repo\\gui\\src\\i18n\\catalogs.ts' -Pattern 'dash.sidecarModel'",
+    "Select-String -Path 'C:\\repo\\gui\\src\\i18n\\en.ts' -Pattern 'dash.visionSidecar'",
+    "Get-ChildItem -Recurse -LiteralPath 'C:\\repo\\gui\\src' -Filter '*.ts*' | Where-Object { $_.Name -match 'ui' }",
+    "$c=Get-Content -LiteralPath 'C:\\repo\\gui\\src\\ui.tsx'; $c[1..40]",
+    "Select-String -Path 'C:\\repo\\gui\\tests\\vision-sidecar-dashboard.test.tsx' -Pattern '^test\\('",
+    "$c=Get-Content -LiteralPath 'C:\\repo\\gui\\tests\\vision-sidecar-dashboard.test.tsx'; $c[204..248]",
+  ];
+
+  let state = {};
+  const options = {
+    evidenceSoftLimit: 8,
+    evidenceHardLimit: 12,
+  };
+
+  for (let index = 0; index < commands.length; index += 1) {
+    const command = commands[index];
+
+    const pre = evaluateCodexHook(
+      {
+        hook_event_name: "PreToolUse",
+        session_id: "opencodex-gui-session",
+        turn_id: "opencodex-gui-turn",
+        tool_name: "Bash",
+        tool_input: { command },
+      },
+      state,
+      {
+        ...options,
+        now: 1_000 + index * 100,
+      },
+    );
+
+    if (index < 7) {
+      assert.equal(pre.output, null, `unexpected intervention at read ${index + 1}`);
+    } else if (index === 7) {
+      assert.equal(pre.output?.decision, undefined);
+      assert.equal(pre.output?.hookSpecificOutput?.hookEventName, "PreToolUse");
+      assert.match(
+        pre.output?.hookSpecificOutput?.additionalContext || "",
+        /evidence|synthesi[sz]e/i,
+      );
+    } else if (index < 11) {
+      assert.equal(pre.output, null, `unexpected intervention at read ${index + 1}`);
+    } else {
+      assert.equal(pre.output?.decision, "block");
+      assert.match(pre.output?.reason || "", /budget exhausted/i);
+      break;
+    }
+
+    state = pre.state;
+
+    const post = evaluateCodexHook(
+      {
+        hook_event_name: "PostToolUse",
+        session_id: "opencodex-gui-session",
+        turn_id: "opencodex-gui-turn",
+        tool_name: "Bash",
+        tool_input: { command },
+        tool_response: "ok",
+      },
+      state,
+      {
+        ...options,
+        now: 1_050 + index * 100,
+      },
+    );
+
+    state = post.state;
+  }
+});
+
+test("incident: Bun validation resets the OpenCodex evidence streak", () => {
+  let state = {};
+  const options = {
+    evidenceSoftLimit: 8,
+    evidenceHardLimit: 12,
+  };
+
+  for (let index = 0; index < 7; index += 1) {
+    const command =
+      `$c=Get-Content -LiteralPath 'C:\\repo\\before-${index}.ts'; $c[1..20]`;
+
+    const pre = evaluateCodexHook(
+      {
+        hook_event_name: "PreToolUse",
+        session_id: "opencodex-bun-session",
+        turn_id: "opencodex-bun-turn",
+        tool_name: "Bash",
+        tool_input: { command },
+      },
+      state,
+      { ...options, now: 1_000 + index * 100 },
+    );
+
+    assert.equal(pre.output, null);
+    state = pre.state;
+  }
+
+  const execution = evaluateCodexHook(
+    {
+      hook_event_name: "PostToolUse",
+      session_id: "opencodex-bun-session",
+      turn_id: "opencodex-bun-turn",
+      tool_name: "Bash",
+      tool_input: { command: "bun run typecheck" },
+      tool_response: "ok",
+    },
+    state,
+    { ...options, now: 2_000 },
+  );
+
+  state = execution.state;
+
+  assert.equal(state.watchdog.consecutiveEvidenceAttempts, 0);
+
+  for (let index = 0; index < 7; index += 1) {
+    const command =
+      `$c=Get-Content -LiteralPath 'C:\\repo\\after-${index}.ts'; $c[1..20]`;
+
+    const pre = evaluateCodexHook(
+      {
+        hook_event_name: "PreToolUse",
+        session_id: "opencodex-bun-session",
+        turn_id: "opencodex-bun-turn",
+        tool_name: "Bash",
+        tool_input: { command },
+      },
+      state,
+      { ...options, now: 3_000 + index * 100 },
+    );
+
+    assert.equal(pre.output, null, `unexpected intervention after Bun at read ${index + 1}`);
+    state = pre.state;
+  }
+});

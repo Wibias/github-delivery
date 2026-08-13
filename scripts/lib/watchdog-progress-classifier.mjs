@@ -7,7 +7,8 @@ const DELEGATE_NAME = /(?:^|__|_)(agent|spawn_agent|delegate|collab)(?:_|$)/i;
 const EXPLICIT_SHELL_WRITE = /\b(?:set-content|add-content|out-file|clear-content|new-item|remove-item|move-item|copy-item|rename-item)\b/i;
 const GIT_WRITE = /\bgit(?:\.exe)?(?:\s+-C\s+(?:"[^"]+"|'[^']+'|\S+))?\s+(?:commit|push|merge|rebase|checkout|switch|reset|restore|clean|add|rm|mv)\b/i;
 const GIT_READ = /(?:^|[;|&(]\s*|\s)git(?:\.exe)?(?:\s+-C\s+(?:"[^"]+"|'[^']+'|\S+))?\s+(?:status|diff|log|show|branch|rev-parse)\b/i;
-const POWERSHELL_READ = /(?:^|[;|&(]\s*)(?:get-content|get-childitem|select-string|rg|grep|cat|head|tail|findstr|type|ls|dir|pwd)\b/i;
+const POWERSHELL_READ =
+  /(?:^|[;|&(]\s*|\$[A-Za-z_][\w:]*\s*=\s*)(?:get-content|get-childitem|select-string|rg|grep|cat|head|tail|findstr|type|ls|dir|pwd)\b/i;
 
 function commandText(command) {
   if (Array.isArray(command)) return command.join(" ");
@@ -85,7 +86,7 @@ function classifyCommand(command) {
   }
 
   if (
-    /(?:^|[;&|]\s*|\b)(?:npm|pnpm|yarn)\s+(?:test|run\s+(?:test|check|lint|build|typecheck|verify))\b|\b(?:node\s+--test|pytest|cargo\s+(?:test|check|build|clippy)|go\s+test|dotnet\s+(?:test|build)|mvn\s+test|gradle\s+test)\b/i.test(
+    /(?:^|[;&|]\s*|\b)(?:bun|npm|pnpm|yarn)\s+(?:test|run\s+(?:test|check|lint|build|typecheck|verify)(?::[\w.-]+)?)\b|\b(?:node\s+--test|pytest|cargo\s+(?:test|check|build|clippy)|go\s+test|dotnet\s+(?:test|build)|mvn\s+test|gradle\s+test)\b/i.test(
       value,
     )
   ) {
