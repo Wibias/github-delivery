@@ -315,7 +315,11 @@ export async function runInstallCommand(options, dependencies = {}) {
         authorityHost,
       };
     }
-    if (candidate.plan.action !== "update" || candidate.plan.safeToReplace !== true) {
+
+    const legacyMigration = candidate.plan.action === "migrate_legacy"
+      && candidate.plan.legacyManifestless === true
+      && candidate.plan.migrationAllowed === true;
+    if (!legacyMigration && (candidate.plan.action !== "update" || candidate.plan.safeToReplace !== true)) {
       throw new Error(`stable_release_update_blocked:${candidate.plan.action || "invalid"}`);
     }
 
@@ -327,6 +331,7 @@ export async function runInstallCommand(options, dependencies = {}) {
       apply: true,
       allowDowngrade: false,
       force: false,
+      legacyManifestlessMigration: legacyMigration,
     });
 
     verifyRelease({ target: options.target, manifest: candidate.manifest });
@@ -341,7 +346,7 @@ export async function runInstallCommand(options, dependencies = {}) {
     });
 
     return {
-      action: "update",
+      action: legacyMigration ? "migrate_legacy" : "update",
       apply: true,
       updated: true,
       verified: true,
