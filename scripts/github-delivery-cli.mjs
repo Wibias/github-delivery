@@ -21,6 +21,7 @@ function renderDoctor(result, stdout) {
   const integrity = result?.integrity?.ok
     ? (result.integrity.clean ? "Clean" : "Modified")
     : "Unknown";
+  const legacyManifestless = result?.installed?.legacyManifestless === true;
 
   stdout.write("GitHub Delivery Doctor\n\n");
   stdout.write("Skill\n");
@@ -28,6 +29,12 @@ function renderDoctor(result, stdout) {
   stdout.write(`  Latest       ${latestVersion}${result?.latest?.relation ? ` (${result.latest.relation})` : ""}\n`);
   stdout.write(`  Integrity    ${integrity}\n`);
   if (result?.target) stdout.write(`  Target       ${result.target}\n`);
+  if (legacyManifestless) {
+    stdout.write("  Legacy       manifest missing; previous file integrity is unknown\n");
+    if (["update", "already_current"].includes(result?.latest?.relation)) {
+      stdout.write("  Migration    available: npx github-delivery update --apply\n");
+    }
+  }
 
   stdout.write("\nEnvironment\n");
   const nodeVersion = value(environment?.node?.version);
