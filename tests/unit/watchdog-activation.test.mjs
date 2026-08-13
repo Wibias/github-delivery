@@ -102,6 +102,29 @@ test("verified unchanged hook definitions can be persisted as active without rei
   assert.equal(persisted.hookTrustVerified, true);
 });
 
+test("normal reinstall preserves an existing verified trust receipt when hook definitions are unchanged", () => {
+  const f = fixture();
+  const first = runInstall(f, ["--lifecycle-hooks-supported", "--apply"]);
+  assert.equal(first.status, 0, first.stderr);
+
+  const afterTrust = runInstall(f, [
+    "--lifecycle-hooks-supported",
+    "--hook-trust-verified",
+    "--apply",
+  ]);
+  assert.equal(afterTrust.status, 0, afterTrust.stderr);
+  assert.equal(JSON.parse(afterTrust.stdout).watchdog.hookTrustVerified, true);
+
+  const reinstall = runInstall(f, ["--lifecycle-hooks-supported", "--apply"]);
+  assert.equal(reinstall.status, 0, reinstall.stderr);
+  const result = JSON.parse(reinstall.stdout);
+  assert.equal(result.watchdog.mode, "hooks");
+  assert.equal(result.watchdog.degradationReason, "streaming_interruption_unavailable");
+  assert.equal(result.watchdog.hookTrustVerified, true);
+  assert.equal(result.watchdog.hookTrustRequired, false);
+  assert.equal(result.watchdog.receiptChanged, false);
+});
+
 test("a hook definition change invalidates a claimed trust state", () => {
   const f = fixture();
   const result = runInstall(f, [
