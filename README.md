@@ -69,7 +69,7 @@ The npm package is only the bootstrap. The installed skill payload still comes f
 
 On supported Windows systems, stable GitHub Releases also carry a **separately verified, self-contained Authority host component** built from the same tagged commit. Managed setup/update can install or repair that component without a local .NET SDK. It is not silently installed for a user whose protection mode is `off` and who has never installed Authority.
 
-On a fresh machine, the guided flow installs the verified release and then walks through any remaining host setup. With an existing valid installation, it offers **Update / Repair setup / Exit** rather than silently reinstalling or updating. If loop interruption is still inactive after install/setup, the CLI prints a prominent postflight warning with the concrete remediation: review/trust the GitHub Delivery definitions in `/hooks`, then rerun `npx github-delivery setup`.
+On a fresh machine, the guided flow installs the verified release and then walks through any remaining host setup. With an existing valid installation, it offers **Update / Repair setup / Exit** rather than silently reinstalling or updating. If loop interruption is still inactive after a guided install, the CLI prints a prominent postflight warning with the concrete remediation: review/trust the GitHub Delivery definitions in `/hooks`, then rerun `npx github-delivery setup`.
 
 Explicit commands are also available:
 
