@@ -92,6 +92,60 @@ test("lifecycle create ignores forged marker records and verifies the exact crea
   assert.equal(result.verification.number, 88);
 });
 
+test("create_pr idempotency lookup is bounded to the head branch", () => {
+  const key = "pr-key";
+  let lookupCommand = null;
+  let createdBody = null;
+  let created = false;
+
+  const result = executeLifecycleMutationRequest({
+    request: {
+      schemaVersion: 1,
+      action: "create_pr",
+      mutationMode: "maintainer",
+      explicitInstruction: true,
+      repo: "acme/widgets",
+      base: "main",
+      head: "feature/x",
+      title: "Add feature",
+      body: "Body",
+      idempotencyKey: key,
+    },
+    execute: true,
+    runner(command, args) {
+      if (command === "gh" && args[0] === "api" && String(args[1]).includes("/pulls?state=all")) {
+        lookupCommand = args.join(" ");
+        const exactPr = created
+          ? [{
+              id: 99,
+              number: 99,
+              user: { login: "agent" },
+              title: "Add feature",
+              base: { ref: "main" },
+              head: { ref: "feature/x", label: "acme:feature/x" },
+              body: createdBody,
+              html_url: "https://github.test/acme/widgets/pull/99",
+            }]
+          : [];
+        return { status: 0, stdout: JSON.stringify([exactPr]), stderr: "" };
+      }
+      if (command === "gh" && args[0] === "api" && args[1] === "user") {
+        return { status: 0, stdout: "agent\n", stderr: "" };
+      }
+      if (command === "gh" && args[0] === "pr" && args[1] === "create") {
+        created = true;
+        createdBody = args[args.indexOf("--body") + 1];
+        return { status: 0, stdout: "https://github.test/acme/widgets/pull/99\n", stderr: "" };
+      }
+      throw new Error(`unexpected command: ${command} ${args.join(" ")}`);
+    },
+  });
+
+  assert.ok(lookupCommand, "expected a head-filtered idempotency lookup");
+  assert.match(lookupCommand, /head=feature%2Fx/);
+  assert.equal(result.status, "succeeded");
+});
+
 test("social mutation ignores a forged marker from another GitHub actor", () => {
   const key = "comment-key";
   const marker = idempotencyMarker(key);
