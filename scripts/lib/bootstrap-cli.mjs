@@ -57,6 +57,48 @@ function parseInstalledManifest(raw) {
   return manifest;
 }
 
+function skillFrontmatterNamesGitHubDelivery(raw) {
+  const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(String(raw || ""));
+  return Boolean(match && /^name:\s*github-delivery\s*$/m.test(match[1]));
+}
+
+export function inspectLegacyManifestlessInstallation({
+  target,
+  exists = existsSync,
+  readFile = readFileSync,
+} = {}) {
+  if (!target) return null;
+  target = resolve(target);
+  if (exists(join(target, "manifest.json"))) return null;
+
+  const packagePath = join(target, "package.json");
+  const skillPath = join(target, "SKILL.md");
+  const installerPath = join(target, "scripts", "install-skill.mjs");
+  if (!exists(packagePath) || !exists(skillPath) || !exists(installerPath)) return null;
+
+  let packageJson;
+  let skill;
+  try {
+    packageJson = JSON.parse(readFile(packagePath, "utf8"));
+    skill = readFile(skillPath, "utf8");
+  } catch {
+    return null;
+  }
+
+  if (
+    !packageJson
+    || typeof packageJson !== "object"
+    || Array.isArray(packageJson)
+    || packageJson.name !== "github-delivery"
+    || !VERSION_PATTERN.test(packageJson.version || "")
+    || !skillFrontmatterNamesGitHubDelivery(skill)
+  ) {
+    return null;
+  }
+
+  return { target, version: packageJson.version };
+}
+
 export function parseBootstrapArgs(argv = []) {
   const values = [...argv];
   let command = "guided";
@@ -146,7 +188,17 @@ export function discoverInstallations({
 
     const manifestPath = join(target, "manifest.json");
     if (!exists(manifestPath)) {
-      if (explicitTarget) {
+      const legacy = inspectLegacyManifestlessInstallation({ target, exists, readFile });
+      if (legacy) {
+        installations.push({
+          target,
+          valid: false,
+          migratable: true,
+          legacy: true,
+          version: legacy.version,
+          reason: "legacy_manifestless",
+        });
+      } else if (explicitTarget) {
         installations.push({ target, valid: false, version: null, reason: "missing_manifest" });
       }
       continue;
