@@ -4,6 +4,20 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-08-13
+
+### Added
+
+- Safe migration for genuine legacy manifestless installations (PR #240). Recognized pre-manifest GitHub Delivery targets are identified through multiple identity markers, reported with explicitly unknown prior file integrity, and can migrate through the normal verified stable `update` path. Migration requires an already-verified release candidate, never downgrades, backs up the entire previous target before replacement, installs the manifest-backed payload, and keeps `setup` restricted to managed installations until migration completes.
+
+### Changed
+
+- Verified Codex hook trust now survives normal reinstalls when the exact hook definitions are unchanged (PR #239). A hook-definition change still invalidates the verified trust receipt. Guided install and `doctor` now describe unverified trust factually and only direct users to `/hooks` when review may actually be needed.
+
+### Fixed
+
+- Closed watchdog classifier gaps exposed by a real OpenCodex GUI task (PR #243). Assignment-prefixed PowerShell reads such as `$c=Get-Content ...` now consume the evidence budget, while Bun validation commands (`bun test` and `bun run test|check|lint|build|typecheck|verify`, including scoped scripts) count as execution progress. Regression coverage pins the warning at the 8th consecutive evidence attempt, the block on the 12th, and the Bun execution reset behavior.
+
 ## [0.5.2] - 2026-08-12
 
 ### Added
