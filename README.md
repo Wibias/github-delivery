@@ -69,7 +69,7 @@ The npm package is only the bootstrap. The installed skill payload still comes f
 
 On supported Windows systems, stable GitHub Releases also carry a **separately verified, self-contained Authority host component** built from the same tagged commit. Managed setup/update can install or repair that component without a local .NET SDK. It is not silently installed for a user whose protection mode is `off` and who has never installed Authority.
 
-On a fresh machine, the guided flow installs the verified release and then walks through any remaining host setup. With an existing valid installation, it offers **Update / Repair setup / Exit** rather than silently reinstalling or updating. If loop interruption is still inactive after a guided install, the CLI prints a prominent postflight warning with the concrete remediation: review/trust the GitHub Delivery definitions in `/hooks`, then rerun `npx github-delivery setup`.
+On a fresh machine, the guided flow installs the verified release and then walks through any remaining host setup. With an existing valid installation, it offers **Update / Repair setup / Exit** rather than silently reinstalling or updating. If loop interruption is still inactive after a guided install, the CLI reports that GitHub Delivery has not verified Codex hook trust for the installation. If the exact unchanged definitions are already trusted in Codex, they do not need to be trusted again; otherwise review them in `/hooks`, then rerun `npx github-delivery setup`.
 
 Explicit commands are also available:
 
@@ -106,6 +106,8 @@ npx github-delivery update --apply
 
 The first command is a dry-run. Self-update accepts only the fixed upstream's latest published stable `vX.Y.Z` GitHub Release and replaces nothing until the release assets, checksums, manifest, exact tag/source commit, constrained GitHub artifact attestation, and strict ZIP extraction all verify. Local tracked modifications block skill replacement even with `--force`; skill downgrades are never performed through `update`.
 
+Recognized pre-manifest GitHub Delivery installations can migrate through this same verified updater. They are accepted only when multiple identity markers match, and the previous installation's file integrity remains explicitly unknown. Migration never downgrades, backs up the entire old target before replacement, and applies only the already-verified stable manifest-backed payload. `setup` remains restricted to managed installations until migration completes.
+
 On Windows, the same update reports the Authority host separately. An already-installed or required stale/legacy Authority host is acquired from its own versioned, attested release asset and kept aligned with the stable skill version. That repair can happen even when the skill itself is already current. If Authority was never installed and protection is `off`, it remains absent; if the installed Authority host is ahead of stable, it is not automatically downgraded.
 
 The compatibility `scripts/update-skill.mjs` command and the installed `node scripts/install-skill.mjs --update` path still forward to the same verified updater. See [`references/update.md`](references/update.md) and [`INSTALL.md`](INSTALL.md).
@@ -126,7 +128,7 @@ For a read-only health report:
 npx github-delivery doctor
 ```
 
-`doctor` is human-readable and actionable by default. It summarizes environment prerequisites, detected installation/version, manifest integrity and local tracked modifications, persistent configuration readability, Codex activation/watchdog state, latest stable version, update relation, and the Windows Authority component without repairing or changing credentials. If loop interruption is inactive, it surfaces a prominent **`LOOP INTERRUPTION NOT ACTIVE`** state with `/hooks` and `github-delivery setup` remediation. Use `npx github-delivery doctor --json` when you need the raw machine-readable report. Authority details include support/install state, version/source commit, whether the effective protection mode requires it, and relations such as `missing`, `legacy`, `update`, `already_current`, or `already_ahead`.
+`doctor` is human-readable and actionable by default. It summarizes environment prerequisites, detected installation/version, manifest integrity and local tracked modifications, persistent configuration readability, Codex activation/watchdog state, latest stable version, update relation, and the Windows Authority component without repairing or changing credentials. Recognized legacy manifestless installations are reported as migratable with prior file integrity explicitly unknown and guidance to use the normal verified `update --apply` path. If loop interruption is inactive, `doctor` reports the unverified hook-trust state without claiming unchanged hooks need to be trusted again, and points to `/hooks` only when review may be needed before `github-delivery setup`. Use `npx github-delivery doctor --json` when you need the raw machine-readable report. Authority details include support/install state, version/source commit, whether the effective protection mode requires it, and relations such as `missing`, `legacy`, `update`, `already_current`, or `already_ahead`.
 
 ### Manual / repository install
 
@@ -153,13 +155,13 @@ Typical skill locations include:
 
 ### Codex progress watchdog
 
-On a detected Codex install, the normal apply path configures GitHub Delivery's lifecycle-hook entries automatically. Codex requires new or changed non-managed hooks to be reviewed and trusted before they run, so open `/hooks`, review the exact GitHub Delivery definitions, and trust them. Then finish/refresh activation through the installed skill with:
+On a detected Codex install, the normal apply path configures GitHub Delivery's lifecycle-hook entries automatically. New or changed non-managed hooks still need to be reviewed and trusted in `/hooks` before they run. Once GitHub Delivery has a verified trust receipt, normal reinstalls preserve it while the exact hook definitions remain unchanged; a definition change invalidates it. Then finish/refresh activation through the installed skill with:
 
 ```bash
 npx github-delivery setup
 ```
 
-Trusted lifecycle hooks use turn-scoped state, keep evidence reads/searches from resetting the no-progress detector, warn after **8 consecutive evidence attempts** without execution/state progress, and deny the **12th** supported evidence attempt until the turn makes real progress. Exact duplicate reads, rapid repeated polls, and supported semantically covered evidence are blocked independently. Successful `PostToolUse` results are never replaced or truncated by the generic watchdog.
+Trusted lifecycle hooks use turn-scoped state, keep evidence reads/searches from resetting the no-progress detector, warn after **8 consecutive evidence attempts** without execution/state progress, and deny the **12th** supported evidence attempt until the turn makes real progress. Exact duplicate reads, rapid repeated polls, and supported semantically covered evidence are blocked independently. Common workflow forms are classified accordingly: assignment-prefixed PowerShell reads such as `$c=Get-Content ...` consume the evidence budget, while Bun validation commands such as `bun test` and `bun run test|check|lint|build|typecheck|verify` count as execution progress and reset the consecutive-evidence streak. Successful `PostToolUse` results are never replaced or truncated by the generic watchdog.
 
 Hooks still cannot interrupt assistant text before a local tool boundary. To stop in-flight narration/tool-emission loops and to bound hosted activity visible through App Server, launch Codex through the installed protected streaming boundary:
 
@@ -570,7 +572,7 @@ The watchdog is deliberately separate from mutation authority. It can interrupt,
 | **Protected Codex stream** | The installed `codex-with-watchdog.mjs` boundary keeps an independent watchdog per turn and shares one detector across agent-message, reasoning-summary, supported raw-reasoning, and plan text. It consumes plan/diff/output-token telemetry, bounds unique generation and tool-emission/protocol stalls, and issues a private `turn/interrupt` when a hard bound is crossed. Required notification or interrupt-contract loss fails closed. |
 | **Workflow controller** | Every routed workflow is locked to an explicit phase graph with checkpointed refs/blockers/evidence/attempts/usage. Only phase/state/blocker/evidence/execution progress resets orchestration no-progress counters; narration changes do not. Phase/workflow retries, evidence actions, tokens, steps and wall time are bounded independently of the per-turn watchdog. |
 
-A configured hook is not automatically an active hook: Codex ties trust to the exact hook definition and skips a new or changed non-managed hook until it is reviewed in `/hooks`. GitHub Delivery records `hook_trust_required` rather than falsely reporting `hooks` in that state. The protected launcher independently marks its own process tree `stream`, so a protected session does not depend on machine-wide activation guesswork. A verified live stream declaration also supersedes stale hook-era degradation metadata.
+A configured hook is not automatically an active hook: Codex ties trust to the exact hook definition and skips a new or changed non-managed hook until it is reviewed in `/hooks`. GitHub Delivery records `hook_trust_required` rather than falsely reporting `hooks` in that state. Once a trust receipt has been verified, normal reinstalls preserve it while those exact definitions remain unchanged; any definition change invalidates it. The protected launcher independently marks its own process tree `stream`, so a protected session does not depend on machine-wide activation guesswork. A verified live stream declaration also supersedes stale hook-era degradation metadata.
 
 The hard interruption boundary is intentionally narrower than the hook boundary. Local lifecycle hooks cannot stop text that is still being generated before a tool call, and hosted tools such as WebSearch do not universally pass through local tool hooks. The controlled App Server stream is therefore the strongest available boundary for those cases. Codex currently marks App Server/WebSocket transport experimental, so this is not presented as a production-stable universal host API.
 
@@ -578,6 +580,7 @@ The hard interruption boundary is intentionally narrower than the hook boundary.
 
 - Evidence acquisition is not treated as execution progress. Reads/searches consume the turn's exploration budget and do **not** reset narration-stall history.
 - The default supported evidence budget warns at **8** consecutive attempts and blocks/interrupts at **12** until execution/state progress occurs or a new turn begins.
+- Assignment-prefixed PowerShell reads such as `$c=Get-Content ...` are evidence attempts; Bun validation commands such as `bun test` and `bun run test|check|lint|build|typecheck|verify` are execution progress and reset the consecutive-evidence streak.
 - Stable reads use `SHA-256(state-generation + tool-name + canonical-tool-input)` and are reusable until relevant state changes.
 - Supported authoritative GitHub/helper evidence additionally uses semantic resource + coverage keys, so different `Select-String` filters over the same Actions run do not automatically become new evidence.
 - Volatile reads remain refreshable; the default identical-poll interval is **30 seconds**.
@@ -719,7 +722,7 @@ npx github-delivery update
 npx github-delivery update --apply
 ```
 
-`install` is for a fresh target. `setup` repairs or finishes activation against an existing installation. `doctor` is read-only and human-readable by default; `doctor --json` emits the machine-readable report. `update` verifies and plans only; `update --apply` performs the verified replacement. On supported Windows, setup/update also manages the separately verified Authority host when required or already installed, without requiring the .NET SDK.
+`install` is for a fresh target. `setup` repairs or finishes activation against an existing managed installation. `doctor` is read-only and human-readable by default; recognized legacy manifestless installations are reported with unknown prior integrity and migration guidance. `doctor --json` emits the machine-readable report. `update` verifies and plans only; `update --apply` performs the verified replacement or verified legacy migration. On supported Windows, setup/update also manages the separately verified Authority host when required or already installed, without requiring the .NET SDK.
 
 Typical skill locations include:
 
@@ -776,11 +779,13 @@ node scripts/install-skill.mjs --update --apply
 
 Self-update is fail-closed and latest-stable only. It verifies release digests/checksums, the manifest, the release-tag commit binding, GitHub artifact attestation, and a strict bounded ZIP before the existing backup/replacement installer can run. Local tracked skill modifications block skill replacement, no skill update downgrade is permitted, and the final installed manifest plus persistent user config are verified after replacement. A post-install skill failure surfaces the backup path for recovery.
 
+A genuine pre-manifest installation can enter this path only after multiple GitHub Delivery identity markers recognize it as legacy. Its previous file integrity remains unknown; the migration can only use the already-verified stable release, never downgrades, and moves the entire previous target to the normal backup before installing and verifying the manifest-backed replacement.
+
 When a Windows Authority host is required or already installed, the updater separately verifies its versioned archive + metadata + exact tag/source + release-workflow attestation before installation. Persistent Authority database/trust state is kept outside the versioned runtime directory and survives upgrades. An absent Authority host remains absent when protection is `off`; an ahead host is not downgraded.
 
 ### Codex progress watchdog
 
-On Codex, the normal installer configures the lifecycle-hook definitions along with the skill. Codex still requires explicit review/trust of new or changed non-managed hooks in `/hooks`; GitHub Delivery does not bypass that trust gate.
+On Codex, the normal installer configures the lifecycle-hook definitions along with the skill. New or changed non-managed hooks still require explicit review/trust in `/hooks`; GitHub Delivery does not bypass that trust gate. A previously verified trust receipt is preserved across normal reinstalls while the exact definitions remain unchanged, and is invalidated when they change.
 
 After trusting the unchanged definitions, finish or refresh activation with:
 
