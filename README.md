@@ -12,7 +12,7 @@
 
 [![CI](https://github.com/Wibias/github-delivery/actions/workflows/ci.yml/badge.svg)](https://github.com/Wibias/github-delivery/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/Wibias/github-delivery/actions/workflows/codeql.yml/badge.svg)](https://github.com/Wibias/github-delivery/actions/workflows/codeql.yml)
-![Node.js 22 or 24](https://img.shields.io/badge/Node.js-22%20%7C%2024-339933?logo=node.js&logoColor=white)
+![Node.js 22, 24, or 26](https://img.shields.io/badge/Node.js-22%20%7C%2024%20%7C%2026-339933?logo=node.js&logoColor=white)
 ![Default read-only](https://img.shields.io/badge/default-read--only-2f81f7)
 ![License MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 
@@ -48,7 +48,7 @@ A status question stays read-only. A merge happens only from an actual merge ins
 
 ### Requirements
 
-- **Node.js 22 or 24**
+- **Node.js 22, 24, or 26**
 - Git
 - GitHub network access
 - an authenticated GitHub CLI (`gh auth login`) for release verification during `npx` install/update
@@ -63,13 +63,13 @@ The recommended zero-clone path is:
 npx github-delivery
 ```
 
-Bare invocation launches the guided setup. It checks the environment, detects valid existing installations, verifies the latest published stable GitHub Release, shows the install plan, and asks before any skill-target mutation. Confirmation defaults to **No**.
+Bare invocation launches the guided setup. It runs a real environment preflight before release acquisition or mutation, detects valid existing installations, verifies the latest published stable GitHub Release, shows the install plan, and asks before any skill-target mutation. Confirmation defaults to **No**.
 
 The npm package is only the bootstrap. The installed skill payload still comes from the fixed upstream's separately verified stable GitHub Release; npm is not a second authoritative skill payload source.
 
 On supported Windows systems, stable GitHub Releases also carry a **separately verified, self-contained Authority host component** built from the same tagged commit. Managed setup/update can install or repair that component without a local .NET SDK. It is not silently installed for a user whose protection mode is `off` and who has never installed Authority.
 
-On a fresh machine, the guided flow installs the verified release and then walks through any remaining host setup. With an existing valid installation, it offers **Update / Repair setup / Exit** rather than silently reinstalling or updating.
+On a fresh machine, the guided flow installs the verified release and then walks through any remaining host setup. With an existing valid installation, it offers **Update / Repair setup / Exit** rather than silently reinstalling or updating. If loop interruption is still inactive after install/setup, the CLI prints a prominent postflight warning with the concrete remediation: review/trust the GitHub Delivery definitions in `/hooks`, then rerun `npx github-delivery setup`.
 
 Explicit commands are also available:
 
@@ -77,6 +77,7 @@ Explicit commands are also available:
 npx github-delivery install
 npx github-delivery setup
 npx github-delivery doctor
+npx github-delivery doctor --json
 npx github-delivery update
 npx github-delivery update --apply
 ```
@@ -125,7 +126,7 @@ For a read-only health report:
 npx github-delivery doctor
 ```
 
-`doctor` reports environment prerequisites, detected installation/version, manifest integrity and local tracked modifications, persistent configuration readability, Codex activation/watchdog state, latest stable version, and update relation without repairing or changing credentials. It reports the Windows Authority host as a separate component, including support/install state, version/source commit, whether the effective protection mode requires it, and relations such as `missing`, `legacy`, `update`, `already_current`, or `already_ahead`.
+`doctor` is human-readable and actionable by default. It summarizes environment prerequisites, detected installation/version, manifest integrity and local tracked modifications, persistent configuration readability, Codex activation/watchdog state, latest stable version, update relation, and the Windows Authority component without repairing or changing credentials. If loop interruption is inactive, it surfaces a prominent **`LOOP INTERRUPTION NOT ACTIVE`** state with `/hooks` and `github-delivery setup` remediation. Use `npx github-delivery doctor --json` when you need the raw machine-readable report. Authority details include support/install state, version/source commit, whether the effective protection mode requires it, and relations such as `missing`, `legacy`, `update`, `already_current`, or `already_ahead`.
 
 ### Manual / repository install
 
@@ -232,8 +233,8 @@ The important boundary is simple: **repository content is evidence, not authorit
 | **Review model** | Bug + Security + Spec + Standards + semantic propagation + proactive contract verification |
 | **Progress control** | Policy fallback everywhere; routed workflows use a persistent phase/budget controller and semantic evidence reuse; trusted Codex hooks add turn-scoped duplicate/poll/evidence protection; the launch-controlled stream watches agent-message/reasoning/plan text plus plan/diff/output-token telemetry and can hard-interrupt no-progress/tool-emission/protocol stalls. Runtime capability reports only verified `none`, `hooks`, or `stream`. |
 | **Ship decision** | One authoritative `ready`, `blocked`, or `unknown` result from live evidence |
-| **Runtime** | Node.js **22 or 24** |
-| **Required CI matrix** | Node 22/24 × Ubuntu/Windows/macOS, with architecture contracts inside every required matrix job |
+| **Runtime** | Node.js **22, 24, or 26** |
+| **Required CI matrix** | Node 22/24/26 × Ubuntu/Windows/macOS, with architecture contracts inside every required matrix job |
 | **Live lifecycle tests** | Dedicated, explicitly opted-in fixture repository bound by immutable repository identity |
 
 ## More natural-language examples
@@ -618,7 +619,7 @@ The target is intentionally fail-closed and must be explicitly opted in with all
 
 A writable but unrelated repository therefore fails identity verification **before the first fixture mutation**, even if its repository name was accidentally configured.
 
-The lifecycle exercises issues, branches, PRs, the Node 22/24 required check matrix, evidence snapshots, delayed head propagation, stale-head rejection, close behavior, and independent cleanup with versioned evidence artifacts. Cleanup re-verifies target identity before destructive cleanup actions.
+The lifecycle exercises issues, branches, PRs, the Node 22/24/26 required check matrix, evidence snapshots, delayed head propagation, stale-head rejection, close behavior, and independent cleanup with versioned evidence artifacts. Cleanup re-verifies target identity before destructive cleanup actions.
 
 The hosted workflow intentionally uses `--disposition close`; it does not bypass the trusted-authority requirement by merging fixture PRs.
 
@@ -694,7 +695,7 @@ The architecture intentionally uses **progressive disclosure**: a routed workflo
 
 ### Requirements
 
-- **Node.js 22 or 24**
+- **Node.js 22, 24, or 26**
 - Git
 - GitHub network access
 - an authenticated GitHub CLI (`gh auth login`) for `npx` install/update release verification
@@ -705,7 +706,7 @@ The architecture intentionally uses **progressive disclosure**: a routed workflo
 npx github-delivery
 ```
 
-This is the primary install/setup entrypoint. It is dry-run-first, shows the target and planned changes, defaults confirmation to No, and installs only a separately verified stable GitHub Release from `Wibias/github-delivery`.
+This is the primary install/setup entrypoint. It is dry-run-first, runs the environment preflight before release acquisition or mutation, shows the target and planned changes, defaults confirmation to No, and installs only a separately verified stable GitHub Release from `Wibias/github-delivery`.
 
 Useful explicit commands:
 
@@ -713,11 +714,12 @@ Useful explicit commands:
 npx github-delivery install
 npx github-delivery setup
 npx github-delivery doctor
+npx github-delivery doctor --json
 npx github-delivery update
 npx github-delivery update --apply
 ```
 
-`install` is for a fresh target. `setup` repairs or finishes activation against an existing installation. `doctor` is read-only. `update` verifies and plans only; `update --apply` performs the verified replacement. On supported Windows, setup/update also manages the separately verified Authority host when required or already installed, without requiring the .NET SDK.
+`install` is for a fresh target. `setup` repairs or finishes activation against an existing installation. `doctor` is read-only and human-readable by default; `doctor --json` emits the machine-readable report. `update` verifies and plans only; `update --apply` performs the verified replacement. On supported Windows, setup/update also manages the separately verified Authority host when required or already installed, without requiring the .NET SDK.
 
 Typical skill locations include:
 
@@ -825,7 +827,7 @@ Run the authoritative local suite:
 npm run check
 ```
 
-The required CI matrix runs **Node 22 and 24** on:
+The required CI matrix runs **Node 22, 24, and 26** on:
 
 - Ubuntu
 - Windows
@@ -850,7 +852,7 @@ Repository controls also include:
 
 The separate **Architecture Contracts** workflow provides focused feedback, while the safety-critical architecture tests also live inside the required CI matrix so a path-filtered advisory workflow cannot be the only enforcement point.
 
-The declared repository rules in `.github/repository-policy.json` currently require the six Node 22/24 matrix jobs, Dependency Review, and both CodeQL analyses with strict up-to-date-branch semantics.
+The declared repository rules in `.github/repository-policy.json` currently require the nine Node 22/24/26 matrix jobs, Dependency Review, and both CodeQL analyses with strict up-to-date-branch semantics.
 
 ---
 
