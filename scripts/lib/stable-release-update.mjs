@@ -6,6 +6,8 @@ import {
 } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
+import { inspectLegacyManifestlessInstallation } from "./bootstrap-cli.mjs";
+
 export function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
 }
@@ -148,9 +150,46 @@ export function releaseAssetPlan(release) {
 export function planStableUpdate({ releases, target, installedManifest = undefined, dependencies = {} } = {}) {
   const release = selectStableRelease(releases);
   const assets = releaseAssetPlan(release);
-  const current = installedManifest || readInstalledManifest(target);
-  const local = compareInstalledManifest({ manifest: current, target, dependencies });
+
+  let current;
+  let local = null;
+  let legacyManifestless = false;
+  if (installedManifest !== undefined) {
+    current = installedManifest;
+    local = compareInstalledManifest({ manifest: current, target, dependencies });
+  } else {
+    try {
+      current = readInstalledManifest(target);
+      local = compareInstalledManifest({ manifest: current, target, dependencies });
+    } catch (error) {
+      if (String(error?.message || error) !== "installed_manifest_missing") throw error;
+      const legacy = inspectLegacyManifestlessInstallation({ target });
+      if (!legacy) throw error;
+      current = { version: legacy.version };
+      legacyManifestless = true;
+    }
+  }
+
   const comparison = compareStableVersions(assets.version, current.version);
+  if (legacyManifestless) {
+    const action = comparison < 0 ? "already_ahead" : "migrate_legacy";
+    return {
+      schemaVersion: 1,
+      kind: "github-delivery/stable-update-plan",
+      source: "latest-stable-release",
+      release: { tag: assets.tag, version: assets.version },
+      currentVersion: current.version || null,
+      target: resolve(target),
+      localModifications: null,
+      safeToReplace: false,
+      action,
+      assets,
+      legacyManifestless: true,
+      integrityKnown: false,
+      migrationAllowed: action === "migrate_legacy",
+    };
+  }
+
   const action = comparison === 0
     ? "already_current"
     : comparison < 0

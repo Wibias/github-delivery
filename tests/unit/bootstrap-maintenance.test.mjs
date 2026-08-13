@@ -21,6 +21,17 @@ function validInstallation(version = "0.4.0") {
   return [{ target: TARGET, valid: true, version, reason: null }];
 }
 
+function legacyInstallation(version = "0.4.0") {
+  return [{
+    target: TARGET,
+    valid: false,
+    migratable: true,
+    legacy: true,
+    version,
+    reason: "legacy_manifestless",
+  }];
+}
+
 function authorityNoopDependencies(extra = {}) {
   return {
     reconcileStableAuthorityHost: async () => ({ ...AUTHORITY_NOOP }),
@@ -304,4 +315,52 @@ test("bare bootstrap never silently updates an existing installation", async () 
   });
   assert.equal(updates, 0);
   assert.deepEqual(result, { action: "exit", target: TARGET });
+});
+
+test("update selects a recognized legacy manifestless installation while setup remains strict", async () => {
+  const calls = [];
+  const result = await runBootstrap(["update"], {
+    discoverInstallations: () => legacyInstallation("0.5.1"),
+    async runBootstrapUpdate(options) {
+      calls.push(options);
+      return { action: "migrate_legacy", apply: false, target: options.target };
+    },
+  });
+
+  assert.deepEqual(calls, [{ target: TARGET, apply: false }]);
+  assert.equal(result.action, "migrate_legacy");
+
+  await assert.rejects(
+    runBootstrap(["setup"], {
+      discoverInstallations: () => legacyInstallation("0.5.1"),
+    }),
+    /bootstrap_setup_installation_missing/,
+  );
+});
+
+test("doctor reports a recognized legacy installation without inventing file integrity", async () => {
+  const report = await runBootstrapDoctor({
+    target: TARGET,
+    codexHome: CODEX_HOME,
+    dependencies: {
+      checkBootstrapEnvironment: () => ({ ok: true, node: { ok: true }, git: { ok: true }, gh: { ok: true }, ghAuth: { ok: true } }),
+      discoverInstallations: () => legacyInstallation("0.5.1"),
+      readInstalledManifest: () => { throw new Error("legacy doctor must not read a missing manifest"); },
+      compareInstalledManifest: () => { throw new Error("legacy doctor must not claim integrity"); },
+      readUserConfig: () => ({ source: "default", config: { schemaVersion: 1, authorityMode: "off" } }),
+      readInstalledAuthorityHost: () => ({ supported: true, installed: false, legacy: false, version: null, sourceCommit: null }),
+      readActivationReceipt: () => null,
+      async latestRelease() {
+        return { tag_name: "v0.5.2", draft: false, prerelease: false, assets: [] };
+      },
+    },
+  });
+
+  assert.equal(report.installed.ok, true);
+  assert.equal(report.installed.version, "0.5.1");
+  assert.equal(report.installed.legacyManifestless, true);
+  assert.equal(report.integrity.ok, false);
+  assert.equal(report.integrity.clean, null);
+  assert.equal(report.integrity.error, "legacy_manifest_missing");
+  assert.deepEqual(report.latest, { version: "0.5.2", relation: "update", error: null });
 });

@@ -65,12 +65,16 @@ export async function chooseInstallation(installations, {
   return installations[index] || null;
 }
 
-function selectSingleTarget(options, installations, code) {
+function selectSingleTarget(options, installations, code, predicate = (entry) => entry.valid === true) {
   if (options.target) return resolve(options.target);
-  const valid = installations.filter((entry) => entry.valid === true);
-  if (valid.length === 1) return resolve(valid[0].target);
-  if (valid.length === 0) fail(code);
+  const eligible = installations.filter(predicate);
+  if (eligible.length === 1) return resolve(eligible[0].target);
+  if (eligible.length === 0) fail(code);
   fail("bootstrap_installation_ambiguous");
+}
+
+function updateEligible(entry) {
+  return entry.valid === true || entry.migratable === true;
 }
 
 export async function runBootstrap(argv = [], dependencies = {}) {
@@ -93,7 +97,12 @@ export async function runBootstrap(argv = [], dependencies = {}) {
   const installations = discover(options.target ? { explicitTarget: options.target } : {});
 
   if (options.command === "update") {
-    const target = selectSingleTarget(options, installations, "bootstrap_update_installation_missing");
+    const target = selectSingleTarget(
+      options,
+      installations,
+      "bootstrap_update_installation_missing",
+      updateEligible,
+    );
     return update({ target, apply: options.apply });
   }
   if (options.command === "setup") {
@@ -102,9 +111,9 @@ export async function runBootstrap(argv = [], dependencies = {}) {
   }
   if (options.command === "doctor") {
     if (options.target) return doctor({ target: resolve(options.target) });
-    const valid = installations.filter((entry) => entry.valid === true);
-    if (valid.length > 1) fail("bootstrap_installation_ambiguous");
-    return doctor({ target: valid[0]?.target || null });
+    const eligible = installations.filter(updateEligible);
+    if (eligible.length > 1) fail("bootstrap_installation_ambiguous");
+    return doctor({ target: eligible[0]?.target || null });
   }
 
   const valid = installations.filter((entry) => entry.valid === true);

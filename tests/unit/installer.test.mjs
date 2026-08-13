@@ -20,6 +20,13 @@ function skill(dir, version, marker = version) {
   writeFileSync(join(dir, "marker.txt"), marker);
 }
 
+function legacySkill(dir, version, marker = version) {
+  skill(dir, version, marker);
+  mkdirSync(join(dir, "scripts"), { recursive: true });
+  writeFileSync(join(dir, "SKILL.md"), "---\nname: github-delivery\ndescription: legacy fixture\n---\n");
+  writeFileSync(join(dir, "scripts", "install-skill.mjs"), "// legacy installer\n");
+}
+
 test("install CLI entry point runs from a file path", () => {
   const command = join(ROOT, "scripts", "install-skill.mjs");
   const result = spawnSync(process.execPath, [command], {
@@ -123,6 +130,45 @@ test("same-version installs with different payloads fail closed even with force"
   assert.equal(planInstallation({ source, target, force: true }).allowed, false);
   assert.throws(() => applyInstallation({ source, target }), /installation is not allowed: same-version/);
   assert.throws(() => applyInstallation({ source, target, force: true }), /installation is not allowed: same-version/);
+});
+
+test("internal legacy migration mode backs up and replaces a recognized same-version manifestless target", () => {
+  const root = mkdtempSync(join(tmpdir(), "github-delivery-install-test-"));
+  const source = join(root, "source");
+  const target = join(root, "target");
+  const backups = join(root, "backups");
+  skill(source, "0.2.0", "managed");
+  writeFileSync(join(source, "manifest.json"), "{\"kind\":\"fixture\"}\n");
+  legacySkill(target, "0.2.0", "legacy");
+
+  assert.equal(planInstallation({ source, target }).allowed, false);
+  const plan = planInstallation({ source, target, legacyManifestlessMigration: true });
+  assert.equal(plan.action, "migrate-legacy");
+  assert.equal(plan.allowed, true);
+
+  const receipt = applyInstallation({
+    source,
+    target,
+    backupRoot: backups,
+    legacyManifestlessMigration: true,
+  });
+  assert.equal(receipt.action, "migrate-legacy");
+  assert(receipt.backupPath);
+  assert.equal(readFileSync(join(target, "marker.txt"), "utf8"), "managed");
+  assert.equal(existsSync(join(target, "manifest.json")), true);
+  assert.equal(readFileSync(join(receipt.backupPath, "marker.txt"), "utf8"), "legacy");
+});
+
+test("legacy migration mode does not authorize an arbitrary same-version target", () => {
+  const root = mkdtempSync(join(tmpdir(), "github-delivery-install-test-"));
+  const source = join(root, "source");
+  const target = join(root, "target");
+  skill(source, "0.2.0", "managed");
+  skill(target, "0.2.0", "unknown");
+
+  const plan = planInstallation({ source, target, legacyManifestlessMigration: true });
+  assert.equal(plan.allowed, false);
+  assert.notEqual(plan.action, "migrate-legacy");
 });
 
 test("classifies symlink targets as conflicts", { skip: process.platform === "win32" }, () => {

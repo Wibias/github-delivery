@@ -178,6 +178,10 @@ function relation(installedVersion, latestVersion) {
   return "already_current";
 }
 
+function doctorEligible(entry) {
+  return entry.valid === true || entry.migratable === true;
+}
+
 export async function runBootstrapDoctor({
   target = null,
   codexHome = defaultCodexHome(),
@@ -194,18 +198,28 @@ export async function runBootstrapDoctor({
 
   const environment = checkEnvironment();
   const found = discover(target ? { explicitTarget: target } : {});
-  const valid = found.filter((entry) => entry.valid === true);
+  const eligible = found.filter(doctorEligible);
   let selected = null;
-  if (target) selected = valid.find((entry) => resolve(entry.target) === resolve(target)) || null;
-  else if (valid.length === 1) selected = valid[0];
+  if (target) selected = eligible.find((entry) => resolve(entry.target) === resolve(target)) || null;
+  else if (eligible.length === 1) selected = eligible[0];
+  const legacyManifestless = selected?.migratable === true && selected?.reason === "legacy_manifestless";
 
   const report = {
     action: "doctor",
     environment,
     target: selected?.target || (target ? resolve(target) : null),
     installations: found,
-    installed: { ok: Boolean(selected), version: selected?.version || null },
-    integrity: { ok: false, clean: null, modifications: [], error: null },
+    installed: {
+      ok: Boolean(selected),
+      version: selected?.version || null,
+      ...(legacyManifestless ? { legacyManifestless: true } : {}),
+    },
+    integrity: {
+      ok: false,
+      clean: null,
+      modifications: [],
+      error: legacyManifestless ? "legacy_manifest_missing" : null,
+    },
     config: { ok: false, source: null, effectiveAuthorityMode: null, error: null },
     authorityHost: {
       ok: false,
@@ -222,10 +236,9 @@ export async function runBootstrapDoctor({
     latest: { version: null, relation: null, error: null },
   };
 
-  let manifest = null;
-  if (selected) {
+  if (selected && !legacyManifestless) {
     try {
-      manifest = readManifest(selected.target);
+      const manifest = readManifest(selected.target);
       const integrity = compareManifest({ manifest, target: selected.target });
       report.integrity = {
         ok: true,
@@ -279,7 +292,7 @@ export async function runBootstrapDoctor({
     const match = /^v(\d+\.\d+\.\d+)$/.exec(tag);
     if (!match) fail("stable_release_tag_invalid");
     report.latest.version = match[1];
-    if (manifest?.version) report.latest.relation = relation(manifest.version, match[1]);
+    if (selected?.version) report.latest.relation = relation(selected.version, match[1]);
     if (
       report.authorityHost.ok &&
       report.authorityHost.supported &&
