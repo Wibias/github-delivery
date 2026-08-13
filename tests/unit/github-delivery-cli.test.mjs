@@ -19,6 +19,14 @@ function validManifest(version = "0.4.0") {
   });
 }
 
+function legacyFiles(target, version = "0.5.1") {
+  return new Map([
+    [join(target, "package.json"), JSON.stringify({ name: "github-delivery", version })],
+    [join(target, "SKILL.md"), "---\nname: github-delivery\ndescription: legacy fixture\n---\n"],
+    [join(target, "scripts", "install-skill.mjs"), "// legacy installer\n"],
+  ]);
+}
+
 test("parses the public npx command surface and rejects unsafe v1 options", () => {
   assert.deepEqual(parseBootstrapArgs([]), {
     command: "guided",
@@ -149,5 +157,51 @@ test("an explicit target is authoritative and duplicate resolved paths are dedup
 
   assert.deepEqual(found, [
     { target: explicit, valid: true, version: "0.4.0", reason: null },
+  ]);
+});
+
+test("recognizes a genuine pre-manifest GitHub Delivery installation as migratable", () => {
+  const target = resolve("/custom/legacy-github-delivery");
+  const files = legacyFiles(target, "0.5.1");
+  const found = discoverInstallations({
+    explicitTarget: target,
+    exists(path) {
+      return files.has(path);
+    },
+    readFile(path) {
+      if (!files.has(path)) throw new Error("missing");
+      return files.get(path);
+    },
+  });
+
+  assert.deepEqual(found, [{
+    target,
+    valid: false,
+    migratable: true,
+    legacy: true,
+    version: "0.5.1",
+    reason: "legacy_manifestless",
+  }]);
+});
+
+test("does not treat an arbitrary manifestless target as a legacy GitHub Delivery installation", () => {
+  const target = resolve("/custom/not-github-delivery");
+  const files = new Map([
+    [join(target, "package.json"), JSON.stringify({ name: "something-else", version: "0.5.1" })],
+    [join(target, "SKILL.md"), "---\nname: something-else\n---\n"],
+  ]);
+  const found = discoverInstallations({
+    explicitTarget: target,
+    exists(path) {
+      return files.has(path);
+    },
+    readFile(path) {
+      if (!files.has(path)) throw new Error("missing");
+      return files.get(path);
+    },
+  });
+
+  assert.deepEqual(found, [
+    { target, valid: false, version: null, reason: "missing_manifest" },
   ]);
 });
