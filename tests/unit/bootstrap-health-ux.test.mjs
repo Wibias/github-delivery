@@ -89,7 +89,7 @@ test("guided install fails before release acquisition when environment preflight
   assert.match(output.toString(), /not supported/i);
 });
 
-test("guided install warns clearly when loop interruption remains inactive after install", async () => {
+test("guided install reports unverified hook trust without claiming Codex still requires trust", async () => {
   const output = writableBuffer();
   const target = resolve("/tmp/github-delivery-health-postflight");
   await runGuidedInstall({
@@ -129,8 +129,11 @@ test("guided install warns clearly when loop interruption remains inactive after
 
   const text = output.toString();
   assert.match(text, /loop interruption.*not active/i);
-  assert.match(text, /\/hooks/);
+  assert.match(text, /has not verified Codex hook trust/i);
+  assert.match(text, /already trusted in Codex/i);
+  assert.match(text, /if needed.*\/hooks/i);
   assert.match(text, /github-delivery setup/);
+  assert.doesNotMatch(text, /still require trust/i);
 });
 
 test("doctor prints an actionable human health summary by default", async () => {
@@ -168,8 +171,11 @@ test("doctor prints an actionable human health summary by default", async () => 
   assert.match(text, /Node\s+.*26\.7\.0/);
   assert.match(text, /Integrity\s+.*Clean/i);
   assert.match(text, /LOOP INTERRUPTION NOT ACTIVE/);
-  assert.match(text, /\/hooks/);
+  assert.match(text, /has not verified Codex hook trust/i);
+  assert.match(text, /already trusted in Codex/i);
+  assert.match(text, /if needed.*\/hooks/i);
   assert.match(text, /github-delivery setup/);
+  assert.doesNotMatch(text, /still require trust/i);
   assert.doesNotMatch(text, /^\s*\{/);
 });
 

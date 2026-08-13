@@ -69,7 +69,9 @@ function renderDoctor(result, stdout) {
     || (activation?.hooksConfigured === true && activation?.hookTrustVerified !== true);
   if (activation?.mode === "none" && hookTrustRequired) {
     stdout.write("\nAction required\n");
-    stdout.write("  1. Open /hooks in Codex and review/trust the GitHub Delivery hooks.\n");
+    stdout.write("  GitHub Delivery has not verified Codex hook trust for this installation.\n");
+    stdout.write("  If these exact hooks are already trusted in Codex, they do not need to be trusted again.\n");
+    stdout.write("  1. If needed, open /hooks in Codex and review/trust the GitHub Delivery hooks.\n");
     stdout.write("  2. Run: npx github-delivery setup\n");
   }
 
