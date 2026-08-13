@@ -8,6 +8,20 @@ All notable changes to `github-delivery` are documented here.
 
 ### Added
 
+- First-class Node.js 26 support across the npm engine contract, bootstrap
+  environment validation, generated skill compatibility metadata, and the
+  required CI matrix. The supported runtime set is now Node.js 22, 24, or 26,
+  with all three majors exercised on Ubuntu, Windows, and macOS.
+
+- Actionable bootstrap health reporting. Guided install now runs the real
+  environment preflight before release acquisition or mutation and fails early
+  on unsupported/missing prerequisites. After a successful guided install it
+  prominently reports when loop interruption is not active, including the
+  `/hooks` trust step and `npx github-delivery setup` remediation. `doctor` is
+  now human-readable by default, surfaces environment, installed version and
+  integrity, Authority status, and a prominent `LOOP INTERRUPTION NOT ACTIVE`
+  state; `doctor --json` preserves the raw machine-readable report.
+
 - First-class stable Windows Authority-host delivery and Control Center settings.
   Releases now build a self-contained `win-x64` Authority component from the
   exact tagged commit, publish versioned ZIP + metadata assets, and attest the
