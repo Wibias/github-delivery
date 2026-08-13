@@ -179,6 +179,38 @@ test("doctor prints an actionable human health summary by default", async () => 
   assert.doesNotMatch(text, /^\s*\{/);
 });
 
+test("doctor explains how to migrate a recognized legacy manifestless installation", async () => {
+  const stdout = writableBuffer();
+  const report = {
+    action: "doctor",
+    environment: {
+      ok: true,
+      node: { ok: true, version: "26.7.0" },
+      git: { ok: true },
+      gh: { ok: true },
+      ghAuth: { ok: true },
+    },
+    target: "C:\\Users\\ws\\.agents\\skills\\github-delivery",
+    installed: { ok: true, version: "0.5.1", legacyManifestless: true },
+    integrity: { ok: false, clean: null, modifications: [], error: "legacy_manifest_missing" },
+    config: { ok: true, source: "default", effectiveAuthorityMode: "off", error: null },
+    authorityHost: { ok: true, supported: true, installed: false, legacy: false, version: null, relation: "missing", requiredByMode: false, error: null },
+    activation: null,
+    latest: { version: "0.5.2", relation: "update", error: null },
+  };
+
+  await main(["doctor"], {
+    stdout,
+    runBootstrap: async () => report,
+  });
+
+  const text = stdout.toString();
+  assert.match(text, /Legacy.*manifest missing/i);
+  assert.match(text, /Integrity\s+.*Unknown/i);
+  assert.match(text, /migration.*available/i);
+  assert.match(text, /github-delivery update --apply/i);
+});
+
 test("doctor --json preserves the existing raw report output", async () => {
   const stdout = writableBuffer();
   const report = { action: "doctor", environment: { ok: true }, installed: { ok: true, version: "0.5.2" } };
