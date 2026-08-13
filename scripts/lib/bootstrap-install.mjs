@@ -123,9 +123,10 @@ function renderProtectionPostflight(watchdog, output) {
 
   output.write("  LOOP INTERRUPTION NOT ACTIVE\n");
   if (watchdog?.hookTrustRequired === true || (watchdog?.hooksConfigured === true && watchdog?.hookTrustVerified !== true)) {
-    output.write("  Codex hooks are installed but still require trust.\n");
+    output.write("  GitHub Delivery has not verified Codex hook trust for this installation.\n");
+    output.write("  If these exact hooks are already trusted in Codex, they do not need to be trusted again.\n");
     output.write("  Action required:\n");
-    output.write("    1. Open /hooks in Codex and review/trust the GitHub Delivery hooks.\n");
+    output.write("    1. If needed, open /hooks in Codex and review/trust the GitHub Delivery hooks.\n");
     output.write("    2. Run: npx github-delivery setup\n\n");
     return;
   }
