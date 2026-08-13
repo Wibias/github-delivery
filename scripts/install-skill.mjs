@@ -19,6 +19,7 @@ import {
 } from "./lib/stable-release-update.mjs";
 import { readUserConfig, resolveAuthorityMode } from "./lib/user-config.mjs";
 import {
+  readActivationReceipt,
   selectWatchdogMode,
   writeActivationReceipt,
 } from "./lib/watchdog-activation.mjs";
@@ -123,6 +124,7 @@ export function installSkill(options) {
   const launcherBundled = existsSync(sourceLauncherPath);
   const streamLaunchVerified = options.streamLaunchControlled === true && launcherBundled;
   const hooksPath = join(options.codexHome, "hooks.json");
+  const previousActivation = readActivationReceipt({ codexHome: options.codexHome });
 
   let hookPlan = null;
   if (options.host === "codex" && options.lifecycleHooksSupported) {
@@ -160,8 +162,13 @@ export function installSkill(options) {
 
   const hooksConfigured = Boolean(hookPlan);
   const hookDefinitionChanged = Boolean(hookPlan?.wouldChange || hookResult?.applied);
+  const previousHookTrustVerified = Boolean(
+    previousActivation?.hooksConfigured === true && previousActivation?.hookTrustVerified === true,
+  );
   const hookTrustVerified = Boolean(
-    hooksConfigured && options.hookTrustVerified === true && !hookDefinitionChanged,
+    hooksConfigured
+      && !hookDefinitionChanged
+      && (options.hookTrustVerified === true || previousHookTrustVerified),
   );
 
   const selection = selectWatchdogMode({
