@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 
 import {
@@ -45,6 +48,15 @@ function dirtyInstalledDependencies() {
   };
 }
 
+function legacySkill(version) {
+  const root = mkdtempSync(join(tmpdir(), "github-delivery-legacy-update-"));
+  mkdirSync(join(root, "scripts"), { recursive: true });
+  writeFileSync(join(root, "package.json"), JSON.stringify({ name: "github-delivery", version }, null, 2));
+  writeFileSync(join(root, "SKILL.md"), "---\nname: github-delivery\ndescription: legacy fixture\n---\n");
+  writeFileSync(join(root, "scripts", "install-skill.mjs"), "// legacy installer\n");
+  return root;
+}
+
 test("stable update never downgrades an installation ahead of the latest release", () => {
   const plan = planStableUpdate({
     releases: [{
@@ -86,6 +98,48 @@ test("current and ahead releases remain no-ops when local drift exists", () => {
     assert.equal(plan.safeToReplace, false);
     assert.deepEqual(plan.localModifications, [{ path: "SKILL.md", reason: "changed" }]);
   }
+});
+
+test("recognized manifestless installations get a migration plan without synthetic integrity", () => {
+  for (const installedVersion of ["0.4.0", "0.5.0"]) {
+    const target = legacySkill(installedVersion);
+    const plan = planStableUpdate({
+      releases: [{
+        tag_name: "v0.5.0",
+        draft: false,
+        prerelease: false,
+        assets: requiredAssets("0.5.0"),
+      }],
+      target,
+    });
+
+    assert.equal(plan.action, "migrate_legacy");
+    assert.equal(plan.currentVersion, installedVersion);
+    assert.equal(plan.legacyManifestless, true);
+    assert.equal(plan.integrityKnown, false);
+    assert.equal(plan.migrationAllowed, true);
+    assert.equal(plan.safeToReplace, false);
+    assert.equal(plan.localModifications, null);
+  }
+});
+
+test("legacy migration never downgrades a manifestless installation", () => {
+  const target = legacySkill("0.6.0");
+  const plan = planStableUpdate({
+    releases: [{
+      tag_name: "v0.5.0",
+      draft: false,
+      prerelease: false,
+      assets: requiredAssets("0.5.0"),
+    }],
+    target,
+  });
+
+  assert.equal(plan.action, "already_ahead");
+  assert.equal(plan.legacyManifestless, true);
+  assert.equal(plan.integrityKnown, false);
+  assert.equal(plan.migrationAllowed, false);
+  assert.equal(plan.safeToReplace, false);
 });
 
 test("required release assets must occur exactly once", () => {
