@@ -18,6 +18,18 @@ test("authority host is unpackaged self-contained WinUI 3, not WinForms", () => 
   assert.doesNotMatch(project, /UseWindowsForms/);
 });
 
+test("unpackaged publish carries compiled XAML resources used by ms-appx LoadComponent", () => {
+  const project = read(`${root}/GitHubDeliveryAuthority.csproj`);
+  const workflow = read(".github/workflows/ci.yml");
+
+  assert.match(project, /CopyUnpackagedWinUiXbfToPublish/);
+  assert.match(project, /AfterTargets="Publish"/);
+  assert.match(project, /\*\*\\\*\.xbf/);
+  assert.match(project, /DestinationFiles=/);
+  assert.match(workflow, /App\.xbf/);
+  assert.match(workflow, /ControlCenterWindow\.xbf/);
+});
+
 test("custom WinUI entry point preserves generated XAML process initialization", () => {
   const program = read(`${root}/Program.cs`);
   assert.match(program, /DllImport\("Microsoft\.ui\.xaml\.dll"\)[\s\S]*XamlCheckProcessRequirements/);
