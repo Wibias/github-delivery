@@ -119,12 +119,15 @@ Use when the user wants a refactor request, refactoring RFC, or tiny-commit plan
 3. Present alternative approaches and tradeoffs.
 4. Interview until scope, non-scope, and testing expectations are explicit.
 5. Inspect existing test coverage in the area.
-6. Break the refactor into the smallest commits that leave the codebase working.
-7. Publish a refactor issue with:
+6. If the refactor migrates an internal API/shape, repeats a deterministic edit across many targets, or has dependent migration phases, apply `references/change-execution.md`. Inventory the old/new contract and callers, decide whether compatibility is real, decide whether a script/codemod/generator lowers change risk, and define the checks that make each migration unit verifiable.
+7. Break the refactor into the smallest meaningful units that leave a checkable state. Prefer units that keep the codebase working; when a temporary non-shippable intermediate state is unavoidable, bound it explicitly and do not present it as merge-ready.
+8. Publish a refactor issue with:
    - Problem Statement
    - Solution
-   - Commits
+   - Commits / Verifiable Units
    - Decision Document
    - Testing Decisions
+   - Migration Surface and Compatibility Decision (when `references/change-execution.md` applies)
+   - Lever Decision and Completion Proof (when `references/change-execution.md` applies)
    - Out of Scope
    - Further Notes

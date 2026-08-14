@@ -63,7 +63,7 @@ Default to one issue and one cohesive PR. Do not split merely because several la
 
 1. Start from the exact base/development tip captured in A. Use a task branch/worktree that preserves unrelated local user work.
 2. Implement the smallest complete change that satisfies the extracted issue contract.
-3. Follow concrete dependencies as they appear; inspect and update required consumers instead of returning to broad preflight research.
+3. Follow concrete dependencies as they appear; inspect and update required consumers instead of returning to broad preflight research. For broad migrations or deterministic sweeps, apply `references/change-execution.md`.
 4. Run focused validation appropriate to the changed code: tests, typecheck, build, repro, and repository-local checks as available.
 5. Require a non-empty base-to-head candidate diff. If no change is needed, return to the matching preflight outcome and do not open an empty PR.
 

@@ -199,10 +199,14 @@ unit test is not mandatory when it would be low-signal or disproportionate.
 4. Run the same regression check after the fix, then run the nearby/full
    validation required by the governing workflow. Confirm the issue is actually
    resolved, not merely that a unit test is green.
-5. **Defense-in-depth:** where the root cause was invalid/missing data, add
-   validation at every layer the data passes through (entry, business logic,
-   environment guards, debug instrumentation) so the bug becomes structurally
-   impossible — not merely fixed at one point.
+5. **Boundary-owned defense:** where the root cause was invalid or missing
+   external data, identify the trust boundary that owns that input and apply
+   `references/design-quality.md`. Parse, narrow, and validate the raw value
+   there into a trusted internal representation. Add deeper checks only when a
+   separate trust transition, authorization/security boundary, persistence or
+   corruption boundary, lifecycle/concurrency invariant, or fail-loud
+   programmer assertion justifies them. Do not duplicate the same validation
+   at every internal layer.
 6. Every fixed High/Critical finding requires durable regression evidence.
    Prefer an automated test when a useful path exists. If a durable test is
    impractical, state why and preserve the exact executable before/after check.
