@@ -50,8 +50,9 @@ test("control center implements the selected activity-first audit design in ligh
     "Quick settings",
     "READY",
   ]) assert.match(window, new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(window, /<ListView x:Name="NavigationList"/);
   for (const nav of ["Overview", "Activity", "Allowlist", "Temporary grants", "Diagnostics", "Settings"]) {
-    assert.match(window, new RegExp(`Content=\\"${nav}\\"`));
+    assert.match(window, new RegExp(`Text=\\"${nav}\\"`));
   }
 });
 
@@ -68,7 +69,7 @@ test("settings page exposes and persists exactly the three authority protection 
     "Source commit",
     "Config file",
   ]) assert.match(window, new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-  assert.match(window, /SelectionChanged="Navigation_SelectionChanged"/);
+  assert.match(window, /SelectionChanged="NavigationList_SelectionChanged"/);
   assert.match(window, /Click="ApplyProtectionMode_Click"/);
   assert.match(code, /UserConfigStore\.WriteAuthorityMode\(mode\)/);
   assert.match(code, /authority-host-version\.json/);
