@@ -204,7 +204,7 @@ jobs:
         run: npm run package:check
 
       - name: Install trusted-publishing npm CLI
-        run: npm install --global npm@11.5.1
+        run: npm install --global git+https://github.com/npm/cli.git#da1d4d299151781500ec854f10eb7e570696d506
 
       - name: Publish npm package
         run: npm publish --access public
