@@ -73,6 +73,8 @@ Machine-enforced configuration is context, not an invitation to manually duplica
 
 Always read `references/code-smells.md` as an advisory baseline. **Repo standards override** that baseline. Every code smell is a **judgement call**, never an automatic violation, and must be suppressed when a documented local design intentionally uses the pattern.
 
+When the diff changes executable behavior, architecture, domain/state modeling, concurrency, or non-trivial control flow, also read `references/design-quality.md`. That companion is advisory: use its happy-path, boundary, abstraction-cost, domain-model, and state-ownership lenses only when the changed code shows a concrete maintenance, correctness, testability, or operational cost. Repository standards still override it. For docs-only, generated-only, lockfile-only, or other changes with no relevant design surface, record the design-quality lens as `n/a` instead of inventing a finding.
+
 ## 4. Run the two axes
 
 Run the axes in parallel when the host supports isolated subagents. Otherwise run them sequentially with separate notes so one conclusion does not contaminate the other.
@@ -86,9 +88,10 @@ Report:
 - documented standards violations with the source file and rule
 - architectural or compatibility drift tied to an accepted repository decision
 - possible smells from `references/code-smells.md`, clearly labelled as heuristics
+- material design-quality observations from `references/design-quality.md`, clearly labelled advisory unless another repository rule independently makes them binding
 - no duplicate findings for matters already enforced and passed by tooling
 
-Distinguish hard documented violations from advisory judgement calls.
+Distinguish hard documented violations from advisory judgement calls. When a design-quality observation reveals a real bug, vulnerability, spec violation, or material unproven safety invariant, hand it to the governing axis/companion rather than reporting the same concern twice under Standards.
 
 ### Spec brief
 
@@ -114,7 +117,7 @@ Use these headings in chat and in the full-review verdict evidence:
 
 ## Standards
 
-List findings with file or symbol, evidence, governing standard, and required action. Keep advisory smells visibly separate from hard violations. Use `none` with the sources checked when clean.
+List findings with file or symbol, evidence, governing standard, and required action. Keep advisory smells/design-quality observations visibly separate from hard violations. Use `none` with the sources checked when clean.
 
 ## Spec
 
@@ -124,7 +127,7 @@ Do not merge or rerank the axes into a single list. Deduplicate only exact overl
 
 ## Fix and completion rules
 
-On merge-ready workflows, fix concrete in-scope blockers when feasible and add focused regression coverage for corrected behavior. Skip cosmetic or speculative smell suggestions that do not create a real maintenance or correctness cost.
+On merge-ready workflows, fix concrete in-scope blockers when feasible and add focused regression coverage for corrected behavior. Skip cosmetic or speculative smell/design suggestions that do not create a real maintenance or correctness cost.
 
 The axis is complete only when:
 
@@ -133,5 +136,6 @@ The axis is complete only when:
 - the spec source or its absence is recorded
 - the standards sources are listed
 - all smell findings follow the repo-override and judgement-call rules
+- the design-quality companion was applied where relevant or explicitly recorded `n/a`
 - docs/help were checked against explicit non-goals when the PR defines phase boundaries
 - `## Standards` and `## Spec` results are available for the final verdict
