@@ -7,6 +7,7 @@ import {
   confirmAuthorityHost,
   runGuidedInstall,
 } from "../../scripts/lib/bootstrap-install.mjs";
+import { reconcileStableAuthorityHost } from "../../scripts/lib/authority-host-install.mjs";
 
 function verifiedPayload(workspace, version = "0.5.0") {
   return {
@@ -108,6 +109,61 @@ test("confirmAuthorityHost explains the GUI and accepts yes/no answers with yes 
   }
 });
 
+test("confirmAuthorityHost reprompts instead of treating arbitrary input as approval", async () => {
+  const answers = ["not sure", "n"];
+  let prompts = 0;
+  const result = await confirmAuthorityHost({
+    input: { isTTY: true },
+    output: { write() {} },
+    ask: async () => {
+      prompts += 1;
+      return answers.shift();
+    },
+  });
+
+  assert.equal(result, false);
+  assert.equal(prompts, 2);
+});
+
+test("accepting the GUI prompt installs Authority even when protection mode is initially off", async () => {
+  const target = resolve("/tmp/skills/github-delivery");
+  let installed = false;
+  let installCalls = 0;
+  const expectedRelease = verifiedPayload("/tmp").release;
+  const result = await runGuidedInstall({
+    target,
+    dependencies: dependencies({
+      platform: "win32",
+      confirmAuthorityHost: async () => true,
+      reconcileStableAuthorityHost: (options) => reconcileStableAuthorityHost({
+        ...options,
+        platform: "win32",
+        client: {
+          async latestRelease() { return { tag_name: expectedRelease.tag }; },
+        },
+        dependencies: {
+          readUserConfig: () => ({ config: { schemaVersion: 1, authorityMode: "off" } }),
+          readInstalledAuthorityHost: () => installed
+            ? { supported: true, configured: true, installed: true, legacy: false, version: expectedRelease.version, sourceCommit: expectedRelease.sourceCommit }
+            : { supported: true, configured: false, installed: false, legacy: false, version: null, sourceCommit: null },
+          makeWorkspace: () => "/tmp/authority-host-install",
+          removeWorkspace() {},
+          acquireVerifiedAuthorityHostPayload: async () => ({ verified: true }),
+          installVerifiedAuthorityHost() {
+            installCalls += 1;
+            installed = true;
+            return { status: 0 };
+          },
+        },
+      }),
+    }),
+  });
+
+  assert.equal(installCalls, 1);
+  assert.equal(result.authorityHost.action, "install");
+  assert.equal(result.authorityHost.changed, true);
+});
+
 test("declining the Windows approval GUI skips reconciliation but completes the skill install", async () => {
   let authorityCalls = 0;
   const target = resolve("/tmp/skills/github-delivery");
@@ -160,6 +216,7 @@ test("guided install verifies a release, performs a dry-run, then reconciles Aut
         events.push("reconcile-authority");
         assert.deepEqual(options.expectedRelease, verifiedPayload("/tmp").release);
         assert.equal(options.scriptPath, join(target, "authority-host", "windows", "install-release.ps1"));
+        assert.equal(options.installWhenDisabled, true);
         return { ...AUTHORITY_NOOP };
       },
     }),

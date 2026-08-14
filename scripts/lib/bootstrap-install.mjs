@@ -101,11 +101,17 @@ export async function confirmAuthorityHost(
     output.write("  You can install it later with: npx github-delivery setup\n\n");
   }
   const prompt = "Install the Windows approval GUI now? [Y/n] ";
-  const answer = ask
-    ? await ask(prompt)
-    : await askWithReadline(prompt, { input, output });
-  // A blank interactive response defaults to yes.
-  return !/^(?:n|no)$/i.test(String(answer ?? "").trim());
+  while (true) {
+    const answer = ask
+      ? await ask(prompt)
+      : await askWithReadline(prompt, { input, output });
+    const normalized = String(answer ?? "").trim();
+    if (normalized === "" || /^(?:y|yes)$/i.test(normalized)) return true;
+    if (/^(?:n|no)$/i.test(normalized)) return false;
+    if (output && typeof output.write === "function") {
+      output.write("Please answer yes or no.\n");
+    }
+  }
 }
 
 function renderEnvironmentCheck(environment, output) {
@@ -249,6 +255,7 @@ export async function runGuidedInstall({
       authorityHost = await reconcileAuthority({
         expectedRelease: payload.release,
         scriptPath: join(target, "authority-host", "windows", "install-release.ps1"),
+        installWhenDisabled: true,
       });
     }
     renderProtectionPostflight(installation?.watchdog, output);
