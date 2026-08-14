@@ -284,7 +284,7 @@ export async function runGuidedInstall({
         installWhenDisabled: true,
       });
       const authorityStarted = authorityHost?.installed?.installed
-        ? startAuthority({ installed: authorityHost.installed })
+        ? await startAuthority({ installed: authorityHost.installed })
         : { started: false, reason: "not_installed" };
       const enableStartup = await confirmAuthStartup({ input, output });
       const configureStartup = dependencies.configureAuthorityHostStartup || configureAuthorityHostStartup;
@@ -292,8 +292,11 @@ export async function runGuidedInstall({
         ? configureStartup({ installed: authorityHost.installed })
         : { configured: false, reason: enableStartup ? "not_installed" : "declined" };
       output?.write?.(authorityStarted.started
-        ? "  Approval GUI is running in the notification area.\n"
+        ? "  Approval GUI is running in the notification area and Authority is ready.\n"
         : `  Approval GUI not started (${authorityStarted.reason}). Run: npx github-delivery start\n`);
+      if (!authorityStarted.started && authorityStarted.diagnosticsPath) {
+        output?.write?.(`  Diagnostics: ${authorityStarted.diagnosticsPath}\n`);
+      }
       output?.write?.(authorityStartup.configured
         ? "  Windows login auto-start: configured.\n"
         : `  Windows login auto-start not enabled (${authorityStartup.reason}). Enable later with: npx github-delivery autostart\n`);

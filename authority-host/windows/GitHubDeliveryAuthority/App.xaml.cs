@@ -15,6 +15,7 @@ public partial class App : Application
     public App(bool forceSetup)
     {
         _forceSetup = forceSetup;
+        UnhandledException += (_, args) => StartupDiagnostics.Write(args.Exception, "App.UnhandledException");
         InitializeComponent();
     }
 

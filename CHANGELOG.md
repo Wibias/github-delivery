@@ -4,6 +4,24 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-08-14
+
+### Added
+
+- Staged human-readable progress for `npx github-delivery update --apply`, so release verification, skill replacement, post-install verification, and Windows Authority reconciliation are visible while they happen instead of appearing to stall until a final receipt is printed.
+- Best-effort local Windows Authority startup diagnostics at `%LOCALAPPDATA%\GitHubDeliveryAuthority\startup-error.log`, including top-level, AppDomain, and WinUI unhandled startup exceptions. Windows CI now also executes the published self-contained Authority executable with `--self-test` after publish.
+
+### Changed
+
+- `npx github-delivery start` now treats the existing Authority named-pipe `status` response as the readiness boundary. A successful process spawn alone is no longer reported as a running GUI; the command waits for `status: ready` and reports a bounded failure with the diagnostics path when readiness is not established.
+- Default `update` and `autostart` output is now concise human-readable CLI text. Raw machine-readable output remains explicit where supported, including `doctor --json`.
+
+### Fixed
+
+- Fixed the npm bootstrap package closure after the new readiness probe introduced an import of `scripts/lib/authority-host-client.mjs`: the runtime client is now included in the published package and in both exact package-surface validators, so a real packed tarball can run the bootstrap CLI after an offline local install.
+- Fixed false-positive `start` success reporting when the Windows Authority process exits during startup or never opens its status pipe.
+- Fixed `update` and `autostart` falling through to raw internal JSON receipts despite existing user-facing renderers.
+
 ## [0.7.0] - 2026-08-14
 
 ### Added

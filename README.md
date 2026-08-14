@@ -6,7 +6,7 @@
 
 **Say the outcome, not the orchestration.**
 
-`github-delivery` turns natural-language requests into evidence-backed GitHub workflows: PRDs, issue research, implementation, deep review, CI, fixes, stacks, verified merges, and verified stable self-update. Its v0.7 quality stack adds evidence-backed design review, stable behavior-boundary verification, and reproducible migration/change execution on top of the existing fail-closed delivery, authority, and progress controls.
+`github-delivery` turns natural-language requests into evidence-backed GitHub workflows: PRDs, issue research, implementation, deep review, CI, fixes, stacks, verified merges, and verified stable self-update. Its v0.7 quality stack adds evidence-backed design review, stable behavior-boundary verification, and reproducible migration/change execution on top of the existing fail-closed delivery, authority, and progress controls. v0.7.1 hardens the bootstrap/runtime edge: update and autostart output is human-readable, applied updates stream stage progress, and Windows Authority startup is only reported ready after the host answers its status pipe.
 
 [Quick start](#try-it-in-60-seconds) · [Self-update](#update-an-installed-release) · [Progress watchdog](#agent-progress-watchdog) · [What it can own](#what-you-can-ask-it-to-own) · [Safety model](#safety-model) · [Installation](#installation)
 
@@ -72,7 +72,7 @@ The npm package is only the bootstrap. The installed skill payload still comes f
 
 On supported Windows systems, stable GitHub Releases also carry a **separately verified, self-contained Authority host component** built from the same tagged commit. Managed setup/update can install or repair that component without a local .NET SDK. It is not silently installed for a user whose protection mode is `off` and who has never installed Authority.
 
-On a fresh machine, the guided flow installs the verified release and starts the Windows Authority host in the notification area when accepted. Login auto-start is a separate opt-in prompt; enable it later with `npx github-delivery autostart`. Use `npx github-delivery start` only to launch the GUI now. If loop interruption is still inactive after a guided install, the CLI reports that GitHub Delivery has not verified Codex hook trust for the installation. If the exact unchanged definitions are already trusted in Codex, they do not need to be trusted again; otherwise review them in `/hooks`, then rerun `npx github-delivery setup`.
+On a fresh machine, the guided flow installs the verified release and starts the Windows Authority host in the notification area when accepted. Login auto-start is a separate opt-in prompt; enable it later with `npx github-delivery autostart`. Use `npx github-delivery start` only to launch the GUI now. The command reports success only after the installed host answers its named-pipe `status` probe with `status: ready`; an early process exit or readiness timeout is reported as a failure instead. If loop interruption is still inactive after a guided install, the CLI reports that GitHub Delivery has not verified Codex hook trust for the installation. If the exact unchanged definitions are already trusted in Codex, they do not need to be trusted again; otherwise review them in `/hooks`, then rerun `npx github-delivery setup`.
 
 Explicit commands are also available:
 
@@ -111,6 +111,8 @@ npx github-delivery update --apply
 
 The first command is a dry-run. Self-update accepts only the fixed upstream's latest published stable `vX.Y.Z` GitHub Release and replaces nothing until the release assets, checksums, manifest, exact tag/source commit, constrained GitHub artifact attestation, and strict ZIP extraction all verify. Local tracked modifications block skill replacement even with `--force`; skill downgrades are never performed through `update`.
 
+`update` is human-readable by default, and `update --apply` streams durable stage lines while release verification, skill installation/verification, and Windows Authority reconciliation are happening instead of withholding all output until the final result. Internal structured receipts are not dumped by default; `doctor --json` remains the explicit machine-readable health-report path.
+
 Recognized pre-manifest GitHub Delivery installations can migrate through this same verified updater. They are accepted only when multiple identity markers match, and the previous installation's file integrity remains explicitly unknown. Migration never downgrades, backs up the entire old target before replacement, and applies only the already-verified stable manifest-backed payload. `setup` remains restricted to managed installations until migration completes.
 
 On Windows, the same update reports the Authority host separately. An already-installed or required stale/legacy Authority host is acquired from its own versioned, attested release asset and kept aligned with the stable skill version. That repair can happen even when the skill itself is already current. If Authority was never installed and protection is `off`, it remains absent; if the installed Authority host is ahead of stable, it is not automatically downgraded.
@@ -127,7 +129,7 @@ npx github-delivery setup
 
 `setup` works only against an existing valid installation. It never substitutes the ephemeral npm package for the installed skill source and never bypasses Codex hook trust. On supported Windows, it also reconciles a required or already-configured Authority host through the verified stable component path.
 
-`start` launches the installed Windows Authority GUI without changing login behavior. Login auto-start is opt-in: enable it during the fresh-install prompt or run `npx github-delivery autostart` later. The command configures the current user’s Windows login startup entry and is idempotent.
+`start` launches the installed Windows Authority GUI without changing login behavior and does not claim success until the host answers `status: ready`. Startup failures are fail-closed and point to the best-effort local diagnostic log at `%LOCALAPPDATA%\GitHubDeliveryAuthority\startup-error.log`. Login auto-start is opt-in: enable it during the fresh-install prompt or run `npx github-delivery autostart` later. `autostart` is human-readable by default; the command configures the current user’s Windows login startup entry and is idempotent.
 
 For a read-only health report:
 
@@ -582,7 +584,7 @@ There is no recursive simplification loop.
 
 ## Agent progress watchdog
 
-GitHub Delivery v0.6 treats convergence as a layered runtime + workflow problem rather than a prompt-only rule. The target failure classes include repeated narration, long unique no-progress generation, channel hopping, read/evidence spirals, tool-call emission stalls (`Run`, `exec`, `Let me wire...` with no real tool), and malformed protocol output such as repeated `<atool>...</atool>`.
+GitHub Delivery v0.7 treats convergence as a layered runtime + workflow problem rather than a prompt-only rule. The target failure classes include repeated narration, long unique no-progress generation, channel hopping, read/evidence spirals, tool-call emission stalls (`Run`, `exec`, `Let me wire...` with no real tool), and malformed protocol output such as repeated `<atool>...</atool>`.
 
 The watchdog is deliberately separate from mutation authority. It can interrupt, block, rate-limit, reuse evidence, or request a focused retry; it cannot authorize or execute a GitHub write.
 
@@ -745,7 +747,7 @@ npx github-delivery update
 npx github-delivery update --apply
 ```
 
-`install` is for a fresh target. `setup` repairs or finishes activation against an existing managed installation. `doctor` is read-only and human-readable by default; recognized legacy manifestless installations are reported with unknown prior integrity and migration guidance. `doctor --json` emits the machine-readable report. `update` verifies and plans only; `update --apply` performs the verified replacement or verified legacy migration. On supported Windows, setup/update also manages the separately verified Authority host when required or already installed, without requiring the .NET SDK.
+`install` is for a fresh target. `setup` repairs or finishes activation against an existing managed installation. `doctor` is read-only and human-readable by default; recognized legacy manifestless installations are reported with unknown prior integrity and migration guidance. `doctor --json` emits the machine-readable report. `update` verifies and plans only; `update --apply` performs the verified replacement or verified legacy migration while emitting human-readable stage progress. `autostart` also uses human-readable default output. On supported Windows, setup/update manages the separately verified Authority host when required or already installed, without requiring the .NET SDK, and `start` does not report success until that host answers `status: ready`.
 
 Typical skill locations include:
 
@@ -790,7 +792,7 @@ npx github-delivery update
 npx github-delivery update --apply
 ```
 
-The first command is check/verify/plan only. The second applies through the same verified update machinery.
+The first command is check/verify/plan only. The second applies through the same verified update machinery and prints stage progress before its final human-readable summary.
 
 The installed-bundle interface remains available for manual or recovery use:
 
@@ -837,7 +839,7 @@ The launcher starts the real App Server over stdio, interposes an authenticated 
 - 60-second grants with one-time redemption;
 - current-user Named Pipe API — no arbitrary signing endpoint and no private key material exposed to the agent.
 
-The stable user path is managed through `npx github-delivery setup` / `update --apply`; it uses a separately built, versioned, attested self-contained `win-x64` release component and does **not** require a local .NET SDK. If the component is already installed, stable update keeps it aligned with the skill while preserving `authority.db`, `trust-store.json`, and persistent user config. If protection is `off` and Authority has never been installed, it stays uninstalled.
+The stable user path is managed through `npx github-delivery setup` / `update --apply`; it uses a separately built, versioned, attested self-contained `win-x64` release component and does **not** require a local .NET SDK. If the component is already installed, stable update keeps it aligned with the skill while preserving `authority.db`, `trust-store.json`, and persistent user config. If protection is `off` and Authority has never been installed, it stays uninstalled. Explicit `npx github-delivery start` waits for the host's `status: ready` response before claiming success; startup exceptions are written best-effort to `%LOCALAPPDATA%\GitHubDeliveryAuthority\startup-error.log` so an early process exit leaves actionable local evidence.
 
 The Control Center now has a functional **Settings** destination for **Off**, **Sensitive actions** (recommended), and **Every GitHub write**. It writes the same persistent `authorityMode` preference as the CLI and shows stored/effective mode plus Authority version/source status.
 
@@ -861,7 +863,7 @@ The required CI matrix runs **Node 22, 24, and 26** on:
 - Windows
 - macOS
 
-Every required matrix leg runs the normal repository checks **and** the architecture contract tests for mutation-action propagation and review-context integrity. Windows legs additionally restore/build the authority host in locked mode and run its self-test.
+Every required matrix leg runs the normal repository checks **and** the architecture contract tests for mutation-action propagation and review-context integrity. Windows legs additionally restore/build the Authority host in locked mode and run its self-test; the Node 24 Windows leg also publishes the self-contained host and executes that published executable with `--self-test` so packaging/runtime regressions are exercised after publish.
 
 Repository controls also include:
 
@@ -892,6 +894,6 @@ Do not publish suspected vulnerability details in a public issue or pull request
 
 ## Current state
 
-The complete issue/PR delivery lifecycle and its safety architecture are implemented: evidence-backed routing and ship gates, deferred-intent-safe merge routing, brokered lifecycle mutations, trusted exact-scope authority and durable verdict provenance, Windows Hello protection for high-assurance thread actions, a managed versioned/attested Windows Authority release component with state-preserving stable updates and functional Control Center protection settings, deep review, semantic propagation, safety-invariant proof, deterministic probes with non-bypassable required evidence, regression-first bug-fix evidence, stable-boundary regression/refactor verification, evidence-preserving durable GitHub prose, advisory design-quality review, reproducible migration/mechanical-change execution, pre-open review, safe simplification, repository-qualified stacks, conflict recovery, merge-queue semantics, aggregated strict-ruleset enforcement, authenticated exact-effect idempotency receipts, ambiguous-merge readback reconciliation, safe read retries, verified npm/npx bootstrap + latest-stable release installation, persistent route/phase workflow convergence, semantic evidence coverage/reuse, trust-aware Codex hook configuration, hard cross-channel protected-stream generation bounds with deterministic incident replay, issue close-out, deterministic release packaging, verified latest-stable self-update, repository controls, and dedicated live lifecycle fixtures.
+The complete issue/PR delivery lifecycle and its safety architecture are implemented: evidence-backed routing and ship gates, deferred-intent-safe merge routing, brokered lifecycle mutations, trusted exact-scope authority and durable verdict provenance, Windows Hello protection for high-assurance thread actions, a managed versioned/attested Windows Authority release component with state-preserving stable updates and functional Control Center protection settings, readiness-verified Authority startup with local startup diagnostics, deep review, semantic propagation, safety-invariant proof, deterministic probes with non-bypassable required evidence, regression-first bug-fix evidence, stable-boundary regression/refactor verification, evidence-preserving durable GitHub prose, advisory design-quality review, reproducible migration/mechanical-change execution, pre-open review, safe simplification, repository-qualified stacks, conflict recovery, merge-queue semantics, aggregated strict-ruleset enforcement, authenticated exact-effect idempotency receipts, ambiguous-merge readback reconciliation, safe read retries, verified npm/npx bootstrap + latest-stable release installation with human-readable staged update progress, persistent route/phase workflow convergence, semantic evidence coverage/reuse, trust-aware Codex hook configuration, hard cross-channel protected-stream generation bounds with deterministic incident replay, issue close-out, deterministic release packaging, verified latest-stable self-update, repository controls, and dedicated live lifecycle fixtures.
 
 Remaining work is primarily **operational** rather than a missing architecture layer: keep live repository rules/security settings aligned with the documented policy, provision and maintain the dedicated live fixture target/credential, run release acceptance for new versions, keep host integrations explicitly configured where runtime watchdog enforcement is desired, perform the npm registry's one-time package bootstrap/Trusted-Publisher setup when required for the first publication, and extend the regression corpus as GitHub and agent hosts evolve.

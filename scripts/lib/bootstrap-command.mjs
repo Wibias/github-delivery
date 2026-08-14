@@ -107,7 +107,11 @@ export async function runBootstrap(argv = [], dependencies = {}) {
       "bootstrap_update_installation_missing",
       updateEligible,
     );
-    return update({ target, apply: options.apply });
+    return update({
+      target,
+      apply: options.apply,
+      ...(typeof dependencies.onProgress === "function" ? { onProgress: dependencies.onProgress } : {}),
+    });
   }
   if (options.command === "setup") {
     const target = selectSingleTarget(options, installations, "bootstrap_setup_installation_missing");

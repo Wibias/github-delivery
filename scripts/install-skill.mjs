@@ -264,10 +264,12 @@ export async function runInstallCommand(options, dependencies = {}) {
   const readConfig = dependencies.readUserConfig || readUserConfig;
   const verifyRelease = dependencies.verifyInstalledRelease || verifyInstalledRelease;
   const reconcileAuthority = dependencies.reconcileStableAuthorityHost || reconcileStableAuthorityHost;
+  const progress = typeof dependencies.onProgress === "function" ? dependencies.onProgress : () => {};
   const workspace = makeWorkspace();
   let installation = null;
 
   try {
+    if (options.apply) progress({ stage: "checking_release" });
     const candidate = await prepareCandidate({
       target: options.target,
       workspace,
@@ -275,6 +277,7 @@ export async function runInstallCommand(options, dependencies = {}) {
     if (!candidate?.verified || !candidate?.plan || !candidate?.release || !candidate?.manifest || !candidate?.source) {
       throw new Error("stable_release_candidate_invalid");
     }
+    if (options.apply) progress({ stage: "release_verified", version: candidate.release.version });
 
     if (candidate.plan.action === "already_ahead") {
       return {
@@ -300,11 +303,21 @@ export async function runInstallCommand(options, dependencies = {}) {
     }
 
     if (candidate.plan.action === "already_current") {
+      if (authorityPlan?.required === true) {
+        progress({
+          stage: "updating_authority",
+          currentVersion: authorityPlan.currentVersion,
+          targetVersion: authorityPlan.targetVersion,
+        });
+      }
       const authorityHost = await reconcileAuthority({
         expectedRelease: candidate.release,
         scriptPath: join(options.target, "authority-host", "windows", "install-release.ps1"),
       });
       const authorityUpdated = authorityHost?.changed === true;
+      if (authorityUpdated) {
+        progress({ stage: "authority_updated", version: authorityHost?.installed?.version || candidate.release.version });
+      }
       return {
         ...candidate.plan,
         action: authorityUpdated ? "update" : candidate.plan.action,
@@ -324,6 +337,11 @@ export async function runInstallCommand(options, dependencies = {}) {
     }
 
     const configBefore = readConfig();
+    progress({
+      stage: "installing_skill",
+      currentVersion: candidate.plan.currentVersion,
+      targetVersion: candidate.release.version,
+    });
     installation = install({
       ...options,
       source: candidate.source,
@@ -333,17 +351,29 @@ export async function runInstallCommand(options, dependencies = {}) {
       force: false,
       legacyManifestlessMigration: legacyMigration,
     });
+    progress({ stage: "skill_installed", backupPath: installation?.backupPath || null });
 
     verifyRelease({ target: options.target, manifest: candidate.manifest });
     const configAfter = readConfig();
     if (!sameUserConfig(configBefore, configAfter)) {
       throw new Error("stable_update_user_config_changed_unexpectedly");
     }
+    progress({ stage: "skill_verified", version: candidate.release.version });
 
+    if (authorityPlan?.required === true) {
+      progress({
+        stage: "updating_authority",
+        currentVersion: authorityPlan.currentVersion,
+        targetVersion: authorityPlan.targetVersion,
+      });
+    }
     const authorityHost = await reconcileAuthority({
       expectedRelease: candidate.release,
       scriptPath: join(options.target, "authority-host", "windows", "install-release.ps1"),
     });
+    if (authorityHost?.changed === true) {
+      progress({ stage: "authority_updated", version: authorityHost?.installed?.version || candidate.release.version });
+    }
 
     return {
       action: legacyMigration ? "migrate_legacy" : "update",
