@@ -88,6 +88,11 @@ jobs:
           node-version: 22
           package-manager-cache: false
 
+      - name: Set up .NET
+        uses: actions/setup-dotnet@3951f0dfe7a07e2313ec93c75700083e2005cbab # v4.3.0
+        with:
+          global-json-file: global.json
+
       - name: Resolve release version
         id: release_version
         shell: pwsh
@@ -105,6 +110,13 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           dotnet publish $Project --configuration Release --runtime win-x64 --self-contained true --no-restore --output $PublishDir
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $DepsPath = Join-Path $PublishDir 'GitHubDeliveryAuthority.deps.json'
+          $Deps = Get-Content $DepsPath -Raw | ConvertFrom-Json
+          $RuntimePackage = $Deps.libraries.PSObject.Properties.Name |
+            Where-Object { $_ -like 'runtimepack.Microsoft.NETCore.App.Runtime.win-x64/*' }
+          if ($RuntimePackage -ne 'runtimepack.Microsoft.NETCore.App.Runtime.win-x64/8.0.30') {
+            throw "Published authority host bundled unexpected runtime: $RuntimePackage"
+          }
           node scripts/build-authority-host-release.mjs --publish-dir "$PublishDir" --out-dir "dist/authority-host" --version "${{ steps.release_version.outputs.version }}" --source-commit "${{ github.sha }}"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
