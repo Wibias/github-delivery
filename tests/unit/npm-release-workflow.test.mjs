@@ -61,7 +61,7 @@ test("npm publication remains fail-visible in the release sequence", () => {
 
   assert.match(
     publishJob,
-    /Rebuild from the tagged commit[\s\S]*npm run package:check[\s\S]*npm ci --prefix \.github\/npm-publish --allow-remote=all --ignore-scripts[\s\S]*node \.github\/npm-publish\/node_modules\/npm\/bin\/npm-cli\.js publish --access public[\s\S]*Publish GitHub Release/,
+    /Rebuild from the tagged commit[\s\S]*npm run package:check[\s\S]*npm ci --prefix \.github\/npm-publish --include=dev --allow-remote=all --ignore-scripts[\s\S]*node \.github\/npm-publish\/node_modules\/npm\/bin\/npm-cli\.js publish --access public[\s\S]*Publish GitHub Release/,
   );
   assert.doesNotMatch(publishJob, /npm publish[^\n]*(\|\| true|continue-on-error)/);
 });
