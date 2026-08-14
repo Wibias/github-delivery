@@ -34,6 +34,6 @@ When a merge closes linked issues, thank relevant issue authors without self-tha
 
 Public security communication should be useful but redacted. Do not publish secrets or unnecessarily actionable exploit chains when the private user conversation is the safer surface.
 
-### GD-PUB-009 - Keep durable GitHub prose concrete
+### GD-PUB-009 — Keep durable GitHub prose concrete
 
 Before publishing prose authored by `github-delivery`, apply `references/prose-quality.md`. Preserve exact evidence, required template structure, GitHub syntax, security redaction, and user-confirmed wording. Style cleanup must never turn `unknown`, `not run`, `blocked`, or another evidence state into a stronger claim.
