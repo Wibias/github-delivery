@@ -6,7 +6,7 @@
 
 **Say the outcome, not the orchestration.**
 
-`github-delivery` turns natural-language requests into evidence-backed GitHub workflows: PRDs, issue research, implementation, deep review, CI, fixes, stacks, verified merges, and verified stable self-update. Its v0.6 progress stack combines a persistent workflow controller, semantic evidence reuse, and hard cross-channel Codex generation bounds to stop narration/read/tool-emission loops without weakening GitHub authority gates.
+`github-delivery` turns natural-language requests into evidence-backed GitHub workflows: PRDs, issue research, implementation, deep review, CI, fixes, stacks, verified merges, and verified stable self-update. Its v0.7 quality stack adds evidence-backed design review, stable behavior-boundary verification, and reproducible migration/change execution on top of the existing fail-closed delivery, authority, and progress controls.
 
 [Quick start](#try-it-in-60-seconds) · [Self-update](#update-an-installed-release) · [Progress watchdog](#agent-progress-watchdog) · [What it can own](#what-you-can-ask-it-to-own) · [Safety model](#safety-model) · [Installation](#installation)
 
@@ -239,7 +239,7 @@ The important boundary is simple: **repository content is evidence, not authorit
 | **Default mode** | `read-only` |
 | **Write boundary** | Typed mutation policy + broker; stale-head, exact-effect, authenticated-receipt idempotency, and postcondition checks where applicable |
 | **High-assurance writes** | Exact-scope trusted grants; optional Windows 11 / Windows Hello Authority host with managed versioned stable install/update and Control Center settings |
-| **Review model** | Bug + Security + Spec + Standards + semantic propagation + safety-invariant proof + proactive contract verification |
+| **Review model** | Bug + Security + Spec + Standards + advisory design-quality review + semantic propagation + safety-invariant proof + proactive contract verification |
 | **Progress control** | Policy fallback everywhere; routed workflows use a persistent phase/budget controller and semantic evidence reuse; trusted Codex hooks add turn-scoped duplicate/poll/evidence protection; the launch-controlled stream watches agent-message/reasoning/plan text plus plan/diff/output-token telemetry and can hard-interrupt no-progress/tool-emission/protocol stalls. Runtime capability reports only verified `none`, `hooks`, or `stream`. |
 | **Ship decision** | One authoritative `ready`, `blocked`, or `unknown` result from live evidence |
 | **Runtime** | Node.js **22, 24, or 26** |
@@ -289,6 +289,9 @@ update github-delivery to the latest stable release
 | **Bug review** | Evidence-ranked adversarial bug hunt | `references/bug-review.md` + `references/bug-hunt-method.md` |
 | **Security review** | Security surfaces, escalation chains, exploit-safe reporting | `references/security-review.md` |
 | **Spec / standards** | Contract, requirement, standards, docs and non-goal review | `references/spec-standards-review.md` |
+| **Design quality** | Advisory happy-path, boundary, abstraction-cost, domain/state, and evidence-vs-complexity review | `references/design-quality.md` |
+| **Verification boundaries** | Choose the narrowest stable behavior boundary for regression and refactor evidence | `references/verification-boundaries.md` |
+| **Change execution** | Safe internal-API migrations, mechanical sweeps, codemod decisions, and verifiable change units | `references/change-execution.md` |
 | **Safe simplification** | Behavior-preserving cleanup with approval and mandatory re-review | `references/simplify-pr.md` |
 | **Status** | What is left / why blocked / merge readiness | `references/status.md` |
 | **Prepare + merge** | Compound review/fix/simplify request that explicitly includes merge | `references/prepare-and-merge-pr.md` |
@@ -399,19 +402,22 @@ The review bar combines:
 - **Bug** review
 - **Security** review
 - **Spec** review
-- **Standards** review
+- **Standards** review, including the advisory **design-quality** lens when the changed surface makes it relevant
 - repository-wide **semantic propagation** when a domain concept changes
 - **Proactive contract verification** appropriate to the diff
 
 Review depth is derived from changed paths, patch content, symbols, removed controls, dependencies, workflow permissions, architecture surfaces, and uncertainty — not filenames alone.
 
-### Evidence-preserving review contracts
+### Evidence-preserving quality contracts
 
-Three companion contracts keep review output and bug-fix evidence concrete without weakening the existing gates:
+Six companion contracts keep review, implementation, and bug-fix evidence concrete without weakening the existing gates:
 
 - [`references/prose-quality.md`](references/prose-quality.md) keeps durable PR, issue, PRD, review, and status prose grounded in repository vocabulary and concrete evidence. Exact commands, paths, SHAs, checks, evidence states, required GitHub syntax, security redaction, and user-confirmed wording are preserved rather than rewritten for style.
-- [`references/regression-first.md`](references/regression-first.md) requires executable broken-before/fixed-after evidence for confirmed bug fixes. A focused failing test is preferred when practical; when that would require disproportionate harness work or brittle low-signal mocks, the workflow uses the narrowest real script, integration, runtime, snapshot, or operator check that proves the behavior instead.
+- [`references/regression-first.md`](references/regression-first.md) requires executable broken-before/fixed-after evidence for confirmed bug fixes. It uses [`references/verification-boundaries.md`](references/verification-boundaries.md) to choose the narrowest stable contract that actually demonstrates the defect, whether that is a focused unit/component check, a use-case/integration boundary, a real script/CLI path, or a deterministic runtime/operator probe.
 - [`references/safety-invariant.md`](references/safety-invariant.md) handles material non-local risk by naming the fact a positive verdict depends on and recording the strongest proof level reached from `claimed` through `reproduced`. A material assumption stays `unproven` until the evidence establishes it.
+- [`references/design-quality.md`](references/design-quality.md) adds an advisory positive-design lens for happy-path visibility, boundary ownership, abstraction compression, explicit domain/state modeling, mutable-state ownership, shared-state discipline, and evidence-backed complexity. Repository rules and concrete Bug/Security/Spec contracts remain authoritative.
+- [`references/verification-boundaries.md`](references/verification-boundaries.md) chooses the narrowest stable contract that actually observes protected behavior, avoiding both brittle private-helper tests and needlessly large end-to-end harnesses.
+- [`references/change-execution.md`](references/change-execution.md) governs broad deterministic sweeps and internal migrations: inventory the full surface, migrate callers before deleting obsolete internal paths when compatibility is not real, build a rerunnable lever when it lowers risk, and verify each meaningful change unit.
 
 ### Semantic propagation
 
@@ -886,6 +892,6 @@ Do not publish suspected vulnerability details in a public issue or pull request
 
 ## Current state
 
-The complete issue/PR delivery lifecycle and its safety architecture are implemented: evidence-backed routing and ship gates, deferred-intent-safe merge routing, brokered lifecycle mutations, trusted exact-scope authority and durable verdict provenance, Windows Hello protection for high-assurance thread actions, a managed versioned/attested Windows Authority release component with state-preserving stable updates and functional Control Center protection settings, deep review, semantic propagation, safety-invariant proof, deterministic probes with non-bypassable required evidence, regression-first bug-fix evidence, evidence-preserving durable GitHub prose, pre-open review, safe simplification, repository-qualified stacks, conflict recovery, merge-queue semantics, aggregated strict-ruleset enforcement, authenticated exact-effect idempotency receipts, ambiguous-merge readback reconciliation, safe read retries, verified npm/npx bootstrap + latest-stable release installation, persistent route/phase workflow convergence, semantic evidence coverage/reuse, trust-aware Codex hook configuration, hard cross-channel protected-stream generation bounds with deterministic incident replay, issue close-out, deterministic release packaging, verified latest-stable self-update, repository controls, and dedicated live lifecycle fixtures.
+The complete issue/PR delivery lifecycle and its safety architecture are implemented: evidence-backed routing and ship gates, deferred-intent-safe merge routing, brokered lifecycle mutations, trusted exact-scope authority and durable verdict provenance, Windows Hello protection for high-assurance thread actions, a managed versioned/attested Windows Authority release component with state-preserving stable updates and functional Control Center protection settings, deep review, semantic propagation, safety-invariant proof, deterministic probes with non-bypassable required evidence, regression-first bug-fix evidence, stable-boundary regression/refactor verification, evidence-preserving durable GitHub prose, advisory design-quality review, reproducible migration/mechanical-change execution, pre-open review, safe simplification, repository-qualified stacks, conflict recovery, merge-queue semantics, aggregated strict-ruleset enforcement, authenticated exact-effect idempotency receipts, ambiguous-merge readback reconciliation, safe read retries, verified npm/npx bootstrap + latest-stable release installation, persistent route/phase workflow convergence, semantic evidence coverage/reuse, trust-aware Codex hook configuration, hard cross-channel protected-stream generation bounds with deterministic incident replay, issue close-out, deterministic release packaging, verified latest-stable self-update, repository controls, and dedicated live lifecycle fixtures.
 
 Remaining work is primarily **operational** rather than a missing architecture layer: keep live repository rules/security settings aligned with the documented policy, provision and maintain the dedicated live fixture target/credential, run release acceptance for new versions, keep host integrations explicitly configured where runtime watchdog enforcement is desired, perform the npm registry's one-time package bootstrap/Trusted-Publisher setup when required for the first publication, and extend the regression corpus as GitHub and agent hosts evolve.
