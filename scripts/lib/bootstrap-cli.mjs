@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 
-const PUBLIC_COMMANDS = new Set(["install", "setup", "update", "doctor"]);
+const PUBLIC_COMMANDS = new Set(["install", "setup", "start", "update", "doctor"]);
 const SUPPORTED_NODE_MAJORS = new Set([22, 24, 26]);
 const VERSION_PATTERN = /^\d+\.\d+\.\d+$/;
 

@@ -1,6 +1,7 @@
 {
   "name": "github-delivery",
   "version": "0.6.0",
+  "description": "Guided installer and safety tooling for GitHub Delivery workflows",
   "type": "module",
   "engines": {
     "node": "^22 || ^24 || ^26"

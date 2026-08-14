@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { parseBootstrapArgs } from "./lib/bootstrap-cli.mjs";
 import { runBootstrap } from "./lib/bootstrap-command.mjs";
 
-export const HELP_TEXT = `GitHub Delivery\n\nUsage:\n  github-delivery\n  github-delivery install [--target PATH]\n  github-delivery setup [--target PATH]\n  github-delivery doctor [--target PATH] [--json]\n  github-delivery update [--target PATH] [--apply]\n\nBare invocation launches guided setup.\nDoctor is human-readable by default; add --json for the raw machine report.\nUpdate is dry-run by default; add --apply only after reviewing the plan.\n`;
+export const HELP_TEXT = `GitHub Delivery\n\nUsage:\n  github-delivery\n  github-delivery install [--target PATH]\n  github-delivery setup [--target PATH]\n  github-delivery start\n  github-delivery doctor [--target PATH] [--json]\n  github-delivery update [--target PATH] [--apply]\n\nBare invocation launches guided setup.\nDoctor is human-readable by default; add --json for the raw machine report.\nUpdate is dry-run by default; add --apply only after reviewing the plan.\n`;
 
 function value(value, fallback = "unknown") {
   if (value === null || value === undefined || value === "") return fallback;
@@ -88,10 +88,42 @@ function renderDoctor(result, stdout) {
   }
 }
 
+function renderBootstrapResult(result, stdout) {
+  if (result.action === "start") {
+    stdout.write(result.started
+      ? "GitHub Delivery approval GUI is running.\n"
+      : `GitHub Delivery approval GUI was not started (${result.reason || "unknown reason"}).\n`);
+    return;
+  }
+  if (result.action === "install") {
+    stdout.write(result.verified === false
+      ? "GitHub Delivery installation did not verify.\n"
+      : "GitHub Delivery installed successfully.\n");
+    if (result.authorityHost?.installed) {
+      stdout.write(`  Authority GUI is installed${result.authorityHost.installed.version ? ` (${result.authorityHost.installed.version})` : ""}\n`);
+      stdout.write("  Start it later with: npx github-delivery start\n");
+    }
+    return;
+  }
+  if (result.action === "setup") {
+    stdout.write(result.status === "ready"
+      ? "GitHub Delivery setup complete.\n"
+      : "GitHub Delivery setup needs one more step.\n");
+    if (result.status === "ready") stdout.write("  Start the approval GUI with: npx github-delivery start\n");
+    if (result.guidance) stdout.write(`  ${result.guidance}\n`);
+    return;
+  }
+  stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+}
+
 function printResult(result, { stdout = process.stdout, options = {} } = {}) {
   if (!result || result.action === "help") return;
   if (result.action === "doctor" && options.json !== true) {
     renderDoctor(result, stdout);
+    return;
+  }
+  if (["install", "setup", "start"].includes(result.action)) {
+    renderBootstrapResult(result, stdout);
     return;
   }
   stdout.write(`${JSON.stringify(result, null, 2)}\n`);

@@ -69,13 +69,14 @@ The npm package is only the bootstrap. The installed skill payload still comes f
 
 On supported Windows systems, stable GitHub Releases also carry a **separately verified, self-contained Authority host component** built from the same tagged commit. Managed setup/update can install or repair that component without a local .NET SDK. It is not silently installed for a user whose protection mode is `off` and who has never installed Authority.
 
-On a fresh machine, the guided flow installs the verified release and then walks through any remaining host setup. With an existing valid installation, it offers **Update / Repair setup / Exit** rather than silently reinstalling or updating. If loop interruption is still inactive after a guided install, the CLI reports that GitHub Delivery has not verified Codex hook trust for the installation. If the exact unchanged definitions are already trusted in Codex, they do not need to be trusted again; otherwise review them in `/hooks`, then rerun `npx github-delivery setup`.
+On a fresh machine, the guided flow installs the verified release, starts the Windows Authority host in the notification area when accepted, and then walks through any remaining host setup. With an existing valid installation, it offers **Update / Repair setup / Exit** rather than silently reinstalling or updating. Use `npx github-delivery start` to launch the approval GUI again. If loop interruption is still inactive after a guided install, the CLI reports that GitHub Delivery has not verified Codex hook trust for the installation. If the exact unchanged definitions are already trusted in Codex, they do not need to be trusted again; otherwise review them in `/hooks`, then rerun `npx github-delivery setup`.
 
 Explicit commands are also available:
 
 ```bash
 npx github-delivery install
 npx github-delivery setup
+npx github-delivery start
 npx github-delivery doctor
 npx github-delivery doctor --json
 npx github-delivery update
@@ -716,6 +717,7 @@ Useful explicit commands:
 ```bash
 npx github-delivery install
 npx github-delivery setup
+npx github-delivery start
 npx github-delivery doctor
 npx github-delivery doctor --json
 npx github-delivery update
