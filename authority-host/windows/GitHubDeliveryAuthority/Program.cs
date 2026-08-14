@@ -12,6 +12,7 @@ internal static class Program
 
         var xamlSelfTest = args.Contains("--xaml-self-test", StringComparer.Ordinal);
         App? app = null;
+        Mutex? mutex = null;
 
         AppDomain.CurrentDomain.UnhandledException += (_, eventArgs) =>
         {
@@ -23,8 +24,11 @@ internal static class Program
         try
         {
             var forceSetup = args.Contains("--setup", StringComparer.Ordinal);
-            using var mutex = new Mutex(initiallyOwned: true, "Local\\GitHubDeliveryAuthority-v1", out var createdNew);
-            if (!createdNew) return 0;
+            if (!xamlSelfTest)
+            {
+                mutex = new Mutex(initiallyOwned: true, "Local\\GitHubDeliveryAuthority-v1", out var createdNew);
+                if (!createdNew) return 0;
+            }
 
             StartupDiagnostics.Clear();
             WinRT.ComWrappersSupport.InitializeComWrappers();
@@ -41,6 +45,10 @@ internal static class Program
         {
             StartupDiagnostics.Write(exception, "Program.Main");
             return 1;
+        }
+        finally
+        {
+            mutex?.Dispose();
         }
     }
 }
