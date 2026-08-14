@@ -131,3 +131,35 @@ test("unsupported systems report when the configured mode requires Authority", a
     mode: "high-assurance",
   });
 });
+
+test("explicit install opt-in overrides disabled planning without changing authority mode", async () => {
+  let isInstalled = false;
+  let installCalls = 0;
+  const expectedRelease = { tag: "v0.5.2", version: "0.5.2", sourceCommit: "b".repeat(40) };
+  const result = await reconcileStableAuthorityHost({
+    expectedRelease,
+    platform: "win32",
+    installWhenDisabled: true,
+    client: {
+      async latestRelease() { return { tag_name: expectedRelease.tag }; },
+    },
+    dependencies: {
+      readUserConfig: () => ({ config: { schemaVersion: 1, authorityMode: "off" } }),
+      readInstalledAuthorityHost: () => isInstalled
+        ? installed({ version: expectedRelease.version, sourceCommit: expectedRelease.sourceCommit })
+        : { supported: true, configured: false, installed: false, legacy: false, version: null, sourceCommit: null },
+      makeWorkspace: () => "/tmp/authority-host-opt-in",
+      removeWorkspace() {},
+      acquireVerifiedAuthorityHostPayload: async () => ({ verified: true }),
+      installVerifiedAuthorityHost() {
+        installCalls += 1;
+        isInstalled = true;
+        return { status: 0 };
+      },
+    },
+  });
+
+  assert.equal(installCalls, 1);
+  assert.equal(result.action, "install");
+  assert.equal(result.mode, "off");
+});
