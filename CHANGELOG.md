@@ -6,8 +6,11 @@ All notable changes to `github-delivery` are documented here.
 
 ## [0.6.1] - 2026-08-14
 
+## [0.6.1] - 2026-08-14
+
 ### Added
 
+- Authority host environment variables are documented as optional explicit overrides. Normal installations use built-in defaults and no longer persist these variables in the user environment.
 - Guided Windows approval-GUI choice. Fresh interactive installs explain the optional component and ask `Install the Windows approval GUI now? [Y/n]`; explicit consent installs the separately verified Authority host without changing an `off` protection mode, while No finishes the skill install without the GUI.
 - User-facing `npx` bootstrap summaries, an explicit `npx github-delivery start` command, and opt-in Windows login auto-start. Fresh installs ask `Enable Windows login auto-start? [y/N]`; users can enable it later with `npx github-delivery autostart`. The `start` command launches the GUI without changing the login setting.
 

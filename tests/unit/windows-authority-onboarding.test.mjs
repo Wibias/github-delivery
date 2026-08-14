@@ -42,3 +42,9 @@ test("Windows authority documentation explains Hello setup and recovery", () => 
   assert.match(installGuide, /Windows Hello PIN/i);
   assert.match(installGuide, /biometric hardware is not required/i);
 });
+
+test("release installer does not persist authority overrides in the user environment", () => {
+  const releaseInstaller = read("authority-host/windows/install-release.ps1");
+
+  assert.doesNotMatch(releaseInstaller, /SetEnvironmentVariable\(/);
+});

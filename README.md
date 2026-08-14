@@ -24,6 +24,9 @@
 > [!IMPORTANT]
 > **Natural language is the public API.** The Node scripts, policy modules, authority layer, evaluators, and mutation broker are internal safety and evidence machinery. You normally do not invoke them yourself.
 
+> [!NOTE]
+> The optional Windows Authority host uses built-in defaults for its trust-store path and named pipe. `GITHUB_DELIVERY_AUTHORITY_TRUST_STORE` and `GITHUB_DELIVERY_AUTHORITY_PIPE` remain available as explicit overrides for custom installations or testing; normal installation does not persist them in the user environment.
+
 <p align="center">
   <img src="docs/assets/github-delivery-demo.svg" alt="github-delivery natural-language workflow demo" width="100%">
 </p>

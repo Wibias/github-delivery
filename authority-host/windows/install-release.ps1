@@ -86,14 +86,6 @@ try {
     $shortcut.WorkingDirectory = $targetDir
     $shortcut.Save()
 
-    [Environment]::SetEnvironmentVariable(
-        'GITHUB_DELIVERY_AUTHORITY_TRUST_STORE',
-        (Join-Path $InstallDir 'trust-store.json'),
-        'User')
-    [Environment]::SetEnvironmentVariable('GITHUB_DELIVERY_AUTHORITY_PIPE', $PipeName, 'User')
-    $env:GITHUB_DELIVERY_AUTHORITY_TRUST_STORE = Join-Path $InstallDir 'trust-store.json'
-    $env:GITHUB_DELIVERY_AUTHORITY_PIPE = $PipeName
-
     $installRecord = [ordered]@{
         schemaVersion = 1
         kind = 'github-delivery/authority-host-install'
