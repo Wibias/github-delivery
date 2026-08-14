@@ -28,9 +28,15 @@ For every test/check relied on by the candidate, answer:
 
 If not, it does not count as evidence. Avoid vacuous assertions, implementation-mirroring tests, incidental formatting assertions, or checks that pass before and after the defect.
 
+Apply `references/verification-boundaries.md` when selecting characterization/equivalence checks. Prefer the narrowest stable boundary that observes the behavior the refactor must preserve. A private-helper-level check is not strong equivalence evidence merely because it is easy to write; it should count only when that helper exposes the relevant stable contract or when a more representative executable boundary is genuinely impractical and the limitation is recorded.
+
+When a test substitutes external dependencies, keep the substitution at a real integration seam where practical and make clear what production path remains unexercised. Do not build an internal mock choreography that can stay green while the use-case behavior changes.
+
 ## Characterization
 
 When current behavior is important but poorly documented or weakly tested, capture characterization evidence **before** restructuring it. This can be an executable test, controlled fixture, golden result, API snapshot, or another deterministic observation that records the behavior being preserved.
+
+Prefer characterization at a stable behavior boundary that survives the planned restructuring. Do not fossilize accidental private decomposition simply to make the refactor measurable.
 
 ## Unknowns
 
