@@ -56,6 +56,38 @@ test("control center implements the selected activity-first audit design in ligh
   }
 });
 
+test("control center owns theme brushes that are missing on affected WinUI runtimes", () => {
+  const app = read(`${root}/App.xaml`);
+  const window = read(`${root}/ControlCenterWindow.xaml`);
+  const fragileFrameworkBrushes = [
+    "CardBackgroundFillColorDefaultBrush",
+    "CardStrokeColorDefaultBrush",
+    "AccentTextFillColorPrimaryBrush",
+    "SystemFillColorSuccessBackgroundBrush",
+    "SystemFillColorSuccessBrush",
+    "SystemFillColorCriticalBrush",
+    "SystemFillColorCautionBrush",
+  ];
+  for (const brush of fragileFrameworkBrushes) {
+    assert.doesNotMatch(window, new RegExp(`ThemeResource ${brush}`));
+  }
+  for (const brush of [
+    "AuthorityCardBackgroundBrush",
+    "AuthorityCardStrokeBrush",
+    "AuthorityAccentBrush",
+    "AuthoritySuccessBackgroundBrush",
+    "AuthoritySuccessBrush",
+    "AuthorityCriticalBrush",
+    "AuthorityCautionBrush",
+  ]) {
+    assert.match(app, new RegExp(`x:Key=\\"${brush}\\"`));
+    assert.match(window, new RegExp(`ThemeResource ${brush}`));
+  }
+  for (const theme of ["Light", "Dark", "HighContrast"]) {
+    assert.match(app, new RegExp(`ResourceDictionary x:Key=\\"${theme}\\"`));
+  }
+});
+
 test("settings page exposes and persists exactly the three authority protection modes", () => {
   const window = read(`${root}/ControlCenterWindow.xaml`);
   const code = read(`${root}/ControlCenterWindow.xaml.cs`);
