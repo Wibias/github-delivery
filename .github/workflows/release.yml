@@ -204,10 +204,10 @@ jobs:
         run: npm run package:check
 
       - name: Install trusted-publishing npm CLI
-        run: npm install --global git+https://github.com/npm/cli.git#da1d4d299151781500ec854f10eb7e570696d506
+        run: npm ci --prefix .github/npm-publish --allow-remote=all --ignore-scripts
 
       - name: Publish npm package
-        run: npm publish --access public
+        run: node .github/npm-publish/node_modules/npm/bin/npm-cli.js publish --access public
 
       - name: Publish GitHub Release
         env:
