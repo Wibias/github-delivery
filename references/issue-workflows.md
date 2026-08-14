@@ -10,6 +10,8 @@ Policy modules:
 
 Detailed procedures for each workflow type. Read the relevant section when executing that workflow.
 
+When a workflow below publishes durable issue or PRD prose authored by `github-delivery`, apply `references/prose-quality.md` before publication. Preserve exact quoted user wording, repository identifiers, evidence states, required issue structure, and any policy-mandated text. Readability cleanup must not strengthen uncertain evidence or hide an unresolved product decision.
+
 ## Issue publication action contract
 
 Use `create_issue` for a direct user request to create, file, or open a new GitHub issue. This is the canonical lifecycle action for ordinary issue publication.
