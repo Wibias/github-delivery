@@ -185,18 +185,30 @@ are failure.
 
 ### Phase 4 — Implementation
 
-1. Write a **failing test first** (state-based, asserts observable outcomes).
-2. Implement the minimal single fix — no "while I'm here" changes.
-3. Verify: targeted test passes, full suite passes, issue actually resolved.
-4. **Defense-in-depth:** where the root cause was invalid/missing data, add
+Apply `references/regression-first.md`. Regression evidence is mandatory; a new
+unit test is not mandatory when it would be low-signal or disproportionate.
+
+1. Choose the narrowest executable check that can demonstrate the bug before
+   the production change. Prefer a focused failing test when a practical test
+   path already exists. Otherwise record why and use the closest script,
+   integration check, runtime repro, snapshot, or other executable signal.
+2. Run the selected check before fixing and capture the specific failing or
+   wrong behavior. Do not proceed from a test that passes unexpectedly or
+   fails for an unrelated reason.
+3. Implement the minimal single root-cause fix — no "while I'm here" changes.
+4. Run the same regression check after the fix, then run the nearby/full
+   validation required by the governing workflow. Confirm the issue is actually
+   resolved, not merely that a unit test is green.
+5. **Defense-in-depth:** where the root cause was invalid/missing data, add
    validation at every layer the data passes through (entry, business logic,
    environment guards, debug instrumentation) so the bug becomes structurally
    impossible — not merely fixed at one point.
-5. Regression test required for every fixed High/Critical; if none, state why.
-   Size the regression coverage by cyclomatic complexity: 1–5 → 2–5 tests;
-   6–10 → 6–15; 11–20 → 16–40; > 20 → refactor first (a complex function
-   needs path coverage, not one happy-path test).
-6. **Central-file coupling:** if the fix touches a file many other files depend
+6. Every fixed High/Critical finding requires durable regression evidence.
+   Prefer an automated test when a useful path exists. If a durable test is
+   impractical, state why and preserve the exact executable before/after check.
+   Size coverage by distinct behavior partitions and failure paths, not an
+   arbitrary cyclomatic-complexity test-count formula.
+7. **Central-file coupling:** if the fix touches a file many other files depend
    on, classify the blast radius before editing:
    - **Direct** — explicit imports/calls; will break if the signature changes.
    - **Implicit** — files that change together with the target without
@@ -205,6 +217,8 @@ are failure.
    - **Unknown** — no coupling, different owner; needs extra review.
    Enumerate dependents (transitive callers/callees) and include them in
    verification — changing a hub breaks many things, not just the tested path.
+   When caller enumeration does not settle the material risk, apply
+   `references/safety-invariant.md` and prove the key non-local assumption.
 
 ### After 3 failed fixes
 
@@ -218,7 +232,7 @@ failed hypothesis — it is a wrong architecture.
 - "Quick fix for now, investigate later"
 - "Just try changing X and see if it works"
 - "Add multiple changes, run tests"
-- "Skip the test, I'll verify manually"
+- "Skip regression evidence, the fix is obvious"
 - "It's probably X, let me fix that"
 - "I don't fully understand but this might work"
 - "One more fix attempt" after 2+ already failed
