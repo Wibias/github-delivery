@@ -7,7 +7,8 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$ExpectedSourceCommit,
     [string]$InstallDir = (Join-Path $env:LOCALAPPDATA 'GitHubDeliveryAuthority'),
-    [string]$PipeName = 'github-delivery-authority-v1'
+    [string]$PipeName = 'github-delivery-authority-v1',
+    [switch]$SkipStart
 )
 
 $ErrorActionPreference = 'Stop'
@@ -105,7 +106,9 @@ try {
     $legacyExe = Join-Path $InstallDir 'GitHubDeliveryAuthority.exe'
     if (Test-Path $legacyExe -PathType Leaf) { Remove-Item $legacyExe -Force }
 
-    Start-Process $installedExe
+    if (-not $SkipStart) {
+        Start-Process $installedExe
+    }
     Write-Host "Installed GitHub Delivery Authority $ExpectedVersion to $targetDir"
 }
 finally {

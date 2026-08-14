@@ -6,6 +6,8 @@ const programUrl = new URL("../../authority-host/windows/GitHubDeliveryAuthority
 const appUrl = new URL("../../authority-host/windows/GitHubDeliveryAuthority/App.xaml.cs", import.meta.url);
 const diagnosticsUrl = new URL("../../authority-host/windows/GitHubDeliveryAuthority/StartupDiagnostics.cs", import.meta.url);
 const xamlSelfTestUrl = new URL("../../authority-host/windows/GitHubDeliveryAuthority/ControlCenterXamlSelfTest.cs", import.meta.url);
+const releaseSmokeUrl = new URL("../../scripts/prepare-authority-host-runtime-smoke.mjs", import.meta.url);
+const installerUrl = new URL("../../authority-host/windows/install-release.ps1", import.meta.url);
 const ciUrl = new URL("../../.github/workflows/ci.yml", import.meta.url);
 
 test("Authority normal startup preserves local crash diagnostics", () => {
@@ -19,11 +21,12 @@ test("Authority normal startup preserves local crash diagnostics", () => {
   assert.match(diagnostics, /startup-error\.log/);
   assert.match(diagnostics, /LocalApplicationData|AppPaths\.RootDirectory/);
   assert.match(diagnostics, /Exception/);
+  assert.match(diagnostics, /HRESULT/);
   assert.match(program, /AppDomain\.CurrentDomain\.UnhandledException/);
   assert.match(program, /StartupDiagnostics\.Clear/);
   assert.match(program, /StartupDiagnostics\.Write/);
   assert.match(app, /UnhandledException/);
-  assert.match(app, /StartupDiagnostics\.Write/);
+  assert.match(app, /StartupDiagnostics\.Write\(args\.Exception,[^\n]+args\.Message\)/);
   assert.doesNotMatch(app, /Handled\s*=\s*true/);
 });
 
@@ -42,8 +45,19 @@ test("Authority has a runtime Control Center XAML smoke path", () => {
   assert.match(selfTest, /window\.Close\(\)/);
 });
 
-test("Windows CI executes core and XAML smoke tests on the published self-contained Authority binary", () => {
+test("Windows CI exercises Control Center XAML after publish, release packaging, and installation", () => {
+  assert.equal(existsSync(releaseSmokeUrl), true, "release runtime smoke helper must exist");
   const ci = readFileSync(ciUrl, "utf8");
+  const installer = readFileSync(installerUrl, "utf8");
+  const releaseSmoke = readFileSync(releaseSmokeUrl, "utf8");
+
   assert.match(ci, /Run Windows authority host XAML smoke test[\s\S]*--xaml-self-test/);
   assert.match(ci, /Publish Windows authority host[\s\S]*GitHubDeliveryAuthority\.exe[\s\S]*--self-test[\s\S]*--xaml-self-test/);
+  assert.match(ci, /prepare-authority-host-runtime-smoke\.mjs/);
+  assert.match(ci, /install-release\.ps1[\s\S]*-SkipStart/);
+  assert.match(ci, /InstalledExecutable[\s\S]*--xaml-self-test/);
+  assert.match(installer, /\[switch\]\$SkipStart/);
+  assert.match(installer, /if \(-not \$SkipStart\)[\s\S]*Start-Process \$installedExe/);
+  assert.match(releaseSmoke, /buildAuthorityHostRelease/);
+  assert.match(releaseSmoke, /extractVerifiedAuthorityHostZip/);
 });

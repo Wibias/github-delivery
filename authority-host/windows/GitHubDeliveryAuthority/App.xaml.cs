@@ -23,7 +23,7 @@ public partial class App : Application
     {
         _forceSetup = forceSetup;
         _xamlSelfTest = xamlSelfTest;
-        UnhandledException += (_, args) => StartupDiagnostics.Write(args.Exception, "App.UnhandledException");
+        UnhandledException += (_, args) => StartupDiagnostics.Write(args.Exception, "App.UnhandledException", args.Message);
         InitializeComponent();
     }
 
