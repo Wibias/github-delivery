@@ -19,7 +19,34 @@ const DEFAULTS = Object.freeze({
 const INTENT_PREFIX = /^\s*(?:(?:now|next|first|then|actually|meanwhile)[,:]?\s+)?(?:let me|i(?:'|’)ll|i will|i need to|i'm going to|i am going to)\s+/i;
 const TOOL_EMISSION_INTENT = /^\s*(?:(?:now|next|then|actually|enough|finally|stop narrating)[,:.!]?\s+)?(?:(?:let me|i(?:'|’)ll|i will|i need to|i(?:'|’)m going to|i am going to)\s+)?(?:(?:just|actually)\s+)?(?:run|running|execute|executing|invoke|invoking|call|calling|issue|issuing|emit|emitting|grep|search|read|open|inspect|apply|patch|use|add|adding|wire|wiring|edit|editing|write|writing|modify|modifying|update|updating|remove|removing|delete|deleting|fix|fixing|change|changing)\b/i;
 const TOOL_PROTOCOL_ARTIFACT = /<\/?(?:atool|invoke|tool_calls?|function_calls?)\b[^>]*>/gi;
+const GRID_PROTOCOL_ARTIFACT = /^\s*(?:<grid>\s*<\/grid>|grid)\s*$/gim;
 const FAILURE_SIGNAL = /\b(error|errors|fail|failed|failure|failing|blocked|blocker|exception|traceback|denied|timeout|timed out|exit(?: code)?|conclusion|status|unsponsored_surface)\b/i;
+
+function countToolProtocolArtifacts(matches, openTags) {
+  let count = 0;
+  for (const artifact of matches || []) {
+    const value = String(artifact);
+    const parsed = value.match(/^<(\/?)\s*([a-z_][\w-]*)\b/i);
+    if (!parsed) {
+      count += 1;
+      continue;
+    }
+    const closing = parsed[1] === "/";
+    const tag = parsed[2].toLowerCase();
+    if (!closing) {
+      count += 1;
+      if (!/\/>\s*$/.test(value)) {
+        openTags.set(tag, (openTags.get(tag) || 0) + 1);
+      }
+      continue;
+    }
+    const openCount = openTags.get(tag) || 0;
+    if (openCount > 1) openTags.set(tag, openCount - 1);
+    else if (openCount === 1) openTags.delete(tag);
+    else count += 1;
+  }
+  return count;
+}
 
 function stableValue(value) {
   if (Array.isArray(value)) return value.map(stableValue);
@@ -174,6 +201,7 @@ export function createProgressWatchdog(options = {}) {
   const intentCounts = new Map();
   const recentIntents = [];
   const reads = new Map();
+  const openProtocolTags = new Map();
 
   if (options.reads && typeof options.reads === "object") {
     for (const [key, value] of Object.entries(options.reads)) reads.set(key, value);
@@ -188,6 +216,7 @@ export function createProgressWatchdog(options = {}) {
   function resetToolEmissionSignals() {
     toolEmissionIntentCount = 0;
     protocolArtifactCount = 0;
+    openProtocolTags.clear();
     pendingNarration = "";
   }
 
@@ -279,9 +308,11 @@ export function createProgressWatchdog(options = {}) {
     if (typeof delta !== "string" || delta.length === 0) return { action: "allow" };
     generatedCharsSinceProgress += delta.length;
 
-    const protocolArtifacts = delta.match(TOOL_PROTOCOL_ARTIFACT);
-    if (protocolArtifacts?.length) {
-      protocolArtifactCount += 1;
+    const toolProtocolArtifacts = delta.match(TOOL_PROTOCOL_ARTIFACT);
+    const gridProtocolArtifacts = delta.match(GRID_PROTOCOL_ARTIFACT);
+    if (toolProtocolArtifacts?.length || gridProtocolArtifacts?.length) {
+      protocolArtifactCount += countToolProtocolArtifacts(toolProtocolArtifacts, openProtocolTags)
+        + (gridProtocolArtifacts?.length || 0);
       if (protocolArtifactCount >= config.protocolArtifactThreshold) {
         return {
           action: "interrupt",
