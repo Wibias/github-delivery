@@ -40,7 +40,7 @@ jobs:
 
   analyze-csharp:
     name: CodeQL / Analyze (csharp)
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     permissions:
       contents: read
       packages: read
@@ -51,11 +51,25 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Set up .NET
+        uses: actions/setup-dotnet@3951f0dfe7a07e2313ec93c75700083e2005cbab # v4.3.0
+        with:
+          global-json-file: global.json
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
         with:
           languages: csharp
-          build-mode: none
+          build-mode: manual
+
+      - name: Build C# authority host
+        shell: pwsh
+        run: |
+          $Project = 'authority-host/windows/GitHubDeliveryAuthority/GitHubDeliveryAuthority.csproj'
+          dotnet restore $Project --locked-mode
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet build $Project --configuration Release --runtime win-x64 --no-restore
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Analyze
         uses: github/codeql-action/analyze@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
