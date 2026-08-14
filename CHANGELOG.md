@@ -6,15 +6,15 @@ All notable changes to `github-delivery` are documented here.
 
 ### Added
 
-- Pending PR #246 will add a guided Windows approval-GUI choice. Fresh interactive installs will explain the optional component and ask `Install the Windows approval GUI now? [Y/n]`; explicit consent will install the separately verified Authority host without changing an `off` protection mode, while No will finish the skill install without the GUI.
+- Guided Windows approval-GUI choice. Fresh interactive installs explain the optional component and ask `Install the Windows approval GUI now? [Y/n]`; explicit consent installs the separately verified Authority host without changing an `off` protection mode, while No finishes the skill install without the GUI.
 
 ### Changed
 
-- Pending PR #245 will make Windows Authority builds reproducible across local, CI, and release environments by pinning exact .NET SDK 10.0.303 and rejecting self-contained publishes that do not contain Microsoft.NETCore.App runtime 8.0.30.
+- Windows Authority builds are reproducible across local, CI, and release environments by pinning the .NET SDK to 10.0.303 and rejecting self-contained publishes that do not contain the Microsoft.NETCore.App runtime 8.0.30.
 
 ### Fixed
 
-- Pending PR #248 will make repeated grid or malformed tool-protocol placeholder output hard-stop immediately instead of being retried, and quarantine the offending model across turns and `SessionEnd`. A new `UserPromptSubmit` hook will block resuming that task with the same model before inference until the model is changed (which clears the quarantine); subagent protocol stalls will not quarantine the parent task.
+- Repeated grid or malformed tool-protocol placeholder output now hard-stops immediately on the first stall instead of being retried, and the offending model is quarantined across turns and `SessionEnd` so a resume with the same model is blocked before inference until the model is changed. Subagent protocol stalls no longer quarantine the parent task.
 
 ## [0.6.0] - 2026-08-14
 
