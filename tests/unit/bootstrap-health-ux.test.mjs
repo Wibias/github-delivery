@@ -4,7 +4,7 @@ import test from "node:test";
 
 import { main } from "../../scripts/github-delivery-cli.mjs";
 import { checkBootstrapEnvironment, parseBootstrapArgs } from "../../scripts/lib/bootstrap-cli.mjs";
-import { runGuidedInstall } from "../../scripts/lib/bootstrap-install.mjs";
+import { confirmAuthorityStartup, runGuidedInstall } from "../../scripts/lib/bootstrap-install.mjs";
 
 function writableBuffer() {
   let text = "";
@@ -47,6 +47,14 @@ test("Node 26 is a supported bootstrap runtime", () => {
   const result = checkBootstrapEnvironment({ nodeVersion: "v26.7.0", spawn: healthySpawn });
   assert.equal(result.ok, true);
   assert.deepEqual(result.node, { ok: true, version: "26.7.0" });
+});
+
+test("Windows login auto-start is opt-in and defaults to disabled", async () => {
+  const output = writableBuffer();
+  const input = { isTTY: true };
+  assert.equal(await confirmAuthorityStartup({ input, output, ask: async () => "" }), false);
+  assert.match(output.toString(), /Windows login auto-start \(optional\)/);
+  assert.equal(await confirmAuthorityStartup({ input, output, ask: async () => "y" }), true);
 });
 
 test("doctor accepts --json as an explicit machine-readable compatibility mode", () => {
