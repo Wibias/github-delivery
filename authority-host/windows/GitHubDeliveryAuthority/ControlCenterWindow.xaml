@@ -7,17 +7,16 @@
     mc:Ignorable="d"
     Title="Delivery Authority">
 
-    <Window.Resources>
-        <SolidColorBrush x:Key="AuthorityCardBackgroundBrush" Color="#147F7F7F" />
-        <SolidColorBrush x:Key="AuthorityCardStrokeBrush" Color="#337F7F7F" />
-        <SolidColorBrush x:Key="AuthorityAccentBrush" Color="#4CC2FF" />
-        <SolidColorBrush x:Key="AuthoritySuccessBackgroundBrush" Color="#2634A853" />
-        <SolidColorBrush x:Key="AuthoritySuccessBrush" Color="#57C36B" />
-        <SolidColorBrush x:Key="AuthorityCriticalBrush" Color="#E65A5A" />
-        <SolidColorBrush x:Key="AuthorityCautionBrush" Color="#E0A52B" />
-    </Window.Resources>
-
     <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+        <Grid.Resources>
+            <SolidColorBrush x:Key="AuthorityCardBackgroundBrush" Color="#147F7F7F" />
+            <SolidColorBrush x:Key="AuthorityCardStrokeBrush" Color="#337F7F7F" />
+            <SolidColorBrush x:Key="AuthorityAccentBrush" Color="#4CC2FF" />
+            <SolidColorBrush x:Key="AuthoritySuccessBackgroundBrush" Color="#2634A853" />
+            <SolidColorBrush x:Key="AuthoritySuccessBrush" Color="#57C36B" />
+            <SolidColorBrush x:Key="AuthorityCriticalBrush" Color="#E65A5A" />
+            <SolidColorBrush x:Key="AuthorityCautionBrush" Color="#E0A52B" />
+        </Grid.Resources>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="188" />
             <ColumnDefinition Width="*" />
