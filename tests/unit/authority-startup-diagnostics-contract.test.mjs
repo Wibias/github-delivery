@@ -46,6 +46,16 @@ test("Authority has a runtime Control Center XAML smoke path", () => {
   assert.match(selfTest, /window\.Close\(\)/);
 });
 
+test("Authority XAML self-test bypasses the production singleton mutex", () => {
+  const program = readFileSync(programUrl, "utf8");
+
+  assert.match(
+    program,
+    /if\s*\(!xamlSelfTest\)\s*\{[\s\S]*?new Mutex\(initiallyOwned: true, "Local\\\\GitHubDeliveryAuthority-v1"/,
+    "--xaml-self-test must still execute even when the installed Authority already owns the singleton mutex",
+  );
+});
+
 test("Authority XAML smoke path records framework resource and runtime-module probes", () => {
   const selfTest = readFileSync(xamlSelfTestUrl, "utf8");
 
