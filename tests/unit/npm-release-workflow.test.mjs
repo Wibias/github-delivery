@@ -45,7 +45,7 @@ test("npm trusted publishing uses registry setup and no publish token secret", (
   );
   assert.match(
     publishJob,
-    /npm ci --prefix \.github\/npm-publish --allow-remote=all --ignore-scripts/,
+    /npm ci --prefix \.github\/npm-publish --include=dev --allow-remote=all --ignore-scripts/,
   );
   assert.match(
     publishJob,

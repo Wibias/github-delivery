@@ -204,7 +204,7 @@ jobs:
         run: npm run package:check
 
       - name: Install trusted-publishing npm CLI
-        run: npm ci --prefix .github/npm-publish --allow-remote=all --ignore-scripts
+        run: npm ci --prefix .github/npm-publish --include=dev --allow-remote=all --ignore-scripts
 
       - name: Publish npm package
         run: node .github/npm-publish/node_modules/npm/bin/npm-cli.js publish --access public
