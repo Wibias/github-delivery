@@ -88,11 +88,89 @@ function renderDoctor(result, stdout) {
   }
 }
 
+function updateTargetVersion(result) {
+  return result?.sourceVersion
+    || result?.release?.version
+    || result?.assets?.version
+    || result?.authorityHost?.targetVersion
+    || "unknown";
+}
+
+function renderUpdateProgress(event, stdout) {
+  if (!event || typeof event !== "object") return;
+  if (event.stage === "checking_release") {
+    stdout.write("Checking latest stable release...\n");
+  } else if (event.stage === "release_verified") {
+    stdout.write(`Verified release v${value(event.version)}.\n`);
+  } else if (event.stage === "installing_skill") {
+    stdout.write(`Updating skill ${value(event.currentVersion)} -> ${value(event.targetVersion)}...\n`);
+  } else if (event.stage === "skill_installed") {
+    stdout.write(event.backupPath
+      ? `Skill files installed. Backup: ${event.backupPath}\n`
+      : "Skill files installed.\n");
+  } else if (event.stage === "skill_verified") {
+    stdout.write("Skill installation verified.\n");
+  } else if (event.stage === "updating_authority") {
+    stdout.write(`Updating Windows approval GUI ${value(event.currentVersion, "not installed")} -> ${value(event.targetVersion)}...\n`);
+  } else if (event.stage === "authority_updated") {
+    stdout.write(`Windows approval GUI is ready at v${value(event.version)}.\n`);
+  }
+}
+
+function renderUpdateResult(result, stdout) {
+  const currentVersion = result?.previousVersion || result?.currentVersion || "unknown";
+  const targetVersion = updateTargetVersion(result);
+  const authority = result?.authorityHost || {};
+
+  if (result?.apply !== true) {
+    stdout.write("\nGitHub Delivery update plan\n");
+    stdout.write(`  Skill        ${currentVersion} -> ${targetVersion}\n`);
+    if (authority?.targetVersion) {
+      stdout.write(`  Authority    ${value(authority.currentVersion, "not installed")} -> ${authority.targetVersion}\n`);
+    }
+    if (result?.action === "already_current" && authority?.required !== true) {
+      stdout.write("No update is required.\n");
+    } else if (result?.action === "already_ahead") {
+      stdout.write("The installed skill is newer than the latest stable release; no update will be applied.\n");
+    } else if (result?.action === "blocked_local_modifications") {
+      stdout.write("Update is blocked because the managed installation has local modifications.\n");
+    } else {
+      stdout.write("Run: npx github-delivery update --apply\n");
+    }
+    return;
+  }
+
+  if (result?.updated === true) {
+    stdout.write("\nGitHub Delivery updated successfully.\n");
+    if (currentVersion !== "unknown" || targetVersion !== "unknown") {
+      stdout.write(`  Skill        ${currentVersion} -> ${targetVersion}\n`);
+    }
+    if (authority?.changed === true) {
+      stdout.write(`  Authority GUI ${value(authority.currentVersion, "not installed")} -> ${value(authority.targetVersion || authority?.installed?.version)}\n`);
+    }
+    if (result?.backupPath) stdout.write(`  Backup       ${result.backupPath}\n`);
+    return;
+  }
+
+  if (result?.action === "already_current") {
+    stdout.write(`\nGitHub Delivery is already current at v${targetVersion}.\n`);
+    return;
+  }
+  if (result?.action === "already_ahead") {
+    stdout.write("\nThe installed skill is newer than the latest stable release; no update was applied.\n");
+    return;
+  }
+  stdout.write(`\nNo update was applied (${result?.action || "unknown reason"}).\n`);
+}
+
 function renderBootstrapResult(result, stdout) {
   if (result.action === "start") {
-    stdout.write(result.started
-      ? "GitHub Delivery approval GUI is running.\n"
+    stdout.write(result.started && result.ready !== false
+      ? "GitHub Delivery approval GUI is running and Authority is ready.\n"
       : `GitHub Delivery approval GUI was not started (${result.reason || "unknown reason"}).\n`);
+    if (!result.started && result.diagnosticsPath) {
+      stdout.write(`  Diagnostics: ${result.diagnosticsPath}\n`);
+    }
     return;
   }
   if (result.action === "autostart") {
@@ -128,7 +206,11 @@ function printResult(result, { stdout = process.stdout, options = {} } = {}) {
     renderDoctor(result, stdout);
     return;
   }
-  if (["install", "setup", "start"].includes(result.action)) {
+  if (options.command === "update") {
+    renderUpdateResult(result, stdout);
+    return;
+  }
+  if (["install", "setup", "start", "autostart"].includes(result.action)) {
     renderBootstrapResult(result, stdout);
     return;
   }
@@ -151,8 +233,17 @@ export async function main(argv = process.argv.slice(2), dependencies = {}) {
     (dependencies.stdout || process.stdout).write(HELP_TEXT);
     return { action: "help" };
   }
-  const result = await (dependencies.runBootstrap || runBootstrap)(argv, dependencies);
-  printResult(result, { stdout: dependencies.stdout || process.stdout, options });
+  const stdout = dependencies.stdout || process.stdout;
+  const runtimeDependencies = { ...dependencies };
+  if (options.command === "update" && options.apply) {
+    const upstreamProgress = dependencies.onProgress;
+    runtimeDependencies.onProgress = (event) => {
+      if (typeof upstreamProgress === "function") upstreamProgress(event);
+      renderUpdateProgress(event, stdout);
+    };
+  }
+  const result = await (runtimeDependencies.runBootstrap || runBootstrap)(argv, runtimeDependencies);
+  printResult(result, { stdout, options });
   return result;
 }
 

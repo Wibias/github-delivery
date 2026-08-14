@@ -58,6 +58,7 @@ function trustGuidance(changed) {
 export async function runBootstrapUpdate({
   target,
   apply = false,
+  onProgress = undefined,
   dependencies = {},
 } = {}) {
   if (!target) fail("bootstrap_update_target_required");
@@ -66,7 +67,10 @@ export async function runBootstrapUpdate({
   const argv = ["--update", "--target", resolve(target)];
   if (apply) argv.push("--apply");
   const options = parse(argv);
-  return run(options);
+  const runDependencies = typeof onProgress === "function"
+    ? { ...dependencies, onProgress }
+    : dependencies;
+  return run(options, runDependencies);
 }
 
 async function defaultLoadInstalledInstaller(modulePath) {
@@ -92,11 +96,14 @@ export async function runBootstrapSetup({
     scriptPath: join(target, "authority-host", "windows", "install-release.ps1"),
   });
   const authorityStarted = authorityHost?.installed?.installed
-    ? startAuthority({ installed: authorityHost.installed })
+    ? await startAuthority({ installed: authorityHost.installed })
     : { started: false, reason: "not_installed" };
   output?.write?.(authorityStarted.started
-    ? "\nWindows approval GUI is running in the notification area.\n"
+    ? "\nWindows approval GUI is running in the notification area and Authority is ready.\n"
     : `\nWindows approval GUI not started (${authorityStarted.reason}). Run: npx github-delivery start\n`);
+  if (!authorityStarted.started && authorityStarted.diagnosticsPath) {
+    output?.write?.(`  Diagnostics: ${authorityStarted.diagnosticsPath}\n`);
+  }
   if (authorityHost?.action === "unsupported" && authorityHost?.required === true) {
     fail("bootstrap_setup_authority_host_unsupported");
   }
@@ -180,9 +187,9 @@ export async function runBootstrapSetup({
   };
 }
 
-export function runBootstrapStart({ dependencies = {} } = {}) {
+export async function runBootstrapStart({ dependencies = {} } = {}) {
   const start = dependencies.startInstalledAuthorityHost || startInstalledAuthorityHost;
-  return { action: "start", ...start() };
+  return { action: "start", ...await start() };
 }
 
 export function runBootstrapAutostart({ dependencies = {} } = {}) {

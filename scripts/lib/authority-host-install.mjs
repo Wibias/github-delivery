@@ -4,6 +4,7 @@ import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve, win32 as win32Path } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { callAuthorityHostSync } from "./authority-host-client.mjs";
 import { acquireVerifiedAuthorityHostPayload } from "./authority-host-release.mjs";
 import { createGitHubReleaseClient } from "./release-self-update.mjs";
 import { compareStableVersions } from "./stable-release-update.mjs";
@@ -101,16 +102,70 @@ export function readInstalledAuthorityHost({
   return { supported: true, configured: false, installed: false, legacy: false, root, recordPath, exePath: null, version: null, sourceCommit: null, record: null };
 }
 
-export function startInstalledAuthorityHost({
+export async function startInstalledAuthorityHost({
   installed = readInstalledAuthorityHost(),
   platform = process.platform,
   runner = spawn,
+  probeStatus = () => callAuthorityHostSync({ method: "status", params: {}, timeoutMs: 200 }),
+  readinessTimeoutMs = 5_000,
+  now = Date.now,
+  sleep = (milliseconds) => new Promise((resolveSleep) => setTimeout(resolveSleep, milliseconds)),
 } = {}) {
-  if (platform !== "win32") return { started: false, reason: "unsupported_platform" };
-  if (!installed?.installed || !installed.exePath) return { started: false, reason: "not_installed" };
-  const child = runner(installed.exePath, [], { detached: true, stdio: "ignore", windowsHide: true });
-  child.unref();
-  return { started: true, version: installed.version, exePath: installed.exePath };
+  if (platform !== "win32") return { started: false, ready: false, reason: "unsupported_platform" };
+  if (!installed?.installed || !installed.exePath) return { started: false, ready: false, reason: "not_installed" };
+
+  const diagnosticsPath = installed.root ? win32Path.join(installed.root, "startup-error.log") : null;
+  let child;
+  try {
+    child = runner(installed.exePath, [], { detached: true, stdio: "ignore", windowsHide: true });
+  } catch {
+    return { started: false, ready: false, reason: "spawn_failed", diagnosticsPath, exePath: installed.exePath };
+  }
+
+  let spawnError = null;
+  if (typeof child?.once === "function") child.once("error", (error) => { spawnError = error; });
+  child?.unref?.();
+  const deadline = now() + readinessTimeoutMs;
+
+  for (;;) {
+    if (spawnError) {
+      return { started: false, ready: false, reason: "spawn_failed", diagnosticsPath, exePath: installed.exePath };
+    }
+    if (child?.exitCode !== null && child?.exitCode !== undefined) {
+      return {
+        started: false,
+        ready: false,
+        reason: "process_exited",
+        exitCode: child.exitCode,
+        diagnosticsPath,
+        exePath: installed.exePath,
+      };
+    }
+    try {
+      const status = await Promise.resolve(probeStatus());
+      if (status?.status === "ready") {
+        return {
+          started: true,
+          ready: true,
+          version: installed.version,
+          exePath: installed.exePath,
+          diagnosticsPath,
+        };
+      }
+    } catch {
+      // The pipe may not exist until WinUI and the Authority service finish starting.
+    }
+    if (now() >= deadline) break;
+    await sleep(80);
+  }
+
+  return {
+    started: false,
+    ready: false,
+    reason: "readiness_timeout",
+    diagnosticsPath,
+    exePath: installed.exePath,
+  };
 }
 
 const WINDOWS_RUN_KEY = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run";

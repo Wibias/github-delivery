@@ -109,3 +109,7 @@ jobs:
           if (-not (Test-Path $Executable -PathType Leaf)) {
             throw 'Published authority executable is missing.'
           }
+          & $Executable --self-test
+          if ($LASTEXITCODE -ne 0) {
+            throw "Published authority executable self-test failed with exit code $LASTEXITCODE."
+          }
