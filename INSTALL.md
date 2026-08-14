@@ -224,7 +224,7 @@ npx github-delivery start
 npx github-delivery doctor
 ```
 
-Fresh install and setup start the Authority host automatically when it is installed. Use `npx github-delivery start` to launch it again; it runs in the Windows notification area.
+Fresh install and setup start the Authority host automatically when it is installed and register it for automatic start when the current Windows user signs in. Use `npx github-delivery start` to launch it again and repair that registration; it runs in the Windows notification area.
 
 Stable GitHub Releases include a separately verified self-contained Windows Authority-host asset, and the managed setup/update path does **not** require the .NET SDK. The Control Center's **Settings** page exposes **Off**, **Sensitive actions** (recommended), and **Every GitHub write**, backed by the same persistent `authorityMode` configuration used by the CLI.
 

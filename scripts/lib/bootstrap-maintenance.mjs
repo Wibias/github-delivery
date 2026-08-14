@@ -5,6 +5,7 @@ import { pathToFileURL } from "node:url";
 import { installCodexWatchdogHooks } from "../install-codex-watchdog-hooks.mjs";
 import { parseInstallArgs, runInstallCommand } from "../install-skill.mjs";
 import {
+  configureAuthorityHostStartup,
   readInstalledAuthorityHost,
   reconcileStableAuthorityHost,
   startInstalledAuthorityHost,
@@ -93,9 +94,16 @@ export async function runBootstrapSetup({
   const authorityStarted = authorityHost?.installed?.installed
     ? startAuthority({ installed: authorityHost.installed })
     : { started: false, reason: "not_installed" };
+  const configureStartup = dependencies.configureAuthorityHostStartup || configureAuthorityHostStartup;
+  const authorityStartup = authorityHost?.installed?.installed
+    ? configureStartup({ installed: authorityHost.installed })
+    : { configured: false, reason: "not_installed" };
   output?.write?.(authorityStarted.started
     ? "\nWindows approval GUI is running in the notification area.\n"
     : `\nWindows approval GUI not started (${authorityStarted.reason}). Run: npx github-delivery start\n`);
+  output?.write?.(authorityStartup.configured
+    ? "Windows login auto-start: configured.\n"
+    : `Windows login auto-start not configured (${authorityStartup.reason}).\n`);
   if (authorityHost?.action === "unsupported" && authorityHost?.required === true) {
     fail("bootstrap_setup_authority_host_unsupported");
   }
@@ -181,7 +189,12 @@ export async function runBootstrapSetup({
 
 export function runBootstrapStart({ dependencies = {} } = {}) {
   const start = dependencies.startInstalledAuthorityHost || startInstalledAuthorityHost;
-  return { action: "start", ...start() };
+  const result = start();
+  const configureStartup = dependencies.configureAuthorityHostStartup || configureAuthorityHostStartup;
+  const startup = result.started
+    ? configureStartup({ installed: { ...result, installed: true } })
+    : { configured: false, reason: result.reason };
+  return { action: "start", ...result, startup };
 }
 
 function relation(installedVersion, latestVersion) {

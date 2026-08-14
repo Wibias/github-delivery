@@ -113,6 +113,37 @@ export function startInstalledAuthorityHost({
   return { started: true, version: installed.version, exePath: installed.exePath };
 }
 
+const WINDOWS_RUN_KEY = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+const WINDOWS_RUN_VALUE = "GitHubDeliveryAuthority";
+
+export function configureAuthorityHostStartup({
+  installed = readInstalledAuthorityHost(),
+  platform = process.platform,
+  runner = spawnSync,
+} = {}) {
+  if (platform !== "win32") return { configured: false, changed: false, reason: "unsupported_platform" };
+  if (!installed?.installed || !installed.exePath) {
+    return { configured: false, changed: false, reason: "not_installed" };
+  }
+
+  const expected = JSON.stringify(installed.exePath);
+  const current = runner("reg.exe", ["QUERY", WINDOWS_RUN_KEY, "/v", WINDOWS_RUN_VALUE], {
+    encoding: "utf8",
+    windowsHide: true,
+  });
+  if (current?.status === 0 && String(current.stdout || "").includes(expected)) {
+    return { configured: true, changed: false, exePath: installed.exePath };
+  }
+
+  const result = runner("reg.exe", [
+    "ADD", WINDOWS_RUN_KEY, "/v", WINDOWS_RUN_VALUE, "/t", "REG_SZ", "/d", expected, "/f",
+  ], { encoding: "utf8", windowsHide: true });
+  if (result?.status !== 0 || result?.error) {
+    throw new Error(`authority_host_startup_registration_failed:${result?.stderr || result?.error?.message || "reg.exe failed"}`);
+  }
+  return { configured: true, changed: true, exePath: installed.exePath };
+}
+
 export function planAuthorityHostUpdate({ mode, targetVersion, installed } = {}) {
   if (!installed?.supported) return { action: "unsupported", required: false, currentVersion: null, targetVersion: targetVersion || null };
   if (!/^\d+\.\d+\.\d+$/.test(String(targetVersion || ""))) fail("authority_host_target_version_invalid");

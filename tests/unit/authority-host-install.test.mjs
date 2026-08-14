@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  configureAuthorityHostStartup,
   planAuthorityHostUpdate,
   readInstalledAuthorityHost,
   reconcileStableAuthorityHost,
@@ -130,6 +131,32 @@ test("unsupported systems report when the configured mode requires Authority", a
     },
     mode: "high-assurance",
   });
+});
+
+test("Windows Authority startup registration is idempotent and user-scoped", () => {
+  const calls = [];
+  const exePath = "C:\\Users\\me\\AppData\\Local\\GitHubDeliveryAuthority\\app\\v0.5.2\\GitHubDeliveryAuthority.exe";
+  const runner = (program, args) => {
+    calls.push({ program, args });
+    if (args[0] === "QUERY") return { status: 1, stdout: "", stderr: "not found" };
+    return { status: 0, stdout: "", stderr: "" };
+  };
+  const first = configureAuthorityHostStartup({
+    platform: "win32",
+    installed: { installed: true, exePath },
+    runner,
+  });
+  assert.deepEqual(first, { configured: true, changed: true, exePath });
+  assert.deepEqual(calls[1].args.slice(0, 6), ["ADD", "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", "/v", "GitHubDeliveryAuthority", "/t", "REG_SZ"]);
+
+  const existing = configureAuthorityHostStartup({
+    platform: "win32",
+    installed: { installed: true, exePath },
+    runner: (program, args) => args[0] === "QUERY"
+      ? { status: 0, stdout: `GitHubDeliveryAuthority REG_SZ ${JSON.stringify(exePath)}`, stderr: "" }
+      : { status: 1, stdout: "", stderr: "unexpected write" },
+  });
+  assert.deepEqual(existing, { configured: true, changed: false, exePath });
 });
 
 test("explicit install opt-in overrides disabled planning without changing authority mode", async () => {

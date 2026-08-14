@@ -93,6 +93,7 @@ function renderBootstrapResult(result, stdout) {
     stdout.write(result.started
       ? "GitHub Delivery approval GUI is running.\n"
       : `GitHub Delivery approval GUI was not started (${result.reason || "unknown reason"}).\n`);
+    if (result.startup?.configured) stdout.write("Windows login auto-start is configured.\n");
     return;
   }
   if (result.action === "install") {

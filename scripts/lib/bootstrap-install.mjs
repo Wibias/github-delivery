@@ -5,7 +5,11 @@ import { isDeepStrictEqual } from "node:util";
 import { createInterface } from "node:readline/promises";
 
 import { installSkill, parseInstallArgs } from "../install-skill.mjs";
-import { reconcileStableAuthorityHost, startInstalledAuthorityHost } from "./authority-host-install.mjs";
+import {
+  configureAuthorityHostStartup,
+  reconcileStableAuthorityHost,
+  startInstalledAuthorityHost,
+} from "./authority-host-install.mjs";
 import { acquireVerifiedReleasePayload } from "./release-self-update.mjs";
 import {
   compareInstalledManifest,
@@ -262,9 +266,16 @@ export async function runGuidedInstall({
       const authorityStarted = authorityHost?.installed?.installed
         ? startAuthority({ installed: authorityHost.installed })
         : { started: false, reason: "not_installed" };
+      const configureStartup = dependencies.configureAuthorityHostStartup || configureAuthorityHostStartup;
+      const authorityStartup = authorityHost?.installed?.installed
+        ? configureStartup({ installed: authorityHost.installed })
+        : { configured: false, reason: "not_installed" };
       output?.write?.(authorityStarted.started
         ? "  Approval GUI is running in the notification area.\n"
         : `  Approval GUI not started (${authorityStarted.reason}). Run: npx github-delivery start\n`);
+      output?.write?.(authorityStartup.configured
+        ? "  Windows login auto-start: configured.\n"
+        : `  Windows login auto-start not configured (${authorityStartup.reason}).\n`);
     }
     renderProtectionPostflight(installation?.watchdog, output);
 
