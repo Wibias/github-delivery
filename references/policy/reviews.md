@@ -38,10 +38,10 @@ For merge-ready review paths, **find bugs before bots**: passing bots/checks are
 
 Post security relevance and remediation publicly when appropriate, but keep actionable exploit details or sensitive secrets in the private user conversation unless disclosure is explicitly safe and authorized.
 
-### GD-REVIEW-010 - Use regression-first evidence without forcing bad tests
+### GD-REVIEW-010 — Use regression-first evidence without forcing bad tests
 
 When an authorized workflow fixes a confirmed bug, apply `references/regression-first.md`. Prefer a failing-before automated test when a focused test path is cheap and natural. When a new test would require disproportionate harness work or low-signal mocks, require the closest executable before/after regression check instead and record why. This policy supersedes absolute test-first or test-count language in detailed review methods; a method may demand regression evidence, but it must not demand low-value tests merely to satisfy a ritual.
 
-### GD-REVIEW-011 - Prove material non-local safety assumptions
+### GD-REVIEW-011 — Prove material non-local safety assumptions
 
 When a change has material non-local risk that direct caller search does not settle, apply `references/safety-invariant.md`. Name the fact the positive verdict depends on, record the strongest proof level reached, and mark a material invariant `unproven` instead of rounding prose up to safe. Semantic propagation maps the affected system; the safety-invariant proof tests the key assumption inside that system.
