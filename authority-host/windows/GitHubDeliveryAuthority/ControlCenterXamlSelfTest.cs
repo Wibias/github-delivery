@@ -9,10 +9,12 @@ namespace GitHubDeliveryAuthority;
 internal static class ControlCenterXamlSelfTest
 {
     private const string PresentationNamespace = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+    private const string XamlNamespace = "http://schemas.microsoft.com/winfx/2006/xaml";
 
     private static readonly (string Name, string Xaml)[] Probes =
     {
         ("Grid", $"<Grid xmlns=\"{PresentationNamespace}\" />"),
+        ("Local.StaticResource", $"<Grid xmlns=\"{PresentationNamespace}\" xmlns:x=\"{XamlNamespace}\"><Grid.Resources><SolidColorBrush x:Key=\"ProbeBrush\" Color=\"#FF7F7F7F\" /></Grid.Resources><Border Background=\"{{StaticResource ProbeBrush}}\" /></Grid>"),
         ("Theme.ApplicationPageBackgroundThemeBrush", $"<Grid xmlns=\"{PresentationNamespace}\" Background=\"{{ThemeResource ApplicationPageBackgroundThemeBrush}}\" />"),
         ("Theme.CardBackgroundFillColorDefaultBrush", $"<Border xmlns=\"{PresentationNamespace}\" Background=\"{{ThemeResource CardBackgroundFillColorDefaultBrush}}\" />"),
         ("Theme.CardStrokeColorDefaultBrush", $"<Border xmlns=\"{PresentationNamespace}\" BorderBrush=\"{{ThemeResource CardStrokeColorDefaultBrush}}\" />"),
