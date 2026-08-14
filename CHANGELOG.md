@@ -4,6 +4,24 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Guided Windows approval-GUI choice. Fresh interactive installs explain the optional component and ask `Install the Windows approval GUI now? [Y/n]`; explicit consent installs the separately verified Authority host without changing an `off` protection mode, while No finishes the skill install without the GUI.
+
+### Changed
+
+- Windows Authority builds are reproducible across local, CI, and release environments by pinning the .NET SDK to 10.0.303 and rejecting self-contained publishes that do not contain the Microsoft.NETCore.App runtime 8.0.30.
+
+### Fixed
+
+- Repeated grid or malformed tool-protocol placeholder output now hard-stops immediately on the first stall instead of being retried, and the offending model is quarantined across turns and `SessionEnd` so a resume with the same model is blocked before inference until the model is changed. Subagent protocol stalls no longer quarantine the parent task.
+
+## [0.6.0] - 2026-08-14
+
+### Fixed
+
+- Bounded `create_pr` idempotency lookup to the requested head branch instead of enumerating every pull request in the repository (PR #244), avoiding pagination overflow and unrelated-PR matches on high-volume repositories.
+
 ## [0.5.3] - 2026-08-13
 
 ### Added

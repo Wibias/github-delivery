@@ -6,7 +6,7 @@
 
 **Say the outcome, not the orchestration.**
 
-`github-delivery` turns natural-language requests into evidence-backed GitHub workflows: PRDs, issue research, implementation, deep review, CI, fixes, stacks, verified merges, and verified stable self-update. Its v0.5 progress stack combines a persistent workflow controller, semantic evidence reuse, and hard cross-channel Codex generation bounds to stop narration/read/tool-emission loops without weakening GitHub authority gates.
+`github-delivery` turns natural-language requests into evidence-backed GitHub workflows: PRDs, issue research, implementation, deep review, CI, fixes, stacks, verified merges, and verified stable self-update. Its v0.6 progress stack combines a persistent workflow controller, semantic evidence reuse, and hard cross-channel Codex generation bounds to stop narration/read/tool-emission loops without weakening GitHub authority gates.
 
 [Quick start](#try-it-in-60-seconds) · [Self-update](#update-an-installed-release) · [Progress watchdog](#agent-progress-watchdog) · [What it can own](#what-you-can-ask-it-to-own) · [Safety model](#safety-model) · [Installation](#installation)
 
@@ -561,14 +561,14 @@ There is no recursive simplification loop.
 
 ## Agent progress watchdog
 
-GitHub Delivery v0.5 treats convergence as a layered runtime + workflow problem rather than a prompt-only rule. The target failure classes include repeated narration, long unique no-progress generation, channel hopping, read/evidence spirals, tool-call emission stalls (`Run`, `exec`, `Let me wire...` with no real tool), and malformed protocol output such as repeated `<atool>...</atool>`.
+GitHub Delivery v0.6 treats convergence as a layered runtime + workflow problem rather than a prompt-only rule. The target failure classes include repeated narration, long unique no-progress generation, channel hopping, read/evidence spirals, tool-call emission stalls (`Run`, `exec`, `Let me wire...` with no real tool), and malformed protocol output such as repeated `<atool>...</atool>`.
 
 The watchdog is deliberately separate from mutation authority. It can interrupt, block, rate-limit, reuse evidence, or request a focused retry; it cannot authorize or execute a GitHub write.
 
 | Enforcement level | What it does |
 |---|---|
 | **Policy only** | `GD-CORE-008` through `GD-CORE-010` provide the universal fallback for bounded progress and evidence/context economy when the host exposes no verified interception surface. |
-| **Codex lifecycle hooks** | The normal install configures `PreToolUse`, `PostToolUse`, `Stop`, `SubagentStop`, and `SessionEnd`. After Codex's explicit non-managed hook trust review, supported tool activity is tracked per turn, exact duplicate reads/polls and already-covered semantic evidence can be blocked, evidence does not reset narration history, the 8th consecutive evidence attempt warns, and the 12th is denied until execution/state progress occurs. Successful tool output is preserved; oversized subagent briefs and bounded Stop recovery remain enforced. |
+| **Codex lifecycle hooks** | The normal install configures `PreToolUse`, `PostToolUse`, `UserPromptSubmit`, `Stop`, `SubagentStop`, and `SessionEnd`. After Codex's explicit non-managed hook trust review, supported tool activity is tracked per turn, exact duplicate reads/polls and already-covered semantic evidence can be blocked, evidence does not reset narration history, the 8th consecutive evidence attempt warns, and the 12th is denied until execution/state progress occurs. Successful tool output is preserved; oversized subagent briefs and bounded Stop recovery remain enforced. Repeated grid or malformed tool-protocol output hard-stops on the first stall, and the offending model is quarantined across turns and `SessionEnd` so a resume with the same model is blocked before inference until the model is changed. |
 | **Protected Codex stream** | The installed `codex-with-watchdog.mjs` boundary keeps an independent watchdog per turn and shares one detector across agent-message, reasoning-summary, supported raw-reasoning, and plan text. It consumes plan/diff/output-token telemetry, bounds unique generation and tool-emission/protocol stalls, and issues a private `turn/interrupt` when a hard bound is crossed. Required notification or interrupt-contract loss fails closed. |
 | **Workflow controller** | Every routed workflow is locked to an explicit phase graph with checkpointed refs/blockers/evidence/attempts/usage. Only phase/state/blocker/evidence/execution progress resets orchestration no-progress counters; narration changes do not. Phase/workflow retries, evidence actions, tokens, steps and wall time are bounded independently of the per-turn watchdog. |
 
