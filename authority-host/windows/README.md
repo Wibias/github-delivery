@@ -114,9 +114,9 @@ This is **not** the normal stable binary-distribution path. The source installer
 2. the `dotnet` command;
 3. at least one installed .NET 8 SDK.
 
-It builds the self-contained host into a temporary publish directory, stamps local version/source metadata, and then delegates deployment to `install-release.ps1` so source and stable installs share one state-preserving process/shortcut/environment replacement boundary.
+It builds the self-contained host into a temporary publish directory, stamps local version/source metadata, and then delegates deployment to `install-release.ps1` so source and stable installs share one state-preserving process/shortcut replacement boundary.
 
-`install-release.ps1` does not call `dotnet`. It stops only a running `GitHubDeliveryAuthority` process whose resolved executable path is inside the selected install root, deploys a versioned runtime, recreates the per-user Startup shortcut, sets `GITHUB_DELIVERY_AUTHORITY_TRUST_STORE` and `GITHUB_DELIVERY_AUTHORITY_PIPE=github-delivery-authority-v1` at User scope, verifies the installed metadata, and starts the host.
+`install-release.ps1` does not call `dotnet`. It stops only a running `GitHubDeliveryAuthority` process whose resolved executable path is inside the selected install root, deploys a versioned runtime, recreates the per-user Startup shortcut, relies on the built-in trust-store and pipe defaults, verifies the installed metadata, and starts the host. The `GITHUB_DELIVERY_AUTHORITY_TRUST_STORE` and `GITHUB_DELIVERY_AUTHORITY_PIPE` variables remain available as explicit overrides.
 
 ### First-run setup
 

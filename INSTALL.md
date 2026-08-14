@@ -212,8 +212,15 @@ node scripts/install-skill.mjs \
 
 Extract an archive and copy the resulting `github-delivery` directory into the host's skill directory. Keep the directory name exactly `github-delivery`, because the Agent Skills specification requires it to match the `name` field in `SKILL.md`.
 
-## Optional Windows authority host
 
+## Authority host environment variables
+
+The optional Windows Authority host uses built-in defaults:
+
+- `GITHUB_DELIVERY_AUTHORITY_TRUST_STORE` defaults to `%LOCALAPPDATA%\GitHubDeliveryAuthority\trust-store.json`.
+- `GITHUB_DELIVERY_AUTHORITY_PIPE` defaults to `github-delivery-authority-v1`.
+
+Normal installations do not need these variables. They remain available as explicit overrides for custom installations or testing. Existing user-level values are not removed automatically.
 The optional Windows 11 Authority host turns local Windows Hello approvals into short-lived, exact-scope trusted grants for high-assurance mutations. It does not automatically enable a stricter global protection mode.
 
 For a normal stable installation, the **guided setup** is managed by the github-delivery bootstrap; do **not** build the Authority host manually. Use:
