@@ -6,7 +6,7 @@ Load this policy when opening a PR and again before declaring it merge-ready.
 
 The PR body is a durable, evidence-grounded explanation of the **final head**. A reviewer should understand what changed, why it matters, and how it was validated without reconstructing the story from commits.
 
-Be concise, but never vague. The body is not a changelog, implementation diary, or file-by-file narration.
+Be concise, but never vague. The body is not a changelog, implementation diary, or file-by-file narration. After the evidence and required sections are correct, apply `references/prose-quality.md`. That cleanup may improve wording, but it must preserve exact evidence states, GitHub syntax, required template fields, security redaction, and user-confirmed wording.
 
 ## Sources of truth
 
