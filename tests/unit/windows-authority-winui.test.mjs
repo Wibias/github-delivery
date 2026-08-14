@@ -24,7 +24,8 @@ test("unpackaged publish carries compiled XAML resources used by ms-appx LoadCom
 
   assert.match(project, /CopyUnpackagedWinUiXbfToPublish/);
   assert.match(project, /AfterTargets="Publish"/);
-  assert.match(project, /\*\*\\\*\.xbf/);
+  assert.match(project, /XamlGeneratedOutputPath\)\*\.xbf/);
+  assert.doesNotMatch(project, /XamlGeneratedOutputPath\)\*\*\\\*\.xbf/);
   assert.match(project, /DestinationFiles=/);
   assert.match(workflow, /App\.xbf/);
   assert.match(workflow, /ControlCenterWindow\.xbf/);
