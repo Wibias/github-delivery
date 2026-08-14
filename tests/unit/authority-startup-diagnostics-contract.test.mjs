@@ -72,6 +72,16 @@ test("Authority XAML smoke path records framework resource and runtime-module pr
   assert.match(selfTest, /StartupDiagnostics\.WriteMessage/);
 });
 
+test("Authority persists each XAML probe boundary before invoking WinUI parsing", () => {
+  const selfTest = readFileSync(xamlSelfTestUrl, "utf8");
+
+  assert.match(
+    selfTest,
+    /foreach \(var probe in Probes\)[\s\S]*?StartupDiagnostics\.WriteMessage\("ControlCenterXamlProbe", \$"BEGIN \{probe\.Name\}"\);[\s\S]*?XamlReader\.Load\(probe\.Xaml\)/,
+    "a native WinUI termination must leave the last started probe on disk",
+  );
+});
+
 test("Windows CI exercises Control Center XAML after publish, release packaging, and installation", () => {
   assert.equal(existsSync(releaseSmokeUrl), true, "release runtime smoke helper must exist");
   const ci = readFileSync(ciUrl, "utf8");
