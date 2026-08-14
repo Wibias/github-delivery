@@ -33,6 +33,46 @@ test("stream watchdog interrupts repeated intent narration before it can grow un
   assert.ok(emitted < 500, `watchdog allowed ${emitted} characters before interrupting`);
 });
 
+test("stream watchdog interrupts repeated grid protocol placeholders in one message", () => {
+  const watchdog = createProgressWatchdog();
+  const decision = watchdog.observeAssistantDelta([
+    "Let me apply the patch.",
+    "grid",
+    "Let me execute it.",
+    "<grid></grid>",
+    "grid",
+  ].join("\n"));
+
+  assert.equal(decision.action, "interrupt");
+  assert.equal(decision.reason, "tool_protocol_emission_stall");
+  assert.equal(decision.details.protocolArtifactCount, 3);
+});
+
+test("stream watchdog counts repeated paired tool-protocol blocks without double-counting tags", () => {
+  const watchdog = createProgressWatchdog();
+  const decision = watchdog.observeAssistantDelta([
+    "<atool></atool>",
+    "<invoke></invoke>",
+    "<atool></atool>",
+  ].join("\n"));
+
+  assert.equal(decision.action, "interrupt");
+  assert.equal(decision.reason, "tool_protocol_emission_stall");
+  assert.equal(decision.details.protocolArtifactCount, 3);
+});
+
+test("split opening and closing protocol tags count as one block across stream chunks", () => {
+  const watchdog = createProgressWatchdog();
+
+  assert.equal(watchdog.observeAssistantDelta("<invoke>").action, "allow");
+  assert.equal(watchdog.observeAssistantDelta("</invoke>").action, "allow");
+  const secondBlock = watchdog.observeAssistantDelta("<atool></atool>");
+
+  assert.equal(secondBlock.action, "interrupt");
+  assert.equal(secondBlock.reason, "tool_protocol_emission_stall");
+  assert.equal(secondBlock.details.protocolArtifactCount, 2);
+});
+
 test("normal concise planning prose does not trigger a narration stall", () => {
   const watchdog = createProgressWatchdog();
   const text = [
