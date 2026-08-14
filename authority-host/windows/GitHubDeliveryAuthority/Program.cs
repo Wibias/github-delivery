@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 
@@ -5,6 +6,9 @@ namespace GitHubDeliveryAuthority;
 
 internal static class Program
 {
+    [DllImport("Microsoft.ui.xaml.dll")]
+    private static extern void XamlCheckProcessRequirements();
+
     [STAThread]
     private static int Main(string[] args)
     {
@@ -31,6 +35,7 @@ internal static class Program
             }
 
             StartupDiagnostics.Clear();
+            XamlCheckProcessRequirements();
             WinRT.ComWrappersSupport.InitializeComWrappers();
             Application.Start(callbackParams =>
             {
