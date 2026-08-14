@@ -18,6 +18,19 @@ test("authority host is unpackaged self-contained WinUI 3, not WinForms", () => 
   assert.doesNotMatch(project, /UseWindowsForms/);
 });
 
+test("custom WinUI entry point preserves generated XAML process initialization", () => {
+  const program = read(`${root}/Program.cs`);
+  assert.match(program, /DllImport\("Microsoft\.ui\.xaml\.dll"\)[\s\S]*XamlCheckProcessRequirements/);
+
+  const processCheck = program.indexOf("XamlCheckProcessRequirements();");
+  const comWrappers = program.indexOf("WinRT.ComWrappersSupport.InitializeComWrappers();");
+  const applicationStart = program.indexOf("Application.Start(");
+
+  assert.ok(processCheck >= 0, "custom Main must call XamlCheckProcessRequirements");
+  assert.ok(processCheck < comWrappers, "XAML process requirements must be checked before COM wrappers initialize");
+  assert.ok(comWrappers < applicationStart, "COM wrappers must initialize before Application.Start");
+});
+
 test("source installer preserves self-contained deployment and delegates to the release installer", () => {
   const installer = read("authority-host/windows/install.ps1");
   const releaseInstaller = read("authority-host/windows/install-release.ps1");
