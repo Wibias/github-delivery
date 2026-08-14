@@ -7,6 +7,16 @@
     mc:Ignorable="d"
     Title="Delivery Authority">
 
+    <Window.Resources>
+        <SolidColorBrush x:Key="AuthorityCardBackgroundBrush" Color="#147F7F7F" />
+        <SolidColorBrush x:Key="AuthorityCardStrokeBrush" Color="#337F7F7F" />
+        <SolidColorBrush x:Key="AuthorityAccentBrush" Color="#4CC2FF" />
+        <SolidColorBrush x:Key="AuthoritySuccessBackgroundBrush" Color="#2634A853" />
+        <SolidColorBrush x:Key="AuthoritySuccessBrush" Color="#57C36B" />
+        <SolidColorBrush x:Key="AuthorityCriticalBrush" Color="#E65A5A" />
+        <SolidColorBrush x:Key="AuthorityCautionBrush" Color="#E0A52B" />
+    </Window.Resources>
+
     <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="188" />
@@ -14,9 +24,9 @@
         </Grid.ColumnDefinitions>
 
         <Border Grid.Column="0"
-                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderBrush="{StaticResource AuthorityCardStrokeBrush}"
                 BorderThickness="0,0,1,0"
-                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                Background="{StaticResource AuthorityCardBackgroundBrush}">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*" />
@@ -70,10 +80,10 @@
                         Margin="8"
                         CornerRadius="8"
                         Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
-                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderBrush="{StaticResource AuthorityCardStrokeBrush}"
                         BorderThickness="1">
                     <StackPanel Orientation="Horizontal" Spacing="10">
-                        <FontIcon Glyph="&#xE83D;" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" FontSize="18" />
+                        <FontIcon Glyph="&#xE83D;" Foreground="{StaticResource AuthorityAccentBrush}" FontSize="18" />
                         <StackPanel>
                             <TextBlock Text="Protection mode" FontWeight="SemiBold" />
                             <TextBlock x:Name="ProtectionModeSidebar" Text="Loading…" Style="{StaticResource CaptionTextBlockStyle}" Opacity="0.72" />
@@ -99,25 +109,25 @@
                             <TextBlock Text="Audit dashboard" Style="{StaticResource TitleTextBlockStyle}" />
                             <TextBlock Text="Monitor activity, approvals, and policy enforcement." Margin="0,4,0,0" Opacity="0.72" />
                         </StackPanel>
-                        <Border Grid.Column="1" Padding="10,5" CornerRadius="6" Background="{ThemeResource SystemFillColorSuccessBackgroundBrush}" VerticalAlignment="Top">
-                            <StackPanel Orientation="Horizontal" Spacing="7"><Ellipse Width="8" Height="8" Fill="{ThemeResource SystemFillColorSuccessBrush}"/><TextBlock Text="READY" FontWeight="SemiBold"/></StackPanel>
+                        <Border Grid.Column="1" Padding="10,5" CornerRadius="6" Background="{StaticResource AuthoritySuccessBackgroundBrush}" VerticalAlignment="Top">
+                            <StackPanel Orientation="Horizontal" Spacing="7"><Ellipse Width="8" Height="8" Fill="{StaticResource AuthoritySuccessBrush}"/><TextBlock Text="READY" FontWeight="SemiBold"/></StackPanel>
                         </Border>
                     </Grid>
 
-                    <Border Grid.Row="1" Padding="18" CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" Margin="0,0,0,16">
+                    <Border Grid.Row="1" Padding="18" CornerRadius="8" Background="{StaticResource AuthorityCardBackgroundBrush}" BorderBrush="{StaticResource AuthorityCardStrokeBrush}" BorderThickness="1" Margin="0,0,0,16">
                         <Grid ColumnSpacing="0">
                             <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0" HorizontalAlignment="Center" Spacing="3"><FontIcon Glyph="&#xE83D;" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/><TextBlock x:Name="AllowlistedCount" Text="0" FontSize="22" FontWeight="SemiBold"/><TextBlock Text="Repositories" Style="{StaticResource CaptionTextBlockStyle}"/><TextBlock Text="Allowlisted" Style="{StaticResource CaptionTextBlockStyle}"/></StackPanel>
-                            <StackPanel Grid.Column="1" HorizontalAlignment="Center" Spacing="3"><FontIcon Glyph="&#xE8D7;" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/><TextBlock x:Name="ActiveGrantCount" Text="0" FontSize="22" FontWeight="SemiBold"/><TextBlock Text="Active" Style="{StaticResource CaptionTextBlockStyle}"/><TextBlock Text="Grants" Style="{StaticResource CaptionTextBlockStyle}"/></StackPanel>
-                            <StackPanel Grid.Column="2" HorizontalAlignment="Center" Spacing="3"><FontIcon Glyph="&#xE73E;" Foreground="{ThemeResource SystemFillColorSuccessBrush}"/><TextBlock x:Name="ApprovedTodayCount" Text="0" FontSize="22" FontWeight="SemiBold"/><TextBlock Text="Approved" Style="{StaticResource CaptionTextBlockStyle}"/><TextBlock Text="Today" Style="{StaticResource CaptionTextBlockStyle}"/></StackPanel>
-                            <StackPanel Grid.Column="3" HorizontalAlignment="Center" Spacing="3"><FontIcon Glyph="&#xE711;" Foreground="{ThemeResource SystemFillColorCriticalBrush}"/><TextBlock x:Name="DeniedTodayCount" Text="0" FontSize="22" FontWeight="SemiBold"/><TextBlock Text="Denied" Style="{StaticResource CaptionTextBlockStyle}"/><TextBlock Text="Today" Style="{StaticResource CaptionTextBlockStyle}"/></StackPanel>
-                            <StackPanel Grid.Column="4" HorizontalAlignment="Center" Spacing="3"><FontIcon Glyph="&#xE823;" Foreground="{ThemeResource SystemFillColorCautionBrush}"/><TextBlock x:Name="ExpiredTodayCount" Text="0" FontSize="22" FontWeight="SemiBold"/><TextBlock Text="Expired" Style="{StaticResource CaptionTextBlockStyle}"/><TextBlock Text="Today" Style="{StaticResource CaptionTextBlockStyle}"/></StackPanel>
+                            <StackPanel Grid.Column="0" HorizontalAlignment="Center" Spacing="3"><FontIcon Glyph="&#xE83D;" Foreground="{StaticResource AuthorityAccentBrush}"/><TextBlock x:Name="AllowlistedCount" Text="0" FontSize="22" FontWeight="SemiBold"/><TextBlock Text="Repositories" Style="{StaticResource CaptionTextBlockStyle}"/><TextBlock Text="Allowlisted" Style="{StaticResource CaptionTextBlockStyle}"/></StackPanel>
+                            <StackPanel Grid.Column="1" HorizontalAlignment="Center" Spacing="3"><FontIcon Glyph="&#xE8D7;" Foreground="{StaticResource AuthorityAccentBrush}"/><TextBlock x:Name="ActiveGrantCount" Text="0" FontSize="22" FontWeight="SemiBold"/><TextBlock Text="Active" Style="{StaticResource CaptionTextBlockStyle}"/><TextBlock Text="Grants" Style="{StaticResource CaptionTextBlockStyle}"/></StackPanel>
+                            <StackPanel Grid.Column="2" HorizontalAlignment="Center" Spacing="3"><FontIcon Glyph="&#xE73E;" Foreground="{StaticResource AuthoritySuccessBrush}"/><TextBlock x:Name="ApprovedTodayCount" Text="0" FontSize="22" FontWeight="SemiBold"/><TextBlock Text="Approved" Style="{StaticResource CaptionTextBlockStyle}"/><TextBlock Text="Today" Style="{StaticResource CaptionTextBlockStyle}"/></StackPanel>
+                            <StackPanel Grid.Column="3" HorizontalAlignment="Center" Spacing="3"><FontIcon Glyph="&#xE711;" Foreground="{StaticResource AuthorityCriticalBrush}"/><TextBlock x:Name="DeniedTodayCount" Text="0" FontSize="22" FontWeight="SemiBold"/><TextBlock Text="Denied" Style="{StaticResource CaptionTextBlockStyle}"/><TextBlock Text="Today" Style="{StaticResource CaptionTextBlockStyle}"/></StackPanel>
+                            <StackPanel Grid.Column="4" HorizontalAlignment="Center" Spacing="3"><FontIcon Glyph="&#xE823;" Foreground="{StaticResource AuthorityCautionBrush}"/><TextBlock x:Name="ExpiredTodayCount" Text="0" FontSize="22" FontWeight="SemiBold"/><TextBlock Text="Expired" Style="{StaticResource CaptionTextBlockStyle}"/><TextBlock Text="Today" Style="{StaticResource CaptionTextBlockStyle}"/></StackPanel>
                         </Grid>
                     </Border>
 
                     <Grid Grid.Row="2" ColumnSpacing="16" Margin="0,0,0,16">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="2.15*"/><ColumnDefinition Width="1*"/></Grid.ColumnDefinitions>
-                        <Border Grid.Column="0" Padding="16" CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                        <Border Grid.Column="0" Padding="16" CornerRadius="8" Background="{StaticResource AuthorityCardBackgroundBrush}" BorderBrush="{StaticResource AuthorityCardStrokeBrush}" BorderThickness="1">
                             <StackPanel Spacing="12">
                                 <Grid><TextBlock Text="Recent activity / Audit trail" FontWeight="SemiBold"/><Button Content="View full activity" HorizontalAlignment="Right" Style="{StaticResource AccentButtonStyle}" Padding="9,3" IsEnabled="False"/></Grid>
                                 <Grid ColumnSpacing="10" Opacity="0.65"><Grid.ColumnDefinitions><ColumnDefinition Width="72"/><ColumnDefinition Width="1.1*"/><ColumnDefinition Width="1.4*"/><ColumnDefinition Width="92"/><ColumnDefinition Width="90"/></Grid.ColumnDefinitions><TextBlock Text="Time"/><TextBlock Grid.Column="1" Text="Repository"/><TextBlock Grid.Column="2" Text="Action"/><TextBlock Grid.Column="3" Text="Status"/><TextBlock Grid.Column="4" Text="Actor"/></Grid>
@@ -125,10 +135,10 @@
                             </StackPanel>
                         </Border>
                         <StackPanel Grid.Column="1" Spacing="16">
-                            <Border Padding="16" CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                            <Border Padding="16" CornerRadius="8" Background="{StaticResource AuthorityCardBackgroundBrush}" BorderBrush="{StaticResource AuthorityCardStrokeBrush}" BorderThickness="1">
                                 <StackPanel Spacing="10"><Grid><TextBlock Text="Repository allowlist" FontWeight="SemiBold"/><Button Content="+ Add repository" HorizontalAlignment="Right" Padding="7,2" IsEnabled="False"/></Grid><ListView x:Name="AllowlistList" SelectionMode="None" MinHeight="135"/></StackPanel>
                             </Border>
-                            <Border Padding="16" CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                            <Border Padding="16" CornerRadius="8" Background="{StaticResource AuthorityCardBackgroundBrush}" BorderBrush="{StaticResource AuthorityCardStrokeBrush}" BorderThickness="1">
                                 <StackPanel Spacing="10"><Grid><TextBlock Text="Active temporary grants" FontWeight="SemiBold"/><Button x:Name="RevokeGrantButton" Content="Revoke selected" HorizontalAlignment="Right" Padding="7,2" IsEnabled="False" Click="RevokeGrant_Click"/></Grid><ListView x:Name="GrantList" SelectionMode="Single" SelectionChanged="GrantList_SelectionChanged" MinHeight="145"/></StackPanel>
                             </Border>
                         </StackPanel>
@@ -136,10 +146,10 @@
 
                     <Grid Grid.Row="3" ColumnSpacing="16">
                         <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
-                        <Border Grid.Column="0" Padding="16" CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
-                            <StackPanel Spacing="10"><TextBlock Text="Diagnostics" FontWeight="SemiBold"/><StackPanel Orientation="Horizontal" Spacing="10"><FontIcon Glyph="&#xE946;" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/><StackPanel><TextBlock Text="All systems operational" FontWeight="SemiBold"/><TextBlock Text="No issues detected." Style="{StaticResource CaptionTextBlockStyle}"/></StackPanel><TextBlock x:Name="DiagnosticsUpdated" Text="Updated now" HorizontalAlignment="Right" VerticalAlignment="Center"/></StackPanel></StackPanel>
+                        <Border Grid.Column="0" Padding="16" CornerRadius="8" Background="{StaticResource AuthorityCardBackgroundBrush}" BorderBrush="{StaticResource AuthorityCardStrokeBrush}" BorderThickness="1">
+                            <StackPanel Spacing="10"><TextBlock Text="Diagnostics" FontWeight="SemiBold"/><StackPanel Orientation="Horizontal" Spacing="10"><FontIcon Glyph="&#xE946;" Foreground="{StaticResource AuthorityAccentBrush}"/><StackPanel><TextBlock Text="All systems operational" FontWeight="SemiBold"/><TextBlock Text="No issues detected." Style="{StaticResource CaptionTextBlockStyle}"/></StackPanel><TextBlock x:Name="DiagnosticsUpdated" Text="Updated now" HorizontalAlignment="Right" VerticalAlignment="Center"/></StackPanel></StackPanel>
                         </Border>
-                        <Border Grid.Column="1" Padding="16" CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                        <Border Grid.Column="1" Padding="16" CornerRadius="8" Background="{StaticResource AuthorityCardBackgroundBrush}" BorderBrush="{StaticResource AuthorityCardStrokeBrush}" BorderThickness="1">
                             <StackPanel Spacing="12"><TextBlock Text="Quick settings" FontWeight="SemiBold"/><Grid><TextBlock Text="Protection mode"/><TextBlock x:Name="ProtectionModeText" Text="Loading…" HorizontalAlignment="Right"/></Grid><Button Content="Open settings" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Click="OpenSettings_Click"/></StackPanel>
                         </Border>
                     </Grid>
@@ -154,7 +164,7 @@
                         <TextBlock Text="Choose when GitHub Delivery must ask for Windows Hello before executing a mutation." Margin="0,4,0,0" Opacity="0.72" TextWrapping="Wrap" />
                     </StackPanel>
 
-                    <Border Grid.Row="1" Padding="20" CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" Margin="0,0,0,16">
+                    <Border Grid.Row="1" Padding="20" CornerRadius="8" Background="{StaticResource AuthorityCardBackgroundBrush}" BorderBrush="{StaticResource AuthorityCardStrokeBrush}" BorderThickness="1" Margin="0,0,0,16">
                         <StackPanel Spacing="16">
                             <TextBlock Text="Protection mode" FontWeight="SemiBold" FontSize="16" />
                             <RadioButton x:Name="OffModeRadio" GroupName="ProtectionMode" Content="Off" />
@@ -170,7 +180,7 @@
                         </StackPanel>
                     </Border>
 
-                    <Border Grid.Row="2" Padding="20" CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                    <Border Grid.Row="2" Padding="20" CornerRadius="8" Background="{StaticResource AuthorityCardBackgroundBrush}" BorderBrush="{StaticResource AuthorityCardStrokeBrush}" BorderThickness="1">
                         <StackPanel Spacing="12">
                             <TextBlock Text="Installation" FontWeight="SemiBold" FontSize="16" />
                             <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="170"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="Delivery Authority" Opacity="0.68"/><TextBlock x:Name="HostVersionText" Grid.Column="1" Text="Unknown" FontFamily="Cascadia Mono, Consolas"/></Grid>
