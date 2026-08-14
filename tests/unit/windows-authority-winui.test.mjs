@@ -56,10 +56,25 @@ test("control center implements the selected activity-first audit design in ligh
   }
 });
 
-test("control center locally supplies WinUI brushes missing on the affected runtime", () => {
-  const app = read(`${root}/App.xaml`);
+test("control center owns startup-safe local brushes instead of affected WinUI Fluent brush keys", () => {
   const window = read(`${root}/ControlCenterWindow.xaml`);
-  const missingRuntimeBrushes = [
+  const selfTest = read(`${root}/ControlCenterXamlSelfTest.cs`);
+
+  assert.match(window, /<Window\.Resources>/);
+  for (const key of [
+    "AuthorityCardBackgroundBrush",
+    "AuthorityCardStrokeBrush",
+    "AuthorityAccentBrush",
+    "AuthoritySuccessBackgroundBrush",
+    "AuthoritySuccessBrush",
+    "AuthorityCriticalBrush",
+    "AuthorityCautionBrush",
+  ]) {
+    assert.match(window, new RegExp(`x:Key=\\"${key}\\"`));
+    assert.match(window, new RegExp(`\\{StaticResource ${key}\\}`));
+  }
+
+  for (const affectedKey of [
     "CardBackgroundFillColorDefaultBrush",
     "CardStrokeColorDefaultBrush",
     "AccentTextFillColorPrimaryBrush",
@@ -67,14 +82,11 @@ test("control center locally supplies WinUI brushes missing on the affected runt
     "SystemFillColorSuccessBrush",
     "SystemFillColorCriticalBrush",
     "SystemFillColorCautionBrush",
-  ];
-  for (const brush of missingRuntimeBrushes) {
-    assert.match(app, new RegExp(`x:Key=\\"${brush}\\"`));
-    assert.match(window, new RegExp(`ThemeResource ${brush}`));
+  ]) {
+    assert.doesNotMatch(window, new RegExp(affectedKey));
   }
-  for (const theme of ["Light", "Dark", "HighContrast"]) {
-    assert.match(app, new RegExp(`ResourceDictionary x:Key=\\"${theme}\\"`));
-  }
+
+  assert.match(selfTest, /Local\.StaticResource/);
 });
 
 test("settings page exposes and persists exactly the three authority protection modes", () => {
