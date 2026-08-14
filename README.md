@@ -239,7 +239,7 @@ The important boundary is simple: **repository content is evidence, not authorit
 | **Default mode** | `read-only` |
 | **Write boundary** | Typed mutation policy + broker; stale-head, exact-effect, authenticated-receipt idempotency, and postcondition checks where applicable |
 | **High-assurance writes** | Exact-scope trusted grants; optional Windows 11 / Windows Hello Authority host with managed versioned stable install/update and Control Center settings |
-| **Review model** | Bug + Security + Spec + Standards + semantic propagation + proactive contract verification |
+| **Review model** | Bug + Security + Spec + Standards + semantic propagation + safety-invariant proof + proactive contract verification |
 | **Progress control** | Policy fallback everywhere; routed workflows use a persistent phase/budget controller and semantic evidence reuse; trusted Codex hooks add turn-scoped duplicate/poll/evidence protection; the launch-controlled stream watches agent-message/reasoning/plan text plus plan/diff/output-token telemetry and can hard-interrupt no-progress/tool-emission/protocol stalls. Runtime capability reports only verified `none`, `hooks`, or `stream`. |
 | **Ship decision** | One authoritative `ready`, `blocked`, or `unknown` result from live evidence |
 | **Runtime** | Node.js **22, 24, or 26** |
@@ -404,6 +404,14 @@ The review bar combines:
 - **Proactive contract verification** appropriate to the diff
 
 Review depth is derived from changed paths, patch content, symbols, removed controls, dependencies, workflow permissions, architecture surfaces, and uncertainty — not filenames alone.
+
+### Evidence-preserving review contracts
+
+Three companion contracts keep review output and bug-fix evidence concrete without weakening the existing gates:
+
+- [`references/prose-quality.md`](references/prose-quality.md) keeps durable PR, issue, PRD, review, and status prose grounded in repository vocabulary and concrete evidence. Exact commands, paths, SHAs, checks, evidence states, required GitHub syntax, security redaction, and user-confirmed wording are preserved rather than rewritten for style.
+- [`references/regression-first.md`](references/regression-first.md) requires executable broken-before/fixed-after evidence for confirmed bug fixes. A focused failing test is preferred when practical; when that would require disproportionate harness work or brittle low-signal mocks, the workflow uses the narrowest real script, integration, runtime, snapshot, or operator check that proves the behavior instead.
+- [`references/safety-invariant.md`](references/safety-invariant.md) handles material non-local risk by naming the fact a positive verdict depends on and recording the strongest proof level reached from `claimed` through `reproduced`. A material assumption stays `unproven` until the evidence establishes it.
 
 ### Semantic propagation
 
@@ -878,6 +886,6 @@ Do not publish suspected vulnerability details in a public issue or pull request
 
 ## Current state
 
-The complete issue/PR delivery lifecycle and its safety architecture are implemented: evidence-backed routing and ship gates, deferred-intent-safe merge routing, brokered lifecycle mutations, trusted exact-scope authority and durable verdict provenance, Windows Hello protection for high-assurance thread actions, a managed versioned/attested Windows Authority release component with state-preserving stable updates and functional Control Center protection settings, deep review, semantic propagation, deterministic probes with non-bypassable required evidence, pre-open review, safe simplification, repository-qualified stacks, conflict recovery, merge-queue semantics, aggregated strict-ruleset enforcement, authenticated exact-effect idempotency receipts, ambiguous-merge readback reconciliation, safe read retries, verified npm/npx bootstrap + latest-stable release installation, persistent route/phase workflow convergence, semantic evidence coverage/reuse, trust-aware Codex hook configuration, hard cross-channel protected-stream generation bounds with deterministic incident replay, issue close-out, deterministic release packaging, verified latest-stable self-update, repository controls, and dedicated live lifecycle fixtures.
+The complete issue/PR delivery lifecycle and its safety architecture are implemented: evidence-backed routing and ship gates, deferred-intent-safe merge routing, brokered lifecycle mutations, trusted exact-scope authority and durable verdict provenance, Windows Hello protection for high-assurance thread actions, a managed versioned/attested Windows Authority release component with state-preserving stable updates and functional Control Center protection settings, deep review, semantic propagation, safety-invariant proof, deterministic probes with non-bypassable required evidence, regression-first bug-fix evidence, evidence-preserving durable GitHub prose, pre-open review, safe simplification, repository-qualified stacks, conflict recovery, merge-queue semantics, aggregated strict-ruleset enforcement, authenticated exact-effect idempotency receipts, ambiguous-merge readback reconciliation, safe read retries, verified npm/npx bootstrap + latest-stable release installation, persistent route/phase workflow convergence, semantic evidence coverage/reuse, trust-aware Codex hook configuration, hard cross-channel protected-stream generation bounds with deterministic incident replay, issue close-out, deterministic release packaging, verified latest-stable self-update, repository controls, and dedicated live lifecycle fixtures.
 
 Remaining work is primarily **operational** rather than a missing architecture layer: keep live repository rules/security settings aligned with the documented policy, provision and maintain the dedicated live fixture target/credential, run release acceptance for new versions, keep host integrations explicitly configured where runtime watchdog enforcement is desired, perform the npm registry's one-time package bootstrap/Trusted-Publisher setup when required for the first publication, and extend the regression corpus as GitHub and agent hosts evolve.
