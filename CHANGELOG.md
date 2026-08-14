@@ -6,8 +6,6 @@ All notable changes to `github-delivery` are documented here.
 
 ## [0.6.1] - 2026-08-14
 
-## [0.6.1] - 2026-08-14
-
 ### Added
 
 - Authority host environment variables are documented as optional explicit overrides. Normal installations use built-in defaults and no longer persist these variables in the user environment.
