@@ -5,7 +5,11 @@ import { isDeepStrictEqual } from "node:util";
 import { createInterface } from "node:readline/promises";
 
 import { installSkill, parseInstallArgs } from "../install-skill.mjs";
-import { reconcileStableAuthorityHost, startInstalledAuthorityHost } from "./authority-host-install.mjs";
+import {
+  configureAuthorityHostStartup,
+  reconcileStableAuthorityHost,
+  startInstalledAuthorityHost,
+} from "./authority-host-install.mjs";
 import { acquireVerifiedReleasePayload } from "./release-self-update.mjs";
 import {
   compareInstalledManifest,
@@ -114,6 +118,25 @@ export async function confirmAuthorityHost(
   }
 }
 
+export async function confirmAuthorityStartup(
+  { input = process.stdin, output = process.stdout, ask = null } = {},
+) {
+  if (input?.isTTY !== true) return false;
+  output?.write?.("\nWindows login auto-start (optional)\n");
+  output?.write?.("  This starts the installed Authority GUI when you sign in to Windows.\n");
+  output?.write?.("  You can change this later with: npx github-delivery autostart\n\n");
+  const prompt = "Enable Windows login auto-start? [y/N] ";
+  while (true) {
+    const answer = ask
+      ? await ask(prompt)
+      : await askWithReadline(prompt, { input, output });
+    const normalized = String(answer ?? "").trim();
+    if (normalized === "" || /^(?:n|no)$/i.test(normalized)) return false;
+    if (/^(?:y|yes)$/i.test(normalized)) return true;
+    output?.write?.("Please answer yes or no.\n");
+  }
+}
+
 function renderEnvironmentCheck(environment, output) {
   if (!output || typeof output.write !== "function") return;
   output.write("\nEnvironment check\n");
@@ -191,6 +214,7 @@ export async function runGuidedInstall({
   const verify = dependencies.verifyInstalledRelease || verifyInstalledRelease;
   const confirm = dependencies.confirmApply || confirmApply;
   const confirmAuthHost = dependencies.confirmAuthorityHost || confirmAuthorityHost;
+  const confirmAuthStartup = dependencies.confirmAuthorityStartup || confirmAuthorityStartup;
   const reconcileAuthority = dependencies.reconcileStableAuthorityHost || reconcileStableAuthorityHost;
   const platform = dependencies.platform || process.platform;
   const startAuthority = dependencies.startInstalledAuthorityHost || startInstalledAuthorityHost;
@@ -262,9 +286,17 @@ export async function runGuidedInstall({
       const authorityStarted = authorityHost?.installed?.installed
         ? startAuthority({ installed: authorityHost.installed })
         : { started: false, reason: "not_installed" };
+      const enableStartup = await confirmAuthStartup({ input, output });
+      const configureStartup = dependencies.configureAuthorityHostStartup || configureAuthorityHostStartup;
+      const authorityStartup = enableStartup && authorityHost?.installed?.installed
+        ? configureStartup({ installed: authorityHost.installed })
+        : { configured: false, reason: enableStartup ? "not_installed" : "declined" };
       output?.write?.(authorityStarted.started
         ? "  Approval GUI is running in the notification area.\n"
         : `  Approval GUI not started (${authorityStarted.reason}). Run: npx github-delivery start\n`);
+      output?.write?.(authorityStartup.configured
+        ? "  Windows login auto-start: configured.\n"
+        : `  Windows login auto-start not enabled (${authorityStartup.reason}). Enable later with: npx github-delivery autostart\n`);
     }
     renderProtectionPostflight(installation?.watchdog, output);
 

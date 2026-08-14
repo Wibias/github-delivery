@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { parseBootstrapArgs } from "./lib/bootstrap-cli.mjs";
 import { runBootstrap } from "./lib/bootstrap-command.mjs";
 
-export const HELP_TEXT = `GitHub Delivery\n\nUsage:\n  github-delivery\n  github-delivery install [--target PATH]\n  github-delivery setup [--target PATH]\n  github-delivery start\n  github-delivery doctor [--target PATH] [--json]\n  github-delivery update [--target PATH] [--apply]\n\nBare invocation launches guided setup.\nDoctor is human-readable by default; add --json for the raw machine report.\nUpdate is dry-run by default; add --apply only after reviewing the plan.\n`;
+export const HELP_TEXT = `GitHub Delivery\n\nUsage:\n  github-delivery\n  github-delivery install [--target PATH]\n  github-delivery setup [--target PATH]\n  github-delivery start\n  github-delivery autostart\n  github-delivery doctor [--target PATH] [--json]\n  github-delivery update [--target PATH] [--apply]\n\nBare invocation launches guided setup.\nDoctor is human-readable by default; add --json for the raw machine report.\nUpdate is dry-run by default; add --apply only after reviewing the plan.\n`;
 
 function value(value, fallback = "unknown") {
   if (value === null || value === undefined || value === "") return fallback;
@@ -93,6 +93,12 @@ function renderBootstrapResult(result, stdout) {
     stdout.write(result.started
       ? "GitHub Delivery approval GUI is running.\n"
       : `GitHub Delivery approval GUI was not started (${result.reason || "unknown reason"}).\n`);
+    return;
+  }
+  if (result.action === "autostart") {
+    stdout.write(result.configured
+      ? "Windows login auto-start is enabled.\n"
+      : `Windows login auto-start was not enabled (${result.reason || "unknown reason"}).\n`);
     return;
   }
   if (result.action === "install") {

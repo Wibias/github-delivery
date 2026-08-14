@@ -11,6 +11,7 @@ import {
   runBootstrapDoctor,
   runBootstrapSetup,
   runBootstrapStart,
+  runBootstrapAutostart,
   runBootstrapUpdate,
 } from "./bootstrap-maintenance.mjs";
 
@@ -85,6 +86,7 @@ export async function runBootstrap(argv = [], dependencies = {}) {
   const update = dependencies.runBootstrapUpdate || runBootstrapUpdate;
   const setup = dependencies.runBootstrapSetup || runBootstrapSetup;
   const start = dependencies.runBootstrapStart || runBootstrapStart;
+  const autostart = dependencies.runBootstrapAutostart || runBootstrapAutostart;
   const doctor = dependencies.runBootstrapDoctor || runBootstrapDoctor;
   const chooseAction = dependencies.chooseExistingAction || chooseExistingAction;
   const chooseTarget = dependencies.chooseInstallation || chooseInstallation;
@@ -112,6 +114,7 @@ export async function runBootstrap(argv = [], dependencies = {}) {
     return setup({ target });
   }
   if (options.command === "start") return start();
+  if (options.command === "autostart") return autostart();
   if (options.command === "doctor") {
     if (options.target) return doctor({ target: resolve(options.target) });
     const eligible = installations.filter(updateEligible);

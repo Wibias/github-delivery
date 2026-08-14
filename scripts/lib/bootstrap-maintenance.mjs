@@ -5,6 +5,7 @@ import { pathToFileURL } from "node:url";
 import { installCodexWatchdogHooks } from "../install-codex-watchdog-hooks.mjs";
 import { parseInstallArgs, runInstallCommand } from "../install-skill.mjs";
 import {
+  configureAuthorityHostStartup,
   readInstalledAuthorityHost,
   reconcileStableAuthorityHost,
   startInstalledAuthorityHost,
@@ -182,6 +183,11 @@ export async function runBootstrapSetup({
 export function runBootstrapStart({ dependencies = {} } = {}) {
   const start = dependencies.startInstalledAuthorityHost || startInstalledAuthorityHost;
   return { action: "start", ...start() };
+}
+
+export function runBootstrapAutostart({ dependencies = {} } = {}) {
+  const configureStartup = dependencies.configureAuthorityHostStartup || configureAuthorityHostStartup;
+  return { action: "autostart", ...configureStartup() };
 }
 
 function relation(installedVersion, latestVersion) {
