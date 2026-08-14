@@ -37,6 +37,12 @@ jobs:
           node-version: ${{ matrix.node }}
           package-manager-cache: false
 
+      - name: Set up .NET
+        if: runner.os == 'Windows'
+        uses: actions/setup-dotnet@3951f0dfe7a07e2313ec93c75700083e2005cbab # v4.3.0
+        with:
+          dotnet-version: 8.0.x
+
       - name: Run checks
         run: npm run check
 

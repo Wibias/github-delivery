@@ -8,6 +8,7 @@ test("release workflow builds, attests, and publishes the Windows authority host
   assert.match(workflow, /authority_host:/);
   assert.match(workflow, /runs-on: windows-latest/);
   assert.match(workflow, /dotnet publish[\s\S]*--runtime win-x64[\s\S]*--self-contained true/);
+  assert.match(workflow, /actions\/setup-dotnet@[0-9a-f]{40}[\s\S]*dotnet-version: 8\.0\.x/);
   assert.match(workflow, /build-authority-host-release\.mjs/);
   assert.match(workflow, /github-delivery-authority-\$\{\{ github\.sha \}\}/);
   assert.match(workflow, /actions\/download-artifact@[0-9a-f]{40}/);
