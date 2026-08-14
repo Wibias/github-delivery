@@ -77,6 +77,7 @@ Explicit commands are also available:
 npx github-delivery install
 npx github-delivery setup
 npx github-delivery start
+npx github-delivery autostart
 npx github-delivery doctor
 npx github-delivery doctor --json
 npx github-delivery update
@@ -122,6 +123,8 @@ npx github-delivery setup
 ```
 
 `setup` works only against an existing valid installation. It never substitutes the ephemeral npm package for the installed skill source and never bypasses Codex hook trust. On supported Windows, it also reconciles a required or already-configured Authority host through the verified stable component path.
+
+`start` launches the installed Windows Authority GUI without changing login behavior. Login auto-start is opt-in: enable it during the fresh-install prompt or run `npx github-delivery autostart` later. The command configures the current user’s Windows login startup entry and is idempotent.
 
 For a read-only health report:
 
@@ -718,6 +721,7 @@ Useful explicit commands:
 npx github-delivery install
 npx github-delivery setup
 npx github-delivery start
+npx github-delivery autostart
 npx github-delivery doctor
 npx github-delivery doctor --json
 npx github-delivery update
