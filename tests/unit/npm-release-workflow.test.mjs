@@ -26,7 +26,11 @@ test("npm trusted publishing runs only in the protected tag publish job", () => 
   assert.match(publishJob, /id-token: write/);
   assert.doesNotMatch(beforePublishJob, /npm publish/);
   assert.equal(
-    (workflow.match(/npm publish --access public/g) || []).length,
+    (
+      workflow.match(
+        /node \.github\/npm-publish\/node_modules\/npm\/bin\/npm-cli\.js publish --access public/g,
+      ) || []
+    ).length,
     1,
     "npm publication must occur exactly once",
   );
@@ -40,10 +44,13 @@ test("npm trusted publishing uses registry setup and no publish token secret", (
     /- name: Set up Node\.js[\s\S]*?registry-url: https:\/\/registry\.npmjs\.org/,
   );
   assert.match(
-  publishJob,
-  /npm install --global git\+https:\/\/github\.com\/npm\/cli\.git#da1d4d299151781500ec854f10eb7e570696d506/,
+    publishJob,
+    /npm ci --prefix \.github\/npm-publish --include=dev --allow-remote=all --ignore-scripts/,
   );
-  assert.match(publishJob, /npm run package:check[\s\S]*npm publish --access public/);
+  assert.match(
+    publishJob,
+    /npm run package:check[\s\S]*node \.github\/npm-publish\/node_modules\/npm\/bin\/npm-cli\.js publish --access public/,
+  );
   assert.doesNotMatch(publishJob, /NPM_TOKEN/);
   assert.doesNotMatch(publishJob, /NODE_AUTH_TOKEN/);
   assert.doesNotMatch(publishJob, /npm publish[^\n]*--provenance/);
@@ -54,7 +61,7 @@ test("npm publication remains fail-visible in the release sequence", () => {
 
   assert.match(
     publishJob,
-    /Rebuild from the tagged commit[\s\S]*npm run package:check[\s\S]*npm install --global git\+https:\/\/github\.com\/npm\/cli\.git#da1d4d299151781500ec854f10eb7e570696d506[\s\S]*npm publish --access public[\s\S]*Publish GitHub Release/,
+    /Rebuild from the tagged commit[\s\S]*npm run package:check[\s\S]*npm ci --prefix \.github\/npm-publish --include=dev --allow-remote=all --ignore-scripts[\s\S]*node \.github\/npm-publish\/node_modules\/npm\/bin\/npm-cli\.js publish --access public[\s\S]*Publish GitHub Release/,
   );
   assert.doesNotMatch(publishJob, /npm publish[^\n]*(\|\| true|continue-on-error)/);
 });
