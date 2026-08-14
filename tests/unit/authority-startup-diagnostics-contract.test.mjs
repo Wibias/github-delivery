@@ -22,6 +22,7 @@ test("Authority normal startup preserves local crash diagnostics", () => {
   assert.match(diagnostics, /LocalApplicationData|AppPaths\.RootDirectory/);
   assert.match(diagnostics, /Exception/);
   assert.match(diagnostics, /HRESULT/);
+  assert.match(diagnostics, /WriteMessage/);
   assert.match(program, /AppDomain\.CurrentDomain\.UnhandledException/);
   assert.match(program, /StartupDiagnostics\.Clear/);
   assert.match(program, /StartupDiagnostics\.Write/);
@@ -43,6 +44,22 @@ test("Authority has a runtime Control Center XAML smoke path", () => {
   assert.match(selfTest, /new StateStore/);
   assert.match(selfTest, /new ControlCenterWindow\(store\)/);
   assert.match(selfTest, /window\.Close\(\)/);
+});
+
+test("Authority XAML smoke path records framework resource and runtime-module probes", () => {
+  const selfTest = readFileSync(xamlSelfTestUrl, "utf8");
+
+  assert.match(selfTest, /XamlReader\.Load/);
+  assert.match(selfTest, /NavigationView/);
+  assert.match(selfTest, /ApplicationPageBackgroundThemeBrush/);
+  assert.match(selfTest, /CardBackgroundFillColorDefaultBrush/);
+  assert.match(selfTest, /CaptionTextBlockStyle/);
+  assert.match(selfTest, /AccentButtonStyle/);
+  assert.match(selfTest, /Process\.GetCurrentProcess/);
+  assert.match(selfTest, /Microsoft\./);
+  assert.match(selfTest, /RuntimeInformation\.OSDescription/);
+  assert.match(selfTest, /CurrentUICulture/);
+  assert.match(selfTest, /StartupDiagnostics\.WriteMessage/);
 });
 
 test("Windows CI exercises Control Center XAML after publish, release packaging, and installation", () => {

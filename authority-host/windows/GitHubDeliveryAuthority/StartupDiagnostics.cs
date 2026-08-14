@@ -30,4 +30,18 @@ internal static class StartupDiagnostics
         {
         }
     }
+
+    public static void WriteMessage(string source, string message)
+    {
+        try
+        {
+            Directory.CreateDirectory(AppPaths.RootDirectory);
+            var entry = $"{DateTimeOffset.UtcNow:O} {source}{Environment.NewLine}" +
+                $"{message.TrimEnd()}{Environment.NewLine}{Environment.NewLine}";
+            File.AppendAllText(Path, entry);
+        }
+        catch
+        {
+        }
+    }
 }
