@@ -179,6 +179,7 @@ export async function reconcileStableAuthorityHost({
   attestationRunner = undefined,
   installRunner = spawnSync,
   scriptPath = defaultInstallScript(),
+  installWhenDisabled = false,
   dependencies = {},
 } = {}) {
   const readInstalled = dependencies.readInstalledAuthorityHost || readInstalledAuthorityHost;
@@ -197,7 +198,7 @@ export async function reconcileStableAuthorityHost({
     };
   }
 
-  if (!installed.installed && !installed.configured && mode === "off") {
+  if (!installWhenDisabled && !installed.installed && !installed.configured && mode === "off") {
     return { action: "disabled", required: false, changed: false, installed, mode, currentVersion: null, targetVersion: expectedRelease?.version || null };
   }
 
@@ -209,7 +210,8 @@ export async function reconcileStableAuthorityHost({
     releaseMetadata = resolved.release;
   }
 
-  const plan = planAuthorityHostUpdate({ mode, targetVersion: expectedRelease.version, installed });
+  const planningMode = installWhenDisabled && mode === "off" ? "high-assurance" : mode;
+  const plan = planAuthorityHostUpdate({ mode: planningMode, targetVersion: expectedRelease.version, installed });
   if (!plan.required) return { ...plan, changed: false, installed, mode };
 
   if (!releaseMetadata) releaseMetadata = await client.latestRelease();
