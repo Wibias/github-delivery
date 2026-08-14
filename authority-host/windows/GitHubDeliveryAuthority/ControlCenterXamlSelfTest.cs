@@ -103,20 +103,22 @@ internal static class ControlCenterXamlSelfTest
             report.AppendLine($"  module-enumeration-failed: HRESULT=0x{exception.HResult:X8} {exception.Message}");
         }
 
-        report.AppendLine("XAML probes:");
+        StartupDiagnostics.WriteMessage("ControlCenterXamlProbe", report.ToString());
+
         foreach (var probe in Probes)
         {
+            StartupDiagnostics.WriteMessage("ControlCenterXamlProbe", $"BEGIN {probe.Name}");
             try
             {
                 _ = XamlReader.Load(probe.Xaml);
-                report.AppendLine($"  PASS {probe.Name}");
+                StartupDiagnostics.WriteMessage("ControlCenterXamlProbe", $"PASS {probe.Name}");
             }
             catch (Exception exception)
             {
-                report.AppendLine($"  FAIL {probe.Name} | HRESULT=0x{exception.HResult:X8} | {exception.Message}");
+                StartupDiagnostics.WriteMessage(
+                    "ControlCenterXamlProbe",
+                    $"FAIL {probe.Name} | HRESULT=0x{exception.HResult:X8} | {exception.Message}");
             }
         }
-
-        StartupDiagnostics.WriteMessage("ControlCenterXamlProbe", report.ToString());
     }
 }
