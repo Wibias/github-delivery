@@ -60,7 +60,8 @@ test("control center owns startup-safe local brushes instead of affected WinUI F
   const window = read(`${root}/ControlCenterWindow.xaml`);
   const selfTest = read(`${root}/ControlCenterXamlSelfTest.cs`);
 
-  assert.match(window, /<Window\.Resources>/);
+  assert.match(window, /<Grid[^>]*Background="\{ThemeResource ApplicationPageBackgroundThemeBrush\}"[^>]*>\s*<Grid\.Resources>/);
+  assert.doesNotMatch(window, /<Window\.Resources>/);
   for (const key of [
     "AuthorityCardBackgroundBrush",
     "AuthorityCardStrokeBrush",
