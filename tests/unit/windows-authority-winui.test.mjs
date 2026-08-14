@@ -56,10 +56,10 @@ test("control center implements the selected activity-first audit design in ligh
   }
 });
 
-test("control center owns theme brushes that are missing on affected WinUI runtimes", () => {
+test("control center locally supplies WinUI brushes missing on the affected runtime", () => {
   const app = read(`${root}/App.xaml`);
   const window = read(`${root}/ControlCenterWindow.xaml`);
-  const fragileFrameworkBrushes = [
+  const missingRuntimeBrushes = [
     "CardBackgroundFillColorDefaultBrush",
     "CardStrokeColorDefaultBrush",
     "AccentTextFillColorPrimaryBrush",
@@ -68,18 +68,7 @@ test("control center owns theme brushes that are missing on affected WinUI runti
     "SystemFillColorCriticalBrush",
     "SystemFillColorCautionBrush",
   ];
-  for (const brush of fragileFrameworkBrushes) {
-    assert.doesNotMatch(window, new RegExp(`ThemeResource ${brush}`));
-  }
-  for (const brush of [
-    "AuthorityCardBackgroundBrush",
-    "AuthorityCardStrokeBrush",
-    "AuthorityAccentBrush",
-    "AuthoritySuccessBackgroundBrush",
-    "AuthoritySuccessBrush",
-    "AuthorityCriticalBrush",
-    "AuthorityCautionBrush",
-  ]) {
+  for (const brush of missingRuntimeBrushes) {
     assert.match(app, new RegExp(`x:Key=\\"${brush}\\"`));
     assert.match(window, new RegExp(`ThemeResource ${brush}`));
   }
