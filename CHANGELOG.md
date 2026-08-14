@@ -4,6 +4,21 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-08-14
+
+### Added
+
+- Advisory design-quality review for changed executable behavior and architecture. Standards review can now evaluate happy-path readability, owning trust boundaries, abstraction/reader cost, domain modeling, mutable-state ownership, shared-state discipline, and evidence-before-complexity without turning generic design taste into an automatic blocker.
+- Safe change-execution guidance for broad deterministic sweeps and internal API migrations. Workflows now inventory the migration surface, migrate known callers before deleting obsolete internal paths when compatibility is not required, use scripts, codemods, or generators when they materially lower change risk, and advance through independently verifiable units with residual old-form checks.
+- Stable verification-boundary guidance for regression and refactor evidence. Checks now target the narrowest stable contract that would actually fail if protected behavior broke, rather than automatically preferring helper-level unit tests or oversized end-to-end harnesses.
+
+### Changed
+
+- Regression-first bug fixes now select evidence by stable behavior boundary while preserving broken-before/fixed-after proof and the existing rule against brittle, low-signal test harnesses.
+- Refactor characterization/equivalence evidence now prefers stable behavior boundaries that survive internal restructuring and records what production path remains unexercised when external dependencies are substituted.
+- Invalid external data is handled at the owning trust boundary, with deeper checks reserved for distinct security, authorization, persistence, corruption, lifecycle, concurrency, or fail-loud contracts instead of repeating identical validation through every internal layer.
+- Refactor planning and issue-to-PR implementation can invoke the new change-execution companion for migrations and mechanical sweeps while keeping the compact core workflow within its context budget.
+
 ## [0.6.2] - 2026-08-14
 
 ### Added
