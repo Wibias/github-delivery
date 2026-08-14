@@ -113,6 +113,12 @@ jobs:
           $PublishDir = Join-Path $env:RUNNER_TEMP 'github-delivery-authority-publish'
           dotnet publish $Project --configuration Release --runtime win-x64 --self-contained true --no-restore --output $PublishDir
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          foreach ($CompiledXaml in @('App.xbf', 'ApprovalWindow.xbf', 'ControlCenterWindow.xbf')) {
+            $CompiledXamlPath = Join-Path $PublishDir $CompiledXaml
+            if (-not (Test-Path $CompiledXamlPath -PathType Leaf)) {
+              throw "Published authority host is missing compiled XAML resource: $CompiledXaml"
+            }
+          }
           $DepsPath = Join-Path $PublishDir 'GitHubDeliveryAuthority.deps.json'
           $Deps = Get-Content $DepsPath -Raw | ConvertFrom-Json
           $RuntimePackage = $Deps.libraries.PSObject.Properties.Name |
