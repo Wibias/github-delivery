@@ -4,6 +4,18 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-08-14
+
+### Added
+
+- Evidence-preserving prose guidance for durable GitHub text such as PR descriptions, issues, PRDs, reviews, status comments, and merge-ready summaries. The guidance prefers concrete repository terms and plain wording while preserving exact commands, identifiers, evidence states, security redaction, and user-confirmed text.
+- Regression-first bug-fix guidance that requires executable broken-before/fixed-after evidence while preferring the narrowest useful check. Focused failing tests remain preferred when they are natural, but low-signal harness work or brittle mocks are not required solely for test-first compliance.
+- Safety-invariant review guidance for material non-local risk. Reviews now name the fact a positive verdict depends on, record the strongest proof level reached from claimed through reproduced, and keep material assumptions explicitly `unproven` when the evidence does not establish them.
+
+### Changed
+
+- Bug-hunt regression coverage is now sized by behavior partitions and failure paths instead of arbitrary cyclomatic-complexity test-count targets, and central-file/non-local risk can escalate into explicit safety-invariant proof.
+
 ## [0.6.1] - 2026-08-14
 
 ### Added
