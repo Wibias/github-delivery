@@ -30,4 +30,16 @@
     <Compile Remove="ShieldMark.cs" />
     <Compile Remove="StatusPill.cs" />
   </ItemGroup>
+
+  <Target Name="CopyUnpackagedWinUiXbfToPublish"
+          AfterTargets="Publish"
+          Condition="'$(WindowsPackageType)' == 'None' and '$(PublishDir)' != ''">
+    <ItemGroup>
+      <AuthorityCompiledXaml Include="$(XamlGeneratedOutputPath)**\*.xbf" />
+    </ItemGroup>
+    <Error Condition="'@(AuthorityCompiledXaml)' == ''"
+           Text="WinUI XBF output is missing; unpackaged publish cannot load compiled XAML resources." />
+    <Copy SourceFiles="@(AuthorityCompiledXaml)"
+          DestinationFiles="@(AuthorityCompiledXaml->'$(PublishDir)%(RecursiveDir)%(Filename)%(Extension)')" />
+  </Target>
 </Project>
