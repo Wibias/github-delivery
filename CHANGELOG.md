@@ -4,6 +4,8 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-08-14
+
 ### Added
 
 - Guided Windows approval-GUI choice. Fresh interactive installs explain the optional component and ask `Install the Windows approval GUI now? [Y/n]`; explicit consent installs the separately verified Authority host without changing an `off` protection mode, while No finishes the skill install without the GUI.
@@ -16,6 +18,7 @@ All notable changes to `github-delivery` are documented here.
 ### Fixed
 
 - Repeated grid or malformed tool-protocol placeholder output now hard-stops immediately on the first stall instead of being retried, and the offending model is quarantined across turns and `SessionEnd` so a resume with the same model is blocked before inference until the model is changed. Subagent protocol stalls no longer quarantine the parent task.
+- Windows login auto-start is now opt-in (previously enabled by default); users explicitly consent via guided install or `npx github-delivery autostart`.
 
 ## [0.6.0] - 2026-08-14
 
