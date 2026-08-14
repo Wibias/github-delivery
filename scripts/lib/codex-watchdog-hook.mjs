@@ -81,6 +81,13 @@ function responseExplicitlyFailed(response) {
 function stopDecision(watchdog, input) {
   const decision = watchdog.observeAssistantDelta(input.last_assistant_message || "");
   if (decision.action !== "interrupt") return null;
+  if (decision.reason === "tool_protocol_emission_stall") {
+    return {
+      continue: false,
+      stopReason: decision.reason,
+      systemMessage: "GitHub Delivery stopped a repeated tool-protocol artifact stall.",
+    };
+  }
   if (input.stop_hook_active) {
     return {
       continue: false,

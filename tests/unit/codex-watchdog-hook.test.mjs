@@ -130,6 +130,30 @@ test("Stop requests one corrective continuation for a narration stall", () => {
   assert.match(second.output.stopReason, /no_progress_stall/);
 });
 
+test("Stop hard-stops a repeated protocol-artifact stall without a corrective continuation", () => {
+  const stalled = [
+    "Let me apply the patch.",
+    "grid",
+    "Let me execute it.",
+    "<grid></grid>",
+    "grid",
+  ].join("\n");
+  const result = evaluateCodexHook(
+    {
+      hook_event_name: "Stop",
+      session_id: "s1",
+      turn_id: "t1",
+      stop_hook_active: false,
+      last_assistant_message: stalled,
+    },
+    {},
+  );
+
+  assert.equal(result.output.continue, false);
+  assert.equal(result.output.stopReason, "tool_protocol_emission_stall");
+  assert.equal(result.output.decision, undefined);
+});
+
 test("SubagentStop uses the same bounded recovery contract", () => {
   const stalled = "Let me inspect the reference.\n".repeat(4);
   const first = evaluateCodexHook(

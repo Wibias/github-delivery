@@ -14,6 +14,7 @@ import { pathToFileURL } from "node:url";
 const EVENTS = Object.freeze([
   "PreToolUse",
   "PostToolUse",
+  "UserPromptSubmit",
   "Stop",
   "SubagentStop",
   "SessionEnd",
@@ -52,12 +53,41 @@ function readExisting(path) {
   }
 }
 
-function hasWatchdog(entry) {
-  return (entry?.hooks || []).some((hook) =>
-    /(?:^|[\\/])codex-watchdog-hook\.mjs(?:"|\s|$)/i.test(
-      String(hook?.commandWindows || hook?.command || ""),
-    ),
+function isWatchdogHook(hook) {
+  return /(?:^|[\\/])codex-watchdog-hook\.mjs(?:"|\s|$)/i.test(
+    String(hook?.commandWindows || hook?.command || ""),
   );
+}
+
+function normalizeWatchdogEntries(entries) {
+  let found = false;
+  let changed = false;
+  const normalized = [];
+  for (const entry of entries) {
+    if (!Array.isArray(entry?.hooks)) {
+      normalized.push(entry);
+      continue;
+    }
+    let entryChanged = false;
+    const entryHooks = [];
+    for (const hook of entry.hooks) {
+      if (!isWatchdogHook(hook)) {
+        entryHooks.push(hook);
+      } else if (!found) {
+        found = true;
+        entryHooks.push(hook);
+      } else {
+        changed = true;
+        entryChanged = true;
+      }
+    }
+    if (entryHooks.length === 0 && entry.hooks.length > 0) {
+      changed = true;
+      continue;
+    }
+    normalized.push(entryChanged ? { ...entry, hooks: entryHooks } : entry);
+  }
+  return { entries: normalized, found, changed };
 }
 
 function watchdogEntry(skillDir) {
@@ -82,9 +112,15 @@ function mergedConfig(existing, skillDir) {
     if (!Array.isArray(current)) {
       throw new Error(`hooks.${event} must be an array`);
     }
-    if (current.some(hasWatchdog)) continue;
-    hooks[event] = [...current, watchdogEntry(skillDir)];
-    changed = true;
+    const normalized = normalizeWatchdogEntries(current);
+    let entries = normalized.entries;
+    if (!normalized.found) {
+      entries = [...entries, watchdogEntry(skillDir)];
+    }
+    if (normalized.changed || !normalized.found) {
+      hooks[event] = entries;
+      changed = true;
+    }
   }
   return { config: { ...existing, hooks }, changed };
 }

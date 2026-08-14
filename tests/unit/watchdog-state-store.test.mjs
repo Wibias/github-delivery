@@ -17,6 +17,7 @@ import test from "node:test";
 
 import {
   runCodexWatchdogHook,
+  statePathForProtocolQuarantine,
   statePathForSession,
 } from "../../scripts/codex-watchdog-hook.mjs";
 import { sessionStateDirectory } from "../../scripts/lib/watchdog-state-store.mjs";
@@ -204,6 +205,170 @@ test("SessionEnd removes every turn and agent state under the hashed session dir
   );
   assert.equal(ended.stateRemoved, true);
   assert.equal(existsSync(sessionDirectory), false);
+});
+
+test("protocol stalls quarantine the same model across turns and SessionEnd until the model changes", () => {
+  const root = mkdtempSync(join(tmpdir(), "gd-session-quarantine-"));
+  const sessionId = "session-quarantine";
+  const stalled = runCodexWatchdogHook(
+    {
+      hook_event_name: "Stop",
+      session_id: sessionId,
+      turn_id: "turn-a",
+      model: "broken/model",
+      stop_hook_active: false,
+      last_assistant_message: ["grid", "<grid></grid>", "grid"].join("\n"),
+    },
+    { stateRoot: root },
+  );
+  assert.equal(stalled.output.continue, false);
+  assert.equal(stalled.output.stopReason, "tool_protocol_emission_stall");
+
+  const blocked = runCodexWatchdogHook(
+    {
+      hook_event_name: "UserPromptSubmit",
+      session_id: sessionId,
+      turn_id: "turn-b",
+      model: "broken/model",
+      prompt: "Resume the work.",
+    },
+    { stateRoot: root },
+  );
+  assert.equal(blocked.output.decision, "block");
+  assert.match(blocked.output.reason, /change model|new task/i);
+
+  const quarantinePath = statePathForProtocolQuarantine(root, sessionId);
+  const persisted = JSON.parse(readFileSync(quarantinePath, "utf8"));
+  assert.deepEqual(
+    Object.keys(persisted.protocolQuarantine).sort(),
+    ["active", "model", "reason", "schemaVersion", "turnId"],
+  );
+
+  const ended = runCodexWatchdogHook(
+    { hook_event_name: "SessionEnd", session_id: sessionId },
+    { stateRoot: root },
+  );
+  assert.equal(ended.stateRemoved, true);
+  assert.equal(existsSync(quarantinePath), true);
+
+  const recovered = runCodexWatchdogHook(
+    {
+      hook_event_name: "UserPromptSubmit",
+      session_id: sessionId,
+      turn_id: "turn-c",
+      model: "working/model",
+      prompt: "Resume with a different model.",
+    },
+    { stateRoot: root },
+  );
+  assert.equal(recovered.output, null);
+
+  const cleared = runCodexWatchdogHook(
+    {
+      hook_event_name: "UserPromptSubmit",
+      session_id: sessionId,
+      turn_id: "turn-d",
+      model: "broken/model",
+      prompt: "The quarantine was cleared by recovery.",
+    },
+    { stateRoot: root },
+  );
+  assert.equal(cleared.output, null);
+});
+
+test("SubagentStop protocol stalls do not quarantine the parent task", () => {
+  const root = mkdtempSync(join(tmpdir(), "gd-subagent-quarantine-"));
+  const sessionId = "session-subagent-quarantine";
+  const stopped = runCodexWatchdogHook(
+    {
+      hook_event_name: "SubagentStop",
+      session_id: sessionId,
+      turn_id: "turn-a",
+      agent_id: "agent-a",
+      model: "broken/model",
+      stop_hook_active: false,
+      last_assistant_message: ["grid", "<grid></grid>", "grid"].join("\n"),
+    },
+    { stateRoot: root },
+  );
+  assert.equal(stopped.output.continue, false);
+  assert.equal(stopped.output.stopReason, "tool_protocol_emission_stall");
+
+  const parentPrompt = runCodexWatchdogHook(
+    {
+      hook_event_name: "UserPromptSubmit",
+      session_id: sessionId,
+      turn_id: "turn-b",
+      model: "broken/model",
+      prompt: "Continue the parent task.",
+    },
+    { stateRoot: root },
+  );
+  assert.equal(parentPrompt.output, null);
+});
+
+test("repeated paired tool-protocol blocks quarantine a root task", () => {
+  const root = mkdtempSync(join(tmpdir(), "gd-paired-protocol-quarantine-"));
+  const sessionId = "session-paired-protocol";
+  const stopped = runCodexWatchdogHook(
+    {
+      hook_event_name: "Stop",
+      session_id: sessionId,
+      turn_id: "turn-a",
+      model: "broken/model",
+      stop_hook_active: false,
+      last_assistant_message: [
+        "<atool></atool>",
+        "<invoke></invoke>",
+        "<atool></atool>",
+      ].join("\n"),
+    },
+    { stateRoot: root },
+  );
+  assert.equal(stopped.output.continue, false);
+  assert.equal(stopped.output.stopReason, "tool_protocol_emission_stall");
+  assert.equal(stopped.quarantinePersisted, true);
+
+  const blocked = runCodexWatchdogHook(
+    {
+      hook_event_name: "UserPromptSubmit",
+      session_id: sessionId,
+      turn_id: "turn-b",
+      model: "broken/model",
+      prompt: "Resume.",
+    },
+    { stateRoot: root },
+  );
+  assert.equal(blocked.output.decision, "block");
+});
+
+test("quarantine lock contention cannot suppress an immediate protocol hard-stop", () => {
+  const root = mkdtempSync(join(tmpdir(), "gd-quarantine-lock-"));
+  const sessionId = "session-quarantine-lock";
+  const quarantinePath = statePathForProtocolQuarantine(root, sessionId);
+  mkdirSync(dirname(quarantinePath), { recursive: true });
+  writeFileSync(`${quarantinePath}.lock`, "", "utf8");
+
+  const stopped = runCodexWatchdogHook(
+    {
+      hook_event_name: "Stop",
+      session_id: sessionId,
+      turn_id: "turn-a",
+      model: "broken/model",
+      stop_hook_active: false,
+      last_assistant_message: ["grid", "<grid></grid>", "grid"].join("\n"),
+    },
+    {
+      stateRoot: root,
+      lockWaitMs: 20,
+      staleLockMs: 10_000,
+    },
+  );
+
+  assert.equal(stopped.output.continue, false);
+  assert.equal(stopped.output.stopReason, "tool_protocol_emission_stall");
+  assert.match(stopped.output.systemMessage, /quarantine state could not be saved/i);
+  assert.equal(stopped.quarantinePersisted, false);
 });
 
 test("persisted state files are private on POSIX platforms", () => {

@@ -25,7 +25,7 @@ test("dry run plans watchdog hooks without touching hooks.json", () => {
     apply: false,
   });
   assert.equal(result.applied, false);
-  assert.equal(result.events.length, 5);
+  assert.equal(result.events.length, 6);
   assert.equal(result.backupPath, null);
   assert.equal(result.wouldChange, true);
   assert.throws(() => readFileSync(f.hooksPath, "utf8"));
@@ -53,7 +53,7 @@ test("apply preserves existing hooks and adds one watchdog command per event", (
   const installed = JSON.parse(readFileSync(f.hooksPath, "utf8"));
   assert.equal(installed.description, "existing");
   assert.match(JSON.stringify(installed), /echo keep/);
-  for (const event of ["PreToolUse", "PostToolUse", "Stop", "SubagentStop", "SessionEnd"]) {
+  for (const event of ["PreToolUse", "PostToolUse", "UserPromptSubmit", "Stop", "SubagentStop", "SessionEnd"]) {
     const commands = (installed.hooks[event] || [])
       .flatMap((entry) => entry.hooks || [])
       .map((entry) => entry.command || "");
@@ -71,6 +71,39 @@ test("reapplying is idempotent and does not create duplicate watchdog hooks", ()
   });
   assert.equal(second.wouldChange, false);
   assert.equal(second.backupPath, null);
+});
+
+test("apply removes duplicate watchdog commands while preserving unrelated hooks", () => {
+  const f = fixture();
+  const watchdog = {
+    type: "command",
+    command: `node "${join(f.skillDir, "scripts", "codex-watchdog-hook.mjs")}"`,
+  };
+  writeFileSync(
+    f.hooksPath,
+    JSON.stringify({
+      hooks: {
+        UserPromptSubmit: [
+          { hooks: [watchdog, { type: "command", command: "echo keep" }] },
+          { hooks: [watchdog] },
+        ],
+      },
+    }),
+  );
+
+  const result = installCodexWatchdogHooks({
+    hooksPath: f.hooksPath,
+    skillDir: f.skillDir,
+    apply: true,
+  });
+  assert.equal(result.applied, true);
+
+  const installed = JSON.parse(readFileSync(f.hooksPath, "utf8"));
+  const commands = installed.hooks.UserPromptSubmit
+    .flatMap((entry) => entry.hooks || [])
+    .map((entry) => entry.command || "");
+  assert.equal(commands.filter((command) => command.includes("codex-watchdog-hook.mjs")).length, 1);
+  assert.equal(commands.filter((command) => command === "echo keep").length, 1);
 });
 
 test("malformed existing hook configuration fails closed", () => {

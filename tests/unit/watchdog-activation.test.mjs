@@ -58,7 +58,7 @@ test("normal Codex install configures hooks but does not falsely claim untrusted
 
   const hooksPath = join(f.codexHome, "hooks.json");
   const hooks = JSON.parse(readFileSync(hooksPath, "utf8"));
-  for (const event of ["PreToolUse", "PostToolUse", "Stop", "SubagentStop", "SessionEnd"]) {
+  for (const event of ["PreToolUse", "PostToolUse", "UserPromptSubmit", "Stop", "SubagentStop", "SessionEnd"]) {
     const commands = (hooks.hooks[event] || [])
       .flatMap((entry) => entry.hooks || [])
       .map((entry) => entry.command || "");
