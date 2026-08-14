@@ -6,6 +6,8 @@ const programUrl = new URL("../../authority-host/windows/GitHubDeliveryAuthority
 const appUrl = new URL("../../authority-host/windows/GitHubDeliveryAuthority/App.xaml.cs", import.meta.url);
 const diagnosticsUrl = new URL("../../authority-host/windows/GitHubDeliveryAuthority/StartupDiagnostics.cs", import.meta.url);
 const xamlSelfTestUrl = new URL("../../authority-host/windows/GitHubDeliveryAuthority/ControlCenterXamlSelfTest.cs", import.meta.url);
+const controlCenterXamlUrl = new URL("../../authority-host/windows/GitHubDeliveryAuthority/ControlCenterWindow.xaml", import.meta.url);
+const controlCenterCodeUrl = new URL("../../authority-host/windows/GitHubDeliveryAuthority/ControlCenterWindow.xaml.cs", import.meta.url);
 const releaseSmokeUrl = new URL("../../scripts/prepare-authority-host-runtime-smoke.mjs", import.meta.url);
 const installerUrl = new URL("../../authority-host/windows/install-release.ps1", import.meta.url);
 const ciUrl = new URL("../../.github/workflows/ci.yml", import.meta.url);
@@ -56,11 +58,22 @@ test("Authority XAML self-test bypasses the production singleton mutex", () => {
   );
 });
 
+test("Authority Control Center avoids the NavigationView startup path that hard-crashes the affected host", () => {
+  const xaml = readFileSync(controlCenterXamlUrl, "utf8");
+  const code = readFileSync(controlCenterCodeUrl, "utf8");
+  const selfTest = readFileSync(xamlSelfTestUrl, "utf8");
+
+  assert.doesNotMatch(xaml, /<NavigationView\b/);
+  assert.match(xaml, /x:Name="NavigationList"/);
+  assert.doesNotMatch(code, /\bNavigationView\b/);
+  assert.doesNotMatch(selfTest, /\("NavigationView/);
+  assert.doesNotMatch(selfTest, /\("NavigationViewItem\./);
+});
+
 test("Authority XAML smoke path records framework resource and runtime-module probes", () => {
   const selfTest = readFileSync(xamlSelfTestUrl, "utf8");
 
   assert.match(selfTest, /XamlReader\.Load/);
-  assert.match(selfTest, /NavigationView/);
   assert.match(selfTest, /ApplicationPageBackgroundThemeBrush/);
   assert.match(selfTest, /CardBackgroundFillColorDefaultBrush/);
   assert.match(selfTest, /CaptionTextBlockStyle/);
