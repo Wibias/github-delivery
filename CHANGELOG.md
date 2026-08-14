@@ -12,6 +12,10 @@ All notable changes to `github-delivery` are documented here.
 
 - Pending PR #245 will make Windows Authority builds reproducible across local, CI, and release environments by pinning exact .NET SDK 10.0.303 and rejecting self-contained publishes that do not contain Microsoft.NETCore.App runtime 8.0.30.
 
+### Fixed
+
+- Pending PR #248 will make repeated grid or malformed tool-protocol placeholder output hard-stop immediately instead of being retried, and quarantine the offending model across turns and `SessionEnd`. A new `UserPromptSubmit` hook will block resuming that task with the same model before inference until the model is changed (which clears the quarantine); subagent protocol stalls will not quarantine the parent task.
+
 ## [0.6.0] - 2026-08-14
 
 ### Fixed
