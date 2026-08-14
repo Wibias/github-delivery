@@ -85,6 +85,30 @@ test("Authority XAML smoke path records framework resource and runtime-module pr
   assert.match(selfTest, /StartupDiagnostics\.WriteMessage/);
 });
 
+test("Authority XAML diagnostics isolate application resource scope and default control templates", () => {
+  const selfTest = readFileSync(xamlSelfTestUrl, "utf8");
+
+  assert.match(selfTest, /Application\.Current/);
+  assert.match(selfTest, /ThemeDictionaries/);
+  assert.match(selfTest, /ApplicationResources/);
+
+  for (const probe of [
+    "Control.Button",
+    "Control.RadioButton",
+    "Control.ListView",
+    "Control.ListViewItem",
+    "Control.ScrollViewer",
+    "Control.FontIcon",
+    "Control.FontFamilyFallback",
+    "Section.Navigation",
+    "Section.OverviewMetrics",
+    "Section.OverviewActivity",
+    "Section.Settings",
+  ]) {
+    assert.match(selfTest, new RegExp(probe.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
+});
+
 test("Authority persists each XAML probe boundary before invoking WinUI parsing", () => {
   const selfTest = readFileSync(xamlSelfTestUrl, "utf8");
 
