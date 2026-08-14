@@ -7,6 +7,7 @@ import { parseInstallArgs, runInstallCommand } from "../install-skill.mjs";
 import {
   readInstalledAuthorityHost,
   reconcileStableAuthorityHost,
+  startInstalledAuthorityHost,
 } from "./authority-host-install.mjs";
 import { confirmApply } from "./bootstrap-install.mjs";
 import {
@@ -85,9 +86,16 @@ export async function runBootstrapSetup({
   const discover = dependencies.discoverInstallations || discoverInstallations;
   requireValidInstallation(target, discover);
   const reconcileAuthority = dependencies.reconcileStableAuthorityHost || reconcileStableAuthorityHost;
+  const startAuthority = dependencies.startInstalledAuthorityHost || startInstalledAuthorityHost;
   const authorityHost = await reconcileAuthority({
     scriptPath: join(target, "authority-host", "windows", "install-release.ps1"),
   });
+  const authorityStarted = authorityHost?.installed?.installed
+    ? startAuthority({ installed: authorityHost.installed })
+    : { started: false, reason: "not_installed" };
+  output?.write?.(authorityStarted.started
+    ? "\nWindows approval GUI is running in the notification area.\n"
+    : `\nWindows approval GUI not started (${authorityStarted.reason}). Run: npx github-delivery start\n`);
   if (authorityHost?.action === "unsupported" && authorityHost?.required === true) {
     fail("bootstrap_setup_authority_host_unsupported");
   }
@@ -169,6 +177,11 @@ export async function runBootstrapSetup({
     guidance: watchdog === "hooks" || watchdog === "stream" ? null : trustGuidance(false),
     result,
   };
+}
+
+export function runBootstrapStart({ dependencies = {} } = {}) {
+  const start = dependencies.startInstalledAuthorityHost || startInstalledAuthorityHost;
+  return { action: "start", ...start() };
 }
 
 function relation(installedVersion, latestVersion) {

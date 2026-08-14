@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve, win32 as win32Path } from "node:path";
@@ -99,6 +99,18 @@ export function readInstalledAuthorityHost({
     };
   }
   return { supported: true, configured: false, installed: false, legacy: false, root, recordPath, exePath: null, version: null, sourceCommit: null, record: null };
+}
+
+export function startInstalledAuthorityHost({
+  installed = readInstalledAuthorityHost(),
+  platform = process.platform,
+  runner = spawn,
+} = {}) {
+  if (platform !== "win32") return { started: false, reason: "unsupported_platform" };
+  if (!installed?.installed || !installed.exePath) return { started: false, reason: "not_installed" };
+  const child = runner(installed.exePath, [], { detached: true, stdio: "ignore", windowsHide: true });
+  child.unref();
+  return { started: true, version: installed.version, exePath: installed.exePath };
 }
 
 export function planAuthorityHostUpdate({ mode, targetVersion, installed } = {}) {

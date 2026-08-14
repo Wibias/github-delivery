@@ -222,3 +222,45 @@ test("doctor --json preserves the existing raw report output", async () => {
 
   assert.deepEqual(JSON.parse(stdout.toString()), report);
 });
+
+test("install renders a concise success summary instead of the internal receipt", async () => {
+  const stdout = writableBuffer();
+  await main(["install"], {
+    stdout,
+    runBootstrap: async () => ({
+      action: "install",
+      apply: true,
+      installed: true,
+      verified: true,
+      sourceVersion: "0.6.0",
+      target: "C:\\Users\\ws\\.agents\\skills\\github-delivery",
+      watchdog: { mode: "hooks", hookTrustVerified: true },
+      authorityHost: { changed: true, installed: { version: "0.6.0" } },
+    }),
+  });
+
+  const text = stdout.toString();
+  assert.match(text, /GitHub Delivery installed successfully/i);
+  assert.match(text, /Authority GUI is installed/i);
+  assert.match(text, /npx github-delivery start/i);
+  assert.doesNotMatch(text, /^\s*\{/);
+});
+
+test("setup renders readiness and start guidance instead of the internal receipt", async () => {
+  const stdout = writableBuffer();
+  await main(["setup"], {
+    stdout,
+    runBootstrap: async () => ({
+      action: "setup",
+      status: "ready",
+      target: "C:\\Users\\ws\\.agents\\skills\\github-delivery",
+      watchdog: "hooks",
+      authorityHost: { changed: false, installed: { version: "0.6.0" } },
+    }),
+  });
+
+  const text = stdout.toString();
+  assert.match(text, /GitHub Delivery setup complete/i);
+  assert.match(text, /npx github-delivery start/i);
+  assert.doesNotMatch(text, /^\s*\{/);
+});

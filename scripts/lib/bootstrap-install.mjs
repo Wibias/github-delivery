@@ -5,7 +5,7 @@ import { isDeepStrictEqual } from "node:util";
 import { createInterface } from "node:readline/promises";
 
 import { installSkill, parseInstallArgs } from "../install-skill.mjs";
-import { reconcileStableAuthorityHost } from "./authority-host-install.mjs";
+import { reconcileStableAuthorityHost, startInstalledAuthorityHost } from "./authority-host-install.mjs";
 import { acquireVerifiedReleasePayload } from "./release-self-update.mjs";
 import {
   compareInstalledManifest,
@@ -193,6 +193,7 @@ export async function runGuidedInstall({
   const confirmAuthHost = dependencies.confirmAuthorityHost || confirmAuthorityHost;
   const reconcileAuthority = dependencies.reconcileStableAuthorityHost || reconcileStableAuthorityHost;
   const platform = dependencies.platform || process.platform;
+  const startAuthority = dependencies.startInstalledAuthorityHost || startInstalledAuthorityHost;
   const workspace = make();
   let installation = null;
 
@@ -252,11 +253,18 @@ export async function runGuidedInstall({
       : true;
     let authorityHost = null;
     if (installAuthorityHost) {
+      output?.write?.("\nWindows approval GUI\n  Installing and verifying the approval host...\n");
       authorityHost = await reconcileAuthority({
         expectedRelease: payload.release,
         scriptPath: join(target, "authority-host", "windows", "install-release.ps1"),
         installWhenDisabled: true,
       });
+      const authorityStarted = authorityHost?.installed?.installed
+        ? startAuthority({ installed: authorityHost.installed })
+        : { started: false, reason: "not_installed" };
+      output?.write?.(authorityStarted.started
+        ? "  Approval GUI is running in the notification area.\n"
+        : `  Approval GUI not started (${authorityStarted.reason}). Run: npx github-delivery start\n`);
     }
     renderProtectionPostflight(installation?.watchdog, output);
 
