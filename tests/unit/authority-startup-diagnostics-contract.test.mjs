@@ -61,3 +61,11 @@ test("Windows CI exercises Control Center XAML after publish, release packaging,
   assert.match(releaseSmoke, /buildAuthorityHostRelease/);
   assert.match(releaseSmoke, /extractVerifiedAuthorityHostZip/);
 });
+
+test("Windows CI retains the instrumented published Authority host for affected-machine diagnosis", () => {
+  const ci = readFileSync(ciUrl, "utf8");
+  assert.match(ci, /Upload instrumented Authority diagnostic build/);
+  assert.match(ci, /actions\/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a/);
+  assert.match(ci, /github-delivery-authority-diagnostic-\$\{\{ github\.sha \}\}/);
+  assert.match(ci, /github-delivery-authority-publish/);
+});
