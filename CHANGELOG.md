@@ -4,6 +4,20 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Pending PR #246 will add a guided Windows approval-GUI choice. Fresh interactive installs will explain the optional component and ask `Install the Windows approval GUI now? [Y/n]`; explicit consent will install the separately verified Authority host without changing an `off` protection mode, while No will finish the skill install without the GUI.
+
+### Changed
+
+- Pending PR #245 will make Windows Authority builds reproducible across local, CI, and release environments by pinning exact .NET SDK 10.0.303 and rejecting self-contained publishes that do not contain Microsoft.NETCore.App runtime 8.0.30.
+
+## [0.6.0] - 2026-08-14
+
+### Fixed
+
+- Bounded `create_pr` idempotency lookup to the requested head branch instead of enumerating every pull request in the repository (PR #244), avoiding pagination overflow and unrelated-PR matches on high-volume repositories.
+
 ## [0.5.3] - 2026-08-13
 
 ### Added

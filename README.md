@@ -6,7 +6,7 @@
 
 **Say the outcome, not the orchestration.**
 
-`github-delivery` turns natural-language requests into evidence-backed GitHub workflows: PRDs, issue research, implementation, deep review, CI, fixes, stacks, verified merges, and verified stable self-update. Its v0.5 progress stack combines a persistent workflow controller, semantic evidence reuse, and hard cross-channel Codex generation bounds to stop narration/read/tool-emission loops without weakening GitHub authority gates.
+`github-delivery` turns natural-language requests into evidence-backed GitHub workflows: PRDs, issue research, implementation, deep review, CI, fixes, stacks, verified merges, and verified stable self-update. Its v0.6 progress stack combines a persistent workflow controller, semantic evidence reuse, and hard cross-channel Codex generation bounds to stop narration/read/tool-emission loops without weakening GitHub authority gates.
 
 [Quick start](#try-it-in-60-seconds) · [Self-update](#update-an-installed-release) · [Progress watchdog](#agent-progress-watchdog) · [What it can own](#what-you-can-ask-it-to-own) · [Safety model](#safety-model) · [Installation](#installation)
 
@@ -561,7 +561,7 @@ There is no recursive simplification loop.
 
 ## Agent progress watchdog
 
-GitHub Delivery v0.5 treats convergence as a layered runtime + workflow problem rather than a prompt-only rule. The target failure classes include repeated narration, long unique no-progress generation, channel hopping, read/evidence spirals, tool-call emission stalls (`Run`, `exec`, `Let me wire...` with no real tool), and malformed protocol output such as repeated `<atool>...</atool>`.
+GitHub Delivery v0.6 treats convergence as a layered runtime + workflow problem rather than a prompt-only rule. The target failure classes include repeated narration, long unique no-progress generation, channel hopping, read/evidence spirals, tool-call emission stalls (`Run`, `exec`, `Let me wire...` with no real tool), and malformed protocol output such as repeated `<atool>...</atool>`.
 
 The watchdog is deliberately separate from mutation authority. It can interrupt, block, rate-limit, reuse evidence, or request a focused retry; it cannot authorize or execute a GitHub write.
 
