@@ -4,6 +4,7 @@ import test from "node:test";
 
 import {
   confirmApply,
+  confirmAuthorityHost,
   runGuidedInstall,
 } from "../../scripts/lib/bootstrap-install.mjs";
 
@@ -61,6 +62,7 @@ function dependencies(overrides = {}) {
     verifyInstalledRelease: () => ({ clean: true, modifications: [] }),
     reconcileStableAuthorityHost: async () => ({ ...AUTHORITY_NOOP }),
     confirmApply: async () => true,
+    confirmAuthorityHost: async () => true,
     ...overrides,
   };
 }
@@ -72,6 +74,58 @@ test("confirmApply defaults to no for blank, EOF, and anything except an explici
   for (const answer of ["y", "Y", "yes", "YES"]) {
     assert.equal(await confirmApply("Apply?", { ask: async () => answer }), true);
   }
+});
+
+test("confirmAuthorityHost defaults to install without prompting when input is not interactive", async () => {
+  const installAuthorityHost = await confirmAuthorityHost({
+    input: { isTTY: false },
+    output: { write() {} },
+    ask: async () => {
+      throw new Error("non-interactive prompt must not run");
+    },
+  });
+
+  assert.equal(installAuthorityHost, true);
+});
+
+test("confirmAuthorityHost explains the GUI and accepts yes/no answers with yes as the default", async () => {
+  for (const [answer, expected] of [["", true], ["y", true], ["yes", true], ["n", false], ["no", false]]) {
+    const writes = [];
+    let prompt = null;
+    const result = await confirmAuthorityHost({
+      input: { isTTY: true },
+      output: { write(value) { writes.push(value); } },
+      ask: async (value) => {
+        prompt = value;
+        return answer;
+      },
+    });
+
+    assert.equal(result, expected, `answer ${JSON.stringify(answer)}`);
+    assert.match(writes.join(""), /Windows Hello/);
+    assert.match(writes.join(""), /npx github-delivery setup/);
+    assert.equal(prompt, "Install the Windows approval GUI now? [Y/n] ");
+  }
+});
+
+test("declining the Windows approval GUI skips reconciliation but completes the skill install", async () => {
+  let authorityCalls = 0;
+  const target = resolve("/tmp/skills/github-delivery");
+  const result = await runGuidedInstall({
+    target,
+    dependencies: dependencies({
+      platform: "win32",
+      confirmAuthorityHost: async () => false,
+      reconcileStableAuthorityHost() {
+        authorityCalls += 1;
+        throw new Error("declined GUI must not reconcile Authority");
+      },
+    }),
+  });
+
+  assert.equal(result.action, "install");
+  assert.deepEqual(result.authorityHost, { action: "skipped", changed: false });
+  assert.equal(authorityCalls, 0);
 });
 
 test("guided install verifies a release, performs a dry-run, then reconciles Authority after apply", async () => {

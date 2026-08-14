@@ -83,6 +83,31 @@ export async function confirmApply(
   return /^(?:y|yes)$/i.test(String(answer ?? "").trim());
 }
 
+// Explain the optional Windows approval GUI and ask whether to install it.
+// Defaults to yes so non-interactive/CI installs keep installing the host and
+// existing automation is not silently changed.
+export async function confirmAuthorityHost(
+  { input = process.stdin, output = process.stdout, ask = null } = {},
+) {
+  if (input?.isTTY !== true) return true;
+
+  if (output && typeof output.write === "function") {
+    output.write("\nWindows approval GUI (optional but recommended)\n");
+    output.write("  The Authority host is a Windows app that turns Windows Hello into\n");
+    output.write("  short-lived, exact-scope approvals for sensitive GitHub mutations\n");
+    output.write("  (merges, PRs, reviews). It is what shows you a yes/no approval prompt\n");
+    output.write("  before these writes happen. It is only active when you set a\n");
+    output.write("  protection mode to Sensitive actions or Every GitHub write.\n");
+    output.write("  You can install it later with: npx github-delivery setup\n\n");
+  }
+  const prompt = "Install the Windows approval GUI now? [Y/n] ";
+  const answer = ask
+    ? await ask(prompt)
+    : await askWithReadline(prompt, { input, output });
+  // A blank interactive response defaults to yes.
+  return !/^(?:n|no)$/i.test(String(answer ?? "").trim());
+}
+
 function renderEnvironmentCheck(environment, output) {
   if (!output || typeof output.write !== "function") return;
   output.write("\nEnvironment check\n");
@@ -159,7 +184,9 @@ export async function runGuidedInstall({
   const readConfig = dependencies.readUserConfig || readUserConfig;
   const verify = dependencies.verifyInstalledRelease || verifyInstalledRelease;
   const confirm = dependencies.confirmApply || confirmApply;
+  const confirmAuthHost = dependencies.confirmAuthorityHost || confirmAuthorityHost;
   const reconcileAuthority = dependencies.reconcileStableAuthorityHost || reconcileStableAuthorityHost;
+  const platform = dependencies.platform || process.platform;
   const workspace = make();
   let installation = null;
 
@@ -212,10 +239,18 @@ export async function runGuidedInstall({
       fail("stable_install_user_config_changed_unexpectedly");
     }
 
-    const authorityHost = await reconcileAuthority({
-      expectedRelease: payload.release,
-      scriptPath: join(target, "authority-host", "windows", "install-release.ps1"),
-    });
+    // Ask about the optional Windows approval GUI on Windows only. Declining
+    // skips Authority host reconciliation while still finishing the skill install.
+    const installAuthorityHost = platform === "win32"
+      ? await confirmAuthHost({ input, output })
+      : true;
+    let authorityHost = null;
+    if (installAuthorityHost) {
+      authorityHost = await reconcileAuthority({
+        expectedRelease: payload.release,
+        scriptPath: join(target, "authority-host", "windows", "install-release.ps1"),
+      });
+    }
     renderProtectionPostflight(installation?.watchdog, output);
 
     return {
@@ -227,7 +262,7 @@ export async function runGuidedInstall({
       target,
       backupPath: installation?.backupPath || null,
       watchdog: installation?.watchdog || null,
-      authorityHost,
+      authorityHost: installAuthorityHost ? authorityHost : { action: "skipped", changed: false },
     };
   } catch (error) {
     if (installation?.backupPath && error && typeof error === "object") {
