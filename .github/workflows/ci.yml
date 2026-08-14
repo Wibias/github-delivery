@@ -90,6 +90,17 @@ jobs:
         if: runner.os == 'Windows'
         run: dotnet run --project authority-host/windows/GitHubDeliveryAuthority/GitHubDeliveryAuthority.csproj --configuration Release --no-build -- --self-test
 
+      - name: Run Windows authority host XAML smoke test
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          dotnet run --project authority-host/windows/GitHubDeliveryAuthority/GitHubDeliveryAuthority.csproj --configuration Release --no-build -- --xaml-self-test
+          if ($LASTEXITCODE -ne 0) {
+            $Diagnostics = Join-Path $env:LOCALAPPDATA 'GitHubDeliveryAuthority\startup-error.log'
+            if (Test-Path $Diagnostics -PathType Leaf) { Get-Content $Diagnostics }
+            exit $LASTEXITCODE
+          }
+
       - name: Publish Windows authority host
         if: runner.os == 'Windows' && matrix.node == 24
         shell: pwsh
@@ -112,4 +123,10 @@ jobs:
           & $Executable --self-test
           if ($LASTEXITCODE -ne 0) {
             throw "Published authority executable self-test failed with exit code $LASTEXITCODE."
+          }
+          & $Executable --xaml-self-test
+          if ($LASTEXITCODE -ne 0) {
+            $Diagnostics = Join-Path $env:LOCALAPPDATA 'GitHubDeliveryAuthority\startup-error.log'
+            if (Test-Path $Diagnostics -PathType Leaf) { Get-Content $Diagnostics }
+            throw "Published authority executable XAML smoke test failed with exit code $LASTEXITCODE."
           }

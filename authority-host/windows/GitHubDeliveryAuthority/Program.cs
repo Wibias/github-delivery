@@ -10,6 +10,9 @@ internal static class Program
     {
         if (args.Contains("--self-test", StringComparer.Ordinal)) return SelfTest.Run();
 
+        var xamlSelfTest = args.Contains("--xaml-self-test", StringComparer.Ordinal);
+        App? app = null;
+
         AppDomain.CurrentDomain.UnhandledException += (_, eventArgs) =>
         {
             var exception = eventArgs.ExceptionObject as Exception
@@ -30,9 +33,9 @@ internal static class Program
                 _ = callbackParams;
                 var dispatcher = DispatcherQueue.GetForCurrentThread();
                 SynchronizationContext.SetSynchronizationContext(new DispatcherQueueSynchronizationContext(dispatcher));
-                _ = new App(forceSetup);
+                app = new App(forceSetup, xamlSelfTest);
             });
-            return 0;
+            return xamlSelfTest ? app?.ExitCode ?? 1 : 0;
         }
         catch (Exception exception)
         {
