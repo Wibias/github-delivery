@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
 
 function read(path) {
@@ -153,4 +153,17 @@ test("control center adapts navigation and dashboard layout across narrow, mediu
   assert.match(window, /Target="ActivityColumnsHeader\.Visibility" Value="Collapsed"/);
 
   assert.doesNotMatch(window, /<ColumnDefinition Width="170"\s*\/>/);
+});
+
+test("authority executable and Control Center use the committed Authority icon", () => {
+  const project = read(`${root}/GitHubDeliveryAuthority.csproj`);
+  const code = read(`${root}/ControlCenterWindow.xaml.cs`);
+  const icon = new URL(`../../${root}/Assets/DeliveryAuthority.ico`, import.meta.url);
+
+  assert.equal(existsSync(icon), true, "DeliveryAuthority.ico must be committed under Assets");
+  assert.match(project, /<ApplicationIcon>Assets\\DeliveryAuthority\.ico<\/ApplicationIcon>/);
+  assert.match(project, /<Content Include="Assets\\DeliveryAuthority\.ico">[\s\S]*?<CopyToOutputDirectory>PreserveNewest<\/CopyToOutputDirectory>[\s\S]*?<CopyToPublishDirectory>PreserveNewest<\/CopyToPublishDirectory>/);
+  assert.match(code, /TrySetWindowIcon\(\);/);
+  assert.match(code, /AppWindow\.SetIcon\(Path\.Combine\(AppContext\.BaseDirectory,\s*"Assets",\s*"DeliveryAuthority\.ico"\)\)/);
+  assert.match(code, /private void TrySetWindowIcon\(\)[\s\S]*?try[\s\S]*?catch/);
 });
