@@ -24,6 +24,7 @@ internal sealed partial class ControlCenterWindow : Window
     private readonly StateStore _store;
     private readonly AppWindow _appWindow;
     private bool _allowClose;
+    private bool _refreshingAutostart;
 
     public ControlCenterWindow(StateStore store)
     {
@@ -88,6 +89,7 @@ internal sealed partial class ControlCenterWindow : Window
 
         RefreshConfiguration();
         RefreshInstallationStatus();
+        RefreshAutostart();
         DiagnosticsUpdated.Text = $"Updated {DateTimeOffset.Now:t}";
     }
 
@@ -123,6 +125,41 @@ internal sealed partial class ControlCenterWindow : Window
         {
             HostVersionText.Text = "Version metadata error";
             HostSourceText.Text = error.Message;
+        }
+    }
+
+    private void RefreshAutostart()
+    {
+        try
+        {
+            _refreshingAutostart = true;
+            var state = AuthorityStartup.Read();
+            AutostartToggle.IsOn = state.Enabled;
+            AutostartStatusText.Text = state.Enabled ? "Enabled" : "Disabled";
+        }
+        catch (Exception error)
+        {
+            AutostartStatusText.Text = $"Could not read auto-start: {error.Message}";
+        }
+        finally
+        {
+            _refreshingAutostart = false;
+        }
+    }
+
+    private void AutostartToggle_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_refreshingAutostart) return;
+        try
+        {
+            var state = AuthorityStartup.Set(AutostartToggle.IsOn);
+            AutostartStatusText.Text = state.Enabled ? "Enabled" : "Disabled";
+        }
+        catch (Exception error)
+        {
+            var message = $"Could not update auto-start: {error.Message}";
+            RefreshAutostart();
+            AutostartStatusText.Text = message;
         }
     }
 
