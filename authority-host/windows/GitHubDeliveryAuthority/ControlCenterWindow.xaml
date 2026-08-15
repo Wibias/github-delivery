@@ -18,9 +18,6 @@
                     <VisualState.Setters>
                         <Setter Target="OverviewContent.Padding" Value="16,16,16,20" />
                         <Setter Target="SettingsContent.Padding" Value="16,16,16,20" />
-                        <Setter Target="ProtectionFooterBorder.Padding" Value="7,8" />
-                        <Setter Target="ProtectionFooterBorder.Margin" Value="4" />
-                        <Setter Target="ProtectionModeSidebarText.Visibility" Value="Collapsed" />
                         <Setter Target="ActivityColumnsHeader.Visibility" Value="Collapsed" />
 
                         <Setter Target="SummaryColumn0.Width" Value="*" />
@@ -72,9 +69,6 @@
                     <VisualState.Setters>
                         <Setter Target="OverviewContent.Padding" Value="22,20,22,24" />
                         <Setter Target="SettingsContent.Padding" Value="22,20,22,24" />
-                        <Setter Target="ProtectionFooterBorder.Padding" Value="7,8" />
-                        <Setter Target="ProtectionFooterBorder.Margin" Value="4" />
-                        <Setter Target="ProtectionModeSidebarText.Visibility" Value="Collapsed" />
                         <Setter Target="ActivityColumnsHeader.Visibility" Value="Visible" />
 
                         <Setter Target="SummaryColumn0.Width" Value="*" />
@@ -120,9 +114,6 @@
                     <VisualState.Setters>
                         <Setter Target="OverviewContent.Padding" Value="28,24,28,28" />
                         <Setter Target="SettingsContent.Padding" Value="28,24,28,28" />
-                        <Setter Target="ProtectionFooterBorder.Padding" Value="12" />
-                        <Setter Target="ProtectionFooterBorder.Margin" Value="8" />
-                        <Setter Target="ProtectionModeSidebarText.Visibility" Value="Visible" />
                         <Setter Target="ActivityColumnsHeader.Visibility" Value="Visible" />
 
                         <Setter Target="SummaryColumn0.Width" Value="*" />
@@ -170,60 +161,14 @@
                         CompactPaneLength="48"
                         OpenPaneLength="172"
                         IsBackButtonVisible="Collapsed"
-                        IsSettingsVisible="False"
+                        IsSettingsVisible="True"
                         IsPaneToggleButtonVisible="False"
                         SelectionChanged="Navigation_SelectionChanged">
             <NavigationView.MenuItems>
-                <NavigationViewItem Content="Overview" Tag="overview" ToolTipService.ToolTip="Overview">
+                <NavigationViewItem Content="Overview" Tag="overview" IsSelected="True" ToolTipService.ToolTip="Overview">
                     <NavigationViewItem.Icon><SymbolIcon Symbol="Home" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
-                <NavigationViewItem Content="Activity" Tag="activity" IsSelected="True" ToolTipService.ToolTip="Activity">
-                    <NavigationViewItem.Icon><SymbolIcon Symbol="Clock" /></NavigationViewItem.Icon>
-                </NavigationViewItem>
-                <NavigationViewItem Content="Allowlist" Tag="allowlist" ToolTipService.ToolTip="Allowlist">
-                    <NavigationViewItem.Icon><SymbolIcon Symbol="List" /></NavigationViewItem.Icon>
-                </NavigationViewItem>
-                <NavigationViewItem Content="Temporary grants" Tag="grants" ToolTipService.ToolTip="Temporary grants">
-                    <NavigationViewItem.Icon><SymbolIcon Symbol="Permissions" /></NavigationViewItem.Icon>
-                </NavigationViewItem>
-                <NavigationViewItem Content="Diagnostics" Tag="diagnostics" ToolTipService.ToolTip="Diagnostics">
-                    <NavigationViewItem.Icon><SymbolIcon Symbol="ReportHacked" /></NavigationViewItem.Icon>
-                </NavigationViewItem>
-                <NavigationViewItem Content="Settings" Tag="settings" ToolTipService.ToolTip="Settings">
-                    <NavigationViewItem.Icon><SymbolIcon Symbol="Setting" /></NavigationViewItem.Icon>
-                </NavigationViewItem>
             </NavigationView.MenuItems>
-
-            <NavigationView.PaneFooter>
-                <Border x:Name="ProtectionFooterBorder"
-                        Padding="7,8"
-                        Margin="4"
-                        CornerRadius="8"
-                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                        BorderThickness="1"
-                        AutomationProperties.Name="Protection mode">
-                    <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                        <FontIcon Glyph="&#xE83D;"
-                                  Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
-                                  FontSize="18"
-                                  Width="18"
-                                  HorizontalAlignment="Center" />
-                        <StackPanel x:Name="ProtectionModeSidebarText"
-                                    Visibility="Collapsed"
-                                    MinWidth="0">
-                            <TextBlock Text="Protection mode"
-                                       FontWeight="SemiBold"
-                                       TextTrimming="CharacterEllipsis" />
-                            <TextBlock x:Name="ProtectionModeSidebar"
-                                       Text="Loading…"
-                                       Style="{StaticResource CaptionTextBlockStyle}"
-                                       Opacity="0.72"
-                                       TextTrimming="CharacterEllipsis" />
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
-            </NavigationView.PaneFooter>
 
             <Grid>
                 <ScrollViewer x:Name="OverviewPage"
@@ -232,8 +177,7 @@
                               HorizontalContentAlignment="Stretch">
                     <Grid x:Name="OverviewContent"
                           Padding="16,16,16,20"
-                          MaxWidth="1480"
-                          HorizontalAlignment="Center">
+                          HorizontalAlignment="Stretch">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
@@ -579,8 +523,7 @@
                               HorizontalContentAlignment="Stretch">
                     <Grid x:Name="SettingsContent"
                           Padding="16,16,16,20"
-                          MaxWidth="1000"
-                          HorizontalAlignment="Center">
+                          HorizontalAlignment="Stretch">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
