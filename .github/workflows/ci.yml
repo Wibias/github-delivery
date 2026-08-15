@@ -105,10 +105,6 @@ jobs:
         if: runner.os == 'Windows' && matrix.node == 24
         shell: pwsh
         run: |
-          $CurrentVersion = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion'
-          Write-Host "Authority smoke OS: $($CurrentVersion.ProductName) $($CurrentVersion.DisplayVersion) build $($CurrentVersion.CurrentBuild).$($CurrentVersion.UBR)"
-          Write-Host "Authority smoke culture: $([Globalization.CultureInfo]::CurrentCulture.Name); UI culture: $([Globalization.CultureInfo]::CurrentUICulture.Name)"
-
           $Project = 'authority-host/windows/GitHubDeliveryAuthority/GitHubDeliveryAuthority.csproj'
           $PublishDir = Join-Path $env:RUNNER_TEMP 'github-delivery-authority-publish'
           dotnet publish $Project --configuration Release --runtime win-x64 --self-contained true --no-restore --output $PublishDir
@@ -175,12 +171,3 @@ jobs:
             if (Test-Path $Diagnostics -PathType Leaf) { Get-Content $Diagnostics }
             throw "Installed Authority XAML smoke test failed with exit code $LASTEXITCODE."
           }
-
-      - name: Upload instrumented Authority diagnostic build
-        if: runner.os == 'Windows' && matrix.node == 24
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: github-delivery-authority-diagnostic-${{ github.sha }}
-          path: ${{ runner.temp }}/github-delivery-authority-publish
-          if-no-files-found: error
-          retention-days: 7
