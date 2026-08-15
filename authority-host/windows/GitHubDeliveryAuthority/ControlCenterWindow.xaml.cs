@@ -74,7 +74,6 @@ internal sealed partial class ControlCenterWindow : Window
             var config = UserConfigStore.Read();
             var display = UserConfigStore.DisplayMode(config.AuthorityMode);
             ProtectionModeText.Text = display;
-            ProtectionModeSidebar.Text = display;
             OffModeRadio.IsChecked = config.AuthorityMode == "off";
             SensitiveModeRadio.IsChecked = config.AuthorityMode == "high-assurance";
             AllModeRadio.IsChecked = config.AuthorityMode == "all";
@@ -83,7 +82,6 @@ internal sealed partial class ControlCenterWindow : Window
         catch (Exception error)
         {
             ProtectionModeText.Text = "Configuration error";
-            ProtectionModeSidebar.Text = "Configuration error";
             SettingsStatusText.Text = error.Message;
             ConfigPathText.Text = UserConfigStore.ConfigPath;
         }
@@ -138,8 +136,7 @@ internal sealed partial class ControlCenterWindow : Window
 
     private void Navigation_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {
-        var tag = (args.SelectedItem as NavigationViewItem)?.Tag?.ToString();
-        var showSettings = string.Equals(tag, "settings", StringComparison.Ordinal);
+        var showSettings = args.IsSettingsSelected;
         SettingsPage.Visibility = showSettings ? Visibility.Visible : Visibility.Collapsed;
         OverviewPage.Visibility = showSettings ? Visibility.Collapsed : Visibility.Visible;
         if (showSettings) Refresh();
@@ -178,10 +175,7 @@ internal sealed partial class ControlCenterWindow : Window
 
     private void OpenSettings_Click(object sender, RoutedEventArgs e)
     {
-        var settingsItem = Navigation.MenuItems
-            .OfType<NavigationViewItem>()
-            .FirstOrDefault(item => string.Equals(item.Tag?.ToString(), "settings", StringComparison.Ordinal));
-        if (settingsItem is not null) Navigation.SelectedItem = settingsItem;
+        Navigation.SelectedItem = Navigation.SettingsItem;
     }
 
     private void TrySetWindowIcon()
