@@ -167,6 +167,23 @@ test("control center uses all available content width while preserving adaptive 
   assert.doesNotMatch(window, /<ColumnDefinition Width="170"\s*\/>/);
 });
 
+test("normal Control Center close hides the existing AppWindow and explicit exit bypasses it", () => {
+  const code = read(`${root}/ControlCenterWindow.xaml.cs`);
+  const host = read(`${root}/AuthorityAppHost.cs`);
+  const smoke = read(`${root}/ControlCenterXamlSelfTest.cs`);
+
+  assert.match(code, /private readonly AppWindow _appWindow;/);
+  assert.match(code, /private bool _allowClose;/);
+  assert.match(code, /_appWindow\.Closing \+= OnAppWindowClosing/);
+  assert.match(code, /private void OnAppWindowClosing\(AppWindow sender, AppWindowClosingEventArgs args\)/);
+  assert.match(code, /args\.Cancel\s*=\s*true/);
+  assert.match(code, /sender\.Hide\(\)/);
+  assert.match(code, /public void PrepareForExit\(\)[\s\S]*?_allowClose\s*=\s*true/);
+  assert.match(code, /public void ShowControlCenter\(\)[\s\S]*?_appWindow\.Show\(\)/);
+  assert.match(host, /_controlCenter\?\.PrepareForExit\(\)/);
+  assert.match(smoke, /window\.PrepareForExit\(\);[\s\S]*window\.Close\(\);/);
+});
+
 test("authority executable and Control Center use the committed Authority icon", () => {
   const project = read(`${root}/GitHubDeliveryAuthority.csproj`);
   const code = read(`${root}/ControlCenterWindow.xaml.cs`);
