@@ -4,9 +4,9 @@
 
 **Goal:** Make Delivery Authority behave like a real background utility: only Overview + Settings navigation, full-width responsive content, hide-to-tray on normal close, the real Delivery Authority icon in the notification area, and explicit Exit from the tray.
 
-**Architecture:** Keep the existing WinUI `NavigationView`, single `ControlCenterWindow`, `AuthorityAppHost`, and native `Shell_NotifyIcon` implementation. The window owns its `AppWindow` close/hide/show behavior; the host owns explicit process exit; the tray remains a small native adapter that loads the committed `.ico`, dispatches Control Center/Exit actions, and owns the resulting `HICON` lifetime.
+**Architecture:** Keep the existing WinUI `NavigationView`, single `ControlCenterWindow`, `AuthorityAppHost`, and native `Shell_NotifyIcon` implementation. The window owns its `AppWindow` close/hide/show behavior; the host owns explicit process exit; the tray remains a native adapter that loads the committed `.ico`, dispatches Control Center/Exit actions, and owns the resulting `HICON` lifetime.
 
-**Tech Stack:** .NET 8, C#, WinUI 3 / Windows App SDK, native Win32 P/Invoke for the notification-area icon/menu, Node.js `node:test` contract tests, GitHub Actions Windows build/publish/install smoke coverage.
+**Tech Stack:** .NET 8, C#, WinUI 3 / Windows App SDK, Win32 P/Invoke, Node.js `node:test`, GitHub Actions Windows build/publish/install smoke coverage.
 
 ## Global Constraints
 
@@ -23,17 +23,17 @@
 
 ## File Structure
 
-- `authority-host/windows/GitHubDeliveryAuthority/ControlCenterWindow.xaml` — primary navigation structure and responsive/full-width dashboard layout.
-- `authority-host/windows/GitHubDeliveryAuthority/ControlCenterWindow.xaml.cs` — NavigationView routing plus `AppWindow` show/hide/close interception.
-- `authority-host/windows/GitHubDeliveryAuthority/AuthorityAppHost.cs` — host-owned explicit shutdown sequence and close-bypass handoff.
-- `authority-host/windows/GitHubDeliveryAuthority/ControlCenterXamlSelfTest.cs` — real-window smoke must intentionally bypass hide-to-tray before closing.
-- `authority-host/windows/GitHubDeliveryAuthority/TrayIcon.cs` — notification-area `.ico` loading, native menu, startup error handoff, and owned `HICON` cleanup.
-- `tests/unit/windows-authority-winui.test.mjs` — static regression contracts for navigation, full-width layout, hide-to-tray lifecycle, tray icon, and Exit.
-- `.github/workflows/ci.yml` — no expected semantic change; final verification must use its existing Windows build/publish/install path.
+- `authority-host/windows/GitHubDeliveryAuthority/ControlCenterWindow.xaml` — primary navigation and responsive/full-width layout.
+- `authority-host/windows/GitHubDeliveryAuthority/ControlCenterWindow.xaml.cs` — navigation routing plus `AppWindow` show/hide/close interception.
+- `authority-host/windows/GitHubDeliveryAuthority/AuthorityAppHost.cs` — host-owned explicit shutdown sequence.
+- `authority-host/windows/GitHubDeliveryAuthority/ControlCenterXamlSelfTest.cs` — real-window smoke intentionally bypasses hide-to-tray before closing.
+- `authority-host/windows/GitHubDeliveryAuthority/TrayIcon.cs` — native tray icon loading, menu behavior, startup error handoff, and `HICON` cleanup.
+- `tests/unit/windows-authority-winui.test.mjs` — regression contracts for all behavior in this pass.
+- `.github/workflows/ci.yml` — verify only; preserve the existing build/publish/install pipeline unchanged.
 
 ---
 
-### Task 1: Remove dead navigation and make the dashboard truly full-width
+### Task 1: Remove dead navigation and make content full-width
 
 **Files:**
 - Modify: `tests/unit/windows-authority-winui.test.mjs`
@@ -41,12 +41,12 @@
 - Modify: `authority-host/windows/GitHubDeliveryAuthority/ControlCenterWindow.xaml.cs`
 
 **Interfaces:**
-- Consumes: existing `Navigation_SelectionChanged`, `OpenSettings_Click`, `OverviewPage`, `SettingsPage`, and responsive visual states.
-- Produces: `NavigationView` whose primary menu contains only Overview and whose built-in Settings item is the bottom navigation target; `Navigation_SelectionChanged` routes via `args.IsSettingsSelected`; `OpenSettings_Click` assigns `Navigation.SelectedItem = Navigation.SettingsItem`.
+- Consumes: `Navigation_SelectionChanged`, `OpenSettings_Click`, `OverviewPage`, `SettingsPage`, existing responsive visual states.
+- Produces: built-in bottom Settings navigation via `Navigation.SettingsItem` / `args.IsSettingsSelected`; Overview as the only primary item; full-width Overview and Settings content grids.
 
-- [ ] **Step 1: Replace the stale navigation/full-width contract with a failing contract**
+- [ ] **Step 1: Write the failing navigation/full-width contracts**
 
-In `tests/unit/windows-authority-winui.test.mjs`, update the dashboard/navigation tests so they require the actual desired shape:
+Replace stale sidebar expectations and add these focused assertions in `tests/unit/windows-authority-winui.test.mjs`:
 
 ```js
 test("control center exposes only Overview plus the built-in bottom Settings target", () => {
@@ -65,31 +65,27 @@ test("control center exposes only Overview plus the built-in bottom Settings tar
 
 test("control center uses all available content width while preserving adaptive states", () => {
   const window = read(`${root}/ControlCenterWindow.xaml`);
-  assert.match(window, /x:Name="OverviewContent"[\s\S]*?HorizontalAlignment="Stretch"/);
-  assert.match(window, /x:Name="SettingsContent"[\s\S]*?HorizontalAlignment="Stretch"/);
-  assert.doesNotMatch(window, /x:Name="OverviewContent"[\s\S]{0,250}MaxWidth=/);
-  assert.doesNotMatch(window, /x:Name="SettingsContent"[\s\S]{0,250}MaxWidth=/);
+  assert.match(window, /<Grid x:Name="OverviewContent"(?=[^>]*HorizontalAlignment="Stretch")(?![^>]*MaxWidth=)[^>]*>/);
+  assert.match(window, /<Grid x:Name="SettingsContent"(?=[^>]*HorizontalAlignment="Stretch")(?![^>]*MaxWidth=)[^>]*>/);
   for (const state of ["NarrowDashboardState", "MediumDashboardState", "WideDashboardState"]) {
     assert.match(window, new RegExp(`x:Name=\\"${state}\\"`));
   }
 });
 ```
 
-Also change the earlier activity-first design test so it no longer expects the removed sidebar items. It should continue asserting the dashboard card text (`Recent activity / Audit trail`, `Repository allowlist`, `Active temporary grants`, `Diagnostics`, `Quick settings`) because those cards remain on Overview.
+Keep dashboard-content assertions for `Recent activity / Audit trail`, `Repository allowlist`, `Active temporary grants`, `Diagnostics`, and `Quick settings`; only their dead navigation entries disappear.
 
-- [ ] **Step 2: Run the focused Node contract and verify RED**
-
-Run:
+- [ ] **Step 2: Run the focused contract and verify RED**
 
 ```bash
 node --test tests/unit/windows-authority-winui.test.mjs
 ```
 
-Expected: FAIL because the current XAML still has five dead primary navigation entries, `IsSettingsVisible="False"`, the decorative pane footer, and content `MaxWidth` values.
+Expected: FAIL because the current XAML still has dead menu entries, `IsSettingsVisible="False"`, a `PaneFooter`, and width caps.
 
-- [ ] **Step 3: Make the minimal XAML/navigation implementation**
+- [ ] **Step 3: Implement the minimal XAML/navigation change**
 
-In `ControlCenterWindow.xaml`:
+Make the NavigationView header exactly follow this shape while preserving existing adaptive pane thresholds:
 
 ```xml
 <NavigationView x:Name="Navigation"
@@ -112,13 +108,22 @@ In `ControlCenterWindow.xaml`:
             </NavigationViewItem.Icon>
         </NavigationViewItem>
     </NavigationView.MenuItems>
-    ...
-</NavigationView>
 ```
 
-Delete `NavigationView.PaneFooter` entirely. Remove `MaxWidth` from both `OverviewContent` and `SettingsContent`; set/retain `HorizontalAlignment="Stretch"` so the outer grids consume the full content area. Keep the existing narrow/medium/wide padding setters and card reflow unchanged.
+Delete `NavigationView.PaneFooter` completely. Remove these now-invalid visual-state setters wherever they occur:
 
-In `ControlCenterWindow.xaml.cs`, route Settings using the standard selection flag rather than tag emulation:
+```xml
+<Setter Target="ProtectionFooterBorder.Padding" Value="7,8" />
+<Setter Target="ProtectionFooterBorder.Margin" Value="4" />
+<Setter Target="ProtectionModeSidebarText.Visibility" Value="Collapsed" />
+<Setter Target="ProtectionFooterBorder.Padding" Value="12" />
+<Setter Target="ProtectionFooterBorder.Margin" Value="8" />
+<Setter Target="ProtectionModeSidebarText.Visibility" Value="Visible" />
+```
+
+Remove `MaxWidth` from `OverviewContent` and `SettingsContent`, and set both outer grids to `HorizontalAlignment="Stretch"`. Preserve current 16 / 22 / 28 responsive paddings and all card reflow setters.
+
+In `ControlCenterWindow.xaml.cs`, replace tag-based Settings routing with:
 
 ```csharp
 private void Navigation_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
@@ -135,19 +140,15 @@ private void OpenSettings_Click(object sender, RoutedEventArgs e)
 }
 ```
 
-Remove references that only existed for the deleted pane footer, including `ProtectionModeSidebarText` visual-state setters and `ProtectionModeSidebar.Text = ...` assignments. Keep the actual dashboard/settings Protection Mode controls.
+Remove both `ProtectionModeSidebar.Text = display;` and `ProtectionModeSidebar.Text = "Configuration error";` because that footer control no longer exists. Keep `ProtectionModeText` and all Settings controls.
 
-- [ ] **Step 4: Run focused tests and Windows XAML smoke**
-
-Run:
+- [ ] **Step 4: Verify Task 1**
 
 ```bash
 node --test tests/unit/windows-authority-winui.test.mjs
 ```
 
-Expected: PASS.
-
-On Windows also run:
+On Windows:
 
 ```powershell
 $Project = 'authority-host/windows/GitHubDeliveryAuthority/GitHubDeliveryAuthority.csproj'
@@ -156,20 +157,18 @@ dotnet build $Project --configuration Release --no-restore
 dotnet run --project $Project --configuration Release --no-build -- --xaml-self-test
 ```
 
-Expected: build succeeds and XAML self-test exits `0`.
+Expected: contract passes, build succeeds, XAML smoke exits `0`.
 
 - [ ] **Step 5: Commit Task 1**
 
 ```bash
-git add tests/unit/windows-authority-winui.test.mjs \
-  authority-host/windows/GitHubDeliveryAuthority/ControlCenterWindow.xaml \
-  authority-host/windows/GitHubDeliveryAuthority/ControlCenterWindow.xaml.cs
+git add tests/unit/windows-authority-winui.test.mjs authority-host/windows/GitHubDeliveryAuthority/ControlCenterWindow.xaml authority-host/windows/GitHubDeliveryAuthority/ControlCenterWindow.xaml.cs
 git commit -m "fix: simplify Authority navigation and use full width"
 ```
 
 ---
 
-### Task 2: Convert normal window close into hide-to-tray without breaking explicit exit or XAML smoke
+### Task 2: Hide the Control Center on normal close and preserve explicit exit
 
 **Files:**
 - Modify: `tests/unit/windows-authority-winui.test.mjs`
@@ -178,12 +177,10 @@ git commit -m "fix: simplify Authority navigation and use full width"
 - Modify: `authority-host/windows/GitHubDeliveryAuthority/ControlCenterXamlSelfTest.cs`
 
 **Interfaces:**
-- Consumes: `AppWindow.GetFromWindowId`, existing single `ControlCenterWindow`, host `Exit()`, and XAML smoke construction.
-- Produces: cached `AppWindow _appWindow`; `PrepareForExit()` close bypass; `ShowControlCenter()` calling `_appWindow.Show()`; close handler `OnAppWindowClosing(AppWindow sender, AppWindowClosingEventArgs args)`; host calls `PrepareForExit()` before process shutdown.
+- Consumes: current single `ControlCenterWindow`, `AppWindow.GetFromWindowId`, `AuthorityAppHost.Exit()`, real-window XAML smoke.
+- Produces: cached `AppWindow _appWindow`; `PrepareForExit()`; `OnAppWindowClosing(...)`; `ShowControlCenter()` restores the same hidden AppWindow.
 
-- [ ] **Step 1: Add failing lifecycle contracts**
-
-Append focused static contracts:
+- [ ] **Step 1: Write the failing close-to-tray contract**
 
 ```js
 test("normal Control Center close hides the existing AppWindow and explicit exit bypasses it", () => {
@@ -192,34 +189,38 @@ test("normal Control Center close hides the existing AppWindow and explicit exit
   const smoke = read(`${root}/ControlCenterXamlSelfTest.cs`);
 
   assert.match(code, /private readonly AppWindow _appWindow;/);
-  assert.match(code, /_appWindow\.Closing \+= OnAppWindowClosing/);
   assert.match(code, /private bool _allowClose;/);
+  assert.match(code, /_appWindow\.Closing \+= OnAppWindowClosing/);
   assert.match(code, /private void OnAppWindowClosing\(AppWindow sender, AppWindowClosingEventArgs args\)/);
   assert.match(code, /args\.Cancel\s*=\s*true/);
   assert.match(code, /sender\.Hide\(\)/);
   assert.match(code, /public void PrepareForExit\(\)[\s\S]*?_allowClose\s*=\s*true/);
-  assert.match(code, /ShowControlCenter\(\)[\s\S]*?_appWindow\.Show\(\)/);
+  assert.match(code, /public void ShowControlCenter\(\)[\s\S]*?_appWindow\.Show\(\)/);
   assert.match(host, /_controlCenter\?\.PrepareForExit\(\)/);
   assert.match(smoke, /window\.PrepareForExit\(\);[\s\S]*window\.Close\(\);/);
 });
 ```
 
-- [ ] **Step 2: Run the focused contract and verify RED**
+- [ ] **Step 2: Run and verify RED**
 
 ```bash
 node --test tests/unit/windows-authority-winui.test.mjs
 ```
 
-Expected: FAIL because no close interception or explicit close bypass exists yet.
+Expected: FAIL because close interception and explicit bypass do not exist.
 
-- [ ] **Step 3: Cache the AppWindow and implement hide/show semantics**
+- [ ] **Step 3: Cache the AppWindow and implement hide/show**
 
-Refactor `ControlCenterWindow` to resolve `AppWindow` once after `InitializeComponent()`:
+Add fields:
 
 ```csharp
 private readonly AppWindow _appWindow;
 private bool _allowClose;
+```
 
+Construct/cache once:
+
+```csharp
 public ControlCenterWindow(StateStore store)
 {
     InitializeComponent();
@@ -240,9 +241,9 @@ private AppWindow ResolveAppWindow()
 }
 ```
 
-Use the cached object for icon and resize helpers rather than repeatedly resolving the HWND.
+Update `TrySetWindowIcon()` to call `_appWindow.SetIcon(iconPath)` and `TryResize()` to call `_appWindow.Resize(new SizeInt32(width, height))`; keep both helpers best-effort via their existing `try/catch` boundaries.
 
-Implement normal-close interception:
+Implement lifecycle methods:
 
 ```csharp
 private void OnAppWindowClosing(AppWindow sender, AppWindowClosingEventArgs args)
@@ -264,9 +265,9 @@ public void ShowControlCenter()
 }
 ```
 
-`AppWindow.Show()` is sufficient to show and activate the existing hidden window; do not construct a replacement window.
+Do not create a new `ControlCenterWindow` when restoring from tray.
 
-- [ ] **Step 4: Wire the explicit host exit and smoke-test close bypass**
+- [ ] **Step 4: Wire explicit shutdown and XAML-smoke bypass**
 
 In `AuthorityAppHost.Exit()`:
 
@@ -279,7 +280,7 @@ private void Exit()
 }
 ```
 
-In `ControlCenterXamlSelfTest.Run()`, deliberately bypass hide-to-tray before closing the temporary real window:
+In `ControlCenterXamlSelfTest.Run()`:
 
 ```csharp
 var window = new ControlCenterWindow(store);
@@ -288,17 +289,13 @@ window.Close();
 return 0;
 ```
 
-This prevents the permanent XAML smoke from accidentally leaving a hidden window alive.
-
-- [ ] **Step 5: Run contract + Windows real-window tests**
-
-Run:
+- [ ] **Step 5: Verify Task 2**
 
 ```bash
 node --test tests/unit/windows-authority-winui.test.mjs
 ```
 
-Then on Windows:
+On Windows:
 
 ```powershell
 $Project = 'authority-host/windows/GitHubDeliveryAuthority/GitHubDeliveryAuthority.csproj'
@@ -307,63 +304,58 @@ dotnet run --project $Project --configuration Release --no-build -- --self-test
 dotnet run --project $Project --configuration Release --no-build -- --xaml-self-test
 ```
 
-Expected: all pass; XAML smoke exits `0` despite the new close interception.
+Expected: all pass; XAML smoke exits `0` rather than leaving a hidden smoke-test window alive.
 
 - [ ] **Step 6: Commit Task 2**
 
 ```bash
-git add tests/unit/windows-authority-winui.test.mjs \
-  authority-host/windows/GitHubDeliveryAuthority/ControlCenterWindow.xaml.cs \
-  authority-host/windows/GitHubDeliveryAuthority/AuthorityAppHost.cs \
-  authority-host/windows/GitHubDeliveryAuthority/ControlCenterXamlSelfTest.cs
+git add tests/unit/windows-authority-winui.test.mjs authority-host/windows/GitHubDeliveryAuthority/ControlCenterWindow.xaml.cs authority-host/windows/GitHubDeliveryAuthority/AuthorityAppHost.cs authority-host/windows/GitHubDeliveryAuthority/ControlCenterXamlSelfTest.cs
 git commit -m "fix: hide Authority control center to tray on close"
 ```
 
 ---
 
-### Task 3: Use DeliveryAuthority.ico in the native notification area and make tray startup failure explicit
+### Task 3: Replace the stock tray icon and harden native tray lifetime
 
 **Files:**
 - Modify: `tests/unit/windows-authority-winui.test.mjs`
 - Modify: `authority-host/windows/GitHubDeliveryAuthority/TrayIcon.cs`
 
 **Interfaces:**
-- Consumes: committed `Assets\DeliveryAuthority.ico`, `Shell_NotifyIconW`, `_showControlCenter`, `_exit`, existing tray thread.
-- Produces: owned `_trayIcon` `HICON`; `LoadImageW(... LR_LOADFROMFILE | LR_DEFAULTSIZE)` file load; `DestroyIcon` cleanup; `_startupError` handoff so constructor cannot deadlock on native setup failure; right-click menu `Control Center`, separator, `Exit`.
+- Consumes: `Assets\DeliveryAuthority.ico`, `Shell_NotifyIconW`, `_showControlCenter`, `_exit`, current tray thread/window.
+- Produces: owned `_trayIcon`; file-based `LoadImageW`; `DestroyIcon` cleanup; `_startupError` handoff; menu with Control Center, separator, Exit.
 
-- [ ] **Step 1: Add failing tray contracts**
-
-Extend the tray test:
+- [ ] **Step 1: Write the failing native tray contract**
 
 ```js
 test("tray uses the committed Authority icon and exposes Control Center plus explicit Exit", () => {
   const tray = read(`${root}/TrayIcon.cs`);
 
-  assert.doesNotMatch(tray, /LoadIconW\(IntPtr\.Zero, new IntPtr\(32512\)\)/);
+  assert.doesNotMatch(tray, /LoadIconW/);
   assert.match(tray, /Path\.Combine\(AppContext\.BaseDirectory, "Assets", "DeliveryAuthority\.ico"\)/);
   assert.match(tray, /LoadImageW/);
   assert.match(tray, /LR_LOADFROMFILE/);
   assert.match(tray, /private IntPtr _trayIcon;/);
   assert.match(tray, /DestroyIcon\(_trayIcon\)/);
+  assert.match(tray, /private Exception\? _startupError;/);
   assert.match(tray, /AppendMenuW\(menu, MF_STRING, MenuControlCenter, "Control Center"\)/);
   assert.match(tray, /AppendMenuW\(menu, MF_SEPARATOR/);
   assert.match(tray, /AppendMenuW\(menu, MF_STRING, MenuExit, "Exit"\)/);
   assert.match(tray, /selected == MenuExit[\s\S]*Dispatch\(_exit\)/);
-  assert.match(tray, /private Exception\? _startupError;/);
 });
 ```
 
-- [ ] **Step 2: Run focused test and verify RED**
+- [ ] **Step 2: Run and verify RED**
 
 ```bash
 node --test tests/unit/windows-authority-winui.test.mjs
 ```
 
-Expected: FAIL because current tray code still loads stock `IDI_APPLICATION` and has no owned icon cleanup/startup-error handoff.
+Expected: FAIL because current tray code still uses stock `IDI_APPLICATION` and does not own/destroy a file-loaded icon.
 
-- [ ] **Step 3: Implement native file-icon loading and ownership**
+- [ ] **Step 3: Add exact native constants, fields, and P/Invoke**
 
-Add constants/field:
+Add:
 
 ```csharp
 private const uint IMAGE_ICON = 1;
@@ -373,9 +365,10 @@ private const uint MF_SEPARATOR = 0x00000800;
 
 private IntPtr _trayIcon;
 private Exception? _startupError;
+private bool _notificationIconAdded;
 ```
 
-Add P/Invoke declarations:
+Replace the `LoadIconW` declaration with:
 
 ```csharp
 [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
@@ -386,27 +379,9 @@ private static extern IntPtr LoadImageW(IntPtr instance, string name, uint type,
 private static extern bool DestroyIcon(IntPtr icon);
 ```
 
-Load the committed file before `Shell_NotifyIconW(NIM_ADD, ...)`:
+- [ ] **Step 4: Split tray setup into focused methods and always release constructor readiness**
 
-```csharp
-var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "DeliveryAuthority.ico");
-_trayIcon = LoadImageW(IntPtr.Zero, iconPath, IMAGE_ICON, 0, 0, LR_LOADFROMFILE | LR_DEFAULTSIZE);
-if (_trayIcon == IntPtr.Zero)
-    throw new InvalidOperationException($"tray_icon_load_failed:{Marshal.GetLastWin32Error()}");
-
-_data = new NOTIFYICONDATA
-{
-    ...
-    hIcon = _trayIcon,
-    szTip = "Delivery Authority",
-};
-```
-
-Do not fall back to a stock icon.
-
-- [ ] **Step 4: Make tray-thread startup failure observable instead of hanging `_ready.Wait()`**
-
-Wrap the native setup/message loop so `_ready` is always signaled:
+Use this exact top-level control flow:
 
 ```csharp
 private void Run()
@@ -421,20 +396,77 @@ private void Run()
         _ready.Set();
     }
 }
+
+private void RunCore()
+{
+    try
+    {
+        RegisterTrayWindow();
+        AddNotificationIcon();
+        _ready.Set();
+        RunMessageLoop();
+    }
+    finally
+    {
+        if (_notificationIconAdded)
+        {
+            Shell_NotifyIconW(NIM_DELETE, ref _data);
+            _notificationIconAdded = false;
+        }
+
+        if (_trayIcon != IntPtr.Zero)
+        {
+            DestroyIcon(_trayIcon);
+            _trayIcon = IntPtr.Zero;
+        }
+    }
+}
 ```
 
-Move the current registration/window/icon/message-loop body to `RunCore()` and signal `_ready.Set()` immediately after successful `NIM_ADD`. In the constructor, after `_ready.Wait()`:
+`RegisterTrayWindow()` contains the current `_wndProc`, class registration, and `CreateWindowExW` logic. `RunMessageLoop()` contains the current `GetMessageW` / `TranslateMessage` / `DispatchMessageW` loop. Do not change message semantics.
+
+After `_ready.Wait()` in the constructor:
 
 ```csharp
 if (_startupError is not null)
     throw new InvalidOperationException("tray_initialization_failed", _startupError);
 ```
 
-Ensure `RunCore()` removes the notification icon in `finally` when it had been added, and destroys `_trayIcon` exactly once when owned.
+- [ ] **Step 5: Load `DeliveryAuthority.ico` and add it to the notification area**
 
-- [ ] **Step 5: Add the menu separator without changing callbacks**
+Implement:
 
-`ShowMenu()` should be:
+```csharp
+private void AddNotificationIcon()
+{
+    var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "DeliveryAuthority.ico");
+    _trayIcon = LoadImageW(IntPtr.Zero, iconPath, IMAGE_ICON, 0, 0, LR_LOADFROMFILE | LR_DEFAULTSIZE);
+    if (_trayIcon == IntPtr.Zero)
+        throw new InvalidOperationException($"tray_icon_load_failed:{Marshal.GetLastWin32Error()}");
+
+    _data = new NOTIFYICONDATA
+    {
+        cbSize = (uint)Marshal.SizeOf<NOTIFYICONDATA>(),
+        hWnd = _window,
+        uID = 1,
+        uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP,
+        uCallbackMessage = WM_TRAY,
+        hIcon = _trayIcon,
+        szTip = "Delivery Authority",
+    };
+
+    if (!Shell_NotifyIconW(NIM_ADD, ref _data))
+        throw new InvalidOperationException("tray_icon_creation_failed");
+
+    _notificationIconAdded = true;
+}
+```
+
+There is no stock-icon fallback.
+
+- [ ] **Step 6: Keep the tray menu minimal and explicit**
+
+In `ShowMenu()`:
 
 ```csharp
 AppendMenuW(menu, MF_STRING, MenuControlCenter, "Control Center");
@@ -444,7 +476,7 @@ AppendMenuW(menu, MF_STRING, MenuExit, "Exit");
 
 Keep double-click -> `_showControlCenter`, Control Center -> `_showControlCenter`, Exit -> `_exit`.
 
-- [ ] **Step 6: Run focused tests and Windows build/XAML smoke**
+- [ ] **Step 7: Verify Task 3**
 
 ```bash
 node --test tests/unit/windows-authority-winui.test.mjs
@@ -460,26 +492,25 @@ dotnet run --project $Project --configuration Release --no-build -- --xaml-self-
 
 Expected: PASS / exit `0`.
 
-- [ ] **Step 7: Commit Task 3**
+- [ ] **Step 8: Commit Task 3**
 
 ```bash
-git add tests/unit/windows-authority-winui.test.mjs \
-  authority-host/windows/GitHubDeliveryAuthority/TrayIcon.cs
+git add tests/unit/windows-authority-winui.test.mjs authority-host/windows/GitHubDeliveryAuthority/TrayIcon.cs
 git commit -m "fix: use Authority icon and explicit exit in tray"
 ```
 
 ---
 
-### Task 4: Final shipping-path regression and manual desktop acceptance
+### Task 4: Final shipping-path regression and manual acceptance
 
 **Files:**
 - Verify only: `.github/workflows/ci.yml`
 - Verify only: `authority-host/windows/GitHubDeliveryAuthority/GitHubDeliveryAuthority.csproj`
-- Verify all Task 1-3 files.
+- Verify: all files modified in Tasks 1-3.
 
 **Interfaces:**
 - Consumes: all preceding task outputs.
-- Produces: final evidence that the feature works without changing the proven XBF/PRI/icon publish pipeline.
+- Produces: final exact-head evidence without altering the proven publish/resource pipeline.
 
 - [ ] **Step 1: Run repository checks**
 
@@ -490,7 +521,7 @@ node --test tests/unit/windows-authority-winui.test.mjs
 
 Expected: PASS.
 
-- [ ] **Step 2: Run the same Windows build/self-test/XAML gates used by CI**
+- [ ] **Step 2: Run Windows build/self-test/XAML gates**
 
 ```powershell
 $Project = 'authority-host/windows/GitHubDeliveryAuthority/GitHubDeliveryAuthority.csproj'
@@ -502,7 +533,7 @@ dotnet run --project $Project --configuration Release --no-build -- --xaml-self-
 
 Expected: all exit `0`.
 
-- [ ] **Step 3: Publish and assert the startup/resource/icon payload remains intact**
+- [ ] **Step 3: Publish and assert the startup/resource/icon payload**
 
 ```powershell
 $Project = 'authority-host/windows/GitHubDeliveryAuthority/GitHubDeliveryAuthority.csproj'
@@ -527,25 +558,25 @@ foreach ($File in @(
 if ($LASTEXITCODE -ne 0) { throw "Published XAML smoke failed: $LASTEXITCODE" }
 ```
 
-Expected: all six required files exist and published XAML smoke exits `0`.
+Expected: required resources exist and published XAML smoke exits `0`.
 
-- [ ] **Step 4: Manual runtime acceptance on Windows**
+- [ ] **Step 4: Manual Windows acceptance**
 
-Launch the published executable normally and verify all of the following in one process lifetime:
+In one normal process lifetime verify:
 
-1. Sidebar shows only Overview at the top and Settings at the bottom.
-2. Overview is selected initially; Settings opens and the in-dashboard Settings action routes to it.
-3. At 1920/2560-wide windows, content stretches to available width with only responsive outer padding; no centered max-width dead zone remains.
-4. At the existing narrow/medium test widths, adaptive card reflow still works and there is no horizontal scrollbar.
-5. Notification-area icon is the peach Delivery Authority icon, not stock Windows `IDI_APPLICATION`.
-6. Title-bar X hides the window; the process, pipe, and tray remain alive.
+1. Overview is the only top sidebar item; Settings is at the bottom.
+2. Overview is selected initially; Settings and the in-dashboard Settings button route correctly.
+3. 1920/2560-wide windows use the available content width with responsive outer padding and no centered dead zone.
+4. Narrow/medium card reflow still works with no horizontal scrollbar.
+5. Tray uses the peach Delivery Authority icon, not stock Windows `IDI_APPLICATION`.
+6. X hides the Control Center while the process/tray remain alive.
 7. Alt+F4 behaves the same as X.
-8. Tray double-click restores the same Control Center window.
+8. Tray double-click restores the same window.
 9. Tray right-click -> Control Center restores the same window.
-10. Tray right-click -> Exit removes the notification icon and terminates the process.
+10. Tray right-click -> Exit removes the tray icon and terminates the process.
 
-- [ ] **Step 5: Push final head and wait for every PR workflow**
+- [ ] **Step 5: Push final head and verify exact-head PR workflows**
 
-Push the completed commits to `fix/authority-xaml-startup`. Wait for CI, Architecture Contracts, Dependency Review, and CodeQL on the exact final SHA. In CI, explicitly verify all 9 Node 22/24/26 x Windows/macOS/Linux jobs and the Windows Node 24 publish/install smoke path are green.
+Push to `fix/authority-xaml-startup`. Wait for CI, Architecture Contracts, Dependency Review, and CodeQL for the exact final SHA. Verify all 9 Node 22/24/26 x Windows/macOS/Linux CI jobs and the Windows Node 24 publish/install smoke path are green.
 
-Do not merge after green; report the final SHA and workflow evidence back to the user.
+Do not merge after green. Report final SHA and workflow evidence to the user.
