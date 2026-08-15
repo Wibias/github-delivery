@@ -119,6 +119,10 @@ jobs:
               throw "Published authority host is missing compiled XAML resource: $CompiledXaml"
             }
           }
+          $ResourceIndex = Join-Path $PublishDir 'resources.pri'
+          if (-not (Test-Path $ResourceIndex -PathType Leaf)) {
+            throw 'Published authority host is missing the unpackaged WinUI resource index: resources.pri'
+          }
           $DepsPath = Join-Path $PublishDir 'GitHubDeliveryAuthority.deps.json'
           $Deps = Get-Content $DepsPath -Raw | ConvertFrom-Json
           $RuntimePackage = $Deps.libraries.PSObject.Properties.Name |
