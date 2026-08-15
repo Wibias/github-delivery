@@ -171,12 +171,3 @@ jobs:
             if (Test-Path $Diagnostics -PathType Leaf) { Get-Content $Diagnostics }
             throw "Installed Authority XAML smoke test failed with exit code $LASTEXITCODE."
           }
-
-      - name: Upload temporary Authority validation build
-        if: runner.os == 'Windows' && matrix.node == 24
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: github-delivery-authority-validation-${{ github.sha }}
-          path: ${{ runner.temp }}/github-delivery-authority-publish
-          if-no-files-found: error
-          retention-days: 2
