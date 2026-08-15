@@ -13,6 +13,8 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <ProjectPriFileName>resources.pri</ProjectPriFileName>
   </PropertyGroup>
 
   <ItemGroup>
@@ -31,15 +33,24 @@
     <Compile Remove="StatusPill.cs" />
   </ItemGroup>
 
-  <Target Name="CopyUnpackagedWinUiXbfToPublish"
+  <Target Name="CopyUnpackagedWinUiResourcesToPublish"
           AfterTargets="Publish"
           Condition="'$(WindowsPackageType)' == 'None' and '$(PublishDir)' != ''">
     <ItemGroup>
       <AuthorityCompiledXaml Include="$(XamlGeneratedOutputPath)*.xbf" />
+      <AuthorityProjectPri Include="$(ProjectPriFullPath)"
+                           Condition="'$(ProjectPriFullPath)' != '' and Exists('$(ProjectPriFullPath)')" />
     </ItemGroup>
     <Error Condition="'@(AuthorityCompiledXaml)' == ''"
            Text="WinUI XBF output is missing; unpackaged publish cannot load compiled XAML resources." />
+    <Error Condition="'@(AuthorityProjectPri)' == ''"
+           Text="WinUI project PRI output is missing; unpackaged publish cannot resolve ms-appx resources." />
     <Copy SourceFiles="@(AuthorityCompiledXaml)"
           DestinationFiles="@(AuthorityCompiledXaml->'$(PublishDir)%(Filename)%(Extension)')" />
+    <Copy SourceFiles="@(AuthorityProjectPri)"
+          DestinationFiles="@(AuthorityProjectPri->'$(PublishDir)resources.pri')"
+          Condition="!Exists('$(PublishDir)resources.pri')" />
+    <Error Condition="!Exists('$(PublishDir)resources.pri')"
+           Text="Published unpackaged WinUI resource index is missing: resources.pri" />
   </Target>
 </Project>
