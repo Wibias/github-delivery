@@ -13,6 +13,7 @@ internal static class ControlCenterXamlSelfTest
         {
             using var store = new StateStore(Path.Combine(root, "authority.db"));
             var window = new ControlCenterWindow(store);
+            window.PrepareForExit();
             window.Close();
             return 0;
         }
