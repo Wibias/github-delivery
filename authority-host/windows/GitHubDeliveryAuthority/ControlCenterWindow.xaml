@@ -23,19 +23,25 @@
                         <Setter Target="SummaryColumn0.Width" Value="*" />
                         <Setter Target="SummaryColumn1.Width" Value="*" />
                         <Setter Target="SummaryColumn2.Width" Value="*" />
-                        <Setter Target="SummaryColumn3.Width" Value="0" />
-                        <Setter Target="SummaryColumn4.Width" Value="0" />
+                        <Setter Target="SummaryColumn3.Width" Value="*" />
+                        <Setter Target="SummaryColumn4.Width" Value="*" />
+                        <Setter Target="SummaryColumn5.Width" Value="*" />
                         <Setter Target="SummarySecondRow.Height" Value="Auto" />
                         <Setter Target="SummaryMetric0.(Grid.Row)" Value="0" />
                         <Setter Target="SummaryMetric0.(Grid.Column)" Value="0" />
+                        <Setter Target="SummaryMetric0.(Grid.ColumnSpan)" Value="2" />
                         <Setter Target="SummaryMetric1.(Grid.Row)" Value="0" />
-                        <Setter Target="SummaryMetric1.(Grid.Column)" Value="1" />
+                        <Setter Target="SummaryMetric1.(Grid.Column)" Value="2" />
+                        <Setter Target="SummaryMetric1.(Grid.ColumnSpan)" Value="2" />
                         <Setter Target="SummaryMetric2.(Grid.Row)" Value="0" />
-                        <Setter Target="SummaryMetric2.(Grid.Column)" Value="2" />
+                        <Setter Target="SummaryMetric2.(Grid.Column)" Value="4" />
+                        <Setter Target="SummaryMetric2.(Grid.ColumnSpan)" Value="2" />
                         <Setter Target="SummaryMetric3.(Grid.Row)" Value="1" />
-                        <Setter Target="SummaryMetric3.(Grid.Column)" Value="0" />
+                        <Setter Target="SummaryMetric3.(Grid.Column)" Value="1" />
+                        <Setter Target="SummaryMetric3.(Grid.ColumnSpan)" Value="2" />
                         <Setter Target="SummaryMetric4.(Grid.Row)" Value="1" />
-                        <Setter Target="SummaryMetric4.(Grid.Column)" Value="1" />
+                        <Setter Target="SummaryMetric4.(Grid.Column)" Value="3" />
+                        <Setter Target="SummaryMetric4.(Grid.ColumnSpan)" Value="2" />
 
                         <Setter Target="DashboardPrimaryColumn.Width" Value="*" />
                         <Setter Target="DashboardSecondaryColumn.Width" Value="0" />
@@ -76,11 +82,23 @@
                         <Setter Target="SummaryColumn2.Width" Value="*" />
                         <Setter Target="SummaryColumn3.Width" Value="*" />
                         <Setter Target="SummaryColumn4.Width" Value="*" />
+                        <Setter Target="SummaryColumn5.Width" Value="0" />
                         <Setter Target="SummarySecondRow.Height" Value="0" />
+                        <Setter Target="SummaryMetric0.(Grid.Row)" Value="0" />
+                        <Setter Target="SummaryMetric0.(Grid.Column)" Value="0" />
+                        <Setter Target="SummaryMetric0.(Grid.ColumnSpan)" Value="1" />
+                        <Setter Target="SummaryMetric1.(Grid.Row)" Value="0" />
+                        <Setter Target="SummaryMetric1.(Grid.Column)" Value="1" />
+                        <Setter Target="SummaryMetric1.(Grid.ColumnSpan)" Value="1" />
+                        <Setter Target="SummaryMetric2.(Grid.Row)" Value="0" />
+                        <Setter Target="SummaryMetric2.(Grid.Column)" Value="2" />
+                        <Setter Target="SummaryMetric2.(Grid.ColumnSpan)" Value="1" />
                         <Setter Target="SummaryMetric3.(Grid.Row)" Value="0" />
                         <Setter Target="SummaryMetric3.(Grid.Column)" Value="3" />
+                        <Setter Target="SummaryMetric3.(Grid.ColumnSpan)" Value="1" />
                         <Setter Target="SummaryMetric4.(Grid.Row)" Value="0" />
                         <Setter Target="SummaryMetric4.(Grid.Column)" Value="4" />
+                        <Setter Target="SummaryMetric4.(Grid.ColumnSpan)" Value="1" />
 
                         <Setter Target="DashboardPrimaryColumn.Width" Value="*" />
                         <Setter Target="DashboardSecondaryColumn.Width" Value="*" />
@@ -121,11 +139,23 @@
                         <Setter Target="SummaryColumn2.Width" Value="*" />
                         <Setter Target="SummaryColumn3.Width" Value="*" />
                         <Setter Target="SummaryColumn4.Width" Value="*" />
+                        <Setter Target="SummaryColumn5.Width" Value="0" />
                         <Setter Target="SummarySecondRow.Height" Value="0" />
+                        <Setter Target="SummaryMetric0.(Grid.Row)" Value="0" />
+                        <Setter Target="SummaryMetric0.(Grid.Column)" Value="0" />
+                        <Setter Target="SummaryMetric0.(Grid.ColumnSpan)" Value="1" />
+                        <Setter Target="SummaryMetric1.(Grid.Row)" Value="0" />
+                        <Setter Target="SummaryMetric1.(Grid.Column)" Value="1" />
+                        <Setter Target="SummaryMetric1.(Grid.ColumnSpan)" Value="1" />
+                        <Setter Target="SummaryMetric2.(Grid.Row)" Value="0" />
+                        <Setter Target="SummaryMetric2.(Grid.Column)" Value="2" />
+                        <Setter Target="SummaryMetric2.(Grid.ColumnSpan)" Value="1" />
                         <Setter Target="SummaryMetric3.(Grid.Row)" Value="0" />
                         <Setter Target="SummaryMetric3.(Grid.Column)" Value="3" />
+                        <Setter Target="SummaryMetric3.(Grid.ColumnSpan)" Value="1" />
                         <Setter Target="SummaryMetric4.(Grid.Row)" Value="0" />
                         <Setter Target="SummaryMetric4.(Grid.Column)" Value="4" />
+                        <Setter Target="SummaryMetric4.(Grid.ColumnSpan)" Value="1" />
 
                         <Setter Target="DashboardPrimaryColumn.Width" Value="2.15*" />
                         <Setter Target="DashboardSecondaryColumn.Width" Value="*" />
@@ -226,6 +256,7 @@
                                     <ColumnDefinition x:Name="SummaryColumn2" Width="*" />
                                     <ColumnDefinition x:Name="SummaryColumn3" Width="0" />
                                     <ColumnDefinition x:Name="SummaryColumn4" Width="0" />
+                                    <ColumnDefinition x:Name="SummaryColumn5" Width="0" />
                                 </Grid.ColumnDefinitions>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
@@ -633,6 +664,27 @@
                                                Text="Unknown"
                                                FontFamily="Cascadia Mono, Consolas"
                                                TextWrapping="WrapWholeWords" />
+                                </Grid>
+
+                                <Grid ColumnSpacing="16" Margin="0,4,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel MinWidth="0">
+                                        <TextBlock Text="Start Delivery Authority when I sign in"
+                                                   FontWeight="SemiBold"
+                                                   TextWrapping="WrapWholeWords" />
+                                        <TextBlock x:Name="AutostartStatusText"
+                                                   Text="Checking…"
+                                                   Style="{StaticResource CaptionTextBlockStyle}"
+                                                   Opacity="0.72"
+                                                   TextWrapping="WrapWholeWords" />
+                                    </StackPanel>
+                                    <ToggleSwitch x:Name="AutostartToggle"
+                                                  Grid.Column="1"
+                                                  VerticalAlignment="Center"
+                                                  Toggled="AutostartToggle_Toggled" />
                                 </Grid>
                             </StackPanel>
                         </Border>
