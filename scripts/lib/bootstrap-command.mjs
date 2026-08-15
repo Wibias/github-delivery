@@ -118,7 +118,7 @@ export async function runBootstrap(argv = [], dependencies = {}) {
     return setup({ target });
   }
   if (options.command === "start") return start();
-  if (options.command === "autostart") return autostart();
+  if (options.command === "autostart") return autostart({ mode: options.autostartMode });
   if (options.command === "doctor") {
     if (options.target) return doctor({ target: resolve(options.target) });
     const eligible = installations.filter(updateEligible);
