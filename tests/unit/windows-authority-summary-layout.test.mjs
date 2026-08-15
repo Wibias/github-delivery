@@ -7,70 +7,43 @@ const window = readFileSync(
   "utf8",
 );
 
-function visualState(name) {
-  const marker = `<VisualState x:Name="${name}">`;
-  const start = window.indexOf(marker);
-  assert.ok(start >= 0, `${name} must exist`);
-  const end = window.indexOf("</VisualState>", start);
-  assert.ok(end > start, `${name} must have a closing VisualState tag`);
-  return window.slice(start, end + "</VisualState>".length);
+function element(name) {
+  const marker = `x:Name="${name}"`;
+  const markerIndex = window.indexOf(marker);
+  assert.ok(markerIndex >= 0, `${name} must exist`);
+  const start = window.lastIndexOf("<", markerIndex);
+  const end = window.indexOf(">", markerIndex);
+  assert.ok(start >= 0 && end > markerIndex, `${name} must have a valid opening tag`);
+  return window.slice(start, end + 1);
 }
 
-function assertSymmetricSummary(stateName) {
-  const state = visualState(stateName);
-
-  assert.doesNotMatch(
-    state,
-    /Target="SummarySecondRow\.Height" Value="0"/,
-    `${stateName} must never collapse the lower metric row`,
-  );
-  assert.doesNotMatch(
-    state,
-    /Target="SummaryColumn5\.Width" Value="0"/,
-    `${stateName} must never collapse the sixth summary column`,
-  );
-
+test("summary metrics use one static symmetric 3+2 layout at every window width", () => {
   for (let column = 0; column < 6; column += 1) {
     assert.match(
-      state,
-      new RegExp(`Target="SummaryColumn${column}\\.Width" Value="\\*"`),
-      `${stateName} must keep all six equal summary columns`,
+      window,
+      new RegExp(`<ColumnDefinition x:Name="SummaryColumn${column}" Width="\\*" \\/>`),
+      `SummaryColumn${column} must be an equal-width base column`,
     );
   }
 
-  assert.match(
-    state,
-    /Target="SummarySecondRow\.Height" Value="Auto"/,
-    `${stateName} must keep the second metric row visible`,
+  const expected = [
+    ["SummaryMetric0", 0, 0],
+    ["SummaryMetric1", 0, 2],
+    ["SummaryMetric2", 0, 4],
+    ["SummaryMetric3", 1, 1],
+    ["SummaryMetric4", 1, 3],
+  ];
+
+  for (const [metric, row, column] of expected) {
+    const tag = element(metric);
+    assert.match(tag, new RegExp(`Grid\\.Row="${row}"`), `${metric} must stay on row ${row}`);
+    assert.match(tag, new RegExp(`Grid\\.Column="${column}"`), `${metric} must stay on column ${column}`);
+    assert.match(tag, /Grid\.ColumnSpan="2"/, `${metric} must span two sixths`);
+  }
+
+  assert.doesNotMatch(
+    window,
+    /Target="Summary(?:Column\d+\.Width|SecondRow\.Height|Metric\d+\.\(Grid\.(?:Row|Column|ColumnSpan)\))"/,
+    "responsive states must not override the summary geometry",
   );
-
-  for (const [metric, row, column] of [
-    [0, 0, 0],
-    [1, 0, 2],
-    [2, 0, 4],
-    [3, 1, 1],
-    [4, 1, 3],
-  ]) {
-    assert.match(
-      state,
-      new RegExp(`Target="SummaryMetric${metric}\\.\\(Grid\\.Row\\)" Value="${row}"`),
-      `${stateName} must place SummaryMetric${metric} on row ${row}`,
-    );
-    assert.match(
-      state,
-      new RegExp(`Target="SummaryMetric${metric}\\.\\(Grid\\.Column\\)" Value="${column}"`),
-      `${stateName} must place SummaryMetric${metric} on column ${column}`,
-    );
-    assert.match(
-      state,
-      new RegExp(`Target="SummaryMetric${metric}\\.\\(Grid\\.ColumnSpan\\)" Value="2"`),
-      `${stateName} must span SummaryMetric${metric} across two sixths`,
-    );
-  }
-}
-
-test("summary metrics preserve the symmetric 3+2 layout at every responsive width", () => {
-  for (const stateName of ["NarrowDashboardState", "MediumDashboardState", "WideDashboardState"]) {
-    assertSymmetricSummary(stateName);
-  }
 });
