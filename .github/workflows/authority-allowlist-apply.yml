@@ -1,0 +1,255 @@
+name: Apply Authority Allowlist Functional Pass
+
+on:
+  push:
+    branches:
+      - fix/authority-xaml-startup
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.event.head_commit.message == 'ci: apply functional Authority allowlist pass'
+    runs-on: windows-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: fix/authority-xaml-startup
+          persist-credentials: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@3951f0dfe7a07e2313ec93c75700083e2005cbab # v4.3.0
+        with:
+          global-json-file: global.json
+
+      - name: Apply functional allowlist UI
+        shell: pwsh
+        run: |
+          @'
+          from pathlib import Path
+
+          xaml_path = Path('authority-host/windows/GitHubDeliveryAuthority/ControlCenterWindow.xaml')
+          code_path = Path('authority-host/windows/GitHubDeliveryAuthority/ControlCenterWindow.xaml.cs')
+
+          xaml = xaml_path.read_text(encoding='utf-8')
+          code = code_path.read_text(encoding='utf-8')
+
+          activity_button = '''                                        <Button Grid.Column="1"
+                                                  Content="View full activity"
+                                                  Style="{StaticResource AccentButtonStyle}"
+                                                  Padding="9,3"
+                                                  IsEnabled="False" />
+          '''
+          if activity_button not in xaml:
+              raise SystemExit('activity button target not found')
+          xaml = xaml.replace(activity_button, '', 1)
+
+          add_stub = '''                                        <Button Grid.Column="1"
+                                                  Content="+ Add repository"
+                                                  Padding="7,2"
+                                                  IsEnabled="False" />
+          '''
+          add_controls = '''                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                              <Button x:Name="AddRepositoryButton"
+                                                      Content="+ Add repository"
+                                                      Padding="7,2"
+                                                      Click="AddRepository_Click" />
+                                              <Button x:Name="RemoveRepositoryButton"
+                                                      Content="Remove selected"
+                                                      Padding="7,2"
+                                                      IsEnabled="False"
+                                                      Click="RemoveRepository_Click" />
+                                          </StackPanel>
+          '''
+          if add_stub not in xaml:
+              raise SystemExit('allowlist add stub target not found')
+          xaml = xaml.replace(add_stub, add_controls, 1)
+
+          allowlist_open = '''                                    <ListView x:Name="AllowlistList"
+                                                SelectionMode="None"
+                                                MinHeight="135"
+          '''
+          allowlist_open_new = '''                                    <ListView x:Name="AllowlistList"
+                                                SelectionMode="Single"
+                                                SelectionChanged="AllowlistList_SelectionChanged"
+                                                MinHeight="135"
+          '''
+          if allowlist_open not in xaml:
+              raise SystemExit('allowlist list target not found')
+          xaml = xaml.replace(allowlist_open, allowlist_open_new, 1)
+
+          allowlist_tail = '''                                    </ListView>
+                                </StackPanel>
+                            </Border>
+
+                            <Border x:Name="GrantCard"
+          '''
+          allowlist_tail_new = '''                                    </ListView>
+                                    <TextBlock x:Name="AllowlistStatusText"
+                                               Text=""
+                                               Opacity="0.72"
+                                               TextWrapping="WrapWholeWords" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border x:Name="GrantCard"
+          '''
+          if allowlist_tail not in xaml:
+              raise SystemExit('allowlist tail target not found')
+          xaml = xaml.replace(allowlist_tail, allowlist_tail_new, 1)
+
+          branch_record = '''    private sealed record BranchLeaseListItem(string LeaseId, string Display)
+              {
+                  public override string ToString() => Display;
+              }
+
+          '''
+          repo_record = branch_record + '''    private sealed record RepositoryListItem(string Repo, string Display)
+              {
+                  public override string ToString() => Display;
+              }
+
+          '''
+          if branch_record not in code:
+              raise SystemExit('branch lease record target not found')
+          code = code.replace(branch_record, repo_record, 1)
+
+          allowlist_refresh = '''        AllowlistedCount.Text = repositories.Count.ToString(CultureInfo.InvariantCulture);
+                  AllowlistList.ItemsSource = repositories.Count == 0
+                      ? new[] { "No repositories allowlisted" }
+                      : repositories.Select(repo => $"▣  {repo}     Allowed").ToArray();
+
+          '''
+          allowlist_refresh_new = '''        AllowlistedCount.Text = repositories.Count.ToString(CultureInfo.InvariantCulture);
+                  AllowlistList.ItemsSource = repositories.Count == 0
+                      ? new[] { new RepositoryListItem(string.Empty, "No repositories allowlisted") }
+                      : repositories.Select(repo => new RepositoryListItem(repo, $"▣  {repo}")).ToArray();
+                  AllowlistList.SelectedItem = null;
+                  RemoveRepositoryButton.IsEnabled = false;
+
+          '''
+          if allowlist_refresh not in code:
+              raise SystemExit('allowlist refresh target not found')
+          code = code.replace(allowlist_refresh, allowlist_refresh_new, 1)
+
+          grant_handler = '''    private void GrantList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+              {
+                  RevokeGrantButton.IsEnabled = GrantList.SelectedItem is BranchLeaseListItem item && !string.IsNullOrEmpty(item.LeaseId);
+              }
+
+          '''
+          allowlist_handlers = '''    private void AllowlistList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+              {
+                  RemoveRepositoryButton.IsEnabled =
+                      AllowlistList.SelectedItem is RepositoryListItem item && !string.IsNullOrEmpty(item.Repo);
+              }
+
+              private async void AddRepository_Click(object sender, RoutedEventArgs e)
+              {
+                  var input = new TextBox
+                  {
+                      Header = "Repository",
+                      PlaceholderText = "owner/repo",
+                  };
+                  var dialog = new ContentDialog
+                  {
+                      XamlRoot = RootLayout.XamlRoot,
+                      Title = "Add repository",
+                      Content = input,
+                      PrimaryButtonText = "Add",
+                      CloseButtonText = "Cancel",
+                      DefaultButton = ContentDialogButton.Primary,
+                  };
+
+                  if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+                  var repo = input.Text.Trim();
+                  if (string.IsNullOrEmpty(repo))
+                  {
+                      AllowlistStatusText.Text = "Enter a repository as owner/repo.";
+                      return;
+                  }
+
+                  if (!await VerifyHelloAsync($"Add {repo} to Delivery Authority trusted grants?")) return;
+                  try
+                  {
+                      _store.SetRepositoryAllowed(repo, true, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+                      AllowlistStatusText.Text = $"Added {repo}.";
+                      Refresh();
+                  }
+                  catch (Exception error)
+                  {
+                      AllowlistStatusText.Text = $"Could not add repository: {error.Message}";
+                  }
+              }
+
+              private async void RemoveRepository_Click(object sender, RoutedEventArgs e)
+              {
+                  if (AllowlistList.SelectedItem is not RepositoryListItem item || string.IsNullOrEmpty(item.Repo)) return;
+                  var repo = item.Repo;
+                  if (!await VerifyHelloAsync($"Remove {repo} from the Delivery Authority allowlist?")) return;
+
+                  try
+                  {
+                      _store.SetRepositoryAllowed(repo, false, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+                      AllowlistStatusText.Text = $"Removed {repo}.";
+                      Refresh();
+                  }
+                  catch (Exception error)
+                  {
+                      AllowlistStatusText.Text = $"Could not remove repository: {error.Message}";
+                  }
+              }
+
+              private async Task<bool> VerifyHelloAsync(string message)
+              {
+                  var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+                  var verification = await HelloVerifier.VerifyAsync(hwnd, message);
+                  if (verification.Verified) return true;
+
+                  AllowlistStatusText.Text = verification.FailureMessage ?? "Windows Hello verification was cancelled.";
+                  if (verification.CanOpenSignInOptions) WindowsSettings.OpenSignInOptions();
+                  return false;
+              }
+
+          ''' + grant_handler
+          if grant_handler not in code:
+              raise SystemExit('grant handler insertion target not found')
+          code = code.replace(grant_handler, allowlist_handlers, 1)
+
+          xaml_path.write_text(xaml, encoding='utf-8')
+          code_path.write_text(code, encoding='utf-8')
+          '@ | python -
+
+      - name: Verify focused contracts
+        shell: pwsh
+        run: |
+          node --test tests/unit/windows-authority-allowlist-ui.test.mjs tests/unit/windows-authority-winui.test.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm run check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $Project = 'authority-host/windows/GitHubDeliveryAuthority/GitHubDeliveryAuthority.csproj'
+          dotnet restore $Project --locked-mode
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet build $Project --configuration Release --no-restore
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet run --project $Project --configuration Release --no-build -- --xaml-self-test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Commit production fix and remove helper workflow
+        shell: pwsh
+        run: |
+          git config user.name "Wibias"
+          git config user.email "37517432+Wibias@users.noreply.github.com"
+          git rm .github/workflows/authority-allowlist-apply.yml
+          git add authority-host/windows/GitHubDeliveryAuthority/ControlCenterWindow.xaml
+          git add authority-host/windows/GitHubDeliveryAuthority/ControlCenterWindow.xaml.cs
+          git commit -m "fix: make Authority allowlist controls functional"
+          git push origin HEAD:fix/authority-xaml-startup
