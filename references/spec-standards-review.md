@@ -75,6 +75,8 @@ Always read `references/code-smells.md` as an advisory baseline. **Repo standard
 
 When the diff changes executable behavior, architecture, domain/state modeling, concurrency, or non-trivial control flow, also read `references/design-quality.md`. That companion is advisory: use its happy-path, boundary, abstraction-cost, domain-model, and state-ownership lenses only when the changed code shows a concrete maintenance, correctness, testability, or operational cost. Repository standards still override it. For docs-only, generated-only, lockfile-only, or other changes with no relevant design surface, record the design-quality lens as `n/a` instead of inventing a finding.
 
+When the diff changes TypeScript or typed JavaScript and the changed path carries meaningful compile-time or runtime type evidence, also read `references/type-evidence-review.md`. Use it to trace evidence creation, loss, and re-establishment across assertions, widening, reflective access, internal broad contracts, and tests that may mock away the production wiring they claim to verify. It is repository-aware and advisory unless the same evidence proves a Bug, Security, Spec, safety-invariant, or documented-standards violation. Do not apply blanket bans on `unknown`, `typeof`, assertions, reflection, or mocks. For non-JS/TS changes, untyped JavaScript with no material type contract, generated-only code, or changes with no relevant type-evidence surface, record the type-evidence lens as `n/a`.
+
 ## 4. Run the two axes
 
 Run the axes in parallel when the host supports isolated subagents. Otherwise run them sequentially with separate notes so one conclusion does not contaminate the other.
@@ -89,9 +91,10 @@ Report:
 - architectural or compatibility drift tied to an accepted repository decision
 - possible smells from `references/code-smells.md`, clearly labelled as heuristics
 - material design-quality observations from `references/design-quality.md`, clearly labelled advisory unless another repository rule independently makes them binding
+- material type-evidence observations from `references/type-evidence-review.md`, including the strongest evidence before the questionable step, what weakened or bypassed it, and whether a credible proof re-establishes the claimed contract
 - no duplicate findings for matters already enforced and passed by tooling
 
-Distinguish hard documented violations from advisory judgement calls. When a design-quality observation reveals a real bug, vulnerability, spec violation, or material unproven safety invariant, hand it to the governing axis/companion rather than reporting the same concern twice under Standards.
+Distinguish hard documented violations from advisory judgement calls. When a design-quality or type-evidence observation reveals a real bug, vulnerability, spec violation, or material unproven safety invariant, hand it to the governing axis/companion rather than reporting the same concern twice under Standards.
 
 ### Spec brief
 
@@ -117,7 +120,7 @@ Use these headings in chat and in the full-review verdict evidence:
 
 ## Standards
 
-List findings with file or symbol, evidence, governing standard, and required action. Keep advisory smells/design-quality observations visibly separate from hard violations. Use `none` with the sources checked when clean.
+List findings with file or symbol, evidence, governing standard, and required action. Keep advisory smells/design-quality/type-evidence observations visibly separate from hard violations. Use `none` with the sources checked when clean.
 
 ## Spec
 
@@ -127,7 +130,7 @@ Do not merge or rerank the axes into a single list. Deduplicate only exact overl
 
 ## Fix and completion rules
 
-On merge-ready workflows, fix concrete in-scope blockers when feasible and add focused regression coverage for corrected behavior. Skip cosmetic or speculative smell/design suggestions that do not create a real maintenance or correctness cost.
+On merge-ready workflows, fix concrete in-scope blockers when feasible and add focused regression coverage for corrected behavior. Skip cosmetic or speculative smell/design/type-evidence suggestions that do not create a real maintenance or correctness cost.
 
 The axis is complete only when:
 
@@ -137,5 +140,6 @@ The axis is complete only when:
 - the standards sources are listed
 - all smell findings follow the repo-override and judgement-call rules
 - the design-quality companion was applied where relevant or explicitly recorded `n/a`
+- the type-evidence companion was applied where relevant or explicitly recorded `n/a`
 - docs/help were checked against explicit non-goals when the PR defines phase boundaries
 - `## Standards` and `## Spec` results are available for the final verdict
