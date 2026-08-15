@@ -17,11 +17,15 @@ internal sealed partial class ControlCenterWindow : Window
     private sealed record HostVersionInfo(string Version, string SourceCommit);
 
     private readonly StateStore _store;
+    private readonly AppWindow _appWindow;
+    private bool _allowClose;
 
     public ControlCenterWindow(StateStore store)
     {
         InitializeComponent();
+        _appWindow = ResolveAppWindow();
         TrySetWindowIcon();
+        _appWindow.Closing += OnAppWindowClosing;
         _store = store;
         Activated += (_, _) => Refresh();
         TryResize(1080, 760);
@@ -30,7 +34,20 @@ internal sealed partial class ControlCenterWindow : Window
     public void ShowControlCenter()
     {
         Refresh();
+        _appWindow.Show();
         Activate();
+    }
+
+    public void PrepareForExit()
+    {
+        _allowClose = true;
+    }
+
+    private void OnAppWindowClosing(AppWindow sender, AppWindowClosingEventArgs args)
+    {
+        if (_allowClose) return;
+        args.Cancel = true;
+        sender.Hide();
     }
 
     private void Refresh()
@@ -178,15 +195,20 @@ internal sealed partial class ControlCenterWindow : Window
         Navigation.SelectedItem = Navigation.SettingsItem;
     }
 
+    private AppWindow ResolveAppWindow()
+    {
+        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+        var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hwnd);
+        return AppWindow.GetFromWindowId(windowId)
+            ?? throw new InvalidOperationException("control_center_app_window_unavailable");
+    }
+
     private void TrySetWindowIcon()
     {
         try
         {
-            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
-            var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hwnd);
-            var appWindow = AppWindow.GetFromWindowId(windowId);
             var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "DeliveryAuthority.ico");
-            if (appWindow is not null && File.Exists(iconPath)) appWindow.SetIcon(iconPath);
+            if (File.Exists(iconPath)) _appWindow.SetIcon(iconPath);
         }
         catch
         {
@@ -198,9 +220,7 @@ internal sealed partial class ControlCenterWindow : Window
     {
         try
         {
-            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
-            var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hwnd);
-            AppWindow.GetFromWindowId(windowId)?.Resize(new SizeInt32(width, height));
+            _appWindow.Resize(new SizeInt32(width, height));
         }
         catch
         {
