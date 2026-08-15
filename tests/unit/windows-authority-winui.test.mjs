@@ -122,3 +122,35 @@ test("tray integration uses native Shell_NotifyIcon rather than WinForms NotifyI
   assert.doesNotMatch(tray, /System\.Windows\.Forms|NotifyIcon\s/);
   assert.doesNotMatch(program, /System\.Windows\.Forms|Application\.Run/);
 });
+
+test("control center adapts navigation and dashboard layout across narrow, medium, and wide windows", () => {
+  const window = read(`${root}/ControlCenterWindow.xaml`);
+
+  assert.match(window, /PaneDisplayMode="Auto"/);
+  assert.match(window, /CompactModeThresholdWidth="0"/);
+  assert.match(window, /ExpandedModeThresholdWidth="1360"/);
+
+  for (const state of ["NarrowDashboardState", "MediumDashboardState", "WideDashboardState"]) {
+    assert.match(window, new RegExp(`x:Name=\\"${state}\\"`));
+  }
+
+  for (const card of ["ActivityCard", "AllowlistCard", "GrantCard", "DiagnosticsCard", "QuickSettingsCard"]) {
+    assert.match(window, new RegExp(`x:Name=\\"${card}\\"`));
+  }
+
+  assert.match(window, /MinWindowWidth="840"/);
+  assert.match(window, /MinWindowWidth="1360"/);
+  assert.doesNotMatch(window, /MaxWidth="1180"/);
+
+  for (const header of ["ActivityHeaderGrid", "AllowlistHeaderGrid", "GrantHeaderGrid"]) {
+    assert.match(
+      window,
+      new RegExp(`x:Name=\\"${header}\\"[\\s\\S]*?<ColumnDefinition Width=\\"\\*\\"[\\s\\S]*?<ColumnDefinition Width=\\"Auto\\"`),
+    );
+  }
+
+  assert.match(window, /x:Name="ActivityColumnsHeader"/);
+  assert.match(window, /Target="ActivityColumnsHeader\.Visibility" Value="Collapsed"/);
+
+  assert.doesNotMatch(window, /<ColumnDefinition Width="170"\s*\/>/);
+});
