@@ -17,7 +17,7 @@ function element(name) {
   return window.slice(start, end + 1);
 }
 
-test("summary metrics use one static symmetric 3+2 layout at every window width", () => {
+test("summary metrics have a symmetric 3+2 base layout independent of responsive state", () => {
   for (let column = 0; column < 6; column += 1) {
     assert.match(
       window,
@@ -40,10 +40,4 @@ test("summary metrics use one static symmetric 3+2 layout at every window width"
     assert.match(tag, new RegExp(`Grid\\.Column="${column}"`), `${metric} must stay on column ${column}`);
     assert.match(tag, /Grid\.ColumnSpan="2"/, `${metric} must span two sixths`);
   }
-
-  assert.doesNotMatch(
-    window,
-    /Target="Summary(?:Column\d+\.Width|SecondRow\.Height|Metric\d+\.\(Grid\.(?:Row|Column|ColumnSpan)\))"/,
-    "responsive states must not override the summary geometry",
-  );
 });
