@@ -254,9 +254,9 @@
                                     <ColumnDefinition x:Name="SummaryColumn0" Width="*" />
                                     <ColumnDefinition x:Name="SummaryColumn1" Width="*" />
                                     <ColumnDefinition x:Name="SummaryColumn2" Width="*" />
-                                    <ColumnDefinition x:Name="SummaryColumn3" Width="0" />
-                                    <ColumnDefinition x:Name="SummaryColumn4" Width="0" />
-                                    <ColumnDefinition x:Name="SummaryColumn5" Width="0" />
+                                    <ColumnDefinition x:Name="SummaryColumn3" Width="*" />
+                                    <ColumnDefinition x:Name="SummaryColumn4" Width="*" />
+                                    <ColumnDefinition x:Name="SummaryColumn5" Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
@@ -266,6 +266,7 @@
                                 <StackPanel x:Name="SummaryMetric0"
                                             Grid.Row="0"
                                             Grid.Column="0"
+                                            Grid.ColumnSpan="2"
                                             HorizontalAlignment="Center"
                                             Spacing="3">
                                     <FontIcon Glyph="&#xE83D;" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
@@ -275,7 +276,8 @@
                                 </StackPanel>
                                 <StackPanel x:Name="SummaryMetric1"
                                             Grid.Row="0"
-                                            Grid.Column="1"
+                                            Grid.Column="2"
+                                            Grid.ColumnSpan="2"
                                             HorizontalAlignment="Center"
                                             Spacing="3">
                                     <FontIcon Glyph="&#xE8D7;" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
@@ -285,7 +287,8 @@
                                 </StackPanel>
                                 <StackPanel x:Name="SummaryMetric2"
                                             Grid.Row="0"
-                                            Grid.Column="2"
+                                            Grid.Column="4"
+                                            Grid.ColumnSpan="2"
                                             HorizontalAlignment="Center"
                                             Spacing="3">
                                     <FontIcon Glyph="&#xE73E;" Foreground="{ThemeResource SystemFillColorSuccessBrush}" />
@@ -295,7 +298,8 @@
                                 </StackPanel>
                                 <StackPanel x:Name="SummaryMetric3"
                                             Grid.Row="1"
-                                            Grid.Column="0"
+                                            Grid.Column="1"
+                                            Grid.ColumnSpan="2"
                                             HorizontalAlignment="Center"
                                             Spacing="3">
                                     <FontIcon Glyph="&#xE711;" Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
@@ -305,7 +309,8 @@
                                 </StackPanel>
                                 <StackPanel x:Name="SummaryMetric4"
                                             Grid.Row="1"
-                                            Grid.Column="1"
+                                            Grid.Column="3"
+                                            Grid.ColumnSpan="2"
                                             HorizontalAlignment="Center"
                                             Spacing="3">
                                     <FontIcon Glyph="&#xE823;" Foreground="{ThemeResource SystemFillColorCautionBrush}" />
