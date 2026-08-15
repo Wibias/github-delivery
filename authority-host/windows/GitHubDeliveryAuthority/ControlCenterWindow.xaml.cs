@@ -22,7 +22,6 @@ internal sealed partial class ControlCenterWindow : Window
     {
         InitializeComponent();
         _store = store;
-        NavigationList.SelectedIndex = 1;
         Activated += (_, _) => Refresh();
         TryResize(1080, 760);
     }
@@ -136,9 +135,9 @@ internal sealed partial class ControlCenterWindow : Window
         return $"{lease.Repo}  •  {lease.Branch}  •  {minutes} min remaining";
     }
 
-    private void NavigationList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void Navigation_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {
-        var tag = (NavigationList.SelectedItem as ListViewItem)?.Tag?.ToString();
+        var tag = (args.SelectedItem as NavigationViewItem)?.Tag?.ToString();
         var showSettings = string.Equals(tag, "settings", StringComparison.Ordinal);
         SettingsPage.Visibility = showSettings ? Visibility.Visible : Visibility.Collapsed;
         OverviewPage.Visibility = showSettings ? Visibility.Collapsed : Visibility.Visible;
@@ -178,10 +177,10 @@ internal sealed partial class ControlCenterWindow : Window
 
     private void OpenSettings_Click(object sender, RoutedEventArgs e)
     {
-        var settingsItem = NavigationList.Items
-            .OfType<ListViewItem>()
+        var settingsItem = Navigation.MenuItems
+            .OfType<NavigationViewItem>()
             .FirstOrDefault(item => string.Equals(item.Tag?.ToString(), "settings", StringComparison.Ordinal));
-        if (settingsItem is not null) NavigationList.SelectedItem = settingsItem;
+        if (settingsItem is not null) Navigation.SelectedItem = settingsItem;
     }
 
     private void TryResize(int width, int height)
