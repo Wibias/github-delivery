@@ -1,0 +1,151 @@
+name: Bootstrap Authority icon
+
+on:
+  push:
+    branches:
+      - fix/authority-xaml-startup
+
+permissions:
+  contents: write
+
+jobs:
+  generate-icon:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: true
+
+      - name: Generate multi-resolution Authority icon
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import math
+          import struct
+          from pathlib import Path
+
+          sizes = [16, 20, 24, 32, 40, 48, 64, 128, 256]
+          peach = (255, 163, 130)
+
+          def inside_mark(x, y):
+              # Normalized coordinates, -1..1. The existing in-app Authority mark
+              # reads as a compact shield made from three curved peach ribbons.
+              if y < -0.80 or y > 0.82:
+                  return False
+
+              if y <= 0.05:
+                  half_width = 0.50
+              else:
+                  half_width = 0.50 - ((y - 0.05) / 0.77) * 0.42
+
+              # Slightly round the upper shoulders.
+              if y < -0.58:
+                  shoulder = max(0.0, (y + 0.80) / 0.22)
+                  half_width *= 0.72 + (0.28 * shoulder)
+
+              if abs(x) > half_width:
+                  return False
+
+              # Two flowing negative-space cuts split the shield into the same
+              # three-ribbon visual language used by the current peach glyph.
+              cut_one = -0.25 + 0.13 * math.sin((x + 0.18) * math.pi * 1.55)
+              cut_two = 0.22 + 0.13 * math.sin((x - 0.12) * math.pi * 1.55)
+              channel = 0.065
+              if abs(y - cut_one) < channel or abs(y - cut_two) < channel:
+                  return False
+
+              return True
+
+          def alpha_for_pixel(px, py, size):
+              samples = 4
+              covered = 0
+              for sy in range(samples):
+                  for sx in range(samples):
+                      fx = (px + (sx + 0.5) / samples) / size
+                      fy = (py + (sy + 0.5) / samples) / size
+                      x = ((fx - 0.5) / 0.72) * 2.0
+                      y = ((fy - 0.5) / 0.72) * 2.0
+                      if inside_mark(x, y):
+                          covered += 1
+              return round(255 * covered / (samples * samples))
+
+          def dib_frame(size):
+              # ICO DIB height includes the XOR bitmap plus the 1-bit AND mask.
+              header = struct.pack(
+                  '<IIIHHIIIIII',
+                  40,
+                  size,
+                  size * 2,
+                  1,
+                  32,
+                  0,
+                  size * size * 4,
+                  0,
+                  0,
+                  0,
+                  0,
+              )
+
+              xor = bytearray()
+              visible = []
+              for y in range(size):
+                  row = []
+                  for x in range(size):
+                      alpha = alpha_for_pixel(x, y, size)
+                      row.append(alpha)
+                  visible.append(row)
+
+              # DIB scanlines are bottom-up and pixels are BGRA.
+              for y in range(size - 1, -1, -1):
+                  for x in range(size):
+                      alpha = visible[y][x]
+                      xor += bytes((peach[2], peach[1], peach[0], alpha))
+
+              mask_stride = ((size + 31) // 32) * 4
+              and_mask = bytearray()
+              for y in range(size - 1, -1, -1):
+                  row = bytearray(mask_stride)
+                  for x in range(size):
+                      if visible[y][x] == 0:
+                          row[x // 8] |= 0x80 >> (x % 8)
+                  and_mask += row
+
+              return header + xor + and_mask
+
+          frames = [(size, dib_frame(size)) for size in sizes]
+          directory_size = 6 + 16 * len(frames)
+          offset = directory_size
+          directory = bytearray(struct.pack('<HHH', 0, 1, len(frames)))
+          payload = bytearray()
+
+          for size, frame in frames:
+              dimension = 0 if size == 256 else size
+              directory += struct.pack(
+                  '<BBBBHHII',
+                  dimension,
+                  dimension,
+                  0,
+                  0,
+                  1,
+                  32,
+                  len(frame),
+                  offset,
+              )
+              payload += frame
+              offset += len(frame)
+
+          target = Path('authority-host/windows/GitHubDeliveryAuthority/Assets/DeliveryAuthority.ico')
+          target.parent.mkdir(parents=True, exist_ok=True)
+          target.write_bytes(directory + payload)
+          PY
+
+      - name: Commit generated icon and remove bootstrap workflow
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add authority-host/windows/GitHubDeliveryAuthority/Assets/DeliveryAuthority.ico
+          git rm .github/workflows/authority-icon-bootstrap.yml
+          git commit -m 'feat: add authority application icon'
+          git push origin HEAD:fix/authority-xaml-startup
