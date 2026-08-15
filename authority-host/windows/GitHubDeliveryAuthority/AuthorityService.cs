@@ -10,12 +10,18 @@ internal sealed class AuthorityService
     private readonly StateStore _store;
     private readonly TpmKeyRing _keys;
     private readonly ApprovalCoordinator _approvals;
+    private readonly Func<bool> _showControlCenter;
 
-    public AuthorityService(StateStore store, TpmKeyRing keys, ApprovalCoordinator approvals)
+    public AuthorityService(
+        StateStore store,
+        TpmKeyRing keys,
+        ApprovalCoordinator approvals,
+        Func<bool>? showControlCenter = null)
     {
         _store = store;
         _keys = keys;
         _approvals = approvals;
+        _showControlCenter = showControlCenter ?? (() => false);
     }
 
     public object Status()
@@ -30,6 +36,12 @@ internal sealed class AuthorityService
             allowedRepositories = _store.ListAllowedRepositories(),
             activeBranchLeases = _store.ListActiveBranchLeases(now).Count,
         };
+    }
+
+    public object ShowControlCenter()
+    {
+        if (!_showControlCenter()) throw new AuthorityException("authority_control_center_show_failed");
+        return new { status = "shown" };
     }
 
     public async Task<object> AuthorizeBatchAsync(JsonElement parameters)
