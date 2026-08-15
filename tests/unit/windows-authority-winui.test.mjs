@@ -164,6 +164,7 @@ test("authority executable and Control Center use the committed Authority icon",
   assert.match(project, /<ApplicationIcon>Assets\\DeliveryAuthority\.ico<\/ApplicationIcon>/);
   assert.match(project, /<Content Include="Assets\\DeliveryAuthority\.ico">[\s\S]*?<CopyToOutputDirectory>PreserveNewest<\/CopyToOutputDirectory>[\s\S]*?<CopyToPublishDirectory>PreserveNewest<\/CopyToPublishDirectory>/);
   assert.match(code, /TrySetWindowIcon\(\);/);
-  assert.match(code, /AppWindow\.SetIcon\(Path\.Combine\(AppContext\.BaseDirectory,\s*"Assets",\s*"DeliveryAuthority\.ico"\)\)/);
+  assert.match(code, /Path\.Combine\(AppContext\.BaseDirectory,\s*"Assets",\s*"DeliveryAuthority\.ico"\)/);
+  assert.match(code, /appWindow\.SetIcon\(iconPath\)/);
   assert.match(code, /private void TrySetWindowIcon\(\)[\s\S]*?try[\s\S]*?catch/);
 });
