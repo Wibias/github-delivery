@@ -3,8 +3,12 @@ import { readFileSync, writeFileSync } from "node:fs";
 const xamlPath = "authority-host/windows/GitHubDeliveryAuthority/ControlCenterWindow.xaml";
 const codePath = "authority-host/windows/GitHubDeliveryAuthority/ControlCenterWindow.xaml.cs";
 
-let xaml = readFileSync(xamlPath, "utf8");
-let code = readFileSync(codePath, "utf8");
+const xamlRaw = readFileSync(xamlPath, "utf8");
+const codeRaw = readFileSync(codePath, "utf8");
+const xamlEol = xamlRaw.includes("\r\n") ? "\r\n" : "\n";
+const codeEol = codeRaw.includes("\r\n") ? "\r\n" : "\n";
+let xaml = xamlRaw.replaceAll("\r\n", "\n");
+let code = codeRaw.replaceAll("\r\n", "\n");
 
 function replaceOnce(source, before, after, label) {
   const first = source.indexOf(before);
@@ -60,5 +64,5 @@ const grantHandler = `    private void GrantList_SelectionChanged(object sender,
 const allowlistHandlers = `    private void AllowlistList_SelectionChanged(object sender, SelectionChangedEventArgs e)\n    {\n        RemoveRepositoryButton.IsEnabled =\n            AllowlistList.SelectedItem is RepositoryListItem item && !string.IsNullOrEmpty(item.Repo);\n    }\n\n    private async void AddRepository_Click(object sender, RoutedEventArgs e)\n    {\n        var input = new TextBox\n        {\n            Header = "Repository",\n            PlaceholderText = "owner/repo",\n        };\n        var dialog = new ContentDialog\n        {\n            XamlRoot = RootLayout.XamlRoot,\n            Title = "Add repository",\n            Content = input,\n            PrimaryButtonText = "Add",\n            CloseButtonText = "Cancel",\n            DefaultButton = ContentDialogButton.Primary,\n        };\n\n        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;\n        var repo = input.Text.Trim();\n        if (string.IsNullOrEmpty(repo))\n        {\n            AllowlistStatusText.Text = "Enter a repository as owner/repo.";\n            return;\n        }\n\n        if (!await VerifyHelloAsync($"Add {repo} to Delivery Authority trusted grants?")) return;\n        try\n        {\n            _store.SetRepositoryAllowed(repo, true, DateTimeOffset.UtcNow.ToUnixTimeSeconds());\n            AllowlistStatusText.Text = $"Added {repo}.";\n            Refresh();\n        }\n        catch (Exception error)\n        {\n            AllowlistStatusText.Text = $"Could not add repository: {error.Message}";\n        }\n    }\n\n    private async void RemoveRepository_Click(object sender, RoutedEventArgs e)\n    {\n        if (AllowlistList.SelectedItem is not RepositoryListItem item || string.IsNullOrEmpty(item.Repo)) return;\n        var repo = item.Repo;\n        if (!await VerifyHelloAsync($"Remove {repo} from the Delivery Authority allowlist?")) return;\n\n        try\n        {\n            _store.SetRepositoryAllowed(repo, false, DateTimeOffset.UtcNow.ToUnixTimeSeconds());\n            AllowlistStatusText.Text = $"Removed {repo}.";\n            Refresh();\n        }\n        catch (Exception error)\n        {\n            AllowlistStatusText.Text = $"Could not remove repository: {error.Message}";\n        }\n    }\n\n    private async Task<bool> VerifyHelloAsync(string message)\n    {\n        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);\n        var verification = await HelloVerifier.VerifyAsync(hwnd, message);\n        if (verification.Verified) return true;\n\n        AllowlistStatusText.Text = verification.FailureMessage ?? "Windows Hello verification was cancelled.";\n        if (verification.CanOpenSignInOptions) WindowsSettings.OpenSignInOptions();\n        return false;\n    }\n\n`;
 code = replaceOnce(code, grantHandler, allowlistHandlers + grantHandler, "allowlist_handlers");
 
-writeFileSync(xamlPath, xaml, "utf8");
-writeFileSync(codePath, code, "utf8");
+writeFileSync(xamlPath, xaml.split("\n").join(xamlEol), "utf8");
+writeFileSync(codePath, code.split("\n").join(codeEol), "utf8");
