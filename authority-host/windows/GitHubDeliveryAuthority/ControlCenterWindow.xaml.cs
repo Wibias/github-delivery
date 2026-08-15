@@ -14,6 +14,11 @@ internal sealed partial class ControlCenterWindow : Window
         public override string ToString() => Display;
     }
 
+    private sealed record RepositoryListItem(string Repo, string Display)
+    {
+        public override string ToString() => Display;
+    }
+
     private sealed record HostVersionInfo(string Version, string SourceCommit);
 
     private readonly StateStore _store;
@@ -57,8 +62,10 @@ internal sealed partial class ControlCenterWindow : Window
         var repositories = _store.ListAllowedRepositories();
         AllowlistedCount.Text = repositories.Count.ToString(CultureInfo.InvariantCulture);
         AllowlistList.ItemsSource = repositories.Count == 0
-            ? new[] { "No repositories allowlisted" }
-            : repositories.Select(repo => $"▣  {repo}     Allowed").ToArray();
+            ? new[] { new RepositoryListItem(string.Empty, "No repositories allowlisted") }
+            : repositories.Select(repo => new RepositoryListItem(repo, $"▣  {repo}")).ToArray();
+        AllowlistList.SelectedItem = null;
+        RemoveRepositoryButton.IsEnabled = false;
 
         var events = _store.ListRecentAuditEvents(50);
         ActivityList.ItemsSource = events.Count == 0
@@ -157,6 +164,79 @@ internal sealed partial class ControlCenterWindow : Window
         SettingsPage.Visibility = showSettings ? Visibility.Visible : Visibility.Collapsed;
         OverviewPage.Visibility = showSettings ? Visibility.Collapsed : Visibility.Visible;
         if (showSettings) Refresh();
+    }
+
+    private void AllowlistList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        RemoveRepositoryButton.IsEnabled =
+            AllowlistList.SelectedItem is RepositoryListItem item && !string.IsNullOrEmpty(item.Repo);
+    }
+
+    private async void AddRepository_Click(object sender, RoutedEventArgs e)
+    {
+        var input = new TextBox
+        {
+            Header = "Repository",
+            PlaceholderText = "owner/repo",
+        };
+        var dialog = new ContentDialog
+        {
+            XamlRoot = RootLayout.XamlRoot,
+            Title = "Add repository",
+            Content = input,
+            PrimaryButtonText = "Add",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Primary,
+        };
+
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        var repo = input.Text.Trim();
+        if (string.IsNullOrEmpty(repo))
+        {
+            AllowlistStatusText.Text = "Enter a repository as owner/repo.";
+            return;
+        }
+
+        if (!await VerifyHelloAsync($"Add {repo} to Delivery Authority trusted grants?")) return;
+        try
+        {
+            _store.SetRepositoryAllowed(repo, true, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+            AllowlistStatusText.Text = $"Added {repo}.";
+            Refresh();
+        }
+        catch (Exception error)
+        {
+            AllowlistStatusText.Text = $"Could not add repository: {error.Message}";
+        }
+    }
+
+    private async void RemoveRepository_Click(object sender, RoutedEventArgs e)
+    {
+        if (AllowlistList.SelectedItem is not RepositoryListItem item || string.IsNullOrEmpty(item.Repo)) return;
+        var repo = item.Repo;
+        if (!await VerifyHelloAsync($"Remove {repo} from the Delivery Authority allowlist?")) return;
+
+        try
+        {
+            _store.SetRepositoryAllowed(repo, false, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+            AllowlistStatusText.Text = $"Removed {repo}.";
+            Refresh();
+        }
+        catch (Exception error)
+        {
+            AllowlistStatusText.Text = $"Could not remove repository: {error.Message}";
+        }
+    }
+
+    private async Task<bool> VerifyHelloAsync(string message)
+    {
+        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+        var verification = await HelloVerifier.VerifyAsync(hwnd, message);
+        if (verification.Verified) return true;
+
+        AllowlistStatusText.Text = verification.FailureMessage ?? "Windows Hello verification was cancelled.";
+        if (verification.CanOpenSignInOptions) WindowsSettings.OpenSignInOptions();
+        return false;
     }
 
     private void GrantList_SelectionChanged(object sender, SelectionChangedEventArgs e)

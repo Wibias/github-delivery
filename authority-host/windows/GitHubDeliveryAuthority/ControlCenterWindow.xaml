@@ -320,11 +320,6 @@
                                                    FontWeight="SemiBold"
                                                    TextTrimming="CharacterEllipsis"
                                                    VerticalAlignment="Center" />
-                                        <Button Grid.Column="1"
-                                                Content="View full activity"
-                                                Style="{StaticResource AccentButtonStyle}"
-                                                Padding="9,3"
-                                                IsEnabled="False" />
                                     </Grid>
                                     <Grid x:Name="ActivityColumnsHeader"
                                           Visibility="Collapsed"
@@ -380,13 +375,21 @@
                                                    FontWeight="SemiBold"
                                                    TextTrimming="CharacterEllipsis"
                                                    VerticalAlignment="Center" />
-                                        <Button Grid.Column="1"
-                                                Content="+ Add repository"
-                                                Padding="7,2"
-                                                IsEnabled="False" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                            <Button x:Name="AddRepositoryButton"
+                                                    Content="+ Add repository"
+                                                    Padding="7,2"
+                                                    Click="AddRepository_Click" />
+                                            <Button x:Name="RemoveRepositoryButton"
+                                                    Content="Remove selected"
+                                                    Padding="7,2"
+                                                    IsEnabled="False"
+                                                    Click="RemoveRepository_Click" />
+                                        </StackPanel>
                                     </Grid>
                                     <ListView x:Name="AllowlistList"
-                                              SelectionMode="None"
+                                              SelectionMode="Single"
+                                              SelectionChanged="AllowlistList_SelectionChanged"
                                               MinHeight="135"
                                               HorizontalContentAlignment="Stretch"
                                               ScrollViewer.HorizontalScrollBarVisibility="Disabled">
@@ -398,6 +401,10 @@
                                             </DataTemplate>
                                         </ListView.ItemTemplate>
                                     </ListView>
+                                    <TextBlock x:Name="AllowlistStatusText"
+                                               Text=""
+                                               Opacity="0.72"
+                                               TextWrapping="WrapWholeWords" />
                                 </StackPanel>
                             </Border>
 
