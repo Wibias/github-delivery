@@ -74,7 +74,7 @@ test("incident: DeepSeek parameter tool scaffolding interrupts on the second sus
     ),
     delta(
       "item/reasoning/summaryTextDelta",
-      '<parameter name="cmd">rg startPrimaryRun src/fabric</parameter>\n',
+      '<parameter name="exec_command">rg startPrimaryRun src/fabric</parameter>\n',
       "deepseek-parameter-2",
     ),
     delta("item/reasoning/summaryTextDelta", "Running.\n", "deepseek-parameter-3"),
@@ -121,6 +121,23 @@ test("false-positive corpus: ordinary XML parameter documentation is not tool pr
       "item/agentMessage/delta",
       '<parameter name="retries">2</parameter>\n',
       "xml-parameter-3",
+    ),
+  ]);
+
+  assert.equal(result.interruptCount, 0);
+});
+
+test("false-positive corpus: tool-like XML parameter names alone do not hard-stop", () => {
+  const result = replay([
+    delta(
+      "item/agentMessage/delta",
+      '<parameter name="cmd">echo hello</parameter>\n',
+      "xml-toolish-parameter-1",
+    ),
+    delta(
+      "item/agentMessage/delta",
+      '<parameter name="workdir">/tmp/example</parameter>\n',
+      "xml-toolish-parameter-2",
     ),
   ]);
 
