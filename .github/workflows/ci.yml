@@ -119,6 +119,10 @@ jobs:
           if (-not (Test-Path $ResourceIndex -PathType Leaf)) {
             throw 'Published authority host is missing the unpackaged WinUI resource index: resources.pri'
           }
+          $AuthorityIcon = Join-Path $PublishDir 'Assets\DeliveryAuthority.ico'
+          if (-not (Test-Path $AuthorityIcon -PathType Leaf)) {
+            throw 'Published authority host is missing Assets\DeliveryAuthority.ico'
+          }
           $DepsPath = Join-Path $PublishDir 'GitHubDeliveryAuthority.deps.json'
           $Deps = Get-Content $DepsPath -Raw | ConvertFrom-Json
           $RuntimePackage = $Deps.libraries.PSObject.Properties.Name |
@@ -164,6 +168,10 @@ jobs:
           $InstalledExecutable = Join-Path $InstallDir "app\v$Version\GitHubDeliveryAuthority.exe"
           if (-not (Test-Path $InstalledExecutable -PathType Leaf)) {
             throw 'Installed Authority smoke executable is missing.'
+          }
+          $InstalledIcon = Join-Path $InstallDir "app\v$Version\Assets\DeliveryAuthority.ico"
+          if (-not (Test-Path $InstalledIcon -PathType Leaf)) {
+            throw 'Installed Authority icon is missing.'
           }
           & $InstalledExecutable --xaml-self-test
           if ($LASTEXITCODE -ne 0) {
