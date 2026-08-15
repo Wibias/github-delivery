@@ -106,6 +106,7 @@ export function parseBootstrapArgs(argv = []) {
   let target = null;
   let help = false;
   let json = false;
+  let autostartMode = null;
   let index = 0;
 
   if (values[0] === "help" || values[0] === "--help" || values[0] === "-h") {
@@ -116,6 +117,15 @@ export function parseBootstrapArgs(argv = []) {
     command = values[0];
     index = 1;
     if (!PUBLIC_COMMANDS.has(command)) fail("bootstrap_command_unknown");
+  }
+
+  if (command === "autostart") {
+    autostartMode = "on";
+    if (values[index] && !values[index].startsWith("-")) {
+      if (!["on", "off", "status"].includes(values[index])) fail("bootstrap_autostart_mode_invalid");
+      autostartMode = values[index];
+      index += 1;
+    }
   }
 
   for (; index < values.length; index += 1) {
@@ -139,6 +149,7 @@ export function parseBootstrapArgs(argv = []) {
 
   const result = { command, apply, target, help };
   if (json) result.json = true;
+  if (autostartMode) result.autostartMode = autostartMode;
   return result;
 }
 
