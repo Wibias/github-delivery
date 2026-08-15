@@ -121,6 +121,22 @@ test("tray integration uses native Shell_NotifyIcon rather than WinForms NotifyI
   assert.doesNotMatch(program, /System\.Windows\.Forms|Application\.Run/);
 });
 
+test("tray uses the committed Authority icon and exposes Control Center plus explicit Exit", () => {
+  const tray = read(`${root}/TrayIcon.cs`);
+
+  assert.doesNotMatch(tray, /LoadIconW/);
+  assert.match(tray, /Path\.Combine\(AppContext\.BaseDirectory, "Assets", "DeliveryAuthority\.ico"\)/);
+  assert.match(tray, /LoadImageW/);
+  assert.match(tray, /LR_LOADFROMFILE/);
+  assert.match(tray, /private IntPtr _trayIcon;/);
+  assert.match(tray, /DestroyIcon\(_trayIcon\)/);
+  assert.match(tray, /private Exception\? _startupError;/);
+  assert.match(tray, /AppendMenuW\(menu, MF_STRING, MenuControlCenter, "Control Center"\)/);
+  assert.match(tray, /AppendMenuW\(menu, MF_SEPARATOR/);
+  assert.match(tray, /AppendMenuW\(menu, MF_STRING, MenuExit, "Exit"\)/);
+  assert.match(tray, /selected == MenuExit[\s\S]*Dispatch\(_exit\)/);
+});
+
 test("control center exposes only Overview plus the built-in bottom Settings target", () => {
   const window = read(`${root}/ControlCenterWindow.xaml`);
   const code = read(`${root}/ControlCenterWindow.xaml.cs`);
