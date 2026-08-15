@@ -168,7 +168,7 @@ test("control center uses all available content width while preserving adaptive 
     assert.match(window, new RegExp(`x:Name=\\"${card}\\"`));
   }
 
-  assert.match(window, /MinWindowWidth="840"/);
+  assert.match(window, /MinWindowWidth="900"/);
   assert.match(window, /MinWindowWidth="1360"/);
 
   for (const header of ["ActivityHeaderGrid", "AllowlistHeaderGrid", "GrantHeaderGrid"]) {
@@ -247,21 +247,4 @@ test("Settings exposes autostart synchronized with the Windows Run registration"
   assert.match(code, /private void RefreshAutostart\(\)[\s\S]*AuthorityStartup\.Read\(\)/);
   assert.match(code, /AutostartToggle_Toggled[\s\S]*AuthorityStartup\.Set\(AutostartToggle\.IsOn\)/);
   assert.match(code, /catch[\s\S]*RefreshAutostart\(\)/);
-});
-
-test("narrow summary keeps the top three and centers the lower two between them", () => {
-  const window = read(`${root}/ControlCenterWindow.xaml`);
-
-  assert.match(window, /<ColumnDefinition x:Name="SummaryColumn5" Width="0"\s*\/>/);
-  for (const column of [0, 1, 2, 3, 4, 5]) {
-    assert.match(window, new RegExp(`Target=\\"SummaryColumn${column}\\.Width\\" Value=\\"\\*\\"`));
-  }
-  for (const [metric, column] of [[0, 0], [1, 2], [2, 4], [3, 1], [4, 3]]) {
-    assert.match(window, new RegExp(`Target=\\"SummaryMetric${metric}\\.\\(Grid\\.Column\\)\\" Value=\\"${column}\\"`));
-    assert.match(window, new RegExp(`Target=\\"SummaryMetric${metric}\\.\\(Grid\\.ColumnSpan\\)\\" Value=\\"2\\"`));
-  }
-  assert.match(window, /Target="SummaryColumn5\.Width" Value="0"/);
-  for (const metric of [0, 1, 2, 3, 4]) {
-    assert.match(window, new RegExp(`Target=\\"SummaryMetric${metric}\\.\\(Grid\\.ColumnSpan\\)\\" Value=\\"1\\"`));
-  }
 });

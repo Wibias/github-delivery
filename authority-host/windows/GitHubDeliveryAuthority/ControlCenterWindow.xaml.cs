@@ -30,6 +30,7 @@ internal sealed partial class ControlCenterWindow : Window
     {
         InitializeComponent();
         _appWindow = ResolveAppWindow();
+        TrySetMinimumWindowSize(720, 620);
         TrySetWindowIcon();
         _appWindow.Closing += OnAppWindowClosing;
         _store = store;
@@ -331,6 +332,22 @@ internal sealed partial class ControlCenterWindow : Window
         catch
         {
             // Window icon setup is best effort.
+        }
+    }
+
+    private void TrySetMinimumWindowSize(int width, int height)
+    {
+        try
+        {
+            if (_appWindow.Presenter is OverlappedPresenter presenter)
+            {
+                presenter.PreferredMinimumWidth = width;
+                presenter.PreferredMinimumHeight = height;
+            }
+        }
+        catch
+        {
+            // Minimum window sizing is best effort.
         }
     }
 
