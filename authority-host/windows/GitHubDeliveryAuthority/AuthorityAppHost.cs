@@ -44,6 +44,7 @@ internal sealed class AuthorityAppHost : IDisposable
 
     private void Exit()
     {
+        _controlCenter?.PrepareForExit();
         Dispose();
         Application.Current.Exit();
     }
