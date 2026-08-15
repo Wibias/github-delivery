@@ -6,7 +6,7 @@
 
 **Say the outcome, not the orchestration.**
 
-`github-delivery` turns natural-language requests into evidence-backed GitHub workflows: PRDs, issue research, implementation, deep review, CI, fixes, stacks, verified merges, and verified stable self-update. Its v0.7 quality stack adds evidence-backed design review, stable behavior-boundary verification, and reproducible migration/change execution on top of the existing fail-closed delivery, authority, and progress controls. v0.7.1 hardens the bootstrap/runtime edge: update and autostart output is human-readable, applied updates stream stage progress, and Windows Authority startup is only reported ready after the host answers its status pipe.
+`github-delivery` turns natural-language requests into evidence-backed GitHub workflows: PRDs, issue research, implementation, deep review, CI, fixes, stacks, verified merges, and verified stable self-update. Its v0.7 quality stack adds evidence-backed design review, stable behavior-boundary verification, and reproducible migration/change execution on top of the existing fail-closed delivery, authority, and progress controls. v0.7.2 closes the unpackaged WinUI Authority startup/resource gap, makes the Control Center operational and deliberately responsive, adds typed-code evidence review, and hardens agent-loop detection plus Full/Partial/Off protection visibility.
 
 [Quick start](#try-it-in-60-seconds) · [Self-update](#update-an-installed-release) · [Progress watchdog](#agent-progress-watchdog) · [What it can own](#what-you-can-ask-it-to-own) · [Safety model](#safety-model) · [Installation](#installation)
 
@@ -72,7 +72,7 @@ The npm package is only the bootstrap. The installed skill payload still comes f
 
 On supported Windows systems, stable GitHub Releases also carry a **separately verified, self-contained Authority host component** built from the same tagged commit. Managed setup/update can install or repair that component without a local .NET SDK. It is not silently installed for a user whose protection mode is `off` and who has never installed Authority.
 
-On a fresh machine, the guided flow installs the verified release and starts the Windows Authority host in the notification area when accepted. Login auto-start is a separate opt-in prompt; enable it later with `npx github-delivery autostart`. Use `npx github-delivery start` only to launch the GUI now. The command reports success only after the installed host answers its named-pipe `status` probe with `status: ready`; an early process exit or readiness timeout is reported as a failure instead. If loop interruption is still inactive after a guided install, the CLI reports that GitHub Delivery has not verified Codex hook trust for the installation. If the exact unchanged definitions are already trusted in Codex, they do not need to be trusted again; otherwise review them in `/hooks`, then rerun `npx github-delivery setup`.
+On a fresh machine, the guided flow installs the verified release and starts the Windows Authority host in the notification area when accepted. Login auto-start is a separate opt-in prompt; enable it later with `npx github-delivery autostart` or manage it explicitly with `autostart on`, `autostart off`, and `autostart status`. `npx github-delivery start` ensures Authority is running and brings the Control Center into view even when an existing instance is already in the notification area. The command reports success only after the installed host answers its named-pipe readiness boundary, then identifies the installed host location and explains that normal window close keeps Authority running in the tray; use tray right-click → `Exit` to stop it completely. The Control Center Settings auto-start switch reads and writes the same current-user Windows Run registration as the CLI. The Control Center uses the full available content width with deliberate layout transitions: Compact from the 720 px minimum through 899 px, Medium from 900 px, and Wide from 1360 px. Windows enforces a best-effort 720 × 620 minimum size so content is never compressed below the last usable layout, while the five overview metrics retain the same symmetric 3+2 geometry at every width. If loop interruption is still inactive after a guided install, the CLI reports that GitHub Delivery has not verified Codex hook trust for the installation. If the exact unchanged definitions are already trusted in Codex, they do not need to be trusted again; otherwise review them in `/hooks`, then rerun `npx github-delivery setup`.
 
 Explicit commands are also available:
 
@@ -81,6 +81,9 @@ npx github-delivery install
 npx github-delivery setup
 npx github-delivery start
 npx github-delivery autostart
+npx github-delivery autostart on
+npx github-delivery autostart off
+npx github-delivery autostart status
 npx github-delivery doctor
 npx github-delivery doctor --json
 npx github-delivery update
@@ -129,7 +132,7 @@ npx github-delivery setup
 
 `setup` works only against an existing valid installation. It never substitutes the ephemeral npm package for the installed skill source and never bypasses Codex hook trust. On supported Windows, it also reconciles a required or already-configured Authority host through the verified stable component path.
 
-`start` launches the installed Windows Authority GUI without changing login behavior and does not claim success until the host answers `status: ready`. Startup failures are fail-closed and point to the best-effort local diagnostic log at `%LOCALAPPDATA%\GitHubDeliveryAuthority\startup-error.log`. Login auto-start is opt-in: enable it during the fresh-install prompt or run `npx github-delivery autostart` later. `autostart` is human-readable by default; the command configures the current user’s Windows login startup entry and is idempotent.
+`start` launches the installed Windows Authority GUI without changing login behavior, or asks an already-running Authority instance to show its existing Control Center. It does not claim success until the host answers its readiness probe. Startup failures are fail-closed and point to the best-effort local diagnostic log at `%LOCALAPPDATA%\GitHubDeliveryAuthority\startup-error.log`. After success, the CLI reports the installed host location and the tray lifecycle: normal close hides the Control Center while Authority keeps running, and tray right-click → `Exit` shuts it down completely. Login auto-start is opt-in: the bare `npx github-delivery autostart` remains the backwards-compatible enable form, while `autostart on`, `autostart off`, and `autostart status` are explicit. The Settings toggle uses that same current-user Windows Run registration, so GUI and CLI stay synchronized.
 
 For a read-only health report:
 
@@ -137,7 +140,7 @@ For a read-only health report:
 npx github-delivery doctor
 ```
 
-`doctor` is human-readable and actionable by default. It summarizes environment prerequisites, detected installation/version, manifest integrity and local tracked modifications, persistent configuration readability, Codex activation/watchdog state, latest stable version, update relation, and the Windows Authority component without repairing or changing credentials. Recognized legacy manifestless installations are reported as migratable with prior file integrity explicitly unknown and guidance to use the normal verified `update --apply` path. If loop interruption is inactive, `doctor` reports the unverified hook-trust state without claiming unchanged hooks need to be trusted again, and points to `/hooks` only when review may be needed before `github-delivery setup`. Use `npx github-delivery doctor --json` when you need the raw machine-readable report. Authority details include support/install state, version/source commit, whether the effective protection mode requires it, and relations such as `missing`, `legacy`, `update`, `already_current`, or `already_ahead`.
+`doctor` is human-readable and actionable by default. It summarizes environment prerequisites, detected installation/version, manifest integrity and local tracked modifications, persistent configuration readability, Codex activation/watchdog state, latest stable version, update relation, and the Windows Authority component without repairing or changing credentials. Recognized legacy manifestless installations are reported as migratable with prior file integrity explicitly unknown and guidance to use the normal verified `update --apply` path. `doctor` also reports agent-loop protection as `Full (STREAM)`, `Partial (HOOKS)`, or `Off (NONE)` and states whether the active boundary can interrupt an already-generating turn; hook-only protection is never described as in-flight interruption. If loop interruption is inactive, `doctor` reports the unverified hook-trust state without claiming unchanged hooks need to be trusted again, and points to `/hooks` only when review may be needed before `github-delivery setup`. Use `npx github-delivery doctor --json` when you need the raw machine-readable report. Authority details include support/install state, version/source commit, whether the effective protection mode requires it, and relations such as `missing`, `legacy`, `update`, `already_current`, or `already_ahead`.
 
 ### Manual / repository install
 
@@ -172,13 +175,15 @@ npx github-delivery setup
 
 Trusted lifecycle hooks use turn-scoped state, keep evidence reads/searches from resetting the no-progress detector, warn after **8 consecutive evidence attempts** without execution/state progress, and deny the **12th** supported evidence attempt until the turn makes real progress. Exact duplicate reads, rapid repeated polls, and supported semantically covered evidence are blocked independently. Common workflow forms are classified accordingly: assignment-prefixed PowerShell reads such as `$c=Get-Content ...` consume the evidence budget, while Bun validation commands such as `bun test` and `bun run test|check|lint|build|typecheck|verify` count as execution progress and reset the consecutive-evidence streak. Successful `PostToolUse` results are never replaced or truncated by the generic watchdog.
 
+Runtime capability reporting distinguishes those lifecycle hooks from the protected stream boundary: `Partial (HOOKS)` can block at supported hook/tool boundaries but cannot stop an already-generating turn, while `Full (STREAM)` owns the protected App Server stream and can request in-flight interruption. `Off (NONE)` means neither protection boundary is active.
+
 Hooks still cannot interrupt assistant text before a local tool boundary. To stop in-flight narration/tool-emission loops and to bound hosted activity visible through App Server, launch Codex through the installed protected streaming boundary:
 
 ```bash
 node ~/.agents/skills/github-delivery/scripts/codex-with-watchdog.mjs
 ```
 
-The protected launcher keeps watchdog state per turn, observes agent-message/reasoning/plan generation through one shared detector, uses plan/diff/output-token events as real progress/budget signals, and can issue one private `turn/interrupt`. Active no-progress generation has hard character/output-token backstops in addition to repeat/tool-emission/protocol detection. The bridge fails closed if required stream notifications disappear or a requested interrupt cannot be confirmed. It declares `stream` only inside the process tree it actually controls. Plain `codex` and IDE sessions are not silently rerouted or falsely reported as streaming-protected. Codex currently documents `app-server` and its WebSocket transport as experimental and unsupported for production workloads, so this is the strongest current boundary for the failure mode rather than a stable production host API. See [Agent progress watchdog](#agent-progress-watchdog) and [`INSTALL.md`](INSTALL.md).
+The protected launcher keeps watchdog state per turn, observes agent-message/reasoning/plan generation through one shared detector, uses plan/diff/output-token events as real progress/budget signals, and can issue one private `turn/interrupt`. Active no-progress generation has hard character/output-token backstops in addition to repeat/tool-emission/protocol detection. High-confidence malformed tool-protocol emissions such as `<parameter name="notify">` and `<parameter name="exec_command">`, plus wrapped `run` / `execute` narration that never reaches a real tool boundary, consume the existing protocol/tool-emission budgets; ordinary XML and tool-like XML documentation remain explicit false-positive controls. The bridge fails closed if required stream notifications disappear or a requested interrupt cannot be confirmed. It declares `stream` only inside the process tree it actually controls. Plain `codex` and IDE sessions are not silently rerouted or falsely reported as streaming-protected. Codex currently documents `app-server` and its WebSocket transport as experimental and unsupported for production workloads, so this is the strongest current boundary for the failure mode rather than a stable production host API. See [Agent progress watchdog](#agent-progress-watchdog) and [`INSTALL.md`](INSTALL.md).
 
 ## Why this is different
 
@@ -404,7 +409,7 @@ The review bar combines:
 - **Bug** review
 - **Security** review
 - **Spec** review
-- **Standards** review, including the advisory **design-quality** lens when the changed surface makes it relevant
+- **Standards** review, including the advisory **design-quality** and typed-code **type-evidence** lenses when the changed surface makes them relevant
 - repository-wide **semantic propagation** when a domain concept changes
 - **Proactive contract verification** appropriate to the diff
 
@@ -412,12 +417,13 @@ Review depth is derived from changed paths, patch content, symbols, removed cont
 
 ### Evidence-preserving quality contracts
 
-Six companion contracts keep review, implementation, and bug-fix evidence concrete without weakening the existing gates:
+Seven companion contracts keep review, implementation, and bug-fix evidence concrete without weakening the existing gates:
 
 - [`references/prose-quality.md`](references/prose-quality.md) keeps durable PR, issue, PRD, review, and status prose grounded in repository vocabulary and concrete evidence. Exact commands, paths, SHAs, checks, evidence states, required GitHub syntax, security redaction, and user-confirmed wording are preserved rather than rewritten for style.
 - [`references/regression-first.md`](references/regression-first.md) requires executable broken-before/fixed-after evidence for confirmed bug fixes. It uses [`references/verification-boundaries.md`](references/verification-boundaries.md) to choose the narrowest stable contract that actually demonstrates the defect, whether that is a focused unit/component check, a use-case/integration boundary, a real script/CLI path, or a deterministic runtime/operator probe.
 - [`references/safety-invariant.md`](references/safety-invariant.md) handles material non-local risk by naming the fact a positive verdict depends on and recording the strongest proof level reached from `claimed` through `reproduced`. A material assumption stays `unproven` until the evidence establishes it.
 - [`references/design-quality.md`](references/design-quality.md) adds an advisory positive-design lens for happy-path visibility, boundary ownership, abstraction compression, explicit domain/state modeling, mutable-state ownership, shared-state discipline, and evidence-backed complexity. Repository rules and concrete Bug/Security/Spec contracts remain authoritative.
+- [`references/type-evidence-review.md`](references/type-evidence-review.md) adds an advisory typed-code lens for evidence erosion: known-value widening, widen-then-assert flows, broad internal contracts, reflective bypasses, weak assertion proof, and mocks that hide production wiring. Valid boundary `unknown`, runtime narrowing, justified interop assertions, genuinely open dictionaries, and ordinary dependency seams remain explicit non-findings; the lens becomes blocking only when the same path proves incorrect behavior, a safety/security issue, a spec violation, or broken production wiring.
 - [`references/verification-boundaries.md`](references/verification-boundaries.md) chooses the narrowest stable contract that actually observes protected behavior, avoiding both brittle private-helper tests and needlessly large end-to-end harnesses.
 - [`references/change-execution.md`](references/change-execution.md) governs broad deterministic sweeps and internal migrations: inventory the full surface, migrate callers before deleting obsolete internal paths when compatibility is not real, build a rerunnable lever when it lowers risk, and verify each meaningful change unit.
 
