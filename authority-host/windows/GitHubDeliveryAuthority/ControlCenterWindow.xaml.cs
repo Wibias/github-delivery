@@ -21,6 +21,7 @@ internal sealed partial class ControlCenterWindow : Window
     public ControlCenterWindow(StateStore store)
     {
         InitializeComponent();
+        TrySetWindowIcon();
         _store = store;
         Activated += (_, _) => Refresh();
         TryResize(1080, 760);
@@ -181,6 +182,22 @@ internal sealed partial class ControlCenterWindow : Window
             .OfType<NavigationViewItem>()
             .FirstOrDefault(item => string.Equals(item.Tag?.ToString(), "settings", StringComparison.Ordinal));
         if (settingsItem is not null) Navigation.SelectedItem = settingsItem;
+    }
+
+    private void TrySetWindowIcon()
+    {
+        try
+        {
+            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+            var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hwnd);
+            var appWindow = AppWindow.GetFromWindowId(windowId);
+            var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "DeliveryAuthority.ico");
+            if (appWindow is not null && File.Exists(iconPath)) appWindow.SetIcon(iconPath);
+        }
+        catch
+        {
+            // Window icon setup is best effort.
+        }
     }
 
     private void TryResize(int width, int height)
