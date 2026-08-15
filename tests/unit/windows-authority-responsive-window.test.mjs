@@ -26,11 +26,11 @@ function assertSetter(state, target, value) {
   );
 }
 
-function assertCardPlacement(state, card, row, column, rowSpan, columnSpan) {
+function assertCardPlacement(state, card, row, column, columnSpan, rowSpan = 1) {
   assertSetter(state, `${card}.(Grid.Row)`, String(row));
   assertSetter(state, `${card}.(Grid.Column)`, String(column));
-  assertSetter(state, `${card}.(Grid.RowSpan)`, String(rowSpan));
   assertSetter(state, `${card}.(Grid.ColumnSpan)`, String(columnSpan));
+  if (rowSpan !== 1) assertSetter(state, `${card}.(Grid.RowSpan)`, String(rowSpan));
 }
 
 test("Control Center switches at the approved 900 and 1360 responsive breakpoints", () => {
@@ -61,23 +61,23 @@ test("Compact, Medium, and Wide states deliberately restructure dashboard cards"
   const medium = visualState("MediumDashboardState");
   const wide = visualState("WideDashboardState");
 
-  assertCardPlacement(compact, "ActivityCard", 0, 0, 1, 2);
-  assertCardPlacement(compact, "AllowlistCard", 1, 0, 1, 2);
-  assertCardPlacement(compact, "GrantCard", 2, 0, 1, 2);
-  assertCardPlacement(compact, "DiagnosticsCard", 3, 0, 1, 2);
-  assertCardPlacement(compact, "QuickSettingsCard", 4, 0, 1, 2);
+  assertCardPlacement(compact, "ActivityCard", 0, 0, 2);
+  assertCardPlacement(compact, "AllowlistCard", 1, 0, 2);
+  assertCardPlacement(compact, "GrantCard", 2, 0, 2);
+  assertCardPlacement(compact, "DiagnosticsCard", 3, 0, 2);
+  assertCardPlacement(compact, "QuickSettingsCard", 4, 0, 2);
 
-  assertCardPlacement(medium, "ActivityCard", 0, 0, 1, 2);
-  assertCardPlacement(medium, "AllowlistCard", 1, 0, 1, 1);
-  assertCardPlacement(medium, "GrantCard", 1, 1, 1, 1);
-  assertCardPlacement(medium, "DiagnosticsCard", 2, 0, 1, 1);
-  assertCardPlacement(medium, "QuickSettingsCard", 2, 1, 1, 1);
+  assertCardPlacement(medium, "ActivityCard", 0, 0, 2);
+  assertCardPlacement(medium, "AllowlistCard", 1, 0, 1);
+  assertCardPlacement(medium, "GrantCard", 1, 1, 1);
+  assertCardPlacement(medium, "DiagnosticsCard", 2, 0, 1);
+  assertCardPlacement(medium, "QuickSettingsCard", 2, 1, 1);
 
-  assertCardPlacement(wide, "ActivityCard", 0, 0, 2, 1);
-  assertCardPlacement(wide, "AllowlistCard", 0, 1, 1, 1);
-  assertCardPlacement(wide, "GrantCard", 1, 1, 1, 1);
-  assertCardPlacement(wide, "DiagnosticsCard", 2, 0, 1, 1);
-  assertCardPlacement(wide, "QuickSettingsCard", 2, 1, 1, 1);
+  assertCardPlacement(wide, "ActivityCard", 0, 0, 1, 2);
+  assertCardPlacement(wide, "AllowlistCard", 0, 1, 1);
+  assertCardPlacement(wide, "GrantCard", 1, 1, 1);
+  assertCardPlacement(wide, "DiagnosticsCard", 2, 0, 1);
+  assertCardPlacement(wide, "QuickSettingsCard", 2, 1, 1);
 });
 
 test("summary geometry is static and is never overridden by responsive states", () => {
