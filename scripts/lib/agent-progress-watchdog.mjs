@@ -19,6 +19,8 @@ const DEFAULTS = Object.freeze({
 const INTENT_PREFIX = /^\s*(?:(?:now|next|first|then|actually|meanwhile)[,:]?\s+)?(?:let me|i(?:'|’)ll|i will|i need to|i'm going to|i am going to)\s+/i;
 const TOOL_EMISSION_INTENT = /^\s*(?:(?:now|next|then|actually|enough|finally|stop narrating)[,:.!]?\s+)?(?:(?:let me|i(?:'|’)ll|i will|i need to|i(?:'|’)m going to|i am going to)\s+)?(?:(?:just|actually)\s+)?(?:run|running|execute|executing|invoke|invoking|call|calling|issue|issuing|emit|emitting|grep|search|read|open|inspect|apply|patch|use|add|adding|wire|wiring|edit|editing|write|writing|modify|modifying|update|updating|remove|removing|delete|deleting|fix|fixing|change|changing)\b/i;
 const TOOL_PROTOCOL_ARTIFACT = /<\/?(?:atool|invoke|tool_calls?|function_calls?)\b[^>]*>/gi;
+const TOOL_PARAMETER_PROTOCOL_ARTIFACT = /<parameter\b(?=[^>]*\bname\s*=\s*["'](?:notify|exec_command)["'])[^>]*>/gi;
+const TOOL_PARAMETER_PROTOCOL_NARRATION = /<parameter\b(?=[^>]*\bname\s*=\s*["'](?:notify|exec_command|cmd|workdir|input)["'])[^>]*>/gi;
 const GRID_PROTOCOL_ARTIFACT = /^\s*(?:<grid>\s*<\/grid>|grid)\s*$/gim;
 const FAILURE_SIGNAL = /\b(error|errors|fail|failed|failure|failing|blocked|blocker|exception|traceback|denied|timeout|timed out|exit(?: code)?|conclusion|status|unsponsored_surface)\b/i;
 
@@ -46,6 +48,15 @@ function countToolProtocolArtifacts(matches, openTags) {
     else count += 1;
   }
   return count;
+}
+
+function normalizeToolProtocolNarration(text) {
+  const value = String(text || "");
+  const parameterOpenings = value.match(TOOL_PARAMETER_PROTOCOL_NARRATION);
+  if (!parameterOpenings?.length) return value;
+  return value
+    .replace(TOOL_PARAMETER_PROTOCOL_NARRATION, " ")
+    .replace(/<\/parameter>/gi, " ");
 }
 
 function stableValue(value) {
@@ -309,9 +320,15 @@ export function createProgressWatchdog(options = {}) {
     generatedCharsSinceProgress += delta.length;
 
     const toolProtocolArtifacts = delta.match(TOOL_PROTOCOL_ARTIFACT);
+    const parameterProtocolArtifacts = delta.match(TOOL_PARAMETER_PROTOCOL_ARTIFACT);
     const gridProtocolArtifacts = delta.match(GRID_PROTOCOL_ARTIFACT);
-    if (toolProtocolArtifacts?.length || gridProtocolArtifacts?.length) {
+    if (
+      toolProtocolArtifacts?.length
+      || parameterProtocolArtifacts?.length
+      || gridProtocolArtifacts?.length
+    ) {
       protocolArtifactCount += countToolProtocolArtifacts(toolProtocolArtifacts, openProtocolTags)
+        + (parameterProtocolArtifacts?.length || 0)
         + (gridProtocolArtifacts?.length || 0);
       if (protocolArtifactCount >= config.protocolArtifactThreshold) {
         return {
@@ -340,7 +357,8 @@ export function createProgressWatchdog(options = {}) {
 
     const complete = pendingNarration.slice(0, lastBoundary + 1);
     pendingNarration = pendingNarration.slice(lastBoundary + 1);
-    for (const clause of clausesFromCompleteText(complete)) {
+    const normalizedComplete = normalizeToolProtocolNarration(complete);
+    for (const clause of clausesFromCompleteText(normalizedComplete)) {
       const decision = processClause(clause);
       if (decision.action === "interrupt") return decision;
     }
