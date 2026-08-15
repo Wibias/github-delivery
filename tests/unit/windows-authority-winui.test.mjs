@@ -213,3 +213,55 @@ test("authority executable and Control Center use the committed Authority icon",
   assert.match(code, /appWindow\.SetIcon\(iconPath\)/);
   assert.match(code, /private void TrySetWindowIcon\(\)[\s\S]*?try[\s\S]*?catch/);
 });
+
+test("Authority pipe can ask the running WinUI host to show the existing Control Center", () => {
+  const service = read(`${root}/AuthorityService.cs`);
+  const pipe = read(`${root}/AuthorityPipeServer.cs`);
+  const host = read(`${root}/AuthorityAppHost.cs`);
+
+  assert.match(service, /Func<bool> _showControlCenter/);
+  assert.match(service, /public object ShowControlCenter\(\)/);
+  assert.match(service, /authority_control_center_show_failed/);
+  assert.match(pipe, /"showControlCenter"\s*=>\s*_service\.ShowControlCenter\(\)/);
+  assert.match(host, /new AuthorityService\([\s\S]*EnqueueShowControlCenter\)/);
+  assert.match(host, /private bool EnqueueShowControlCenter\(\)[\s\S]*_dispatcher\.TryEnqueue\(ShowControlCenter\)/);
+});
+
+test("Settings exposes autostart synchronized with the Windows Run registration", () => {
+  const startupUrl = new URL(`../../${root}/AuthorityStartup.cs`, import.meta.url);
+  assert.equal(existsSync(startupUrl), true, "AuthorityStartup.cs must provide the WinUI startup-state contract");
+  const startup = read(`${root}/AuthorityStartup.cs`);
+  const window = read(`${root}/ControlCenterWindow.xaml`);
+  const code = read(`${root}/ControlCenterWindow.xaml.cs`);
+
+  assert.match(startup, /Software\\Microsoft\\Windows\\CurrentVersion\\Run/);
+  assert.match(startup, /GitHubDeliveryAuthority/);
+  assert.match(startup, /Registry\.CurrentUser/);
+  assert.match(startup, /public static AuthorityStartupState Read\(\)/);
+  assert.match(startup, /public static AuthorityStartupState Set\(bool enabled\)/);
+  assert.match(window, /Start Delivery Authority when I sign in/);
+  assert.match(window, /x:Name="AutostartToggle"/);
+  assert.match(window, /Toggled="AutostartToggle_Toggled"/);
+  assert.match(window, /x:Name="AutostartStatusText"/);
+  assert.match(code, /private bool _refreshingAutostart;/);
+  assert.match(code, /private void RefreshAutostart\(\)[\s\S]*AuthorityStartup\.Read\(\)/);
+  assert.match(code, /AutostartToggle_Toggled[\s\S]*AuthorityStartup\.Set\(AutostartToggle\.IsOn\)/);
+  assert.match(code, /catch[\s\S]*RefreshAutostart\(\)/);
+});
+
+test("narrow summary keeps the top three and centers the lower two between them", () => {
+  const window = read(`${root}/ControlCenterWindow.xaml`);
+
+  assert.match(window, /<ColumnDefinition x:Name="SummaryColumn5" Width="0"\s*\/>/);
+  for (const column of [0, 1, 2, 3, 4, 5]) {
+    assert.match(window, new RegExp(`Target=\\"SummaryColumn${column}\\.Width\\" Value=\\"\\*\\"`));
+  }
+  for (const [metric, column] of [[0, 0], [1, 2], [2, 4], [3, 1], [4, 3]]) {
+    assert.match(window, new RegExp(`Target=\\"SummaryMetric${metric}\\.\\(Grid\\.Column\\)\\" Value=\\"${column}\\"`));
+    assert.match(window, new RegExp(`Target=\\"SummaryMetric${metric}\\.\\(Grid\\.ColumnSpan\\)\\" Value=\\"2\\"`));
+  }
+  assert.match(window, /Target="SummaryColumn5\.Width" Value="0"/);
+  for (const metric of [0, 1, 2, 3, 4]) {
+    assert.match(window, new RegExp(`Target=\\"SummaryMetric${metric}\\.\\(Grid\\.ColumnSpan\\)\\" Value=\\"1\\"`));
+  }
+});
