@@ -19,6 +19,17 @@ function visualState(name) {
 function assertSymmetricSummary(stateName) {
   const state = visualState(stateName);
 
+  assert.doesNotMatch(
+    state,
+    /Target="SummarySecondRow\.Height" Value="0"/,
+    `${stateName} must never collapse the lower metric row`,
+  );
+  assert.doesNotMatch(
+    state,
+    /Target="SummaryColumn5\.Width" Value="0"/,
+    `${stateName} must never collapse the sixth summary column`,
+  );
+
   for (let column = 0; column < 6; column += 1) {
     assert.match(
       state,
