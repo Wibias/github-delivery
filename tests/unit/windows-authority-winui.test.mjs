@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
 
 function read(path) {
@@ -16,6 +16,37 @@ test("authority host is unpackaged self-contained WinUI 3, not WinForms", () => 
   assert.match(project, /<SelfContained>true<\/SelfContained>/);
   assert.match(project, /Microsoft\.WindowsAppSDK/);
   assert.doesNotMatch(project, /UseWindowsForms/);
+});
+
+test("unpackaged publish carries compiled XAML and a root PRI resource index", () => {
+  const project = read(`${root}/GitHubDeliveryAuthority.csproj`);
+  const workflow = read(".github/workflows/ci.yml");
+
+  assert.match(project, /<EnableMsixTooling>true<\/EnableMsixTooling>/);
+  assert.match(project, /<ProjectPriFileName>resources\.pri<\/ProjectPriFileName>/);
+  assert.match(project, /CopyUnpackagedWinUiResourcesToPublish/);
+  assert.match(project, /AfterTargets="Publish"/);
+  assert.match(project, /XamlGeneratedOutputPath\)\*\.xbf/);
+  assert.doesNotMatch(project, /XamlGeneratedOutputPath\)\*\*\\\*\.xbf/);
+  assert.match(project, /ProjectPriFullPath/);
+  assert.match(project, /resources\.pri/);
+  assert.match(project, /DestinationFiles=/);
+  assert.match(workflow, /App\.xbf/);
+  assert.match(workflow, /ControlCenterWindow\.xbf/);
+  assert.match(workflow, /resources\.pri/);
+});
+
+test("custom WinUI entry point preserves generated XAML process initialization", () => {
+  const program = read(`${root}/Program.cs`);
+  assert.match(program, /DllImport\("Microsoft\.ui\.xaml\.dll"\)[\s\S]*XamlCheckProcessRequirements/);
+
+  const processCheck = program.indexOf("XamlCheckProcessRequirements();");
+  const comWrappers = program.indexOf("WinRT.ComWrappersSupport.InitializeComWrappers();");
+  const applicationStart = program.indexOf("Application.Start(");
+
+  assert.ok(processCheck >= 0, "custom Main must call XamlCheckProcessRequirements");
+  assert.ok(processCheck < comWrappers, "XAML process requirements must be checked before COM wrappers initialize");
+  assert.ok(comWrappers < applicationStart, "COM wrappers must initialize before Application.Start");
 });
 
 test("source installer preserves self-contained deployment and delegates to the release installer", () => {
@@ -50,9 +81,7 @@ test("control center implements the selected activity-first audit design in ligh
     "Quick settings",
     "READY",
   ]) assert.match(window, new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-  for (const nav of ["Overview", "Activity", "Allowlist", "Temporary grants", "Diagnostics", "Settings"]) {
-    assert.match(window, new RegExp(`Content=\\"${nav}\\"`));
-  }
+  assert.match(window, /Content="Overview"/);
 });
 
 test("settings page exposes and persists exactly the three authority protection modes", () => {
@@ -90,4 +119,132 @@ test("tray integration uses native Shell_NotifyIcon rather than WinForms NotifyI
   assert.match(tray, /Shell_NotifyIcon/);
   assert.doesNotMatch(tray, /System\.Windows\.Forms|NotifyIcon\s/);
   assert.doesNotMatch(program, /System\.Windows\.Forms|Application\.Run/);
+});
+
+test("tray uses the committed Authority icon and exposes Control Center plus explicit Exit", () => {
+  const tray = read(`${root}/TrayIcon.cs`);
+
+  assert.doesNotMatch(tray, /LoadIconW/);
+  assert.match(tray, /Path\.Combine\(AppContext\.BaseDirectory, "Assets", "DeliveryAuthority\.ico"\)/);
+  assert.match(tray, /LoadImageW/);
+  assert.match(tray, /LR_LOADFROMFILE/);
+  assert.match(tray, /private IntPtr _trayIcon;/);
+  assert.match(tray, /DestroyIcon\(_trayIcon\)/);
+  assert.match(tray, /private Exception\? _startupError;/);
+  assert.match(tray, /AppendMenuW\(menu, MF_STRING, MenuControlCenter, "Control Center"\)/);
+  assert.match(tray, /AppendMenuW\(menu, MF_SEPARATOR/);
+  assert.match(tray, /AppendMenuW\(menu, MF_STRING, MenuExit, "Exit"\)/);
+  assert.match(tray, /selected == MenuExit[\s\S]*Dispatch\(_exit\)/);
+});
+
+test("control center exposes only Overview plus the built-in bottom Settings target", () => {
+  const window = read(`${root}/ControlCenterWindow.xaml`);
+  const code = read(`${root}/ControlCenterWindow.xaml.cs`);
+
+  assert.match(window, /IsSettingsVisible="True"/);
+  assert.match(window, /<NavigationViewItem Content="Overview" Tag="overview" IsSelected="True"/);
+  for (const deadItem of ["Activity", "Allowlist", "Temporary grants", "Diagnostics"]) {
+    assert.doesNotMatch(window, new RegExp(`<NavigationViewItem Content=\\"${deadItem}\\"`));
+  }
+  assert.doesNotMatch(window, /<NavigationView\.PaneFooter>/);
+  assert.match(code, /args\.IsSettingsSelected/);
+  assert.match(code, /Navigation\.SelectedItem\s*=\s*Navigation\.SettingsItem/);
+});
+
+test("control center uses all available content width while preserving adaptive states", () => {
+  const window = read(`${root}/ControlCenterWindow.xaml`);
+
+  assert.match(window, /PaneDisplayMode="Auto"/);
+  assert.match(window, /CompactModeThresholdWidth="0"/);
+  assert.match(window, /ExpandedModeThresholdWidth="1360"/);
+  assert.match(window, /<Grid x:Name="OverviewContent"(?=[^>]*HorizontalAlignment="Stretch")(?![^>]*MaxWidth=)[^>]*>/);
+  assert.match(window, /<Grid x:Name="SettingsContent"(?=[^>]*HorizontalAlignment="Stretch")(?![^>]*MaxWidth=)[^>]*>/);
+
+  for (const state of ["NarrowDashboardState", "MediumDashboardState", "WideDashboardState"]) {
+    assert.match(window, new RegExp(`x:Name=\\"${state}\\"`));
+  }
+
+  for (const card of ["ActivityCard", "AllowlistCard", "GrantCard", "DiagnosticsCard", "QuickSettingsCard"]) {
+    assert.match(window, new RegExp(`x:Name=\\"${card}\\"`));
+  }
+
+  assert.match(window, /MinWindowWidth="900"/);
+  assert.match(window, /MinWindowWidth="1360"/);
+
+  for (const header of ["ActivityHeaderGrid", "AllowlistHeaderGrid", "GrantHeaderGrid"]) {
+    assert.match(
+      window,
+      new RegExp(`x:Name=\\"${header}\\"[\\s\\S]*?<ColumnDefinition Width=\\"\\*\\"[\\s\\S]*?<ColumnDefinition Width=\\"Auto\\"`),
+    );
+  }
+
+  assert.match(window, /x:Name="ActivityColumnsHeader"/);
+  assert.match(window, /Target="ActivityColumnsHeader\.Visibility" Value="Collapsed"/);
+  assert.doesNotMatch(window, /<ColumnDefinition Width="170"\s*\/>/);
+});
+
+test("normal Control Center close hides the existing AppWindow and explicit exit bypasses it", () => {
+  const code = read(`${root}/ControlCenterWindow.xaml.cs`);
+  const host = read(`${root}/AuthorityAppHost.cs`);
+  const smoke = read(`${root}/ControlCenterXamlSelfTest.cs`);
+
+  assert.match(code, /private readonly AppWindow _appWindow;/);
+  assert.match(code, /private bool _allowClose;/);
+  assert.match(code, /_appWindow\.Closing \+= OnAppWindowClosing/);
+  assert.match(code, /private void OnAppWindowClosing\(AppWindow sender, AppWindowClosingEventArgs args\)/);
+  assert.match(code, /args\.Cancel\s*=\s*true/);
+  assert.match(code, /sender\.Hide\(\)/);
+  assert.match(code, /public void PrepareForExit\(\)[\s\S]*?_allowClose\s*=\s*true/);
+  assert.match(code, /public void ShowControlCenter\(\)[\s\S]*?_appWindow\.Show\(\)/);
+  assert.match(host, /_controlCenter\?\.PrepareForExit\(\)/);
+  assert.match(smoke, /window\.PrepareForExit\(\);[\s\S]*window\.Close\(\);/);
+});
+
+test("authority executable and Control Center use the committed Authority icon", () => {
+  const project = read(`${root}/GitHubDeliveryAuthority.csproj`);
+  const code = read(`${root}/ControlCenterWindow.xaml.cs`);
+  const icon = new URL(`../../${root}/Assets/DeliveryAuthority.ico`, import.meta.url);
+
+  assert.equal(existsSync(icon), true, "DeliveryAuthority.ico must be committed under Assets");
+  assert.match(project, /<ApplicationIcon>Assets\\DeliveryAuthority\.ico<\/ApplicationIcon>/);
+  assert.match(project, /<Content Include="Assets\\DeliveryAuthority\.ico">[\s\S]*?<CopyToOutputDirectory>PreserveNewest<\/CopyToOutputDirectory>[\s\S]*?<CopyToPublishDirectory>PreserveNewest<\/CopyToPublishDirectory>/);
+  assert.match(code, /TrySetWindowIcon\(\);/);
+  assert.match(code, /Path\.Combine\(AppContext\.BaseDirectory,\s*"Assets",\s*"DeliveryAuthority\.ico"\)/);
+  assert.match(code, /appWindow\.SetIcon\(iconPath\)/);
+  assert.match(code, /private void TrySetWindowIcon\(\)[\s\S]*?try[\s\S]*?catch/);
+});
+
+test("Authority pipe can ask the running WinUI host to show the existing Control Center", () => {
+  const service = read(`${root}/AuthorityService.cs`);
+  const pipe = read(`${root}/AuthorityPipeServer.cs`);
+  const host = read(`${root}/AuthorityAppHost.cs`);
+
+  assert.match(service, /Func<bool> _showControlCenter/);
+  assert.match(service, /public object ShowControlCenter\(\)/);
+  assert.match(service, /authority_control_center_show_failed/);
+  assert.match(pipe, /"showControlCenter"\s*=>\s*_service\.ShowControlCenter\(\)/);
+  assert.match(host, /new AuthorityService\([\s\S]*EnqueueShowControlCenter\)/);
+  assert.match(host, /private bool EnqueueShowControlCenter\(\)[\s\S]*_dispatcher\.TryEnqueue\(ShowControlCenter\)/);
+});
+
+test("Settings exposes autostart synchronized with the Windows Run registration", () => {
+  const startupUrl = new URL(`../../${root}/AuthorityStartup.cs`, import.meta.url);
+  assert.equal(existsSync(startupUrl), true, "AuthorityStartup.cs must provide the WinUI startup-state contract");
+  const startup = read(`${root}/AuthorityStartup.cs`);
+  const window = read(`${root}/ControlCenterWindow.xaml`);
+  const code = read(`${root}/ControlCenterWindow.xaml.cs`);
+
+  assert.match(startup, /Software\\Microsoft\\Windows\\CurrentVersion\\Run/);
+  assert.match(startup, /GitHubDeliveryAuthority/);
+  assert.match(startup, /Registry\.CurrentUser/);
+  assert.match(startup, /public static AuthorityStartupState Read\(\)/);
+  assert.match(startup, /public static AuthorityStartupState Set\(bool enabled\)/);
+  assert.match(window, /Start Delivery Authority when I sign in/);
+  assert.match(window, /x:Name="AutostartToggle"/);
+  assert.match(window, /Toggled="AutostartToggle_Toggled"/);
+  assert.match(window, /x:Name="AutostartStatusText"/);
+  assert.match(code, /private bool _refreshingAutostart;/);
+  assert.match(code, /private void RefreshAutostart\(\)[\s\S]*AuthorityStartup\.Read\(\)/);
+  assert.match(code, /AutostartToggle_Toggled[\s\S]*AuthorityStartup\.Set\(AutostartToggle\.IsOn\)/);
+  assert.match(code, /catch[\s\S]*RefreshAutostart\(\)/);
 });

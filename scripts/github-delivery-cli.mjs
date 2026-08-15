@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { parseBootstrapArgs } from "./lib/bootstrap-cli.mjs";
 import { runBootstrap } from "./lib/bootstrap-command.mjs";
 
-export const HELP_TEXT = `GitHub Delivery\n\nUsage:\n  github-delivery\n  github-delivery install [--target PATH]\n  github-delivery setup [--target PATH]\n  github-delivery start\n  github-delivery autostart\n  github-delivery doctor [--target PATH] [--json]\n  github-delivery update [--target PATH] [--apply]\n\nBare invocation launches guided setup.\nDoctor is human-readable by default; add --json for the raw machine report.\nUpdate is dry-run by default; add --apply only after reviewing the plan.\n`;
+export const HELP_TEXT = `GitHub Delivery\n\nUsage:\n  github-delivery\n  github-delivery install [--target PATH]\n  github-delivery setup [--target PATH]\n  github-delivery start\n  github-delivery autostart [on|off|status]\n  github-delivery doctor [--target PATH] [--json]\n  github-delivery update [--target PATH] [--apply]\n\nBare invocation launches guided setup.\nDoctor is human-readable by default; add --json for the raw machine report.\nUpdate is dry-run by default; add --apply only after reviewing the plan.\n`;
 
 function value(value, fallback = "unknown") {
   if (value === null || value === undefined || value === "") return fallback;
@@ -191,18 +191,28 @@ function renderUpdateResult(result, stdout) {
 
 function renderBootstrapResult(result, stdout) {
   if (result.action === "start") {
-    stdout.write(result.started && result.ready !== false
-      ? "GitHub Delivery approval GUI is running and Authority is ready.\n"
-      : `GitHub Delivery approval GUI was not started (${result.reason || "unknown reason"}).\n`);
-    if (!result.started && result.diagnosticsPath) {
+    const opened = result.started && result.ready !== false && result.shown !== false;
+    stdout.write(opened
+      ? "GitHub Delivery Control Center is open and Authority is ready.\n"
+      : `GitHub Delivery Control Center was not opened (${result.reason || "unknown reason"}).\n`);
+    if (result.exePath) stdout.write(`  Location     ${result.exePath}\n`);
+    if (opened) {
+      stdout.write("Closing the window keeps Delivery Authority running in the notification area.\n");
+      stdout.write("To exit completely, right-click the notification-area icon and choose Exit.\n");
+    } else if (result.diagnosticsPath) {
       stdout.write(`  Diagnostics: ${result.diagnosticsPath}\n`);
     }
     return;
   }
   if (result.action === "autostart") {
-    stdout.write(result.configured
+    if (result.reason && result.enabled === undefined) {
+      stdout.write(`Windows login auto-start could not be changed (${result.reason}).\n`);
+      return;
+    }
+    const enabled = result.enabled ?? result.configured === true;
+    stdout.write(enabled
       ? "Windows login auto-start is enabled.\n"
-      : `Windows login auto-start was not enabled (${result.reason || "unknown reason"}).\n`);
+      : "Windows login auto-start is disabled.\n");
     return;
   }
   if (result.action === "install") {

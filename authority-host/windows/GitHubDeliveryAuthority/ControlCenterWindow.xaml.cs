@@ -14,13 +14,25 @@ internal sealed partial class ControlCenterWindow : Window
         public override string ToString() => Display;
     }
 
+    private sealed record RepositoryListItem(string Repo, string Display)
+    {
+        public override string ToString() => Display;
+    }
+
     private sealed record HostVersionInfo(string Version, string SourceCommit);
 
     private readonly StateStore _store;
+    private readonly AppWindow _appWindow;
+    private bool _allowClose;
+    private bool _refreshingAutostart;
 
     public ControlCenterWindow(StateStore store)
     {
         InitializeComponent();
+        _appWindow = ResolveAppWindow();
+        TrySetMinimumWindowSize(720, 620);
+        TrySetWindowIcon();
+        _appWindow.Closing += OnAppWindowClosing;
         _store = store;
         Activated += (_, _) => Refresh();
         TryResize(1080, 760);
@@ -29,7 +41,20 @@ internal sealed partial class ControlCenterWindow : Window
     public void ShowControlCenter()
     {
         Refresh();
+        _appWindow.Show();
         Activate();
+    }
+
+    public void PrepareForExit()
+    {
+        _allowClose = true;
+    }
+
+    private void OnAppWindowClosing(AppWindow sender, AppWindowClosingEventArgs args)
+    {
+        if (_allowClose) return;
+        args.Cancel = true;
+        sender.Hide();
     }
 
     private void Refresh()
@@ -39,8 +64,10 @@ internal sealed partial class ControlCenterWindow : Window
         var repositories = _store.ListAllowedRepositories();
         AllowlistedCount.Text = repositories.Count.ToString(CultureInfo.InvariantCulture);
         AllowlistList.ItemsSource = repositories.Count == 0
-            ? new[] { "No repositories allowlisted" }
-            : repositories.Select(repo => $"▣  {repo}     Allowed").ToArray();
+            ? new[] { new RepositoryListItem(string.Empty, "No repositories allowlisted") }
+            : repositories.Select(repo => new RepositoryListItem(repo, $"▣  {repo}")).ToArray();
+        AllowlistList.SelectedItem = null;
+        RemoveRepositoryButton.IsEnabled = false;
 
         var events = _store.ListRecentAuditEvents(50);
         ActivityList.ItemsSource = events.Count == 0
@@ -63,6 +90,7 @@ internal sealed partial class ControlCenterWindow : Window
 
         RefreshConfiguration();
         RefreshInstallationStatus();
+        RefreshAutostart();
         DiagnosticsUpdated.Text = $"Updated {DateTimeOffset.Now:t}";
     }
 
@@ -73,7 +101,6 @@ internal sealed partial class ControlCenterWindow : Window
             var config = UserConfigStore.Read();
             var display = UserConfigStore.DisplayMode(config.AuthorityMode);
             ProtectionModeText.Text = display;
-            ProtectionModeSidebar.Text = display;
             OffModeRadio.IsChecked = config.AuthorityMode == "off";
             SensitiveModeRadio.IsChecked = config.AuthorityMode == "high-assurance";
             AllModeRadio.IsChecked = config.AuthorityMode == "all";
@@ -82,7 +109,6 @@ internal sealed partial class ControlCenterWindow : Window
         catch (Exception error)
         {
             ProtectionModeText.Text = "Configuration error";
-            ProtectionModeSidebar.Text = "Configuration error";
             SettingsStatusText.Text = error.Message;
             ConfigPathText.Text = UserConfigStore.ConfigPath;
         }
@@ -100,6 +126,41 @@ internal sealed partial class ControlCenterWindow : Window
         {
             HostVersionText.Text = "Version metadata error";
             HostSourceText.Text = error.Message;
+        }
+    }
+
+    private void RefreshAutostart()
+    {
+        try
+        {
+            _refreshingAutostart = true;
+            var state = AuthorityStartup.Read();
+            AutostartToggle.IsOn = state.Enabled;
+            AutostartStatusText.Text = state.Enabled ? "Enabled" : "Disabled";
+        }
+        catch (Exception error)
+        {
+            AutostartStatusText.Text = $"Could not read auto-start: {error.Message}";
+        }
+        finally
+        {
+            _refreshingAutostart = false;
+        }
+    }
+
+    private void AutostartToggle_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_refreshingAutostart) return;
+        try
+        {
+            var state = AuthorityStartup.Set(AutostartToggle.IsOn);
+            AutostartStatusText.Text = state.Enabled ? "Enabled" : "Disabled";
+        }
+        catch (Exception error)
+        {
+            var message = $"Could not update auto-start: {error.Message}";
+            RefreshAutostart();
+            AutostartStatusText.Text = message;
         }
     }
 
@@ -137,11 +198,83 @@ internal sealed partial class ControlCenterWindow : Window
 
     private void Navigation_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {
-        var tag = (args.SelectedItem as NavigationViewItem)?.Tag?.ToString();
-        var showSettings = string.Equals(tag, "settings", StringComparison.Ordinal);
+        var showSettings = args.IsSettingsSelected;
         SettingsPage.Visibility = showSettings ? Visibility.Visible : Visibility.Collapsed;
         OverviewPage.Visibility = showSettings ? Visibility.Collapsed : Visibility.Visible;
         if (showSettings) Refresh();
+    }
+
+    private void AllowlistList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        RemoveRepositoryButton.IsEnabled =
+            AllowlistList.SelectedItem is RepositoryListItem item && !string.IsNullOrEmpty(item.Repo);
+    }
+
+    private async void AddRepository_Click(object sender, RoutedEventArgs e)
+    {
+        var input = new TextBox
+        {
+            Header = "Repository",
+            PlaceholderText = "owner/repo",
+        };
+        var dialog = new ContentDialog
+        {
+            XamlRoot = RootLayout.XamlRoot,
+            Title = "Add repository",
+            Content = input,
+            PrimaryButtonText = "Add",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Primary,
+        };
+
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        var repo = input.Text.Trim();
+        if (string.IsNullOrEmpty(repo))
+        {
+            AllowlistStatusText.Text = "Enter a repository as owner/repo.";
+            return;
+        }
+
+        if (!await VerifyHelloAsync($"Add {repo} to Delivery Authority trusted grants?")) return;
+        try
+        {
+            _store.SetRepositoryAllowed(repo, true, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+            AllowlistStatusText.Text = $"Added {repo}.";
+            Refresh();
+        }
+        catch (Exception error)
+        {
+            AllowlistStatusText.Text = $"Could not add repository: {error.Message}";
+        }
+    }
+
+    private async void RemoveRepository_Click(object sender, RoutedEventArgs e)
+    {
+        if (AllowlistList.SelectedItem is not RepositoryListItem item || string.IsNullOrEmpty(item.Repo)) return;
+        var repo = item.Repo;
+        if (!await VerifyHelloAsync($"Remove {repo} from the Delivery Authority allowlist?")) return;
+
+        try
+        {
+            _store.SetRepositoryAllowed(repo, false, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+            AllowlistStatusText.Text = $"Removed {repo}.";
+            Refresh();
+        }
+        catch (Exception error)
+        {
+            AllowlistStatusText.Text = $"Could not remove repository: {error.Message}";
+        }
+    }
+
+    private async Task<bool> VerifyHelloAsync(string message)
+    {
+        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+        var verification = await HelloVerifier.VerifyAsync(hwnd, message);
+        if (verification.Verified) return true;
+
+        AllowlistStatusText.Text = verification.FailureMessage ?? "Windows Hello verification was cancelled.";
+        if (verification.CanOpenSignInOptions) WindowsSettings.OpenSignInOptions();
+        return false;
     }
 
     private void GrantList_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -177,19 +310,52 @@ internal sealed partial class ControlCenterWindow : Window
 
     private void OpenSettings_Click(object sender, RoutedEventArgs e)
     {
-        var settingsItem = Navigation.MenuItems
-            .OfType<NavigationViewItem>()
-            .FirstOrDefault(item => string.Equals(item.Tag?.ToString(), "settings", StringComparison.Ordinal));
-        if (settingsItem is not null) Navigation.SelectedItem = settingsItem;
+        Navigation.SelectedItem = Navigation.SettingsItem;
+    }
+
+    private AppWindow ResolveAppWindow()
+    {
+        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+        var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hwnd);
+        return AppWindow.GetFromWindowId(windowId)
+            ?? throw new InvalidOperationException("control_center_app_window_unavailable");
+    }
+
+    private void TrySetWindowIcon()
+    {
+        try
+        {
+            var appWindow = _appWindow;
+            var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "DeliveryAuthority.ico");
+            if (File.Exists(iconPath)) appWindow.SetIcon(iconPath);
+        }
+        catch
+        {
+            // Window icon setup is best effort.
+        }
+    }
+
+    private void TrySetMinimumWindowSize(int width, int height)
+    {
+        try
+        {
+            if (_appWindow.Presenter is OverlappedPresenter presenter)
+            {
+                presenter.PreferredMinimumWidth = width;
+                presenter.PreferredMinimumHeight = height;
+            }
+        }
+        catch
+        {
+            // Minimum window sizing is best effort.
+        }
     }
 
     private void TryResize(int width, int height)
     {
         try
         {
-            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
-            var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hwnd);
-            AppWindow.GetFromWindowId(windowId)?.Resize(new SizeInt32(width, height));
+            _appWindow.Resize(new SizeInt32(width, height));
         }
         catch
         {

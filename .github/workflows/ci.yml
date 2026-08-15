@@ -90,6 +90,17 @@ jobs:
         if: runner.os == 'Windows'
         run: dotnet run --project authority-host/windows/GitHubDeliveryAuthority/GitHubDeliveryAuthority.csproj --configuration Release --no-build -- --self-test
 
+      - name: Run Windows authority host XAML smoke test
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          dotnet run --project authority-host/windows/GitHubDeliveryAuthority/GitHubDeliveryAuthority.csproj --configuration Release --no-build -- --xaml-self-test
+          if ($LASTEXITCODE -ne 0) {
+            $Diagnostics = Join-Path $env:LOCALAPPDATA 'GitHubDeliveryAuthority\startup-error.log'
+            if (Test-Path $Diagnostics -PathType Leaf) { Get-Content $Diagnostics }
+            exit $LASTEXITCODE
+          }
+
       - name: Publish Windows authority host
         if: runner.os == 'Windows' && matrix.node == 24
         shell: pwsh
@@ -98,6 +109,20 @@ jobs:
           $PublishDir = Join-Path $env:RUNNER_TEMP 'github-delivery-authority-publish'
           dotnet publish $Project --configuration Release --runtime win-x64 --self-contained true --no-restore --output $PublishDir
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          foreach ($CompiledXaml in @('App.xbf', 'ApprovalWindow.xbf', 'ControlCenterWindow.xbf')) {
+            $CompiledXamlPath = Join-Path $PublishDir $CompiledXaml
+            if (-not (Test-Path $CompiledXamlPath -PathType Leaf)) {
+              throw "Published authority host is missing compiled XAML resource: $CompiledXaml"
+            }
+          }
+          $ResourceIndex = Join-Path $PublishDir 'resources.pri'
+          if (-not (Test-Path $ResourceIndex -PathType Leaf)) {
+            throw 'Published authority host is missing the unpackaged WinUI resource index: resources.pri'
+          }
+          $AuthorityIcon = Join-Path $PublishDir 'Assets\DeliveryAuthority.ico'
+          if (-not (Test-Path $AuthorityIcon -PathType Leaf)) {
+            throw 'Published authority host is missing Assets\DeliveryAuthority.ico'
+          }
           $DepsPath = Join-Path $PublishDir 'GitHubDeliveryAuthority.deps.json'
           $Deps = Get-Content $DepsPath -Raw | ConvertFrom-Json
           $RuntimePackage = $Deps.libraries.PSObject.Properties.Name |
@@ -112,4 +137,45 @@ jobs:
           & $Executable --self-test
           if ($LASTEXITCODE -ne 0) {
             throw "Published authority executable self-test failed with exit code $LASTEXITCODE."
+          }
+          & $Executable --xaml-self-test
+          if ($LASTEXITCODE -ne 0) {
+            $Diagnostics = Join-Path $env:LOCALAPPDATA 'GitHubDeliveryAuthority\startup-error.log'
+            if (Test-Path $Diagnostics -PathType Leaf) { Get-Content $Diagnostics }
+            throw "Published authority executable XAML smoke test failed with exit code $LASTEXITCODE."
+          }
+
+          $Version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $SmokeWorkspace = Join-Path $env:RUNNER_TEMP 'github-delivery-authority-release-smoke'
+          $PreparedJson = node scripts/prepare-authority-host-runtime-smoke.mjs `
+            --publish-dir $PublishDir `
+            --workspace $SmokeWorkspace `
+            --version $Version `
+            --source-commit $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $Prepared = $PreparedJson | ConvertFrom-Json
+
+          $InstallDir = Join-Path $env:RUNNER_TEMP 'github-delivery-authority-installed-smoke'
+          & powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass `
+            -File authority-host/windows/install-release.ps1 `
+            -SourceDir $Prepared.source `
+            -ExpectedVersion $Version `
+            -ExpectedSourceCommit $env:GITHUB_SHA `
+            -InstallDir $InstallDir `
+            -SkipStart
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          $InstalledExecutable = Join-Path $InstallDir "app\v$Version\GitHubDeliveryAuthority.exe"
+          if (-not (Test-Path $InstalledExecutable -PathType Leaf)) {
+            throw 'Installed Authority smoke executable is missing.'
+          }
+          $InstalledIcon = Join-Path $InstallDir "app\v$Version\Assets\DeliveryAuthority.ico"
+          if (-not (Test-Path $InstalledIcon -PathType Leaf)) {
+            throw 'Installed Authority icon is missing.'
+          }
+          & $InstalledExecutable --xaml-self-test
+          if ($LASTEXITCODE -ne 0) {
+            $Diagnostics = Join-Path $env:LOCALAPPDATA 'GitHubDeliveryAuthority\startup-error.log'
+            if (Test-Path $Diagnostics -PathType Leaf) { Get-Content $Diagnostics }
+            throw "Installed Authority XAML smoke test failed with exit code $LASTEXITCODE."
           }

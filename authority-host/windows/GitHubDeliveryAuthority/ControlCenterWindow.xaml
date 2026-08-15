@@ -7,128 +7,624 @@
     mc:Ignorable="d"
     Title="Delivery Authority">
 
-    <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+    <Grid x:Name="RootLayout"
+          Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroup x:Name="DashboardLayoutStates">
+                <VisualState x:Name="NarrowDashboardState">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="0" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="OverviewContent.Padding" Value="16,16,16,20" />
+                        <Setter Target="SettingsContent.Padding" Value="16,16,16,20" />
+                        <Setter Target="ActivityColumnsHeader.Visibility" Value="Collapsed" />
+
+
+                        <Setter Target="DashboardPrimaryColumn.Width" Value="*" />
+                        <Setter Target="DashboardSecondaryColumn.Width" Value="0" />
+                        <Setter Target="DashboardCardsGrid.ColumnSpacing" Value="0" />
+                        <Setter Target="DashboardRow3.Height" Value="Auto" />
+                        <Setter Target="DashboardRow4.Height" Value="Auto" />
+
+                        <Setter Target="ActivityCard.(Grid.Row)" Value="0" />
+                        <Setter Target="ActivityCard.(Grid.Column)" Value="0" />
+                        <Setter Target="ActivityCard.(Grid.RowSpan)" Value="1" />
+                        <Setter Target="ActivityCard.(Grid.ColumnSpan)" Value="2" />
+                        <Setter Target="AllowlistCard.(Grid.Row)" Value="1" />
+                        <Setter Target="AllowlistCard.(Grid.Column)" Value="0" />
+                        <Setter Target="AllowlistCard.(Grid.ColumnSpan)" Value="2" />
+                        <Setter Target="GrantCard.(Grid.Row)" Value="2" />
+                        <Setter Target="GrantCard.(Grid.Column)" Value="0" />
+                        <Setter Target="GrantCard.(Grid.ColumnSpan)" Value="2" />
+                        <Setter Target="DiagnosticsCard.(Grid.Row)" Value="3" />
+                        <Setter Target="DiagnosticsCard.(Grid.Column)" Value="0" />
+                        <Setter Target="DiagnosticsCard.(Grid.ColumnSpan)" Value="2" />
+                        <Setter Target="QuickSettingsCard.(Grid.Row)" Value="4" />
+                        <Setter Target="QuickSettingsCard.(Grid.Column)" Value="0" />
+                        <Setter Target="QuickSettingsCard.(Grid.ColumnSpan)" Value="2" />
+                    </VisualState.Setters>
+                </VisualState>
+
+                <VisualState x:Name="MediumDashboardState">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="900" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="OverviewContent.Padding" Value="22,20,22,24" />
+                        <Setter Target="SettingsContent.Padding" Value="22,20,22,24" />
+                        <Setter Target="ActivityColumnsHeader.Visibility" Value="Visible" />
+
+
+                        <Setter Target="DashboardPrimaryColumn.Width" Value="*" />
+                        <Setter Target="DashboardSecondaryColumn.Width" Value="*" />
+                        <Setter Target="DashboardCardsGrid.ColumnSpacing" Value="16" />
+                        <Setter Target="DashboardRow3.Height" Value="0" />
+                        <Setter Target="DashboardRow4.Height" Value="0" />
+
+                        <Setter Target="ActivityCard.(Grid.Row)" Value="0" />
+                        <Setter Target="ActivityCard.(Grid.Column)" Value="0" />
+                        <Setter Target="ActivityCard.(Grid.RowSpan)" Value="1" />
+                        <Setter Target="ActivityCard.(Grid.ColumnSpan)" Value="2" />
+                        <Setter Target="AllowlistCard.(Grid.Row)" Value="1" />
+                        <Setter Target="AllowlistCard.(Grid.Column)" Value="0" />
+                        <Setter Target="AllowlistCard.(Grid.ColumnSpan)" Value="1" />
+                        <Setter Target="GrantCard.(Grid.Row)" Value="1" />
+                        <Setter Target="GrantCard.(Grid.Column)" Value="1" />
+                        <Setter Target="GrantCard.(Grid.ColumnSpan)" Value="1" />
+                        <Setter Target="DiagnosticsCard.(Grid.Row)" Value="2" />
+                        <Setter Target="DiagnosticsCard.(Grid.Column)" Value="0" />
+                        <Setter Target="DiagnosticsCard.(Grid.ColumnSpan)" Value="1" />
+                        <Setter Target="QuickSettingsCard.(Grid.Row)" Value="2" />
+                        <Setter Target="QuickSettingsCard.(Grid.Column)" Value="1" />
+                        <Setter Target="QuickSettingsCard.(Grid.ColumnSpan)" Value="1" />
+                    </VisualState.Setters>
+                </VisualState>
+
+                <VisualState x:Name="WideDashboardState">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="1360" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="OverviewContent.Padding" Value="28,24,28,28" />
+                        <Setter Target="SettingsContent.Padding" Value="28,24,28,28" />
+                        <Setter Target="ActivityColumnsHeader.Visibility" Value="Visible" />
+
+
+                        <Setter Target="DashboardPrimaryColumn.Width" Value="2.15*" />
+                        <Setter Target="DashboardSecondaryColumn.Width" Value="*" />
+                        <Setter Target="DashboardCardsGrid.ColumnSpacing" Value="16" />
+                        <Setter Target="DashboardRow3.Height" Value="0" />
+                        <Setter Target="DashboardRow4.Height" Value="0" />
+
+                        <Setter Target="ActivityCard.(Grid.Row)" Value="0" />
+                        <Setter Target="ActivityCard.(Grid.Column)" Value="0" />
+                        <Setter Target="ActivityCard.(Grid.RowSpan)" Value="2" />
+                        <Setter Target="ActivityCard.(Grid.ColumnSpan)" Value="1" />
+                        <Setter Target="AllowlistCard.(Grid.Row)" Value="0" />
+                        <Setter Target="AllowlistCard.(Grid.Column)" Value="1" />
+                        <Setter Target="AllowlistCard.(Grid.ColumnSpan)" Value="1" />
+                        <Setter Target="GrantCard.(Grid.Row)" Value="1" />
+                        <Setter Target="GrantCard.(Grid.Column)" Value="1" />
+                        <Setter Target="GrantCard.(Grid.ColumnSpan)" Value="1" />
+                        <Setter Target="DiagnosticsCard.(Grid.Row)" Value="2" />
+                        <Setter Target="DiagnosticsCard.(Grid.Column)" Value="0" />
+                        <Setter Target="DiagnosticsCard.(Grid.ColumnSpan)" Value="1" />
+                        <Setter Target="QuickSettingsCard.(Grid.Row)" Value="2" />
+                        <Setter Target="QuickSettingsCard.(Grid.Column)" Value="1" />
+                        <Setter Target="QuickSettingsCard.(Grid.ColumnSpan)" Value="1" />
+                    </VisualState.Setters>
+                </VisualState>
+            </VisualStateGroup>
+        </VisualStateManager.VisualStateGroups>
+
         <NavigationView x:Name="Navigation"
-                        PaneDisplayMode="Left"
-                        IsBackButtonVisible="Collapsed"
-                        IsSettingsVisible="False"
-                        IsPaneToggleButtonVisible="False"
+                        PaneDisplayMode="Auto"
+                        CompactModeThresholdWidth="0"
+                        ExpandedModeThresholdWidth="1360"
+                        CompactPaneLength="48"
                         OpenPaneLength="172"
+                        IsBackButtonVisible="Collapsed"
+                        IsSettingsVisible="True"
+                        IsPaneToggleButtonVisible="False"
                         SelectionChanged="Navigation_SelectionChanged">
             <NavigationView.MenuItems>
-                <NavigationViewItem Content="Overview" Tag="overview"><NavigationViewItem.Icon><SymbolIcon Symbol="Home" /></NavigationViewItem.Icon></NavigationViewItem>
-                <NavigationViewItem Content="Activity" Tag="activity" IsSelected="True"><NavigationViewItem.Icon><SymbolIcon Symbol="Clock" /></NavigationViewItem.Icon></NavigationViewItem>
-                <NavigationViewItem Content="Allowlist" Tag="allowlist"><NavigationViewItem.Icon><SymbolIcon Symbol="List" /></NavigationViewItem.Icon></NavigationViewItem>
-                <NavigationViewItem Content="Temporary grants" Tag="grants"><NavigationViewItem.Icon><SymbolIcon Symbol="Permissions" /></NavigationViewItem.Icon></NavigationViewItem>
-                <NavigationViewItem Content="Diagnostics" Tag="diagnostics"><NavigationViewItem.Icon><SymbolIcon Symbol="ReportHacked" /></NavigationViewItem.Icon></NavigationViewItem>
-                <NavigationViewItem Content="Settings" Tag="settings"><NavigationViewItem.Icon><SymbolIcon Symbol="Setting" /></NavigationViewItem.Icon></NavigationViewItem>
+                <NavigationViewItem Content="Overview" Tag="overview" IsSelected="True" ToolTipService.ToolTip="Overview">
+                    <NavigationViewItem.Icon><SymbolIcon Symbol="Home" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
             </NavigationView.MenuItems>
 
-            <NavigationView.PaneFooter>
-                <Border Padding="12" Margin="8" CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
-                    <StackPanel Orientation="Horizontal" Spacing="10">
-                        <FontIcon Glyph="&#xE83D;" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" FontSize="18" />
-                        <StackPanel>
-                            <TextBlock Text="Protection mode" FontWeight="SemiBold" />
-                            <TextBlock x:Name="ProtectionModeSidebar" Text="Loading…" Style="{StaticResource CaptionTextBlockStyle}" Opacity="0.72" />
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
-            </NavigationView.PaneFooter>
-
             <Grid>
-                <ScrollViewer x:Name="OverviewPage" VerticalScrollBarVisibility="Auto">
-                    <Grid Padding="28,24,28,28" MaxWidth="1180" HorizontalAlignment="Center">
+                <ScrollViewer x:Name="OverviewPage"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              HorizontalContentAlignment="Stretch">
+                    <Grid x:Name="OverviewContent"
+                          Padding="16,16,16,20"
+                          HorizontalAlignment="Stretch">
                         <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
 
-                        <Grid Grid.Row="0" Margin="0,0,0,20">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                            <StackPanel>
-                                <TextBlock Text="Audit dashboard" Style="{StaticResource TitleTextBlockStyle}" />
-                                <TextBlock Text="Monitor activity, approvals, and policy enforcement." Margin="0,4,0,0" Opacity="0.72" />
+                        <Grid Grid.Row="0" Margin="0,0,0,20" ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel MinWidth="0">
+                                <TextBlock Text="Audit dashboard"
+                                           Style="{StaticResource TitleTextBlockStyle}"
+                                           TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="Monitor activity, approvals, and policy enforcement."
+                                           Margin="0,4,0,0"
+                                           Opacity="0.72"
+                                           TextWrapping="WrapWholeWords" />
                             </StackPanel>
-                            <Border Grid.Column="1" Padding="10,5" CornerRadius="6" Background="{ThemeResource SystemFillColorSuccessBackgroundBrush}" VerticalAlignment="Top">
-                                <StackPanel Orientation="Horizontal" Spacing="7"><Ellipse Width="8" Height="8" Fill="{ThemeResource SystemFillColorSuccessBrush}"/><TextBlock Text="READY" FontWeight="SemiBold"/></StackPanel>
+                            <Border Grid.Column="1"
+                                    Padding="10,5"
+                                    CornerRadius="6"
+                                    Background="{ThemeResource SystemFillColorSuccessBackgroundBrush}"
+                                    VerticalAlignment="Top">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <Ellipse Width="8"
+                                             Height="8"
+                                             Fill="{ThemeResource SystemFillColorSuccessBrush}" />
+                                    <TextBlock Text="READY" FontWeight="SemiBold" />
+                                </StackPanel>
                             </Border>
                         </Grid>
 
-                        <Border Grid.Row="1" Padding="18" CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" Margin="0,0,0,16">
-                            <Grid ColumnSpacing="0">
-                                <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0" HorizontalAlignment="Center" Spacing="3"><FontIcon Glyph="&#xE83D;" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/><TextBlock x:Name="AllowlistedCount" Text="0" FontSize="22" FontWeight="SemiBold"/><TextBlock Text="Repositories" Style="{StaticResource CaptionTextBlockStyle}"/><TextBlock Text="Allowlisted" Style="{StaticResource CaptionTextBlockStyle}"/></StackPanel>
-                                <StackPanel Grid.Column="1" HorizontalAlignment="Center" Spacing="3"><FontIcon Glyph="&#xE8D7;" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/><TextBlock x:Name="ActiveGrantCount" Text="0" FontSize="22" FontWeight="SemiBold"/><TextBlock Text="Active" Style="{StaticResource CaptionTextBlockStyle}"/><TextBlock Text="Grants" Style="{StaticResource CaptionTextBlockStyle}"/></StackPanel>
-                                <StackPanel Grid.Column="2" HorizontalAlignment="Center" Spacing="3"><FontIcon Glyph="&#xE73E;" Foreground="{ThemeResource SystemFillColorSuccessBrush}"/><TextBlock x:Name="ApprovedTodayCount" Text="0" FontSize="22" FontWeight="SemiBold"/><TextBlock Text="Approved" Style="{StaticResource CaptionTextBlockStyle}"/><TextBlock Text="Today" Style="{StaticResource CaptionTextBlockStyle}"/></StackPanel>
-                                <StackPanel Grid.Column="3" HorizontalAlignment="Center" Spacing="3"><FontIcon Glyph="&#xE711;" Foreground="{ThemeResource SystemFillColorCriticalBrush}"/><TextBlock x:Name="DeniedTodayCount" Text="0" FontSize="22" FontWeight="SemiBold"/><TextBlock Text="Denied" Style="{StaticResource CaptionTextBlockStyle}"/><TextBlock Text="Today" Style="{StaticResource CaptionTextBlockStyle}"/></StackPanel>
-                                <StackPanel Grid.Column="4" HorizontalAlignment="Center" Spacing="3"><FontIcon Glyph="&#xE823;" Foreground="{ThemeResource SystemFillColorCautionBrush}"/><TextBlock x:Name="ExpiredTodayCount" Text="0" FontSize="22" FontWeight="SemiBold"/><TextBlock Text="Expired" Style="{StaticResource CaptionTextBlockStyle}"/><TextBlock Text="Today" Style="{StaticResource CaptionTextBlockStyle}"/></StackPanel>
+                        <Border Grid.Row="1"
+                                Padding="18"
+                                CornerRadius="8"
+                                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                Margin="0,0,0,16">
+                            <Grid x:Name="SummaryMetricsGrid" RowSpacing="14">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition x:Name="SummaryColumn0" Width="*" />
+                                    <ColumnDefinition x:Name="SummaryColumn1" Width="*" />
+                                    <ColumnDefinition x:Name="SummaryColumn2" Width="*" />
+                                    <ColumnDefinition x:Name="SummaryColumn3" Width="*" />
+                                    <ColumnDefinition x:Name="SummaryColumn4" Width="*" />
+                                    <ColumnDefinition x:Name="SummaryColumn5" Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition x:Name="SummarySecondRow" Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <StackPanel x:Name="SummaryMetric0"
+                                            Grid.Row="0"
+                                            Grid.Column="0"
+                                            Grid.ColumnSpan="2"
+                                            HorizontalAlignment="Center"
+                                            Spacing="3">
+                                    <FontIcon Glyph="&#xE83D;" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                                    <TextBlock x:Name="AllowlistedCount" Text="0" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                    <TextBlock Text="Repositories" Style="{StaticResource CaptionTextBlockStyle}" HorizontalAlignment="Center" />
+                                    <TextBlock Text="Allowlisted" Style="{StaticResource CaptionTextBlockStyle}" HorizontalAlignment="Center" />
+                                </StackPanel>
+                                <StackPanel x:Name="SummaryMetric1"
+                                            Grid.Row="0"
+                                            Grid.Column="2"
+                                            Grid.ColumnSpan="2"
+                                            HorizontalAlignment="Center"
+                                            Spacing="3">
+                                    <FontIcon Glyph="&#xE8D7;" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                                    <TextBlock x:Name="ActiveGrantCount" Text="0" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                    <TextBlock Text="Active" Style="{StaticResource CaptionTextBlockStyle}" HorizontalAlignment="Center" />
+                                    <TextBlock Text="Grants" Style="{StaticResource CaptionTextBlockStyle}" HorizontalAlignment="Center" />
+                                </StackPanel>
+                                <StackPanel x:Name="SummaryMetric2"
+                                            Grid.Row="0"
+                                            Grid.Column="4"
+                                            Grid.ColumnSpan="2"
+                                            HorizontalAlignment="Center"
+                                            Spacing="3">
+                                    <FontIcon Glyph="&#xE73E;" Foreground="{ThemeResource SystemFillColorSuccessBrush}" />
+                                    <TextBlock x:Name="ApprovedTodayCount" Text="0" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                    <TextBlock Text="Approved" Style="{StaticResource CaptionTextBlockStyle}" HorizontalAlignment="Center" />
+                                    <TextBlock Text="Today" Style="{StaticResource CaptionTextBlockStyle}" HorizontalAlignment="Center" />
+                                </StackPanel>
+                                <StackPanel x:Name="SummaryMetric3"
+                                            Grid.Row="1"
+                                            Grid.Column="1"
+                                            Grid.ColumnSpan="2"
+                                            HorizontalAlignment="Center"
+                                            Spacing="3">
+                                    <FontIcon Glyph="&#xE711;" Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
+                                    <TextBlock x:Name="DeniedTodayCount" Text="0" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                    <TextBlock Text="Denied" Style="{StaticResource CaptionTextBlockStyle}" HorizontalAlignment="Center" />
+                                    <TextBlock Text="Today" Style="{StaticResource CaptionTextBlockStyle}" HorizontalAlignment="Center" />
+                                </StackPanel>
+                                <StackPanel x:Name="SummaryMetric4"
+                                            Grid.Row="1"
+                                            Grid.Column="3"
+                                            Grid.ColumnSpan="2"
+                                            HorizontalAlignment="Center"
+                                            Spacing="3">
+                                    <FontIcon Glyph="&#xE823;" Foreground="{ThemeResource SystemFillColorCautionBrush}" />
+                                    <TextBlock x:Name="ExpiredTodayCount" Text="0" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                    <TextBlock Text="Expired" Style="{StaticResource CaptionTextBlockStyle}" HorizontalAlignment="Center" />
+                                    <TextBlock Text="Today" Style="{StaticResource CaptionTextBlockStyle}" HorizontalAlignment="Center" />
+                                </StackPanel>
                             </Grid>
                         </Border>
 
-                        <Grid Grid.Row="2" ColumnSpacing="16" Margin="0,0,0,16">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="2.15*"/><ColumnDefinition Width="1*"/></Grid.ColumnDefinitions>
-                            <Border Grid.Column="0" Padding="16" CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                        <Grid x:Name="DashboardCardsGrid"
+                              Grid.Row="2"
+                              ColumnSpacing="0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition x:Name="DashboardPrimaryColumn" Width="*" />
+                                <ColumnDefinition x:Name="DashboardSecondaryColumn" Width="0" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition x:Name="DashboardRow3" Height="Auto" />
+                                <RowDefinition x:Name="DashboardRow4" Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <Border x:Name="ActivityCard"
+                                    Grid.Row="0"
+                                    Grid.Column="0"
+                                    Grid.ColumnSpan="2"
+                                    Padding="16"
+                                    CornerRadius="8"
+                                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1"
+                                    Margin="0,0,0,16">
                                 <StackPanel Spacing="12">
-                                    <Grid><TextBlock Text="Recent activity / Audit trail" FontWeight="SemiBold"/><Button Content="View full activity" HorizontalAlignment="Right" Style="{StaticResource AccentButtonStyle}" Padding="9,3" IsEnabled="False"/></Grid>
-                                    <Grid ColumnSpacing="10" Opacity="0.65"><Grid.ColumnDefinitions><ColumnDefinition Width="72"/><ColumnDefinition Width="1.1*"/><ColumnDefinition Width="1.4*"/><ColumnDefinition Width="92"/><ColumnDefinition Width="90"/></Grid.ColumnDefinitions><TextBlock Text="Time"/><TextBlock Grid.Column="1" Text="Repository"/><TextBlock Grid.Column="2" Text="Action"/><TextBlock Grid.Column="3" Text="Status"/><TextBlock Grid.Column="4" Text="Actor"/></Grid>
-                                    <ListView x:Name="ActivityList" SelectionMode="None" IsItemClickEnabled="False" MinHeight="280" />
+                                    <Grid x:Name="ActivityHeaderGrid" ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Recent activity / Audit trail"
+                                                   FontWeight="SemiBold"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   VerticalAlignment="Center" />
+                                    </Grid>
+                                    <Grid x:Name="ActivityColumnsHeader"
+                                          Visibility="Collapsed"
+                                          ColumnSpacing="10"
+                                          Opacity="0.65">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="72" />
+                                            <ColumnDefinition Width="1.1*" />
+                                            <ColumnDefinition Width="1.4*" />
+                                            <ColumnDefinition Width="92" />
+                                            <ColumnDefinition Width="90" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Time" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="1" Text="Repository" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="2" Text="Action" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="3" Text="Status" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="4" Text="Actor" TextTrimming="CharacterEllipsis" />
+                                    </Grid>
+                                    <ListView x:Name="ActivityList"
+                                              SelectionMode="None"
+                                              IsItemClickEnabled="False"
+                                              MinHeight="280"
+                                              HorizontalContentAlignment="Stretch"
+                                              ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding}"
+                                                           TextWrapping="WrapWholeWords"
+                                                           TextTrimming="CharacterEllipsis" />
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
                                 </StackPanel>
                             </Border>
-                            <StackPanel Grid.Column="1" Spacing="16">
-                                <Border Padding="16" CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
-                                    <StackPanel Spacing="10"><Grid><TextBlock Text="Repository allowlist" FontWeight="SemiBold"/><Button Content="+ Add repository" HorizontalAlignment="Right" Padding="7,2" IsEnabled="False"/></Grid><ListView x:Name="AllowlistList" SelectionMode="None" MinHeight="135"/></StackPanel>
-                                </Border>
-                                <Border Padding="16" CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
-                                    <StackPanel Spacing="10"><Grid><TextBlock Text="Active temporary grants" FontWeight="SemiBold"/><Button x:Name="RevokeGrantButton" Content="Revoke selected" HorizontalAlignment="Right" Padding="7,2" IsEnabled="False" Click="RevokeGrant_Click"/></Grid><ListView x:Name="GrantList" SelectionMode="Single" SelectionChanged="GrantList_SelectionChanged" MinHeight="145"/></StackPanel>
-                                </Border>
-                            </StackPanel>
-                        </Grid>
 
-                        <Grid Grid.Row="3" ColumnSpacing="16">
-                            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
-                            <Border Grid.Column="0" Padding="16" CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
-                                <StackPanel Spacing="10"><TextBlock Text="Diagnostics" FontWeight="SemiBold"/><StackPanel Orientation="Horizontal" Spacing="10"><FontIcon Glyph="&#xE946;" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/><StackPanel><TextBlock Text="All systems operational" FontWeight="SemiBold"/><TextBlock Text="No issues detected." Style="{StaticResource CaptionTextBlockStyle}"/></StackPanel><TextBlock x:Name="DiagnosticsUpdated" Text="Updated now" HorizontalAlignment="Right" VerticalAlignment="Center"/></StackPanel></StackPanel>
+                            <Border x:Name="AllowlistCard"
+                                    Grid.Row="1"
+                                    Grid.Column="0"
+                                    Grid.ColumnSpan="2"
+                                    Padding="16"
+                                    CornerRadius="8"
+                                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1"
+                                    Margin="0,0,0,16">
+                                <StackPanel Spacing="10">
+                                    <Grid x:Name="AllowlistHeaderGrid" ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Repository allowlist"
+                                                   FontWeight="SemiBold"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                            <Button x:Name="AddRepositoryButton"
+                                                    Content="+ Add repository"
+                                                    Padding="7,2"
+                                                    Click="AddRepository_Click" />
+                                            <Button x:Name="RemoveRepositoryButton"
+                                                    Content="Remove selected"
+                                                    Padding="7,2"
+                                                    IsEnabled="False"
+                                                    Click="RemoveRepository_Click" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <ListView x:Name="AllowlistList"
+                                              SelectionMode="Single"
+                                              SelectionChanged="AllowlistList_SelectionChanged"
+                                              MinHeight="135"
+                                              HorizontalContentAlignment="Stretch"
+                                              ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding}"
+                                                           TextWrapping="WrapWholeWords"
+                                                           TextTrimming="CharacterEllipsis" />
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+                                    <TextBlock x:Name="AllowlistStatusText"
+                                               Text=""
+                                               Opacity="0.72"
+                                               TextWrapping="WrapWholeWords" />
+                                </StackPanel>
                             </Border>
-                            <Border Grid.Column="1" Padding="16" CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
-                                <StackPanel Spacing="12"><TextBlock Text="Quick settings" FontWeight="SemiBold"/><Grid><TextBlock Text="Protection mode"/><TextBlock x:Name="ProtectionModeText" Text="Loading…" HorizontalAlignment="Right"/></Grid><Button Content="Open settings" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Click="OpenSettings_Click"/></StackPanel>
+
+                            <Border x:Name="GrantCard"
+                                    Grid.Row="2"
+                                    Grid.Column="0"
+                                    Grid.ColumnSpan="2"
+                                    Padding="16"
+                                    CornerRadius="8"
+                                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1"
+                                    Margin="0,0,0,16">
+                                <StackPanel Spacing="10">
+                                    <Grid x:Name="GrantHeaderGrid" ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Active temporary grants"
+                                                   FontWeight="SemiBold"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   VerticalAlignment="Center" />
+                                        <Button x:Name="RevokeGrantButton"
+                                                Grid.Column="1"
+                                                Content="Revoke selected"
+                                                Padding="7,2"
+                                                IsEnabled="False"
+                                                Click="RevokeGrant_Click" />
+                                    </Grid>
+                                    <ListView x:Name="GrantList"
+                                              SelectionMode="Single"
+                                              SelectionChanged="GrantList_SelectionChanged"
+                                              MinHeight="145"
+                                              HorizontalContentAlignment="Stretch"
+                                              ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding}"
+                                                           TextWrapping="WrapWholeWords"
+                                                           TextTrimming="CharacterEllipsis" />
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+                                </StackPanel>
+                            </Border>
+
+                            <Border x:Name="DiagnosticsCard"
+                                    Grid.Row="3"
+                                    Grid.Column="0"
+                                    Grid.ColumnSpan="2"
+                                    Padding="16"
+                                    CornerRadius="8"
+                                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1"
+                                    Margin="0,0,0,16">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="Diagnostics" FontWeight="SemiBold" />
+                                    <Grid ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <FontIcon Glyph="&#xE946;"
+                                                  Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                                  VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" MinWidth="0">
+                                            <TextBlock Text="All systems operational"
+                                                       FontWeight="SemiBold"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="No issues detected."
+                                                       Style="{StaticResource CaptionTextBlockStyle}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                        <TextBlock x:Name="DiagnosticsUpdated"
+                                                   Grid.Column="2"
+                                                   Text="Updated now"
+                                                   VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <Border x:Name="QuickSettingsCard"
+                                    Grid.Row="4"
+                                    Grid.Column="0"
+                                    Grid.ColumnSpan="2"
+                                    Padding="16"
+                                    CornerRadius="8"
+                                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1">
+                                <StackPanel Spacing="12">
+                                    <TextBlock Text="Quick settings" FontWeight="SemiBold" />
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Protection mode"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock x:Name="ProtectionModeText"
+                                                   Grid.Column="1"
+                                                   Text="Loading…"
+                                                   TextTrimming="CharacterEllipsis" />
+                                    </Grid>
+                                    <Button Content="Open settings"
+                                            HorizontalAlignment="Stretch"
+                                            HorizontalContentAlignment="Left"
+                                            Click="OpenSettings_Click" />
+                                </StackPanel>
                             </Border>
                         </Grid>
                     </Grid>
                 </ScrollViewer>
 
-                <ScrollViewer x:Name="SettingsPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
-                    <Grid Padding="28,24,28,28" MaxWidth="920" HorizontalAlignment="Center">
-                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                <ScrollViewer x:Name="SettingsPage"
+                              Visibility="Collapsed"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              HorizontalContentAlignment="Stretch">
+                    <Grid x:Name="SettingsContent"
+                          Padding="16,16,16,20"
+                          HorizontalAlignment="Stretch">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
                         <StackPanel Grid.Row="0" Margin="0,0,0,20">
                             <TextBlock Text="Settings" Style="{StaticResource TitleTextBlockStyle}" />
-                            <TextBlock Text="Choose when GitHub Delivery must ask for Windows Hello before executing a mutation." Margin="0,4,0,0" Opacity="0.72" TextWrapping="Wrap" />
+                            <TextBlock Text="Choose when GitHub Delivery must ask for Windows Hello before executing a mutation."
+                                       Margin="0,4,0,0"
+                                       Opacity="0.72"
+                                       TextWrapping="WrapWholeWords" />
                         </StackPanel>
 
-                        <Border Grid.Row="1" Padding="20" CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" Margin="0,0,0,16">
+                        <Border Grid.Row="1"
+                                Padding="20"
+                                CornerRadius="8"
+                                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                Margin="0,0,0,16">
                             <StackPanel Spacing="16">
                                 <TextBlock Text="Protection mode" FontWeight="SemiBold" FontSize="16" />
                                 <RadioButton x:Name="OffModeRadio" GroupName="ProtectionMode" Content="Off" />
-                                <TextBlock Text="No Windows Hello prompts. Normal GitHub Delivery authorization, workflow, head-freshness and policy rules still apply." Margin="28,-10,0,0" Opacity="0.70" TextWrapping="Wrap" />
+                                <TextBlock Text="No Windows Hello prompts. Normal GitHub Delivery authorization, workflow, head-freshness and policy rules still apply."
+                                           Margin="28,-10,0,0"
+                                           Opacity="0.70"
+                                           TextWrapping="WrapWholeWords" />
                                 <RadioButton x:Name="SensitiveModeRadio" GroupName="ProtectionMode" Content="Sensitive actions (Recommended)" />
-                                <TextBlock Text="Require Windows Hello for pushes, merges, PR creation and other high-assurance or autonomous mutations." Margin="28,-10,0,0" Opacity="0.70" TextWrapping="Wrap" />
+                                <TextBlock Text="Require Windows Hello for pushes, merges, PR creation and other high-assurance or autonomous mutations."
+                                           Margin="28,-10,0,0"
+                                           Opacity="0.70"
+                                           TextWrapping="WrapWholeWords" />
                                 <RadioButton x:Name="AllModeRadio" GroupName="ProtectionMode" Content="Every GitHub write" />
-                                <TextBlock Text="Require Windows Hello for every executed GitHub mutation, including comments and reviews." Margin="28,-10,0,0" Opacity="0.70" TextWrapping="Wrap" />
-                                <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,4,0,0">
-                                    <Button x:Name="ApplyProtectionModeButton" Content="Apply" Style="{StaticResource AccentButtonStyle}" Click="ApplyProtectionMode_Click" />
-                                    <TextBlock x:Name="SettingsStatusText" VerticalAlignment="Center" Opacity="0.72" />
-                                </StackPanel>
+                                <TextBlock Text="Require Windows Hello for every executed GitHub mutation, including comments and reviews."
+                                           Margin="28,-10,0,0"
+                                           Opacity="0.70"
+                                           TextWrapping="WrapWholeWords" />
+                                <Grid ColumnSpacing="12" Margin="0,4,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Button x:Name="ApplyProtectionModeButton"
+                                            Content="Apply"
+                                            Style="{StaticResource AccentButtonStyle}"
+                                            Click="ApplyProtectionMode_Click" />
+                                    <TextBlock x:Name="SettingsStatusText"
+                                               Grid.Column="1"
+                                               VerticalAlignment="Center"
+                                               Opacity="0.72"
+                                               TextWrapping="WrapWholeWords" />
+                                </Grid>
                             </StackPanel>
                         </Border>
 
-                        <Border Grid.Row="2" Padding="20" CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                        <Border Grid.Row="2"
+                                Padding="20"
+                                CornerRadius="8"
+                                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1">
                             <StackPanel Spacing="12">
                                 <TextBlock Text="Installation" FontWeight="SemiBold" FontSize="16" />
-                                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="170"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="Delivery Authority" Opacity="0.68"/><TextBlock x:Name="HostVersionText" Grid.Column="1" Text="Unknown" FontFamily="Cascadia Mono, Consolas"/></Grid>
-                                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="170"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="Source commit" Opacity="0.68"/><TextBlock x:Name="HostSourceText" Grid.Column="1" Text="Unknown" FontFamily="Cascadia Mono, Consolas" TextTrimming="CharacterEllipsis"/></Grid>
-                                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="170"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="Config file" Opacity="0.68"/><TextBlock x:Name="ConfigPathText" Grid.Column="1" Text="Unknown" FontFamily="Cascadia Mono, Consolas" TextWrapping="Wrap"/></Grid>
+
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" MinWidth="120" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Delivery Authority" Opacity="0.68" />
+                                    <TextBlock x:Name="HostVersionText"
+                                               Grid.Column="1"
+                                               Text="Unknown"
+                                               FontFamily="Cascadia Mono, Consolas"
+                                               TextTrimming="CharacterEllipsis" />
+                                </Grid>
+
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" MinWidth="120" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Source commit" Opacity="0.68" />
+                                    <TextBlock x:Name="HostSourceText"
+                                               Grid.Column="1"
+                                               Text="Unknown"
+                                               FontFamily="Cascadia Mono, Consolas"
+                                               TextTrimming="CharacterEllipsis" />
+                                </Grid>
+
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" MinWidth="120" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Config file" Opacity="0.68" />
+                                    <TextBlock x:Name="ConfigPathText"
+                                               Grid.Column="1"
+                                               Text="Unknown"
+                                               FontFamily="Cascadia Mono, Consolas"
+                                               TextWrapping="WrapWholeWords" />
+                                </Grid>
+
+                                <Grid ColumnSpacing="16" Margin="0,4,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel MinWidth="0">
+                                        <TextBlock Text="Start Delivery Authority when I sign in"
+                                                   FontWeight="SemiBold"
+                                                   TextWrapping="WrapWholeWords" />
+                                        <TextBlock x:Name="AutostartStatusText"
+                                                   Text="Checking…"
+                                                   Style="{StaticResource CaptionTextBlockStyle}"
+                                                   Opacity="0.72"
+                                                   TextWrapping="WrapWholeWords" />
+                                    </StackPanel>
+                                    <ToggleSwitch x:Name="AutostartToggle"
+                                                  Grid.Column="1"
+                                                  VerticalAlignment="Center"
+                                                  Toggled="AutostartToggle_Toggled" />
+                                </Grid>
                             </StackPanel>
                         </Border>
                     </Grid>

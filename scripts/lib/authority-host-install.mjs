@@ -102,24 +102,62 @@ export function readInstalledAuthorityHost({
   return { supported: true, configured: false, installed: false, legacy: false, root, recordPath, exePath: null, version: null, sourceCommit: null, record: null };
 }
 
+async function showReadyAuthority({ installed, diagnosticsPath, processStarted, showControlCenter }) {
+  try {
+    const shown = await Promise.resolve(showControlCenter());
+    if (shown?.status !== "shown") throw new Error("authority_control_center_show_failed");
+    return {
+      started: true,
+      ready: true,
+      shown: true,
+      processStarted,
+      version: installed.version,
+      exePath: installed.exePath,
+      diagnosticsPath,
+    };
+  } catch {
+    return {
+      started: true,
+      ready: true,
+      shown: false,
+      processStarted,
+      reason: "control_center_show_failed",
+      version: installed.version,
+      exePath: installed.exePath,
+      diagnosticsPath,
+    };
+  }
+}
+
 export async function startInstalledAuthorityHost({
   installed = readInstalledAuthorityHost(),
   platform = process.platform,
   runner = spawn,
   probeStatus = () => callAuthorityHostSync({ method: "status", params: {}, timeoutMs: 200 }),
+  showControlCenter = () => callAuthorityHostSync({ method: "showControlCenter", params: {}, timeoutMs: 1_000 }),
   readinessTimeoutMs = 5_000,
   now = Date.now,
   sleep = (milliseconds) => new Promise((resolveSleep) => setTimeout(resolveSleep, milliseconds)),
 } = {}) {
-  if (platform !== "win32") return { started: false, ready: false, reason: "unsupported_platform" };
-  if (!installed?.installed || !installed.exePath) return { started: false, ready: false, reason: "not_installed" };
+  if (platform !== "win32") return { started: false, ready: false, shown: false, reason: "unsupported_platform" };
+  if (!installed?.installed || !installed.exePath) return { started: false, ready: false, shown: false, reason: "not_installed" };
 
   const diagnosticsPath = installed.root ? win32Path.join(installed.root, "startup-error.log") : null;
+
+  try {
+    const status = await Promise.resolve(probeStatus());
+    if (status?.status === "ready") {
+      return showReadyAuthority({ installed, diagnosticsPath, processStarted: false, showControlCenter });
+    }
+  } catch {
+    // No ready Authority instance is currently reachable; start the installed host below.
+  }
+
   let child;
   try {
     child = runner(installed.exePath, [], { detached: true, stdio: "ignore", windowsHide: true });
   } catch {
-    return { started: false, ready: false, reason: "spawn_failed", diagnosticsPath, exePath: installed.exePath };
+    return { started: false, ready: false, shown: false, reason: "spawn_failed", diagnosticsPath, exePath: installed.exePath };
   }
 
   let spawnError = null;
@@ -129,12 +167,13 @@ export async function startInstalledAuthorityHost({
 
   for (;;) {
     if (spawnError) {
-      return { started: false, ready: false, reason: "spawn_failed", diagnosticsPath, exePath: installed.exePath };
+      return { started: false, ready: false, shown: false, reason: "spawn_failed", diagnosticsPath, exePath: installed.exePath };
     }
     if (child?.exitCode !== null && child?.exitCode !== undefined) {
       return {
         started: false,
         ready: false,
+        shown: false,
         reason: "process_exited",
         exitCode: child.exitCode,
         diagnosticsPath,
@@ -144,13 +183,7 @@ export async function startInstalledAuthorityHost({
     try {
       const status = await Promise.resolve(probeStatus());
       if (status?.status === "ready") {
-        return {
-          started: true,
-          ready: true,
-          version: installed.version,
-          exePath: installed.exePath,
-          diagnosticsPath,
-        };
+        return showReadyAuthority({ installed, diagnosticsPath, processStarted: true, showControlCenter });
       }
     } catch {
       // The pipe may not exist until WinUI and the Authority service finish starting.
@@ -162,6 +195,7 @@ export async function startInstalledAuthorityHost({
   return {
     started: false,
     ready: false,
+    shown: false,
     reason: "readiness_timeout",
     diagnosticsPath,
     exePath: installed.exePath,
@@ -171,32 +205,78 @@ export async function startInstalledAuthorityHost({
 const WINDOWS_RUN_KEY = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 const WINDOWS_RUN_VALUE = "GitHubDeliveryAuthority";
 
-export function configureAuthorityHostStartup({
-  installed = readInstalledAuthorityHost(),
-  platform = process.platform,
-  runner = spawnSync,
-} = {}) {
-  if (platform !== "win32") return { configured: false, changed: false, reason: "unsupported_platform" };
-  if (!installed?.installed || !installed.exePath) {
-    return { configured: false, changed: false, reason: "not_installed" };
-  }
-
+function queryAuthorityHostStartup({ installed, runner }) {
   const expected = JSON.stringify(installed.exePath);
   const current = runner("reg.exe", ["QUERY", WINDOWS_RUN_KEY, "/v", WINDOWS_RUN_VALUE], {
     encoding: "utf8",
     windowsHide: true,
   });
-  if (current?.status === 0 && String(current.stdout || "").includes(expected)) {
-    return { configured: true, changed: false, exePath: installed.exePath };
+  return {
+    expected,
+    exists: current?.status === 0,
+    enabled: current?.status === 0 && String(current.stdout || "").includes(expected),
+  };
+}
+
+export function readAuthorityHostStartup({
+  installed = readInstalledAuthorityHost(),
+  platform = process.platform,
+  runner = spawnSync,
+} = {}) {
+  if (platform !== "win32") return { configured: false, enabled: false, changed: false, reason: "unsupported_platform" };
+  if (!installed?.installed || !installed.exePath) {
+    return { configured: false, enabled: false, changed: false, reason: "not_installed" };
   }
 
-  const result = runner("reg.exe", [
-    "ADD", WINDOWS_RUN_KEY, "/v", WINDOWS_RUN_VALUE, "/t", "REG_SZ", "/d", expected, "/f",
-  ], { encoding: "utf8", windowsHide: true });
-  if (result?.status !== 0 || result?.error) {
-    throw new Error(`authority_host_startup_registration_failed:${result?.stderr || result?.error?.message || "reg.exe failed"}`);
+  const current = queryAuthorityHostStartup({ installed, runner });
+  return {
+    configured: current.enabled,
+    enabled: current.enabled,
+    changed: false,
+    exePath: installed.exePath,
+  };
+}
+
+export function setAuthorityHostStartup({
+  enabled,
+  installed = readInstalledAuthorityHost(),
+  platform = process.platform,
+  runner = spawnSync,
+} = {}) {
+  if (platform !== "win32") return { configured: false, enabled: false, changed: false, reason: "unsupported_platform" };
+  if (!installed?.installed || !installed.exePath) {
+    return { configured: false, enabled: false, changed: false, reason: "not_installed" };
   }
-  return { configured: true, changed: true, exePath: installed.exePath };
+
+  const requested = enabled === true;
+  const current = queryAuthorityHostStartup({ installed, runner });
+  if (requested && current.enabled) {
+    return { configured: true, enabled: true, changed: false, exePath: installed.exePath };
+  }
+  if (!requested && !current.exists) {
+    return { configured: false, enabled: false, changed: false, exePath: installed.exePath };
+  }
+
+  const args = requested
+    ? ["ADD", WINDOWS_RUN_KEY, "/v", WINDOWS_RUN_VALUE, "/t", "REG_SZ", "/d", current.expected, "/f"]
+    : ["DELETE", WINDOWS_RUN_KEY, "/v", WINDOWS_RUN_VALUE, "/f"];
+  const result = runner("reg.exe", args, { encoding: "utf8", windowsHide: true });
+  if (result?.status !== 0 || result?.error) {
+    const code = requested ? "authority_host_startup_registration_failed" : "authority_host_startup_removal_failed";
+    throw new Error(`${code}:${result?.stderr || result?.error?.message || "reg.exe failed"}`);
+  }
+  return {
+    configured: requested,
+    enabled: requested,
+    changed: true,
+    exePath: installed.exePath,
+  };
+}
+
+export function configureAuthorityHostStartup(options = {}) {
+  const result = setAuthorityHostStartup({ ...options, enabled: true });
+  if (result.reason) return { configured: false, changed: false, reason: result.reason };
+  return { configured: true, changed: result.changed, exePath: result.exePath };
 }
 
 export function planAuthorityHostUpdate({ mode, targetVersion, installed } = {}) {

@@ -6,8 +6,10 @@ import { installCodexWatchdogHooks } from "../install-codex-watchdog-hooks.mjs";
 import { parseInstallArgs, runInstallCommand } from "../install-skill.mjs";
 import {
   configureAuthorityHostStartup,
+  readAuthorityHostStartup,
   readInstalledAuthorityHost,
   reconcileStableAuthorityHost,
+  setAuthorityHostStartup,
   startInstalledAuthorityHost,
 } from "./authority-host-install.mjs";
 import { confirmApply } from "./bootstrap-install.mjs";
@@ -192,9 +194,19 @@ export async function runBootstrapStart({ dependencies = {} } = {}) {
   return { action: "start", ...await start() };
 }
 
-export function runBootstrapAutostart({ dependencies = {} } = {}) {
-  const configureStartup = dependencies.configureAuthorityHostStartup || configureAuthorityHostStartup;
-  return { action: "autostart", ...configureStartup() };
+export function runBootstrapAutostart({ mode = "on", dependencies = {} } = {}) {
+  if (mode === "status") {
+    const readStartup = dependencies.readAuthorityHostStartup || readAuthorityHostStartup;
+    return { action: "autostart", mode, ...readStartup() };
+  }
+
+  if (mode === "on" && dependencies.configureAuthorityHostStartup && !dependencies.setAuthorityHostStartup) {
+    const legacy = dependencies.configureAuthorityHostStartup();
+    return { action: "autostart", mode, enabled: legacy.configured === true, ...legacy };
+  }
+
+  const setStartup = dependencies.setAuthorityHostStartup || setAuthorityHostStartup;
+  return { action: "autostart", mode, ...setStartup({ enabled: mode === "on" }) };
 }
 
 function relation(installedVersion, latestVersion) {

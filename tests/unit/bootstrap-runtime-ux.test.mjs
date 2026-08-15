@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { main } from "../../scripts/github-delivery-cli.mjs";
+import { parseBootstrapArgs } from "../../scripts/lib/bootstrap-cli.mjs";
 import { startInstalledAuthorityHost } from "../../scripts/lib/authority-host-install.mjs";
 
 function writableBuffer() {
@@ -162,4 +163,132 @@ test("Authority start reports success only after the status pipe is ready", asyn
   assert.equal(result.ready, true);
   assert.equal(result.version, "0.7.0");
   assert.equal(probes, 2);
+});
+
+test("Authority start reuses an already-running host and asks it to show the Control Center", async () => {
+  let spawnCalls = 0;
+  let showCalls = 0;
+  const exePath = "C:\\Users\\ws\\AppData\\Local\\GitHubDeliveryAuthority\\app\\v0.7.1\\GitHubDeliveryAuthority.exe";
+  const result = await startInstalledAuthorityHost({
+    platform: "win32",
+    installed: { installed: true, version: "0.7.1", root: "C:\\Users\\ws\\AppData\\Local\\GitHubDeliveryAuthority", exePath },
+    runner: () => { spawnCalls += 1; return { exitCode: null, unref() {} }; },
+    probeStatus: () => ({ status: "ready" }),
+    showControlCenter: () => { showCalls += 1; return { status: "shown" }; },
+  });
+
+  assert.equal(spawnCalls, 0);
+  assert.equal(showCalls, 1);
+  assert.equal(result.started, true);
+  assert.equal(result.ready, true);
+  assert.equal(result.shown, true);
+  assert.equal(result.processStarted, false);
+  assert.equal(result.exePath, exePath);
+});
+
+test("Authority start shows the Control Center after a freshly spawned host becomes ready", async () => {
+  let probes = 0;
+  let showCalls = 0;
+  const child = { exitCode: null, unref() {} };
+  const result = await startInstalledAuthorityHost({
+    platform: "win32",
+    installed: {
+      installed: true,
+      version: "0.7.1",
+      root: "C:\\Users\\ws\\AppData\\Local\\GitHubDeliveryAuthority",
+      exePath: "C:\\Users\\ws\\AppData\\Local\\GitHubDeliveryAuthority\\app\\v0.7.1\\GitHubDeliveryAuthority.exe",
+    },
+    runner: () => child,
+    probeStatus: () => {
+      probes += 1;
+      if (probes < 2) throw new Error("authority_host_unavailable");
+      return { status: "ready" };
+    },
+    showControlCenter: () => { showCalls += 1; return { status: "shown" }; },
+    readinessTimeoutMs: 1_000,
+    now: () => probes * 100,
+    sleep: async () => {},
+  });
+
+  assert.equal(result.started, true);
+  assert.equal(result.ready, true);
+  assert.equal(result.shown, true);
+  assert.equal(result.processStarted, true);
+  assert.equal(showCalls, 1);
+});
+
+test("start success explains the notification-area lifecycle and executable location", async () => {
+  const stdout = writableBuffer();
+  const exePath = "C:\\Users\\ws\\AppData\\Local\\GitHubDeliveryAuthority\\app\\v0.7.1\\GitHubDeliveryAuthority.exe";
+  await main(["start"], {
+    stdout,
+    runBootstrap: async () => ({ action: "start", started: true, ready: true, shown: true, exePath }),
+  });
+
+  const text = stdout.toString();
+  assert.match(text, /Control Center.*open/i);
+  assert.match(text, /GitHubDeliveryAuthority\.exe/);
+  assert.match(text, /notification area/i);
+  assert.match(text, /right-click/i);
+  assert.match(text, /Exit/);
+});
+
+test("autostart parser supports backward-compatible on plus off and status modes", () => {
+  assert.equal(parseBootstrapArgs(["autostart"]).autostartMode, "on");
+  assert.equal(parseBootstrapArgs(["autostart", "on"]).autostartMode, "on");
+  assert.equal(parseBootstrapArgs(["autostart", "off"]).autostartMode, "off");
+  assert.equal(parseBootstrapArgs(["autostart", "status"]).autostartMode, "status");
+  assert.throws(() => parseBootstrapArgs(["autostart", "maybe"]), /bootstrap_autostart_mode_invalid/);
+});
+
+test("autostart renderer distinguishes enabled disabled and status without raw receipts", async () => {
+  for (const [argv, result, pattern] of [
+    [["autostart", "on"], { action: "autostart", mode: "on", enabled: true, configured: true, changed: true }, /auto-start is enabled/i],
+    [["autostart", "off"], { action: "autostart", mode: "off", enabled: false, configured: false, changed: true }, /auto-start is disabled/i],
+    [["autostart", "status"], { action: "autostart", mode: "status", enabled: false, configured: false, changed: false }, /auto-start is disabled/i],
+  ]) {
+    const stdout = writableBuffer();
+    await main(argv, { stdout, runBootstrap: async () => result });
+    assert.match(stdout.toString(), pattern);
+    assert.doesNotMatch(stdout.toString(), /^\s*\{/);
+  }
+});
+
+test("Authority startup state helper supports read enable disable and unchanged state", async () => {
+  const install = await import("../../scripts/lib/authority-host-install.mjs");
+  assert.equal(typeof install.readAuthorityHostStartup, "function");
+  assert.equal(typeof install.setAuthorityHostStartup, "function");
+
+  const exePath = "C:\\Users\\ws\\AppData\\Local\\GitHubDeliveryAuthority\\app\\v0.7.1\\GitHubDeliveryAuthority.exe";
+  let registered = null;
+  const runner = (_program, args) => {
+    if (args[0] === "QUERY") {
+      return registered === null
+        ? { status: 1, stdout: "", stderr: "ERROR: The system was unable to find the specified registry value." }
+        : { status: 0, stdout: `GitHubDeliveryAuthority    REG_SZ    ${registered}\r\n`, stderr: "" };
+    }
+    if (args[0] === "ADD") {
+      registered = args[args.indexOf("/d") + 1];
+      return { status: 0, stdout: "", stderr: "" };
+    }
+    if (args[0] === "DELETE") {
+      registered = null;
+      return { status: 0, stdout: "", stderr: "" };
+    }
+    throw new Error(`unexpected reg command: ${args.join(" ")}`);
+  };
+  const installed = { installed: true, exePath };
+
+  assert.equal(install.readAuthorityHostStartup({ platform: "win32", installed, runner }).enabled, false);
+  assert.deepEqual(
+    install.setAuthorityHostStartup({ platform: "win32", installed, runner, enabled: true }),
+    { configured: true, enabled: true, changed: true, exePath },
+  );
+  assert.equal(install.readAuthorityHostStartup({ platform: "win32", installed, runner }).enabled, true);
+  assert.equal(install.setAuthorityHostStartup({ platform: "win32", installed, runner, enabled: true }).changed, false);
+  assert.deepEqual(
+    install.setAuthorityHostStartup({ platform: "win32", installed, runner, enabled: false }),
+    { configured: false, enabled: false, changed: true, exePath },
+  );
+  assert.equal(install.readAuthorityHostStartup({ platform: "win32", installed, runner }).enabled, false);
 });

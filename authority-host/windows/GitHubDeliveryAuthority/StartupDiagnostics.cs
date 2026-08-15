@@ -15,12 +15,15 @@ internal static class StartupDiagnostics
         }
     }
 
-    public static void Write(Exception exception, string source)
+    public static void Write(Exception exception, string source, string? detail = null)
     {
         try
         {
             Directory.CreateDirectory(AppPaths.RootDirectory);
-            var entry = $"{DateTimeOffset.UtcNow:O} {source}{Environment.NewLine}{exception}{Environment.NewLine}{Environment.NewLine}";
+            var entry = $"{DateTimeOffset.UtcNow:O} {source}{Environment.NewLine}" +
+                $"HRESULT: 0x{exception.HResult:X8}{Environment.NewLine}" +
+                (string.IsNullOrWhiteSpace(detail) ? string.Empty : $"Message: {detail}{Environment.NewLine}") +
+                $"{exception}{Environment.NewLine}{Environment.NewLine}";
             File.AppendAllText(Path, entry);
         }
         catch

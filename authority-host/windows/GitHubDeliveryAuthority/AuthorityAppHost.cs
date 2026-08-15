@@ -27,12 +27,12 @@ internal sealed class AuthorityAppHost : IDisposable
         _keys = new TpmKeyRing(_store);
         _keys.EnsureActiveKey(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
 
+        _controlCenter = new ControlCenterWindow(_store);
         var coordinator = new ApprovalCoordinator(_dispatcher);
-        var service = new AuthorityService(_store, _keys, coordinator);
+        var service = new AuthorityService(_store, _keys, coordinator, EnqueueShowControlCenter);
         _pipe = new AuthorityPipeServer(service, Environment.GetEnvironmentVariable("GITHUB_DELIVERY_AUTHORITY_PIPE") ?? AuthorityPipeServer.DefaultPipeName);
         _pipe.Start();
 
-        _controlCenter = new ControlCenterWindow(_store);
         _tray = new TrayIcon(_dispatcher, ShowControlCenter, Exit);
         if (ShouldShowSetup(_forceSetup, _store.ListAllowedRepositories().Count)) ShowControlCenter();
     }
@@ -40,10 +40,14 @@ internal sealed class AuthorityAppHost : IDisposable
     internal static bool ShouldShowSetup(bool forceSetup, int allowedRepositoryCount)
         => forceSetup || allowedRepositoryCount == 0;
 
+    private bool EnqueueShowControlCenter()
+        => _dispatcher.TryEnqueue(ShowControlCenter);
+
     private void ShowControlCenter() => _controlCenter?.ShowControlCenter();
 
     private void Exit()
     {
+        _controlCenter?.PrepareForExit();
         Dispose();
         Application.Current.Exit();
     }

@@ -81,6 +81,7 @@ internal sealed class AuthorityPipeServer : IAsyncDisposable
             object result = method switch
             {
                 "status" => _service.Status(),
+                "showControlCenter" => _service.ShowControlCenter(),
                 "authorizeBatch" => await RunAuthorizeBatchAsync(parameters, cancellationToken).ConfigureAwait(false),
                 "redeemGrant" => _service.RedeemGrant(parameters),
                 _ => throw new AuthorityException("authority_method_not_allowed"),
