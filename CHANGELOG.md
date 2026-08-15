@@ -4,6 +4,25 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-08-15
+
+### Added
+
+- Added a typed-code type-evidence Standards companion for TypeScript and typed JavaScript (PR #263). Review can now trace known-value widening, widen-then-assert flows, broad internal contracts, reflective bypasses, assertion proof quality, and test wiring hidden by mocks while keeping valid boundary `unknown`, runtime narrowing, justified interop assertions, genuinely open dictionaries, and ordinary dependency-seam mocks as explicit non-findings.
+- Added a real sanitized agent-loop incident replay to the release-blocking reliability gate plus explicit runtime protection visibility (PR #264). Startup capability snapshots, setup, install, and `doctor` distinguish `Full (STREAM)`, `Partial (HOOKS)`, and `Off (NONE)` and report whether the current boundary can interrupt an already-generating turn.
+- Added operational Control Center settings and trust management for the Windows Authority host (PR #262): repository allowlist add/remove controls, a login auto-start toggle synchronized with the CLI, the committed Authority icon in the window and notification area, and an explicit tray `Exit` action.
+
+### Changed
+
+- `npx github-delivery start` now ensures the Authority host is running and brings the Control Center into view even when an existing instance is already in the notification area. Successful output identifies the installed host location, explains that closing the window leaves Authority running in the tray, and points to tray right-click → `Exit` for a complete shutdown (PR #262).
+- `npx github-delivery autostart` remains the backwards-compatible enable form and now has explicit `autostart on`, `autostart off`, and `autostart status` variants. The Control Center Settings switch reads and writes the same current-user Windows Run registration, so CLI and GUI stay synchronized (PR #262).
+- The Control Center now uses only the useful `Overview` navigation plus native `Settings`, uses the full available content width, hides to the notification area on normal close, and has three deliberate responsive layouts: Compact below 900 px, Medium from 900 px, and Wide from 1360 px. Windows enforces a best-effort 720 × 620 minimum window size, while the five summary metrics keep the same symmetric 3+2 geometry at every size (PR #262).
+
+### Fixed
+
+- Fixed the v0.7.1 unpackaged WinUI startup failure by restoring the generated XAML process-requirements check and making compiled application XBFs plus the root `resources.pri` mandatory publish artifacts. CI now exercises the real compiled Control Center through build, self-test, XAML smoke, self-contained publish, release-ZIP round trip, install, and installed XAML smoke boundaries (PR #262).
+- Fixed malformed tool-protocol loops that emitted high-confidence `<parameter name="notify">` / `<parameter name="exec_command">` scaffolding or wrapped `run` / `execute` narration without reaching a real tool boundary. The detector reuses the existing protocol/tool-emission budgets and retains false-positive controls for ordinary XML and documentation examples (PR #264).
+
 ## [0.7.1] - 2026-08-14
 
 ### Added
