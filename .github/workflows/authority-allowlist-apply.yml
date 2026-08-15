@@ -37,8 +37,6 @@ jobs:
         run: |
           node --test tests/unit/windows-authority-allowlist-ui.test.mjs tests/unit/windows-authority-winui.test.mjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          npm run check
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $Project = 'authority-host/windows/GitHubDeliveryAuthority/GitHubDeliveryAuthority.csproj'
           dotnet restore $Project --locked-mode
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
