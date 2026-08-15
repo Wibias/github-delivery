@@ -11,6 +11,28 @@ function watchdogMode(value) {
   return ["hooks", "stream"].includes(normalized) ? normalized : "none";
 }
 
+function agentLoopProtection(mode) {
+  if (mode === "stream") {
+    return {
+      level: "full",
+      mode: "stream",
+      canInterruptInFlight: true,
+    };
+  }
+  if (mode === "hooks") {
+    return {
+      level: "partial",
+      mode: "hooks",
+      canInterruptInFlight: false,
+    };
+  }
+  return {
+    level: "off",
+    mode: "none",
+    canInterruptInFlight: false,
+  };
+}
+
 export function buildRuntimeCapabilities({
   host = "unknown",
   os = process.platform,
@@ -48,6 +70,7 @@ export function buildRuntimeCapabilities({
         : activation?.degradationReason || null,
     progressWatchdogLauncherPath:
       typeof activation?.launcherPath === "string" ? activation.launcherPath : null,
+    agentLoopProtection: agentLoopProtection(effectiveWatchdog),
   };
   runtime.progressWatchdogAvailable = runtime.progressWatchdog !== "none";
 

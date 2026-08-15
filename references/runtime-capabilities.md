@@ -51,6 +51,14 @@ When no explicit runtime declaration exists, discovery reads `~/.codex/github-de
 
 `none` means policy-only protection for that capability snapshot. See `references/agent-progress-watchdog.md` for the different guarantees.
 
+For operator-facing status, those modes map to an explicit agent-loop protection level:
+
+- `stream` -> **Full (STREAM)**, including in-flight turn interruption;
+- `hooks` -> **Partial (HOOKS)**, with lifecycle/tool-boundary guardrails but no in-flight interruption claim;
+- `none` -> **Off (NONE)**, meaning policy-only protection.
+
+The same mapping is returned structurally as `runtime.agentLoopProtection` so workflows and UIs do not have to reinterpret mode strings or accidentally imply that hook-only protection can stop a turn that is already generating.
+
 ## Output contract
 
 ```json
@@ -77,7 +85,12 @@ When no explicit runtime declaration exists, discovery reads `~/.codex/github-de
     "progressWatchdog": "stream",
     "progressWatchdogAvailable": true,
     "progressWatchdogDegradationReason": null,
-    "progressWatchdogLauncherPath": "/path/to/github-delivery/scripts/codex-with-watchdog.mjs"
+    "progressWatchdogLauncherPath": "/path/to/github-delivery/scripts/codex-with-watchdog.mjs",
+    "agentLoopProtection": {
+      "level": "full",
+      "mode": "stream",
+      "canInterruptInFlight": true
+    }
   },
   "fallbacks": {
     "githubReads": "connector",
@@ -105,6 +118,9 @@ When no explicit runtime declaration exists, discovery reads `~/.codex/github-de
 - Bugbot is used only on Cursor when both host and capability declarations permit it. Every other host uses complementary lenses.
 - Subagents are used only when declared. Otherwise run the work in-session without claiming fan-out occurred.
 - `runtime.progressWatchdog` is `stream`, `hooks`, or `none`; the corresponding `contextEconomy` fallback is `streaming-watchdog`, `lifecycle-hooks`, or `policy-only`.
+- `runtime.agentLoopProtection` is the authoritative user-facing protection summary: `full/stream/true`, `partial/hooks/false`, or `off/none/false` for `level/mode/canInterruptInFlight`.
+- Workflows inspect that protection level from the startup capability snapshot before relying on runtime interruption. `partial` and `off` must never be described as capable of interrupting an already-generating turn.
+- Doctor/setup surfaces the same `Full (STREAM)`, `Partial (HOOKS)`, or `Off (NONE)` distinction so installation state is not confused with active in-flight protection.
 - `hooks` is turn-scoped for supported local hook paths. Its evidence budget does not imply hosted WebSearch coverage or mid-generation interruption.
 - `stream` is a current controlled-runtime claim, not a promise that an ordinary `codex`/IDE launch is automatically protected. Runtime loss of the required stream contract is fatal to the protected launcher rather than a silent downgrade.
 - A current verified `stream` declaration clears stale machine-wide activation degradation for that capability snapshot; `progressWatchdogDegradationReason` remains reserved for degradation that actually applies to the effective current mode.
@@ -127,7 +143,7 @@ This mode is safe with an empty `PATH` and is used by CI. Explicit fixture decla
 For `merge PR #32`, the agent:
 
 1. loads `github-delivery` and `references/merge-pr.md`;
-2. discovers capabilities;
+2. discovers capabilities, including the explicit agent-loop protection level;
 3. stops if no reliable GitHub read or brokered write path exists;
 4. runs the authoritative gate;
 5. executes broker mutations through `connector-broker` or `gh-broker`;

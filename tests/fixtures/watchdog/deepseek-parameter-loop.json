@@ -1,0 +1,298 @@
+{
+  "schemaVersion": 1,
+  "kind": "github-delivery/watchdog-incident-fixture",
+  "incident": "deepseek-parameter-tool-emission-loop",
+  "source": {
+    "type": "user-supplied-transcript",
+    "sanitized": true,
+    "capturedAt": "2026-08-15",
+    "note": "Generated text is derived from the real incident transcript. Repository paths and command targets are anonymized. App Server generated-text channel assignments are synthetic because the transcript did not contain channel metadata."
+  },
+  "scenarios": {
+    "deepseek_parameter_tool_emission_loop": {
+      "watchdogOptions": {},
+      "expect": {
+        "interruptCount": 1,
+        "firstInterruptEventMax": 6
+      },
+      "events": [
+        {
+          "method": "item/reasoning/summaryTextDelta",
+          "params": {
+            "threadId": "thr-deepseek-incident",
+            "turnId": "turn-parameter-loop",
+            "itemId": "incident-1",
+            "delta": "<parameter name=\"notify\">run backend search</parameter>Running.\n"
+          }
+        },
+        {
+          "method": "item/reasoning/summaryTextDelta",
+          "params": {
+            "threadId": "thr-deepseek-incident",
+            "turnId": "turn-parameter-loop",
+            "itemId": "incident-2",
+            "delta": "Let me execute the search.\n"
+          }
+        },
+        {
+          "method": "item/reasoning/summaryTextDelta",
+          "params": {
+            "threadId": "thr-deepseek-incident",
+            "turnId": "turn-parameter-loop",
+            "itemId": "incident-3",
+            "delta": "<parameter name=\"notify\"></parameter>executing backend search\n"
+          }
+        },
+        {
+          "method": "item/reasoning/summaryTextDelta",
+          "params": {
+            "threadId": "thr-deepseek-incident",
+            "turnId": "turn-parameter-loop",
+            "itemId": "incident-4",
+            "delta": "Running rg.\n"
+          }
+        },
+        {
+          "method": "item/reasoning/summaryTextDelta",
+          "params": {
+            "threadId": "thr-deepseek-incident",
+            "turnId": "turn-parameter-loop",
+            "itemId": "incident-5",
+            "delta": "Let me run it.\n"
+          }
+        },
+        {
+          "method": "item/reasoning/summaryTextDelta",
+          "params": {
+            "threadId": "thr-deepseek-incident",
+            "turnId": "turn-parameter-loop",
+            "itemId": "incident-6",
+            "delta": "<parameter name=\"notify\">execute</parameter>Executing rg.\n"
+          }
+        },
+        {
+          "method": "item/reasoning/summaryTextDelta",
+          "params": {
+            "threadId": "thr-deepseek-incident",
+            "turnId": "turn-parameter-loop",
+            "itemId": "incident-7",
+            "delta": "Let me run the search now.\n"
+          }
+        }
+      ]
+    },
+    "deepseek_repeated_execution_narration": {
+      "watchdogOptions": {
+        "protocolArtifactThreshold": 99
+      },
+      "expect": {
+        "interruptCount": 1,
+        "firstInterruptEventMax": 6
+      },
+      "events": [
+        {
+          "method": "item/reasoning/summaryTextDelta",
+          "params": {
+            "threadId": "thr-deepseek-incident",
+            "turnId": "turn-execution-narration",
+            "itemId": "narration-1",
+            "delta": "Running rg.\n"
+          }
+        },
+        {
+          "method": "item/reasoning/summaryTextDelta",
+          "params": {
+            "threadId": "thr-deepseek-incident",
+            "turnId": "turn-execution-narration",
+            "itemId": "narration-2",
+            "delta": "Let me run it.\n"
+          }
+        },
+        {
+          "method": "item/reasoning/summaryTextDelta",
+          "params": {
+            "threadId": "thr-deepseek-incident",
+            "turnId": "turn-execution-narration",
+            "itemId": "narration-3",
+            "delta": "Executing rg.\n"
+          }
+        },
+        {
+          "method": "item/reasoning/summaryTextDelta",
+          "params": {
+            "threadId": "thr-deepseek-incident",
+            "turnId": "turn-execution-narration",
+            "itemId": "narration-4",
+            "delta": "Let me run the search now.\n"
+          }
+        },
+        {
+          "method": "item/reasoning/summaryTextDelta",
+          "params": {
+            "threadId": "thr-deepseek-incident",
+            "turnId": "turn-execution-narration",
+            "itemId": "narration-5",
+            "delta": "Running rg.\n"
+          }
+        },
+        {
+          "method": "item/reasoning/summaryTextDelta",
+          "params": {
+            "threadId": "thr-deepseek-incident",
+            "turnId": "turn-execution-narration",
+            "itemId": "narration-6",
+            "delta": "Let me search.\n"
+          }
+        },
+        {
+          "method": "item/reasoning/summaryTextDelta",
+          "params": {
+            "threadId": "thr-deepseek-incident",
+            "turnId": "turn-execution-narration",
+            "itemId": "narration-7",
+            "delta": "Running.\n"
+          }
+        }
+      ]
+    },
+    "deepseek_parameter_channel_hopping": {
+      "watchdogOptions": {
+        "protocolArtifactThreshold": 99,
+        "toolEmissionIntentThreshold": 4
+      },
+      "expect": {
+        "interruptCount": 1,
+        "firstInterruptEventMax": 4
+      },
+      "events": [
+        {
+          "method": "item/reasoning/summaryTextDelta",
+          "params": {
+            "threadId": "thr-deepseek-incident",
+            "turnId": "turn-channel-hopping",
+            "itemId": "hop-1",
+            "delta": "<parameter name=\"notify\">run backend search</parameter>Running.\n"
+          }
+        },
+        {
+          "method": "item/agentMessage/delta",
+          "params": {
+            "threadId": "thr-deepseek-incident",
+            "turnId": "turn-channel-hopping",
+            "itemId": "hop-2",
+            "delta": "Let me execute the search.\n"
+          }
+        },
+        {
+          "method": "item/plan/delta",
+          "params": {
+            "threadId": "thr-deepseek-incident",
+            "turnId": "turn-channel-hopping",
+            "itemId": "hop-3",
+            "delta": "Executing backend search.\n"
+          }
+        },
+        {
+          "method": "item/reasoning/textDelta",
+          "params": {
+            "threadId": "thr-deepseek-incident",
+            "turnId": "turn-channel-hopping",
+            "itemId": "hop-4",
+            "delta": "Let me run it.\n"
+          }
+        }
+      ]
+    },
+    "deepseek_tool_markup_then_real_tool": {
+      "watchdogOptions": {
+        "protocolArtifactThreshold": 99
+      },
+      "expect": {
+        "interruptCount": 0
+      },
+      "events": [
+        {
+          "method": "item/reasoning/summaryTextDelta",
+          "params": {
+            "threadId": "thr-deepseek-incident",
+            "turnId": "turn-real-tool-reset",
+            "itemId": "reset-1",
+            "delta": "<parameter name=\"notify\">run backend search</parameter>Running.\n"
+          }
+        },
+        {
+          "method": "item/reasoning/summaryTextDelta",
+          "params": {
+            "threadId": "thr-deepseek-incident",
+            "turnId": "turn-real-tool-reset",
+            "itemId": "reset-2",
+            "delta": "Let me execute the search.\n"
+          }
+        },
+        {
+          "method": "item/reasoning/summaryTextDelta",
+          "params": {
+            "threadId": "thr-deepseek-incident",
+            "turnId": "turn-real-tool-reset",
+            "itemId": "reset-3",
+            "delta": "Running rg.\n"
+          }
+        },
+        {
+          "method": "item/reasoning/summaryTextDelta",
+          "params": {
+            "threadId": "thr-deepseek-incident",
+            "turnId": "turn-real-tool-reset",
+            "itemId": "reset-4",
+            "delta": "Let me run it.\n"
+          }
+        },
+        {
+          "method": "item/reasoning/summaryTextDelta",
+          "params": {
+            "threadId": "thr-deepseek-incident",
+            "turnId": "turn-real-tool-reset",
+            "itemId": "reset-5",
+            "delta": "Executing rg.\n"
+          }
+        },
+        {
+          "method": "item/started",
+          "params": {
+            "threadId": "thr-deepseek-incident",
+            "turnId": "turn-real-tool-reset",
+            "item": {
+              "id": "real-command-1",
+              "type": "commandExecution",
+              "command": "rg <sanitized-target>",
+              "status": "inProgress"
+            }
+          }
+        },
+        {
+          "method": "item/completed",
+          "params": {
+            "threadId": "thr-deepseek-incident",
+            "turnId": "turn-real-tool-reset",
+            "item": {
+              "id": "real-command-1",
+              "type": "commandExecution",
+              "command": "rg <sanitized-target>",
+              "status": "completed",
+              "exitCode": 0
+            }
+          }
+        },
+        {
+          "method": "item/reasoning/summaryTextDelta",
+          "params": {
+            "threadId": "thr-deepseek-incident",
+            "turnId": "turn-real-tool-reset",
+            "itemId": "reset-8",
+            "delta": "Running.\n"
+          }
+        }
+      ]
+    }
+  }
+}

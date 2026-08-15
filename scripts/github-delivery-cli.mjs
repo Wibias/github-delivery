@@ -12,6 +12,30 @@ function value(value, fallback = "unknown") {
   return String(value);
 }
 
+function normalizeWatchdogMode(value) {
+  const normalized = String(value || "none").toLowerCase();
+  return ["stream", "hooks"].includes(normalized) ? normalized : "none";
+}
+
+function watchdogModeFromResult(value) {
+  if (typeof value === "string") return normalizeWatchdogMode(value);
+  return normalizeWatchdogMode(value?.mode);
+}
+
+function loopProtectionLabel(mode) {
+  if (mode === "stream") return "Full (STREAM)";
+  if (mode === "hooks") return "Partial (HOOKS)";
+  return "Off (NONE)";
+}
+
+function renderLoopProtection(mode, stdout, { includeInFlight = false } = {}) {
+  const normalized = normalizeWatchdogMode(mode);
+  stdout.write(`  Agent loops  ${loopProtectionLabel(normalized)}\n`);
+  if (includeInFlight) {
+    stdout.write(`  In-flight    ${normalized === "stream" ? "interrupt enabled" : "not available"}\n`);
+  }
+}
+
 function renderDoctor(result, stdout) {
   const environment = result?.environment || {};
   const activation = result?.activation || {};
@@ -22,6 +46,7 @@ function renderDoctor(result, stdout) {
     ? (result.integrity.clean ? "Clean" : "Modified")
     : "Unknown";
   const legacyManifestless = result?.installed?.legacyManifestless === true;
+  const activationMode = normalizeWatchdogMode(activation?.mode);
 
   stdout.write("GitHub Delivery Doctor\n\n");
   stdout.write("Skill\n");
@@ -46,12 +71,13 @@ function renderDoctor(result, stdout) {
   stdout.write(`  GitHub auth  ${environment?.ghAuth?.ok ? "OK" : "ERROR"}\n`);
 
   stdout.write("\nRuntime protection\n");
-  stdout.write(`  Mode         ${value(activation?.mode, "none")}\n`);
+  renderLoopProtection(activationMode, stdout, { includeInFlight: true });
+  stdout.write(`  Mode         ${activationMode}\n`);
   stdout.write(`  Hooks        ${activation?.hooksConfigured ? "configured" : "not configured"}\n`);
   stdout.write(`  Hook trust   ${activation?.hookTrustVerified ? "verified" : "not verified"}\n`);
-  if (activation?.mode === "stream") {
+  if (activationMode === "stream") {
     stdout.write("  Loop interruption ACTIVE (protected stream)\n");
-  } else if (activation?.mode === "hooks") {
+  } else if (activationMode === "hooks") {
     stdout.write("  Hooks are active; streaming loop interruption is not active.\n");
   } else {
     stdout.write("  LOOP INTERRUPTION NOT ACTIVE\n");
@@ -74,7 +100,7 @@ function renderDoctor(result, stdout) {
 
   const hookTrustRequired = activation?.degradationReason === "hook_trust_required"
     || (activation?.hooksConfigured === true && activation?.hookTrustVerified !== true);
-  if (activation?.mode === "none" && hookTrustRequired) {
+  if (activationMode === "none" && hookTrustRequired) {
     stdout.write("\nAction required\n");
     stdout.write("  GitHub Delivery has not verified Codex hook trust for this installation.\n");
     stdout.write("  If these exact hooks are already trusted in Codex, they do not need to be trusted again.\n");
@@ -183,6 +209,9 @@ function renderBootstrapResult(result, stdout) {
     stdout.write(result.verified === false
       ? "GitHub Delivery installation did not verify.\n"
       : "GitHub Delivery installed successfully.\n");
+    if (result.watchdog !== undefined) {
+      renderLoopProtection(watchdogModeFromResult(result.watchdog), stdout);
+    }
     if (result.authorityHost?.installed) {
       stdout.write(`  Authority GUI is installed${result.authorityHost.installed.version ? ` (${result.authorityHost.installed.version})` : ""}\n`);
       stdout.write("  Start it later with: npx github-delivery start\n");
@@ -193,6 +222,9 @@ function renderBootstrapResult(result, stdout) {
     stdout.write(result.status === "ready"
       ? "GitHub Delivery setup complete.\n"
       : "GitHub Delivery setup needs one more step.\n");
+    if (result.watchdog !== undefined) {
+      renderLoopProtection(watchdogModeFromResult(result.watchdog), stdout);
+    }
     if (result.status === "ready") stdout.write("  Start the approval GUI with: npx github-delivery start\n");
     if (result.guidance) stdout.write(`  ${result.guidance}\n`);
     return;

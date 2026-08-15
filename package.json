@@ -38,7 +38,7 @@
   },
   "scripts": {
     "test": "node --test \"tests/unit/*.test.mjs\"",
-    "reliability:gate": "node --test tests/unit/reliability-regression-gate.test.mjs",
+    "reliability:gate": "node --test tests/unit/reliability-regression-gate.test.mjs tests/unit/deepseek-watchdog-incident.test.mjs",
     "evals:offline": "node scripts/validate-evals.mjs",
     "evals:behavioural:compare": "node scripts/compare-behavioural-evals.mjs",
     "build:dist": "node scripts/build-dist.mjs",

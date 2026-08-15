@@ -65,6 +65,85 @@ test("incident: malformed tool-protocol emission interrupts on the second malfor
   assert.equal(result.firstInterruptEvent, 2);
 });
 
+test("incident: DeepSeek parameter tool scaffolding interrupts on the second suspicious block", () => {
+  const result = replay([
+    delta(
+      "item/reasoning/summaryTextDelta",
+      '<parameter name="notify">run backend search</parameter>\n',
+      "deepseek-parameter-1",
+    ),
+    delta(
+      "item/reasoning/summaryTextDelta",
+      '<parameter name="exec_command">rg startPrimaryRun src/fabric</parameter>\n',
+      "deepseek-parameter-2",
+    ),
+    delta("item/reasoning/summaryTextDelta", "Running.\n", "deepseek-parameter-3"),
+  ]);
+
+  assert.equal(result.interruptCount, 1);
+  assert.equal(result.firstInterruptEvent, 2);
+});
+
+test("incident: DeepSeek parameter-wrapped intent still counts toward tool-emission stall", () => {
+  const result = replay(
+    [
+      delta(
+        "item/reasoning/summaryTextDelta",
+        '<parameter name="notify">run backend search</parameter>\n',
+        "deepseek-intent-1",
+      ),
+      delta("item/reasoning/summaryTextDelta", "Executing.\n", "deepseek-intent-2"),
+      delta("item/reasoning/summaryTextDelta", "Let me run it.\n", "deepseek-intent-3"),
+    ],
+    {
+      protocolArtifactThreshold: 99,
+      toolEmissionIntentThreshold: 3,
+    },
+  );
+
+  assert.equal(result.interruptCount, 1);
+  assert.equal(result.firstInterruptEvent, 3);
+});
+
+test("false-positive corpus: ordinary XML parameter documentation is not tool protocol", () => {
+  const result = replay([
+    delta(
+      "item/agentMessage/delta",
+      '<parameter name="temperature">0.2</parameter>\n',
+      "xml-parameter-1",
+    ),
+    delta(
+      "item/agentMessage/delta",
+      '<parameter name="timeout">30</parameter>\n',
+      "xml-parameter-2",
+    ),
+    delta(
+      "item/agentMessage/delta",
+      '<parameter name="retries">2</parameter>\n',
+      "xml-parameter-3",
+    ),
+  ]);
+
+  assert.equal(result.interruptCount, 0);
+});
+
+test("false-positive corpus: tool-like XML parameter names alone do not hard-stop", () => {
+  const result = replay([
+    delta(
+      "item/agentMessage/delta",
+      '<parameter name="cmd">echo hello</parameter>\n',
+      "xml-toolish-parameter-1",
+    ),
+    delta(
+      "item/agentMessage/delta",
+      '<parameter name="workdir">/tmp/example</parameter>\n',
+      "xml-toolish-parameter-2",
+    ),
+  ]);
+
+  assert.equal(result.interruptCount, 0);
+});
+
 test("incident: channel hopping cannot evade repeated tool intent", () => {
   const methods = [
     "item/reasoning/summaryTextDelta",
