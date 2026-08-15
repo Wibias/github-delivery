@@ -207,8 +207,9 @@ internal sealed partial class ControlCenterWindow : Window
     {
         try
         {
+            var appWindow = _appWindow;
             var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "DeliveryAuthority.ico");
-            if (File.Exists(iconPath)) _appWindow.SetIcon(iconPath);
+            if (File.Exists(iconPath)) appWindow.SetIcon(iconPath);
         }
         catch
         {
