@@ -41,6 +41,7 @@ test("Control Center switches at the approved 900 and 1360 responsive breakpoint
   assert.match(compact, /<AdaptiveTrigger MinWindowWidth="0"\s*\/>/);
   assert.match(medium, /<AdaptiveTrigger MinWindowWidth="900"\s*\/>/);
   assert.match(wide, /<AdaptiveTrigger MinWindowWidth="1360"\s*\/>/);
+  assert.doesNotMatch(xaml, /MinWindowWidth="840"/);
 
   assertSetter(compact, "OverviewContent.Padding", "16,16,16,20");
   assertSetter(compact, "SettingsContent.Padding", "16,16,16,20");
