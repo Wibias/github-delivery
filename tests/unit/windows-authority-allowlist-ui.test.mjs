@@ -13,6 +13,9 @@ test("Control Center exposes only functional allowlist actions", () => {
 
   assert.doesNotMatch(window, /Content="View full activity"/);
   assert.match(window, /x:Name="AddRepositoryButton"[\s\S]*?Content="\+ Add repository"[\s\S]*?Click="AddRepository_Click"/);
+  const addButton = window.match(/<Button x:Name="AddRepositoryButton"[\s\S]*?\/>/)?.[0];
+  assert.ok(addButton, "Add repository button must be present");
+  assert.doesNotMatch(addButton, /IsEnabled="False"/);
   assert.match(window, /x:Name="RemoveRepositoryButton"[\s\S]*?Content="Remove selected"[\s\S]*?IsEnabled="False"[\s\S]*?Click="RemoveRepository_Click"/);
   assert.match(window, /x:Name="AllowlistList"[\s\S]*?SelectionChanged="AllowlistList_SelectionChanged"/);
 });
