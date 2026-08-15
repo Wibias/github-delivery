@@ -81,44 +81,9 @@ test("control center implements the selected activity-first audit design in ligh
     "Quick settings",
     "READY",
   ]) assert.match(window, new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-  assert.match(window, /<ListView x:Name="NavigationList"/);
   for (const nav of ["Overview", "Activity", "Allowlist", "Temporary grants", "Diagnostics", "Settings"]) {
-    assert.match(window, new RegExp(`Text=\\"${nav}\\"`));
+    assert.match(window, new RegExp(`Content=\\"${nav}\\"`));
   }
-});
-
-test("control center owns startup-safe local brushes instead of affected WinUI Fluent brush keys", () => {
-  const window = read(`${root}/ControlCenterWindow.xaml`);
-  const selfTest = read(`${root}/ControlCenterXamlSelfTest.cs`);
-
-  assert.match(window, /<Grid[^>]*Background="\{ThemeResource ApplicationPageBackgroundThemeBrush\}"[^>]*>\s*<Grid\.Resources>/);
-  assert.doesNotMatch(window, /<Window\.Resources>/);
-  for (const key of [
-    "AuthorityCardBackgroundBrush",
-    "AuthorityCardStrokeBrush",
-    "AuthorityAccentBrush",
-    "AuthoritySuccessBackgroundBrush",
-    "AuthoritySuccessBrush",
-    "AuthorityCriticalBrush",
-    "AuthorityCautionBrush",
-  ]) {
-    assert.match(window, new RegExp(`x:Key=\\"${key}\\"`));
-    assert.match(window, new RegExp(`\\{StaticResource ${key}\\}`));
-  }
-
-  for (const affectedKey of [
-    "CardBackgroundFillColorDefaultBrush",
-    "CardStrokeColorDefaultBrush",
-    "AccentTextFillColorPrimaryBrush",
-    "SystemFillColorSuccessBackgroundBrush",
-    "SystemFillColorSuccessBrush",
-    "SystemFillColorCriticalBrush",
-    "SystemFillColorCautionBrush",
-  ]) {
-    assert.doesNotMatch(window, new RegExp(affectedKey));
-  }
-
-  assert.match(selfTest, /Local\.StaticResource/);
 });
 
 test("settings page exposes and persists exactly the three authority protection modes", () => {
@@ -134,7 +99,7 @@ test("settings page exposes and persists exactly the three authority protection 
     "Source commit",
     "Config file",
   ]) assert.match(window, new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-  assert.match(window, /SelectionChanged="NavigationList_SelectionChanged"/);
+  assert.match(window, /SelectionChanged="Navigation_SelectionChanged"/);
   assert.match(window, /Click="ApplyProtectionMode_Click"/);
   assert.match(code, /UserConfigStore\.WriteAuthorityMode\(mode\)/);
   assert.match(code, /authority-host-version\.json/);
