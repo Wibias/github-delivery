@@ -81,9 +81,7 @@ test("control center implements the selected activity-first audit design in ligh
     "Quick settings",
     "READY",
   ]) assert.match(window, new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-  for (const nav of ["Overview", "Activity", "Allowlist", "Temporary grants", "Diagnostics", "Settings"]) {
-    assert.match(window, new RegExp(`Content=\\"${nav}\\"`));
-  }
+  assert.match(window, /Content="Overview"/);
 });
 
 test("settings page exposes and persists exactly the three authority protection modes", () => {
@@ -123,12 +121,28 @@ test("tray integration uses native Shell_NotifyIcon rather than WinForms NotifyI
   assert.doesNotMatch(program, /System\.Windows\.Forms|Application\.Run/);
 });
 
-test("control center adapts navigation and dashboard layout across narrow, medium, and wide windows", () => {
+test("control center exposes only Overview plus the built-in bottom Settings target", () => {
+  const window = read(`${root}/ControlCenterWindow.xaml`);
+  const code = read(`${root}/ControlCenterWindow.xaml.cs`);
+
+  assert.match(window, /IsSettingsVisible="True"/);
+  assert.match(window, /<NavigationViewItem Content="Overview" Tag="overview" IsSelected="True"/);
+  for (const deadItem of ["Activity", "Allowlist", "Temporary grants", "Diagnostics"]) {
+    assert.doesNotMatch(window, new RegExp(`<NavigationViewItem Content=\\"${deadItem}\\"`));
+  }
+  assert.doesNotMatch(window, /<NavigationView\.PaneFooter>/);
+  assert.match(code, /args\.IsSettingsSelected/);
+  assert.match(code, /Navigation\.SelectedItem\s*=\s*Navigation\.SettingsItem/);
+});
+
+test("control center uses all available content width while preserving adaptive states", () => {
   const window = read(`${root}/ControlCenterWindow.xaml`);
 
   assert.match(window, /PaneDisplayMode="Auto"/);
   assert.match(window, /CompactModeThresholdWidth="0"/);
   assert.match(window, /ExpandedModeThresholdWidth="1360"/);
+  assert.match(window, /<Grid x:Name="OverviewContent"(?=[^>]*HorizontalAlignment="Stretch")(?![^>]*MaxWidth=)[^>]*>/);
+  assert.match(window, /<Grid x:Name="SettingsContent"(?=[^>]*HorizontalAlignment="Stretch")(?![^>]*MaxWidth=)[^>]*>/);
 
   for (const state of ["NarrowDashboardState", "MediumDashboardState", "WideDashboardState"]) {
     assert.match(window, new RegExp(`x:Name=\\"${state}\\"`));
@@ -140,7 +154,6 @@ test("control center adapts navigation and dashboard layout across narrow, mediu
 
   assert.match(window, /MinWindowWidth="840"/);
   assert.match(window, /MinWindowWidth="1360"/);
-  assert.doesNotMatch(window, /MaxWidth="1180"/);
 
   for (const header of ["ActivityHeaderGrid", "AllowlistHeaderGrid", "GrantHeaderGrid"]) {
     assert.match(
@@ -151,7 +164,6 @@ test("control center adapts navigation and dashboard layout across narrow, mediu
 
   assert.match(window, /x:Name="ActivityColumnsHeader"/);
   assert.match(window, /Target="ActivityColumnsHeader\.Visibility" Value="Collapsed"/);
-
   assert.doesNotMatch(window, /<ColumnDefinition Width="170"\s*\/>/);
 });
 
