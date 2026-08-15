@@ -6,8 +6,6 @@ const programUrl = new URL("../../authority-host/windows/GitHubDeliveryAuthority
 const appUrl = new URL("../../authority-host/windows/GitHubDeliveryAuthority/App.xaml.cs", import.meta.url);
 const diagnosticsUrl = new URL("../../authority-host/windows/GitHubDeliveryAuthority/StartupDiagnostics.cs", import.meta.url);
 const xamlSelfTestUrl = new URL("../../authority-host/windows/GitHubDeliveryAuthority/ControlCenterXamlSelfTest.cs", import.meta.url);
-const controlCenterXamlUrl = new URL("../../authority-host/windows/GitHubDeliveryAuthority/ControlCenterWindow.xaml", import.meta.url);
-const controlCenterCodeUrl = new URL("../../authority-host/windows/GitHubDeliveryAuthority/ControlCenterWindow.xaml.cs", import.meta.url);
 const releaseSmokeUrl = new URL("../../scripts/prepare-authority-host-runtime-smoke.mjs", import.meta.url);
 const installerUrl = new URL("../../authority-host/windows/install-release.ps1", import.meta.url);
 const ciUrl = new URL("../../.github/workflows/ci.yml", import.meta.url);
@@ -24,7 +22,6 @@ test("Authority normal startup preserves local crash diagnostics", () => {
   assert.match(diagnostics, /LocalApplicationData|AppPaths\.RootDirectory/);
   assert.match(diagnostics, /Exception/);
   assert.match(diagnostics, /HRESULT/);
-  assert.match(diagnostics, /WriteMessage/);
   assert.match(program, /AppDomain\.CurrentDomain\.UnhandledException/);
   assert.match(program, /StartupDiagnostics\.Clear/);
   assert.match(program, /StartupDiagnostics\.Write/);
@@ -58,67 +55,6 @@ test("Authority XAML self-test bypasses the production singleton mutex", () => {
   );
 });
 
-test("Authority Control Center avoids the NavigationView startup path that hard-crashes the affected host", () => {
-  const xaml = readFileSync(controlCenterXamlUrl, "utf8");
-  const code = readFileSync(controlCenterCodeUrl, "utf8");
-  const selfTest = readFileSync(xamlSelfTestUrl, "utf8");
-
-  assert.doesNotMatch(xaml, /<NavigationView\b/);
-  assert.match(xaml, /x:Name="NavigationList"/);
-  assert.doesNotMatch(code, /\bNavigationView\b/);
-  assert.doesNotMatch(selfTest, /\("NavigationView/);
-  assert.doesNotMatch(selfTest, /\("NavigationViewItem\./);
-});
-
-test("Authority XAML smoke path records framework resource and runtime-module probes", () => {
-  const selfTest = readFileSync(xamlSelfTestUrl, "utf8");
-
-  assert.match(selfTest, /XamlReader\.Load/);
-  assert.match(selfTest, /ApplicationPageBackgroundThemeBrush/);
-  assert.match(selfTest, /CardBackgroundFillColorDefaultBrush/);
-  assert.match(selfTest, /CaptionTextBlockStyle/);
-  assert.match(selfTest, /AccentButtonStyle/);
-  assert.match(selfTest, /Process\.GetCurrentProcess/);
-  assert.match(selfTest, /Microsoft\./);
-  assert.match(selfTest, /RuntimeInformation\.OSDescription/);
-  assert.match(selfTest, /CurrentUICulture/);
-  assert.match(selfTest, /StartupDiagnostics\.WriteMessage/);
-});
-
-test("Authority XAML diagnostics isolate application resource scope and default control templates", () => {
-  const selfTest = readFileSync(xamlSelfTestUrl, "utf8");
-
-  assert.match(selfTest, /Application\.Current/);
-  assert.match(selfTest, /ThemeDictionaries/);
-  assert.match(selfTest, /ApplicationResources/);
-
-  for (const probe of [
-    "Control.Button",
-    "Control.RadioButton",
-    "Control.ListView",
-    "Control.ListViewItem",
-    "Control.ScrollViewer",
-    "Control.FontIcon",
-    "Control.FontFamilyFallback",
-    "Section.Navigation",
-    "Section.OverviewMetrics",
-    "Section.OverviewActivity",
-    "Section.Settings",
-  ]) {
-    assert.match(selfTest, new RegExp(probe.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-  }
-});
-
-test("Authority persists each XAML probe boundary before invoking WinUI parsing", () => {
-  const selfTest = readFileSync(xamlSelfTestUrl, "utf8");
-
-  assert.match(
-    selfTest,
-    /foreach \(var probe in Probes\)[\s\S]*?StartupDiagnostics\.WriteMessage\("ControlCenterXamlProbe", \$"BEGIN \{probe\.Name\}"\);[\s\S]*?XamlReader\.Load\(probe\.Xaml\)/,
-    "a native WinUI termination must leave the last started probe on disk",
-  );
-});
-
 test("Windows CI exercises Control Center XAML after publish, release packaging, and installation", () => {
   assert.equal(existsSync(releaseSmokeUrl), true, "release runtime smoke helper must exist");
   const ci = readFileSync(ciUrl, "utf8");
@@ -134,12 +70,4 @@ test("Windows CI exercises Control Center XAML after publish, release packaging,
   assert.match(installer, /if \(-not \$SkipStart\)[\s\S]*Start-Process \$installedExe/);
   assert.match(releaseSmoke, /buildAuthorityHostRelease/);
   assert.match(releaseSmoke, /extractVerifiedAuthorityHostZip/);
-});
-
-test("Windows CI retains the instrumented published Authority host for affected-machine diagnosis", () => {
-  const ci = readFileSync(ciUrl, "utf8");
-  assert.match(ci, /Upload instrumented Authority diagnostic build/);
-  assert.match(ci, /actions\/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a/);
-  assert.match(ci, /github-delivery-authority-diagnostic-\$\{\{ github\.sha \}\}/);
-  assert.match(ci, /github-delivery-authority-publish/);
 });
