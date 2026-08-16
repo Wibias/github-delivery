@@ -12,9 +12,19 @@ internal static class ControlCenterXamlSelfTest
         try
         {
             using var store = new StateStore(Path.Combine(root, "authority.db"));
-            var window = new ControlCenterWindow(store);
-            window.PrepareForExit();
-            window.Close();
+            var controlCenter = new ControlCenterWindow(store);
+            controlCenter.PrepareForExit();
+            controlCenter.Close();
+
+            var longSummary = string.Join(
+                Environment.NewLine,
+                Enumerable.Range(1, 250).Select(index => $"approval smoke line {index}: {new string('x', 96)}"));
+            var approval = new ApprovalWindow(
+                new[] { longSummary },
+                "Approval window XAML smoke test",
+                "Wibias/github-delivery",
+                "test/approval-window");
+            approval.Close();
             return 0;
         }
         catch (Exception exception)
