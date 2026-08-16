@@ -6,7 +6,7 @@ const STREAM_WATCHDOG_DEFAULTS = Object.freeze({
   generatedCharHardLimit: 8_000,
   noProgressTokenSoftLimit: 1_024,
   noProgressTokenHardLimit: 2_048,
-  toolEmissionIntentThreshold: 4,
+  toolEmissionIntentThreshold: 6,
 });
 
 function messageTurnId(message) {
