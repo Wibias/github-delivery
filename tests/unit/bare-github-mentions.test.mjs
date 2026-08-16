@@ -22,9 +22,11 @@ test("public comment templates use notifying mention syntax", () => {
   assert.match(source, /write `@user`, never `` `@user` ``/);
 });
 
-test("merge workflow keeps broker architecture and bare mentions", () => {
+test("merge workflow keeps hardened broker architecture and bare mentions", () => {
   const source = read("references/merge-pr.md");
-  assert.match(source, /Every visible GitHub write must pass through `scripts\/github-mutate\.mjs`/);
+  assert.match(source, /Routine visible GitHub writes use `scripts\/github-mutate\.mjs`/);
+  assert.match(source, /Merge is the deliberate exception at the public boundary/);
+  assert.match(source, /generic `merge_pr` mutation documents are forbidden/);
   assert.match(source, /keep GitHub `@mentions` bare and never backticked/);
   assert.match(source, /keep the real `@login` bare and omit self-thanks/);
   assert.doesNotMatch(source, /<<<<<<<|=======|>>>>>>>/);

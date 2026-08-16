@@ -6,6 +6,10 @@ const workflow = readFileSync(
   new URL("../../.github/workflows/release.yml", import.meta.url),
   "utf8",
 ).replace(/\r\n?/g, "\n");
+const publisher = readFileSync(
+  new URL("../../scripts/publish-npm-idempotent.mjs", import.meta.url),
+  "utf8",
+).replace(/\r\n?/g, "\n");
 
 function publishJobSource() {
   const marker = "\n  publish:\n";
@@ -24,15 +28,15 @@ test("npm trusted publishing runs only in the protected tag publish job", () => 
   );
   assert.match(publishJob, /environment: release/);
   assert.match(publishJob, /id-token: write/);
-  assert.doesNotMatch(beforePublishJob, /npm publish/);
+  assert.doesNotMatch(beforePublishJob, /publish-npm-idempotent|npm publish|npm-cli\.js publish/);
   assert.equal(
-    (
-      workflow.match(
-        /node \.github\/npm-publish\/node_modules\/npm\/bin\/npm-cli\.js publish --access public/g,
-      ) || []
-    ).length,
+    (workflow.match(/node scripts\/publish-npm-idempotent\.mjs/g) || []).length,
     1,
-    "npm publication must occur exactly once",
+    "npm publication entrypoint must occur exactly once",
+  );
+  assert.match(
+    publisher,
+    /run\(npmCli, \["publish", "--access", "public", "--ignore-scripts"\]\)/,
   );
 });
 
@@ -49,19 +53,25 @@ test("npm trusted publishing uses registry setup and no publish token secret", (
   );
   assert.match(
     publishJob,
-    /npm run package:check[\s\S]*node \.github\/npm-publish\/node_modules\/npm\/bin\/npm-cli\.js publish --access public/,
+    /npm run package:check[\s\S]*node scripts\/publish-npm-idempotent\.mjs/,
   );
-  assert.doesNotMatch(publishJob, /NPM_TOKEN/);
-  assert.doesNotMatch(publishJob, /NODE_AUTH_TOKEN/);
-  assert.doesNotMatch(publishJob, /npm publish[^\n]*--provenance/);
+  assert.doesNotMatch(workflow, /NPM_TOKEN/);
+  assert.doesNotMatch(workflow, /NODE_AUTH_TOKEN/);
+  assert.doesNotMatch(publisher, /--provenance/);
 });
 
-test("npm publication remains fail-visible in the release sequence", () => {
+test("npm publication remains fail-visible and resumable after GitHub publication", () => {
   const publishJob = publishJobSource();
 
   assert.match(
     publishJob,
-    /Rebuild from the tagged commit[\s\S]*npm run package:check[\s\S]*npm ci --prefix \.github\/npm-publish --include=dev --allow-remote=all --ignore-scripts[\s\S]*node \.github\/npm-publish\/node_modules\/npm\/bin\/npm-cli\.js publish --access public[\s\S]*Publish GitHub Release/,
+    /Rebuild from the tagged commit[\s\S]*npm run package:check[\s\S]*Install trusted-publishing npm CLI[\s\S]*Publish or verify GitHub Release[\s\S]*Publish or verify npm package/,
   );
-  assert.doesNotMatch(publishJob, /npm publish[^\n]*(\|\| true|continue-on-error)/);
+  assert.doesNotMatch(publishJob, /continue-on-error|\|\| true/);
+  const existingCheck = publisher.indexOf("const existingIntegrity = publishedPackageIntegrity");
+  const publishCall = publisher.indexOf('run(npmCli, ["publish", "--access", "public", "--ignore-scripts"]);');
+  assert.ok(existingCheck >= 0, "publisher must inspect an existing package version");
+  assert.ok(publishCall > existingCheck, "publisher must verify/reuse before attempting publish");
+  assert.match(publisher, /npm_existing_version_integrity_mismatch/);
+  assert.match(publisher, /npm_publish_verification_failed/);
 });

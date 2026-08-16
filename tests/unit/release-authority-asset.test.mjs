@@ -16,7 +16,10 @@ test("release workflow builds, attests, and publishes the Windows authority host
   assert.match(workflow, /actions\/download-artifact@[0-9a-f]{40}/);
   assert.match(workflow, /name: Attest Windows authority host/);
   assert.match(workflow, /subject-path: dist\/authority-host\/github-delivery-authority-v\*\.zip/);
-  assert.match(workflow, /gh release create[\s\S]*dist\/authority-host\/github-delivery-authority-v\*\.zip[\s\S]*dist\/authority-host\/github-delivery-authority-v\*\.json/);
+  assert.match(
+    workflow,
+    /assets=\([\s\S]*dist\/authority-host\/github-delivery-authority-v\*\.zip[\s\S]*dist\/authority-host\/github-delivery-authority-v\*\.json[\s\S]*\)[\s\S]*gh release create/,
+  );
 });
 
 test("authority host builds pin the exact verified SDK and self-contained runtime", () => {

@@ -126,7 +126,7 @@ export async function runBootstrapSetup({
       watchdog: receipt.mode,
       changed: authorityHost?.changed === true,
       authorityHost,
-      guidance: authorityUnavailable ? authorityProviderGuidance() : null,
+      ...(authorityUnavailable ? { guidance: authorityProviderGuidance() } : {}),
     };
   }
 
