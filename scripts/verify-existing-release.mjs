@@ -1,8 +1,9 @@
 #!/usr/bin/env node
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { basename } from "node:path";
-import { spawnSync } from "node:child_process";
+import { basename, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 function sha256File(path) {
   return createHash("sha256").update(readFileSync(path)).digest("hex");
@@ -51,7 +52,9 @@ export function verifyExistingRelease({ repo, tag, files, release = null }) {
   return { tag, status: "verified_existing_release", assets: verified };
 }
 
-if (process.argv[1]) {
+const invokedPath = process.argv[1] ? resolve(process.argv[1]) : null;
+const modulePath = resolve(fileURLToPath(import.meta.url));
+if (invokedPath && invokedPath === modulePath) {
   const [repo, tag, ...files] = process.argv.slice(2);
   try {
     process.stdout.write(`${JSON.stringify(verifyExistingRelease({ repo, tag, files }), null, 2)}\n`);
