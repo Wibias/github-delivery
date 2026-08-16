@@ -10,6 +10,7 @@ const WRITE_ALLOWLIST = new Map([
   [".github/workflows/codeql.yml", new Set(["security-events"])],
   [".github/workflows/scorecard.yml", new Set(["security-events", "id-token"])],
   [".github/workflows/live-integration.yml", new Set(["contents", "pull-requests", "issues"])],
+  [".github/workflows/cleanup-orphaned-workflows.yml", new Set(["actions"])],
 ]);
 
 function posix(path) {
