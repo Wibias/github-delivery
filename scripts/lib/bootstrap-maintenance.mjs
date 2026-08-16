@@ -57,6 +57,10 @@ function trustGuidance(changed) {
     : "Open /hooks in Codex, review the GitHub Delivery hook definitions, trust them, then run setup again and confirm that review.";
 }
 
+function authorityProviderGuidance() {
+  return "The selected authority protection mode requires a trusted authority provider, but the bundled Windows authority host is unavailable on this platform. Read-only/local workflows remain usable. Protected GitHub writes stay blocked until a compatible authority provider is configured or you explicitly choose authorityMode=off.";
+}
+
 export async function runBootstrapUpdate({
   target,
   apply = false,
@@ -97,17 +101,19 @@ export async function runBootstrapSetup({
   const authorityHost = await reconcileAuthority({
     scriptPath: join(target, "authority-host", "windows", "install-release.ps1"),
   });
+  const authorityUnavailable =
+    authorityHost?.action === "unsupported" && authorityHost?.required === true;
   const authorityStarted = authorityHost?.installed?.installed
     ? await startAuthority({ installed: authorityHost.installed })
-    : { started: false, reason: "not_installed" };
+    : { started: false, reason: authorityUnavailable ? "unsupported_platform" : "not_installed" };
   output?.write?.(authorityStarted.started
     ? "\nWindows approval GUI is running in the notification area and Authority is ready.\n"
-    : `\nWindows approval GUI not started (${authorityStarted.reason}). Run: npx github-delivery start\n`);
+    : `\nWindows approval GUI not started (${authorityStarted.reason}).${authorityUnavailable ? "" : " Run: npx github-delivery start"}\n`);
   if (!authorityStarted.started && authorityStarted.diagnosticsPath) {
     output?.write?.(`  Diagnostics: ${authorityStarted.diagnosticsPath}\n`);
   }
-  if (authorityHost?.action === "unsupported" && authorityHost?.required === true) {
-    fail("bootstrap_setup_authority_host_unsupported");
+  if (authorityUnavailable) {
+    output?.write?.(`  ${authorityProviderGuidance()}\n`);
   }
 
   const readReceipt = dependencies.readActivationReceipt || readActivationReceipt;
@@ -115,11 +121,12 @@ export async function runBootstrapSetup({
   if (readyReceipt(receipt)) {
     return {
       action: "setup",
-      status: "ready",
+      status: authorityUnavailable ? "authority_provider_required" : "ready",
       target,
       watchdog: receipt.mode,
       changed: authorityHost?.changed === true,
       authorityHost,
+      ...(authorityUnavailable ? { guidance: authorityProviderGuidance() } : {}),
     };
   }
 
@@ -137,8 +144,11 @@ export async function runBootstrapSetup({
       watchdog: receipt?.mode || "none",
       changed: authorityHost?.changed === true,
       authorityHost,
+      authorityProviderRequired: authorityUnavailable,
       hookDefinitionChanged: true,
-      guidance: trustGuidance(true),
+      guidance: authorityUnavailable
+        ? `${trustGuidance(true)} ${authorityProviderGuidance()}`
+        : trustGuidance(true),
     };
   }
 
@@ -155,8 +165,11 @@ export async function runBootstrapSetup({
       watchdog: receipt?.mode || "none",
       changed: authorityHost?.changed === true,
       authorityHost,
+      authorityProviderRequired: authorityUnavailable,
       hookDefinitionChanged: false,
-      guidance: trustGuidance(false),
+      guidance: authorityUnavailable
+        ? `${trustGuidance(false)} ${authorityProviderGuidance()}`
+        : trustGuidance(false),
     };
   }
 
@@ -177,14 +190,24 @@ export async function runBootstrapSetup({
   ]);
   const result = await installed.runInstallCommand(options);
   const watchdog = result?.watchdog?.mode || "none";
+  const watchdogReady = watchdog === "hooks" || watchdog === "stream";
   return {
     action: "setup",
-    status: watchdog === "hooks" || watchdog === "stream" ? "ready" : "hook_trust_required",
+    status: !watchdogReady
+      ? "hook_trust_required"
+      : authorityUnavailable
+        ? "authority_provider_required"
+        : "ready",
     target,
     watchdog,
     changed: result?.watchdog?.receiptChanged === true || authorityHost?.changed === true,
     authorityHost,
-    guidance: watchdog === "hooks" || watchdog === "stream" ? null : trustGuidance(false),
+    authorityProviderRequired: authorityUnavailable,
+    guidance: !watchdogReady
+      ? trustGuidance(false)
+      : authorityUnavailable
+        ? authorityProviderGuidance()
+        : null,
     result,
   };
 }

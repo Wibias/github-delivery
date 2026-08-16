@@ -9,6 +9,7 @@ import {
 } from "./github-lifecycle-mutation-broker.mjs";
 import { makeGitHubBodyTransportRunner } from "./github-body-transport.mjs";
 import { makeIdempotencyReceiptRunner } from "./idempotency-receipt-runner.mjs";
+import { verifyLegacyMutationPostcondition } from "./mutation-postconditions.mjs";
 import { boundedSpawnSync } from "./subprocess-policy.mjs";
 
 export function planMutationRequest(request = {}, options = {}) {
@@ -37,8 +38,14 @@ export function executeMutationRequest(options = {}) {
     request: planned.request,
     runner: bodySafeRunner,
   });
-  return executeLegacyMutationRequest({
+  const receipt = executeLegacyMutationRequest({
     ...options,
     runner,
   });
+  const postcondition = verifyLegacyMutationPostcondition({
+    request: planned.request,
+    receipt,
+    runner,
+  });
+  return postcondition ? { ...receipt, postcondition } : receipt;
 }

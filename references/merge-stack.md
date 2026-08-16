@@ -1,33 +1,9 @@
 # Merge discipline for stacks
 
-## Order
+Deprecated compatibility reference.
 
-Merge **bottom-up, one at a time**. A top PR whose base is still a parent branch
-must not land first — that merges into the parent branch, not trunk.
+Use `references/stacked-prs.md` for all stacked-PR merge, retarget, restack, and recovery operations.
 
-```text
-1. Merge bottom PR (base = trunk)
-2. Verify child bases retarget to trunk (or PATCH)
-3. Restack next child onto trunk
-4. Merge next; repeat
-```
+The canonical workflow merges bottom-up, re-inspects topology after every parent lands, retargets only through broker action `retarget_pr`, rewrites branches only through broker action `push_code`, and revalidates every surviving child on its new head/base generation.
 
-## Retarget before delete risk
-
-If the repo auto-deletes head branches on merge, retarget immediate children
-**before** merging the parent so GitHub does not close them:
-
-```bash
-gh api "repos/$OWNER/$REPO/pulls/$CHILD_N" -X PATCH -f base="$TRUNK"
-```
-
-## Empty after restack
-
-If a child diff collapses to empty after a parent lands, close that PR with a
-one-line explanation. Do not leave empty PRs open.
-
-## Review hygiene
-
-- Avoid rebasing the bottom PR mid-review round (breaks comment anchors).
-- Do not request full review on PR K while PR K-1 is still unapproved, unless
-  the reviewer is explicitly scoped to the delta only.
+Do not use raw mutating `gh api` or `git push` commands from a stack workflow.

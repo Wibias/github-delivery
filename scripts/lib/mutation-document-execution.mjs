@@ -44,6 +44,15 @@ export function requestsFromMutationDocument(document) {
   throw new Error("mutation_document_requests_required");
 }
 
+function assertPublicMutationDocument(requests) {
+  const merge = requests.find((request) => request?.action === "merge_pr");
+  if (merge) {
+    throw new Error(
+      "merge_pr_requires_merge_driver: use scripts/merge-pr-driver.mjs so ship-gate, review evidence, settle, and final boundary checks cannot be bypassed",
+    );
+  }
+}
+
 function refreshRunner(runner) {
   return (argv) => {
     const [command, ...args] = argv;
@@ -95,6 +104,7 @@ export function executeMutationDocument({
   const normalized = requestsFromMutationDocument(document);
   const effectiveEnv = deps.authorityRuntimeEnvironment({ env });
   const requests = normalized.requests;
+  assertPublicMutationDocument(requests);
 
   if (execute) {
     for (const request of requests) {

@@ -17,7 +17,7 @@ export const AUTHORITY_MODES = Object.freeze([
 
 export const DEFAULT_USER_CONFIG = Object.freeze({
   schemaVersion: 1,
-  authorityMode: "off",
+  authorityMode: "high-assurance",
 });
 
 function codedError(code, cause = undefined) {

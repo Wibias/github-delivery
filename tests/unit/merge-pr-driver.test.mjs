@@ -111,15 +111,14 @@ test("merge driver gate blocks on required-check pending", () => {
   assert.ok(gate.blockers.some((blocker) => blocker.includes("requiredChecks")));
 });
 
-test("merge boundary binds head, base oid, and active-rules fingerprint", () => {
-  const snapshot = boundarySnapshot();
-  assert.deepEqual(mergeBoundaryForSnapshot(snapshot), {
-    headOid: HEAD,
-    baseRefName: "main",
-    baseOid: "b".repeat(40),
-    rulesFingerprint: "c".repeat(64),
-    coherence: "strict_required_checks",
-  });
+test("merge boundary binds head, base oid, active rules, and feedback generation", () => {
+  const boundary = mergeBoundaryForSnapshot(boundarySnapshot());
+  assert.equal(boundary.headOid, HEAD);
+  assert.equal(boundary.baseRefName, "main");
+  assert.equal(boundary.baseOid, "b".repeat(40));
+  assert.equal(boundary.rulesFingerprint, "c".repeat(64));
+  assert.match(boundary.feedbackFingerprint, /^[0-9a-f]{64}$/);
+  assert.equal(boundary.coherence, "strict_required_checks");
 });
 
 test("merge boundary refuses repositories without server-enforced base coherence", () => {

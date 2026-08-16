@@ -444,26 +444,36 @@ function autonomousPostComment(overrides = {}) {
   };
 }
 
-test("autonomous social create acquires a remote idempotency claim before the visible effect", () => {
+test("autonomous social create acquires and re-verifies a remote idempotency claim before the visible effect", () => {
   const calls = [];
   let visibleEffects = 0;
+  let tagMessage = null;
+  const claimObject = "claim-tag-object";
   const result = executeMutationRequest({
     request: autonomousPostComment(),
     execute: true,
     runner(command, args) {
       calls.push([command, ...args]);
+      const endpoint = String(args[1] || "");
       if (args[0] === "pr" && args[1] === "view") {
         return { status: 0, stdout: "abcdef1234567890\n", stderr: "" };
       }
-      if (args[0] === "api" && String(args[1]).includes("/issues/32/comments")) {
+      if (args[0] === "api" && endpoint.includes("/issues/32/comments")) {
         return { status: 0, stdout: "[[]]", stderr: "" };
       }
-      if (
-        args[0] === "api" &&
-        String(args[1]).endsWith("/git/refs") &&
-        args.includes("POST")
-      ) {
+      if (args[0] === "api" && endpoint.endsWith("/git/tags") && args.includes("POST")) {
+        const argument = args.find((value) => String(value).startsWith("message="));
+        tagMessage = String(argument || "").slice("message=".length);
+        return { status: 0, stdout: JSON.stringify({ sha: claimObject }), stderr: "" };
+      }
+      if (args[0] === "api" && endpoint.endsWith("/git/refs") && args.includes("POST")) {
         return { status: 0, stdout: JSON.stringify({ ref: "refs/github-delivery/idempotency/example" }), stderr: "" };
+      }
+      if (args[0] === "api" && endpoint.includes("/git/ref/github-delivery/idempotency/")) {
+        return { status: 0, stdout: JSON.stringify({ object: { type: "tag", sha: claimObject } }), stderr: "" };
+      }
+      if (args[0] === "api" && endpoint.endsWith(`/git/tags/${claimObject}`)) {
+        return { status: 0, stdout: JSON.stringify({ message: tagMessage }), stderr: "" };
       }
       if (args[0] === "pr" && args[1] === "comment") {
         visibleEffects += 1;
@@ -475,33 +485,47 @@ test("autonomous social create acquires a remote idempotency claim before the vi
   const claimIndex = calls.findIndex(
     (call) => call[1] === "api" && String(call[2]).endsWith("/git/refs") && call.includes("POST"),
   );
+  const verifyIndex = calls.findLastIndex(
+    (call) => call[1] === "api" && String(call[2]).includes("/git/ref/github-delivery/idempotency/"),
+  );
   const effectIndex = calls.findIndex((call) => call[1] === "pr" && call[2] === "comment");
   assert.ok(claimIndex >= 0);
-  assert.ok(effectIndex > claimIndex);
+  assert.ok(verifyIndex > claimIndex);
+  assert.ok(effectIndex > verifyIndex);
   assert.equal(visibleEffects, 1);
   assert.equal(result.status, "succeeded");
+  assert.equal(result.idempotencyClaim.status, "claimed");
 });
 
-test("a competing autonomous idempotency claim fails closed before any visible effect", () => {
+test("a fresh competing autonomous idempotency claim fails closed before any visible effect", () => {
   let visibleEffects = 0;
+  let attemptedTagMessage = null;
   assert.throws(
     () =>
       executeMutationRequest({
         request: autonomousPostComment(),
         execute: true,
         runner(command, args) {
+          const endpoint = String(args[1] || "");
           if (args[0] === "pr" && args[1] === "view") {
             return { status: 0, stdout: "abcdef1234567890\n", stderr: "" };
           }
-          if (args[0] === "api" && String(args[1]).includes("/issues/32/comments")) {
+          if (args[0] === "api" && endpoint.includes("/issues/32/comments")) {
             return { status: 0, stdout: "[[]]", stderr: "" };
           }
-          if (
-            args[0] === "api" &&
-            String(args[1]).endsWith("/git/refs") &&
-            args.includes("POST")
-          ) {
+          if (args[0] === "api" && endpoint.endsWith("/git/tags") && args.includes("POST")) {
+            const argument = args.find((value) => String(value).startsWith("message="));
+            attemptedTagMessage = String(argument || "").slice("message=".length);
+            return { status: 0, stdout: JSON.stringify({ sha: "attempted-tag" }), stderr: "" };
+          }
+          if (args[0] === "api" && endpoint.endsWith("/git/refs") && args.includes("POST")) {
             return { status: 1, stdout: "", stderr: "HTTP 422: Reference already exists" };
+          }
+          if (args[0] === "api" && endpoint.includes("/git/ref/github-delivery/idempotency/")) {
+            return { status: 0, stdout: JSON.stringify({ object: { type: "tag", sha: "existing-tag" } }), stderr: "" };
+          }
+          if (args[0] === "api" && endpoint.endsWith("/git/tags/existing-tag")) {
+            return { status: 0, stdout: JSON.stringify({ message: attemptedTagMessage }), stderr: "" };
           }
           if (args[0] === "pr" && args[1] === "comment") {
             visibleEffects += 1;

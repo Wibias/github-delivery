@@ -40,5 +40,5 @@ test("issue-to-PR workflow keeps safety gates while staying compact", () => {
 test("routine mutation docs make github-mutate own authority choreography", () => {
   assert.match(mutationPolicy, /github-mutate\.mjs --request .* --execute/i);
   assert.match(mutationPolicy, /authority acquisition/i);
-  assert.match(skill, /Do not invoke `scripts\/github-authorize\.mjs` separately/i);
+  assert.match(skill, /Do not invoke\s+`(?:scripts\/)?github-authorize\.mjs` separately/i);
 });

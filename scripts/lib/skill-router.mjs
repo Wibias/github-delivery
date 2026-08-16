@@ -21,6 +21,7 @@ const FIX_REVIEW_REQUEST = /\b(fix|address)\b[\s\S]*(review|coderabbit|codex|com
 const ISSUE_CREATE_REQUEST = /\b(?:create|file)\b[\s\S]{0,120}\b(?:issue|issues|ticket|tickets|bug report|bug reports)\b|\bopen\s+(?:a|an|new)\b[\s\S]{0,80}\b(?:issue|ticket|bug report)\b/;
 const FOLLOW_UP_ISSUE_REQUEST = /\bfollow[- ]?up\s+(?:issue|ticket)\b/;
 const CREATE_PR_FOR_ISSUE_REQUEST = /\b(?:create|open)\b[\s\S]*\b(?:pr|pull request)\b[\s\S]*\b(?:issue|#\d+)\b/;
+const IMPLEMENT_ISSUE_REQUEST = /\b(?:implement|fix|address|solve|resolve)\b[\s\S]{0,180}\b(?:issue|#\d+)\b|\b(?:issue|#\d+)\b[\s\S]{0,180}\b(?:implement|fix|address|solve|resolve)\b/;
 const CREATE_PR_REQUEST = /\b(?:create|open|make)\b[\s\S]{0,120}\b(?:pr|pull request)\b/;
 const DELIVERY_NAME = /\bgithub[- ]?delivery\b/;
 const DELIVERY_UPDATE = /\b(update|upgrade)\b[\s\S]*\bgithub[- ]?delivery\b|\bgithub[- ]?delivery\b[\s\S]*\b(update|upgrade|latest stable release)\b/;
@@ -97,7 +98,9 @@ export function routeShippingGithubPrompt(prompt) {
     const autonomous = /\bautonomous(ly)?\b|\bauto[- ]?fix\b|\bfix and merge without asking\b/.test(text);
     return result("references/watch-pr.md", autonomous ? "autonomous" : "read-only");
   }
-  if (CREATE_PR_FOR_ISSUE_REQUEST.test(text)) return result("references/create-pr-for-issue.md", "maintainer");
+  if (CREATE_PR_FOR_ISSUE_REQUEST.test(text) || IMPLEMENT_ISSUE_REQUEST.test(text)) {
+    return result("references/create-pr-for-issue.md", "maintainer");
+  }
   if (CREATE_PR_REQUEST.test(text) && !PR_REFERENCE.test(text)) return result("references/create-pr-from-local-work.md", "maintainer", ["push_code", "create_pr"]);
   if (/\b(research|investigate)\b[\s\S]*\b(issue|issues|#\d+)\b/.test(text)) return result("references/research-issue.md", "review");
 

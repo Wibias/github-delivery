@@ -162,16 +162,26 @@ export function isFinalMergeOutcome(receipt) {
 export function executeMergeTransaction({
   mergeRequest,
   thankRequest = null,
+  beforeMerge = null,
   executeRequest = (request) => executeMutationWithAuthority({ request, execute: true }),
 } = {}) {
   if (!mergeRequest) throw new Error("merge_request_required");
   const receipts = [];
+  if (beforeMerge) beforeMerge();
   const mergeReceipt = executeRequest(mergeRequest);
   receipts.push({ name: "merge", receipt: mergeReceipt });
   if (!isFinalMergeOutcome(mergeReceipt)) return receipts;
   if (thankRequest) {
-    const thankReceipt = executeRequest(thankRequest);
-    receipts.push({ name: "post_merge_thanks", receipt: thankReceipt });
+    try {
+      const thankReceipt = executeRequest(thankRequest);
+      receipts.push({ name: "post_merge_thanks", receipt: thankReceipt });
+    } catch (error) {
+      receipts.push({
+        name: "post_merge_thanks",
+        receipt: null,
+        error: String(error?.message || error),
+      });
+    }
   }
   return receipts;
 }
@@ -262,11 +272,84 @@ export function verifyFinalMergeBoundary({
   };
 }
 
+function receiptSummary(entry) {
+  if (entry.error) {
+    return {
+      name: entry.name,
+      action: entry.name === "post_merge_thanks" ? "post_comment" : null,
+      status: "failed_after_merge",
+      outcome: null,
+      error: entry.error,
+    };
+  }
+  const receipt = entry.receipt;
+  return {
+    name: entry.name,
+    action: receipt?.action || null,
+    status: receipt?.status || null,
+    outcome: receipt?.outcome ?? null,
+    observedHead: receipt?.observedHead ?? null,
+    verification: receipt?.verification ?? null,
+    authority: receipt?.authority ?? null,
+    redemption: receipt?.redemption ?? null,
+  };
+}
+
+async function reconcileAlreadyMerged({ args, mode, snapshot }) {
+  const pr = snapshot.evidence?.pullRequest || {};
+  const expectedHead = snapshot.headOid;
+  const authorLogin = pr.author?.login || null;
+  const thankBody =
+    args.thankComment ||
+    (authorLogin && !args.skipThanks ? defaultThanksBody({ author: authorLogin }) : null);
+  const thankRequest = thankBody
+    ? buildThankRequest({ repo: args.repo, pr: args.pr, expectedHead, body: thankBody })
+    : null;
+  const plan = thankRequest ? planMutationWithAuthority(thankRequest) : null;
+  const summary = {
+    schemaVersion: 1,
+    kind: "github-delivery/merge-pr-driver",
+    repo: args.repo,
+    pr: args.pr,
+    mode,
+    headOid: expectedHead,
+    alreadyMerged: true,
+    recovery: "post_merge_reconciliation",
+    steps: plan
+      ? [{ name: "post_merge_thanks", action: plan.action, command: plan.command, requestHash: plan.requestHash, authority: plan.authority }]
+      : [],
+    executed: false,
+  };
+  if (!args.execute || !thankRequest) {
+    process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
+    return;
+  }
+
+  const fresh = captureLiveSnapshot({ repo: args.repo, pr: args.pr });
+  if (fresh.headOid !== expectedHead || fresh.evidence?.pullRequest?.state !== "MERGED") {
+    throw new Error("post_merge_reconciliation_state_moved");
+  }
+  const authorized = authorizeMergeRequests([{ name: "post_merge_thanks", request: thankRequest }]);
+  const request = authorized.requests[0]?.request;
+  if (!request) throw new Error("authorized_post_merge_thanks_missing");
+  const receipt = executeMutationWithAuthority({ request, execute: true });
+  if (args.audit) appendFileSync(args.audit, `${JSON.stringify(receipt)}\n`, "utf8");
+  process.stdout.write(`${JSON.stringify({
+    ...summary,
+    executed: true,
+    authorityBatch: { batchId: authorized.batchId, expiresAt: authorized.expiresAt },
+    receipts: [receiptSummary({ name: "post_merge_thanks", receipt })],
+  }, null, 2)}\n`);
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const mode = normalizeMutationMode(args.mode);
   if (!mutationProfile(mode).actions.merge_pr?.allowed) {
     throw new Error(`mutation_mode_merge_forbidden:${mode}`);
+  }
+  if (args.execute && !args.settle) {
+    throw new Error("merge_execute_requires_settle");
   }
 
   let snapshot = captureLiveSnapshot({ repo: args.repo, pr: args.pr });
@@ -275,13 +358,16 @@ async function main() {
       `expected_head_mismatch: expected ${args.expectedHead}, observed ${snapshot.headOid}`,
     );
   }
-  const pr = snapshot.evidence?.pullRequest || {};
-  if (pr.state === "MERGED") throw new Error("pr_already_merged");
+  let pr = snapshot.evidence?.pullRequest || {};
+  if (pr.state === "MERGED") {
+    await reconcileAlreadyMerged({ args, mode, snapshot });
+    return;
+  }
   if (pr.isDraft === true) throw new Error("pr_is_draft");
 
   let gate = buildGateOutput(snapshot, mode);
   if (!gate.ready) {
-    throw new Error(`gate_blocked:${(gate.blockers || []).join(",") || "unknown"}`);
+    throw new Error(`gate_blocked:${(gate.blockers || gate.unknowns || []).join(",") || "unknown"}`);
   }
 
   if (args.settle) {
@@ -289,6 +375,7 @@ async function main() {
     if (!settled.ok) throw new Error(`settle_failed:${settled.reason}`);
     snapshot = settled.snapshot;
     gate = settled.gate;
+    pr = snapshot.evidence?.pullRequest || pr;
   }
 
   const approvedBoundary = mergeBoundaryForSnapshot(snapshot);
@@ -331,6 +418,7 @@ async function main() {
       decision: gate.decision,
       ready: gate.ready,
       blockers: gate.blockers,
+      unknowns: gate.unknowns,
     },
     settle: args.settle,
     mergeMethod,
@@ -350,8 +438,18 @@ async function main() {
     return;
   }
 
-  // Authorize the exact precomputed mutation batch first. Then recapture all
-  // gate-critical state before redeeming any grant or touching GitHub.
+  // Verify all gate-critical state before requesting destructive authority.
+  const freshSnapshot = captureLiveSnapshot({ repo: args.repo, pr: args.pr });
+  const finalBoundary = verifyFinalMergeBoundary({
+    approvedBoundary,
+    approvedReviewEvidence,
+    freshSnapshot,
+    mode,
+  });
+
+  // Authorize the exact batch only after the first final-boundary recapture.
+  // The transaction performs one more live boundary check immediately before
+  // the merge write, after any human approval delay.
   const authorizedBatch = authorizeMergeRequests(requests);
   const authorizedMergeRequest = authorizedBatch.requests.find(
     (entry) => entry.name === "merge",
@@ -361,17 +459,19 @@ async function main() {
   )?.request || null;
   if (!authorizedMergeRequest) throw new Error("authorized_merge_request_missing");
 
-  const freshSnapshot = captureLiveSnapshot({ repo: args.repo, pr: args.pr });
-  const finalBoundary = verifyFinalMergeBoundary({
-    approvedBoundary,
-    approvedReviewEvidence,
-    freshSnapshot,
-    mode,
-  });
-
+  let immediateBoundary = null;
   const receipts = executeMergeTransaction({
     mergeRequest: authorizedMergeRequest,
     thankRequest: authorizedThankRequest,
+    beforeMerge() {
+      const immediateSnapshot = captureLiveSnapshot({ repo: args.repo, pr: args.pr });
+      immediateBoundary = verifyFinalMergeBoundary({
+        approvedBoundary,
+        approvedReviewEvidence,
+        freshSnapshot: immediateSnapshot,
+        mode,
+      });
+    },
     executeRequest(request) {
       const receipt = executeMutationWithAuthority({ request, execute: true });
       if (args.audit) appendFileSync(args.audit, `${JSON.stringify(receipt)}\n`, "utf8");
@@ -390,21 +490,14 @@ async function main() {
   const final = {
     ...summary,
     executed: true,
+    partialFailure: receipts.some((entry) => Boolean(entry.error)),
     authorityBatch: {
       batchId: authorizedBatch.batchId,
       expiresAt: authorizedBatch.expiresAt,
     },
     finalBoundary,
-    receipts: receipts.map(({ name, receipt }) => ({
-      name,
-      action: receipt.action,
-      status: receipt.status,
-      outcome: receipt.outcome ?? null,
-      observedHead: receipt.observedHead,
-      verification: receipt.verification,
-      authority: receipt.authority,
-      redemption: receipt.redemption,
-    })),
+    immediateBoundary,
+    receipts: receipts.map(receiptSummary),
     cleanup: {
       action: cleanup.action,
       reason: cleanup.reason,
