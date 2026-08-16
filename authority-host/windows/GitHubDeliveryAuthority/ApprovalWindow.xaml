@@ -5,7 +5,7 @@
     Title="Delivery Authority">
     <Grid x:Name="RootLayout"
           Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
-          Padding="28">
+          Padding="31,28,31,28">
         <VisualStateManager.VisualStateGroups>
             <VisualStateGroup x:Name="ApprovalLayoutStates">
                 <VisualState x:Name="NarrowApprovalState">
@@ -13,7 +13,7 @@
                         <AdaptiveTrigger MinWindowWidth="0" />
                     </VisualState.StateTriggers>
                     <VisualState.Setters>
-                        <Setter Target="RootLayout.Padding" Value="16" />
+                        <Setter Target="RootLayout.Padding" Value="18,16,18,16" />
                         <Setter Target="HeaderPanel.Margin" Value="0,0,0,16" />
                         <Setter Target="BranchGrantText.(Grid.ColumnSpan)" Value="2" />
                         <Setter Target="BranchGrantControls.(Grid.Row)" Value="1" />
@@ -28,7 +28,7 @@
                         <AdaptiveTrigger MinWindowWidth="680" />
                     </VisualState.StateTriggers>
                     <VisualState.Setters>
-                        <Setter Target="RootLayout.Padding" Value="28" />
+                        <Setter Target="RootLayout.Padding" Value="31,28,31,28" />
                         <Setter Target="HeaderPanel.Margin" Value="0,0,0,22" />
                         <Setter Target="BranchGrantText.(Grid.ColumnSpan)" Value="1" />
                         <Setter Target="BranchGrantControls.(Grid.Row)" Value="0" />
