@@ -18,7 +18,7 @@ internal static class UserConfigStore
 
     public static DeliveryUserConfig Read()
     {
-        if (!File.Exists(ConfigPath)) return new DeliveryUserConfig(1, "off");
+        if (!File.Exists(ConfigPath)) return new DeliveryUserConfig(1, "high-assurance");
         try
         {
             using var document = JsonDocument.Parse(File.ReadAllText(ConfigPath));
