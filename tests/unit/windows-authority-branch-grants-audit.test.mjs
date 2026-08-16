@@ -54,6 +54,16 @@ test("authority state persists bounded branch leases and a token-free audit ledg
   assert.doesNotMatch(store, /audit_events[\s\S]{0,800}\btoken\b/i);
 });
 
+test("branch lease duration is bounded to one through ten minutes at host boundaries", () => {
+  const store = read(`${host}/StateStore.cs`);
+  const coordinator = read(`${host}/ApprovalCoordinator.cs`);
+  const window = read(`${host}/ApprovalWindow.xaml.cs`);
+
+  assert.match(store, /minutes is < 1 or > 10/);
+  assert.match(coordinator, /minutes < 1 \|\| minutes > 10/);
+  assert.match(window, /minutes is >= 1 and <= 10/);
+});
+
 test("approval flow atomically reuses only an exact repo plus branch lease", () => {
   const service = read(`${host}/AuthorityService.cs`);
   const coordinator = read(`${host}/ApprovalCoordinator.cs`);
