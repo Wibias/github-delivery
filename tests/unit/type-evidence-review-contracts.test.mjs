@@ -34,6 +34,28 @@ test("Standards review loads the type-evidence companion only for relevant typed
   assert.match(standards, /type-evidence.*`n\/a`|`n\/a`.*type-evidence/is);
 });
 
+test("Type-evidence review maps the practical anti-slop subset rule by rule", () => {
+  const typeEvidence = read("references/type-evidence-review.md");
+
+  for (const rule of [
+    "no-chained-type-assertions",
+    "no-known-value-widening",
+    "no-object-parameters",
+    "no-reflect-apply",
+    "no-reflect-get",
+    "no-widen-then-assert",
+    "require-safety-comment-for-type-assertion",
+  ]) {
+    assert.match(typeEvidence, new RegExp(`\\b${rule}\\b`), `missing review mapping for ${rule}`);
+  }
+
+  assert.match(typeEvidence, /rule-by-rule|rule mapping|anti-slop checklist/i);
+  assert.match(typeEvidence, /repository.*lint.*binding|binding.*repository.*lint/is);
+  assert.match(typeEvidence, /SAFETY.*repository.*requires|repository.*requires.*SAFETY/is);
+  assert.match(typeEvidence, /Reflect\.get.*typed|typed.*Reflect\.get/is);
+  assert.match(typeEvidence, /Reflect\.apply.*typed|typed.*Reflect\.apply/is);
+});
+
 test("Type-evidence guidance rejects blanket anti-slop rules", () => {
   const typeEvidence = read("references/type-evidence-review.md");
 
@@ -46,7 +68,7 @@ test("Type-evidence guidance rejects blanket anti-slop rules", () => {
 
 test("Type-evidence behavioural cases include positive and false-positive controls", () => {
   const cases = JSON.parse(read("tests/evals/behavioural-type-evidence-cases.json"));
-  assert.ok(cases.length >= 6, "expected a compact positive/control suite");
+  assert.ok(cases.length >= 10, "expected the anti-slop positive/control suite");
 
   for (const item of cases) validateBehaviouralCase(item);
 
@@ -58,6 +80,10 @@ test("Type-evidence behavioural cases include positive and false-positive contro
     "TYPE-EVID-004-interop-assertion-control",
     "TYPE-EVID-005-wiring-mock",
     "TYPE-EVID-006-unit-mock-control",
+    "TYPE-EVID-007-broad-object-parameter",
+    "TYPE-EVID-008-reflect-get-typed-contract",
+    "TYPE-EVID-009-reflect-apply-typed-contract",
+    "TYPE-EVID-010-repository-safety-comment",
   ]) {
     assert.ok(ids.has(id), `missing behavioural case ${id}`);
   }
