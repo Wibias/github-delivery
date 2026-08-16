@@ -1,6 +1,14 @@
 import { createProgressWatchdog } from "./agent-progress-watchdog.mjs";
 import { observeCodexAppServerMessage } from "./codex-progress-watchdog.mjs";
 
+const STREAM_WATCHDOG_DEFAULTS = Object.freeze({
+  generatedCharSoftLimit: 4_000,
+  generatedCharHardLimit: 8_000,
+  noProgressTokenSoftLimit: 1_024,
+  noProgressTokenHardLimit: 2_048,
+  toolEmissionIntentThreshold: 4,
+});
+
 function messageTurnId(message) {
   return message?.params?.turnId || message?.params?.turn?.id || null;
 }
@@ -42,7 +50,10 @@ export function createAppServerWatchdogRouter(options = {}) {
     } else if (typeof options.watchdogFactory === "function") {
       watchdog = options.watchdogFactory({ turnId });
     } else {
-      watchdog = createProgressWatchdog(options.watchdogOptions);
+      watchdog = createProgressWatchdog({
+        ...STREAM_WATCHDOG_DEFAULTS,
+        ...options.watchdogOptions,
+      });
     }
     const state = {
       watchdog,
