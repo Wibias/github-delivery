@@ -4,6 +4,26 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-08-16
+
+### Added
+
+- Added an explicit rule-by-rule anti-slop checklist to the typed-code Standards companion (PR #267). Reviews now cover chained assertions, known-value widening, broad internal `object` parameters, unnecessary `Reflect.apply` / `Reflect.get`, widen-then-assert flows, and repository-required assertion safety justification while preserving valid boundary `unknown`, runtime narrowing, dynamic interop, open dictionaries, and repository test seams as false-positive controls.
+- Added adversarial audit regression coverage and resumable cross-system release helpers (PR #268). Release publication can publish or verify GitHub assets before npm, verify an already-published npm version by registry integrity, and resume safely after a partial publication attempt.
+
+### Changed
+
+- Merge execution now has one canonical destructive boundary in `merge-pr-driver.mjs` (PR #268). Generic `merge_pr` mutation documents are rejected, execution requires settle, and the driver binds head, base, active-rules, feedback, and review-evidence generations before destructive authority and recaptures them again immediately before the merge write after any approval delay.
+- The ship gate now fails closed on unsupported active ruleset types and unexplained GitHub `BLOCKED` merge state, while successful merges with failed post-merge thanks report partial success and already-merged retries can reconcile only the missing idempotent ceremony (PR #268).
+- Missing persistent user configuration now defaults trusted-authority mode to `high-assurance` instead of `off`. Autonomous idempotency claims are timestamped, scope-bound annotated Git tags with bounded stale recovery, visible-write ownership is rechecked immediately before mutation, and close/draft operations assert semantic postconditions (PR #268).
+- Required CI remains Node 22 and Node 24 across Ubuntu, Windows, and macOS, with the full Node 26 compatibility check executed inside every protected Node 24 platform lane before lane-specific follow-up. Dependabot now also covers the nested `.github/npm-publish` toolchain (PR #268).
+- Compound `research and implement issue #N` intent now routes to the implementation workflow while retaining its bounded research preflight, and stack mutation guidance points back to the canonical workflows instead of stale raw helper commands (PR #268).
+
+### Fixed
+
+- Fixed release ordering that could strand an npm-only release when GitHub publication failed later; GitHub Release assets are now the resumable first publication boundary and npm is the final irreversible cross-system write (PR #268).
+- Fixed merge transaction reporting so a successful merge is never converted into a generic failure solely because the post-merge thank-you failed, and later reconciliation does not attempt the merge again (PR #268).
+
 ## [0.7.3] - 2026-08-16
 
 ### Added
