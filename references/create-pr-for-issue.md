@@ -53,7 +53,7 @@ Review author-provided screenshots/images before implementation. If required scr
 - **Still needs fix:** continue.
 - **Evidence incomplete:** restore the missing evidence; do not guess.
 
-If the same `research-issue.md` verdict remains valid on the same development tip/issue conversation, reuse it. Re-enter preflight only when new evidence invalidates it.
+If `research-issue.md` just produced the same verdict on the same development tip and unchanged issue conversation, reuse it. Do not restart broad research merely because implementation reveals another call site, adapter, UI surface, test, or documentation consumer. Re-enter preflight only when a new fact invalidates the original decision.
 
 ## B. Confirm scope
 
