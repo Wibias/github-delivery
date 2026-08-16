@@ -17,6 +17,7 @@ All notable changes to `github-delivery` are documented here.
 - Fixed Windows Hello desktop approval startup and recovery handling, including fail-closed classification of TPM/TBS error `0x80284002`, retry/sign-in recovery, and exact owner-window verification.
 - Fixed approval windows appearing behind other windows by keeping a pending approval window above other application windows until the approval is completed or cancelled.
 - Fixed approval summaries so branch-driving fields are explicit and temporary branch grants remain bound to one exact repository and branch.
+- Fixed lifecycle-hook narration recovery so short no-progress follow-up messages keep the corrective obligation active until a real `PreToolUse` boundary is reached, with up to three corrective continuations by default before failing closed. Real tool boundaries clear the pending recovery signal, while malformed tool-protocol stalls still stop immediately (PR #277).
 
 ## [0.8.0] - 2026-08-16
 
