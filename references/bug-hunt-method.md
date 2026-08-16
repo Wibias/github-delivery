@@ -4,7 +4,8 @@ Companion to `references/bug-review.md`. The bug axis runs this method when the
 scope script says `skipDeepBugReview: false`. It merges the strongest
 techniques from community bug-hunting skills: complete input gathering,
 attack-surface mapping, adversarial verification (Finder → Challenger → Arbiter),
-systematic root-cause fixing, and honest coverage reporting.
+tight symptom feedback for difficult diagnoses, systematic root-cause fixing,
+and honest coverage reporting.
 
 ## 1. Input gathering (never skip)
 
@@ -157,11 +158,39 @@ create-PR).
 **Iron law: no fixes without root-cause investigation first.** Symptom fixes
 are failure.
 
+### Phase 0 — Tight symptom signal for difficult diagnoses
+
+Use this phase when the root cause is not already established by direct code
+evidence or an existing narrow regression check. Do not manufacture a broad
+harness for an obvious defect whose reachable causal chain is already proved.
+
+1. Build one **red-capable** executable signal that drives the actual bug path
+   and detects the user's exact symptom. Prefer, in order of fit, an existing
+   focused test, a small CLI/API/script invocation, a browser/runtime probe, a
+   captured-trace replay or throwaway harness, then differential/bisect/fuzz
+   loops when the failure class calls for them.
+2. Make the signal as **tight** as practical: deterministic (or a measured high
+   reproduction rate for flaky bugs), fast enough to iterate, and runnable by
+   the agent without manual interpretation.
+3. Run it before building a theory. Record the command/probe, exact head and
+   environment, and the deciding output. A check that only proves "did not
+   crash" is insufficient when the reported symptom is wrong output, timing,
+   ordering, or state.
+4. Minimize the reproducer one element at a time, rerunning the same signal.
+   Stop when removing any remaining input/step/config element makes the bug
+   disappear. The minimized repro becomes the smallest useful hypothesis and
+   regression surface.
+5. If no credible red-capable loop can be built because the required
+   environment or artifact is unavailable, record what was attempted and what
+   evidence is missing. Do not replace the missing signal with a confident
+   guess.
+
 ### Phase 1 — Root cause
 
 1. Read error messages and stack traces completely; note file/line/code.
-2. Reproduce consistently (exact steps; every time?). If not reproducible,
-   gather more data — do not guess.
+2. Reproduce consistently using the Phase 0 signal when it applies, or the
+   strongest existing executable evidence when the defect was already direct.
+   If not reproducible, gather more data — do not guess.
 3. Check recent changes: diff, commits, dependencies, config, environment.
 4. Multi-component systems: add diagnostic instrumentation at **each component
    boundary** (what enters, what exits, config propagation), run once, find the
@@ -177,11 +206,25 @@ are failure.
 - List every difference between working and broken, however small.
 - Map dependencies, settings, and assumptions.
 
-### Phase 3 — Hypothesis
+### Phase 3 — Hypotheses
 
-- Form **one** specific hypothesis ("X is the root cause because Y").
-- Test with the **smallest possible change**, one variable at a time.
-- Verify before continuing. Wrong → new hypothesis. Never stack fixes.
+For an obvious direct causal chain, one specific hypothesis is enough. For a
+non-trivial or ambiguous diagnosis, generate **3–5 ranked candidate
+hypotheses** before changing production code so the first plausible story does
+not anchor the investigation.
+
+For each candidate, state a falsifiable prediction: if it is the cause, what
+single observation or controlled change should make the symptom disappear,
+appear, or measurably change?
+
+Then:
+
+1. test only the highest-ranked live hypothesis;
+2. change **one variable at a time** and prefer diagnostic instrumentation or a
+   reversible experiment over a production fix;
+3. run the same tight symptom signal after the experiment;
+4. mark the hypothesis supported or disproved before moving to the next;
+5. never stack speculative fixes to see whether the total happens to turn green.
 
 ### Phase 4 — Implementation
 
@@ -231,7 +274,7 @@ different place, or fixes requiring massive refactoring, means the pattern
 itself is wrong. Discuss with the human before attempting fix #4. This is not a
 failed hypothesis — it is a wrong architecture.
 
-### Red flags (stop and return to Phase 1)
+### Red flags (stop and return to Phase 0/1)
 
 - "Quick fix for now, investigate later"
 - "Just try changing X and see if it works"
@@ -268,3 +311,12 @@ Before finalizing **any** verdict:
 
 Chat gets full cards; PR comments get the condensed `comment-depth.md` shape.
 Keep dismissed cards in a collapsed `<details>` block for transparency.
+
+## Provenance
+
+The core adversarial and root-cause method combines GitHub Delivery's existing
+community-derived bug-hunt practices. The Phase 0 tight/red-capable feedback
+loop, repro minimization, and ranked falsifiable-hypothesis discipline adapt
+ideas from Matt Pocock's MIT-licensed `diagnosing-bugs` skill. They are
+rewritten to fit GitHub Delivery's existing regression-first, runtime-evidence,
+review-authority, and fail-closed publication contracts.

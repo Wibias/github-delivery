@@ -22,6 +22,7 @@ Prefer reporting **nothing worth simplifying** over manufacturing edits.
 
 - Read `references/shared-rules.md` before acting.
 - Read `references/refactor-contract-card.md` before proposing or applying non-trivial candidates.
+- Use `references/minimal-solution.md` when evaluating an equivalent replacement so repository reuse, standard library/runtime, native platform behavior, or an already-installed dependency is considered before new custom structure.
 - Inspect the PR comparison plus only the directly necessary adjacent code needed to prove equivalence.
 - Do not expand into unrelated refactors, repository-wide cleanup, formatting churn, dependency changes, or architectural redesign.
 - Simplification cannot overrule bug, security, Spec/Standards, review, CI, base-health, mutation-policy, or `ship-gate.mjs` authority.
@@ -37,10 +38,12 @@ Look for high-confidence opportunities such as:
 - wrappers, adapters, or indirection that add no policy, compatibility, lifecycle, or abstraction value
 - genuinely duplicated logic whose consolidation reduces maintenance risk without increasing coupling
 - obsolete compatibility paths proven unnecessary by the repository's supported versions
-- native language, platform, or existing repository facilities that are behaviorally equivalent and clearer
+- repository facilities, standard library/runtime functions, native platform behavior, or already-installed dependencies that are behaviorally equivalent and clearer
 - comments, names, or structure that obscure intent and can be clarified without changing behavior
 
 ### Readability, vocabulary, and state lenses
+
+This lens also covers seam/deep-module signals when they are relevant to a behavior-preserving candidate.
 
 Also inspect for:
 
@@ -53,10 +56,12 @@ Also inspect for:
 - aliases, adapters, fallback formats, old signatures, or compatibility paths introduced and superseded entirely within the same unmerged PR
 - names, comments, or structure that a reader cannot understand without reading the issue, conversation, or commit history
 - existing repository utilities or abstractions that already express the same operation more clearly without widening coupling
+- pass-through abstractions where the **deletion test** shows that removing the wrapper makes complexity disappear rather than pushing policy/invariants back into callers
+- speculative seams/interfaces that have only one real adapter or variant and add indirection without a current testing, ownership, compatibility, or external-boundary need
 
-Treat these as candidate signals, not automatic edits. Prefer the clearest established repository or domain term over shorter but less precise vocabulary. Do not shorten names, derive state, remove compatibility, reorder files, replace local code with shared utilities, or combine concepts unless the resulting behavior and relevant invariants can be proven equivalent.
+Treat these as candidate signals, not automatic edits. Prefer the clearest established repository or domain term over shorter but less precise vocabulary. Do not shorten names, derive state, remove compatibility, reorder files, replace local code with shared utilities, collapse a seam, or combine concepts unless the resulting behavior and relevant invariants can be proven equivalent.
 
-For derivable state, explicitly check whether recomputation would alter performance, timing, snapshot semantics, consistency boundaries, or side effects. For branch-local compatibility, prove that the superseded form was never shipped, persisted, externally consumed, or relied on by fixtures, generated artifacts, downstream branches, or tests.
+For derivable state, explicitly check whether recomputation would alter performance, timing, snapshot semantics, consistency boundaries, or side effects. For branch-local compatibility, prove that the superseded form was never shipped, persisted, externally consumed, or relied on by fixtures, generated artifacts, downstream branches, or tests. For seam deletion, prove that policy, security, lifecycle, compatibility, observability, test substitution, or independently changing behavior is not being hidden by that seam.
 
 Do not treat every code smell as an instruction to refactor. Repository conventions and the local design override generic style preferences.
 

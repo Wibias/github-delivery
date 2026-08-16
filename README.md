@@ -6,7 +6,7 @@
 
 **Say the outcome, not the orchestration.**
 
-`github-delivery` turns natural-language requests into evidence-backed GitHub workflows: PRDs, issue research, implementation, deep review, CI, fixes, stacks, verified merges, and verified stable self-update. Its v0.7 quality stack adds evidence-backed design review, stable behavior-boundary verification, and reproducible migration/change execution on top of the existing fail-closed delivery, authority, and progress controls. v0.7.2 closes the unpackaged WinUI Authority startup/resource gap, makes the Control Center operational and deliberately responsive, adds typed-code evidence review, and hardens agent-loop detection plus Full/Partial/Off protection visibility.
+`github-delivery` turns natural-language requests into evidence-backed GitHub workflows: PRDs, issue research, implementation, deep review, CI, fixes, stacks, verified merges, and verified stable self-update. Its v0.7 quality stack adds evidence-backed design review, stable behavior-boundary verification, and reproducible migration/change execution on top of the existing fail-closed delivery, authority, and progress controls. v0.7.3 extends that stack with minimal-solution selection before implementation, tight red-capable diagnosis for difficult bugs, explicit expand-contract migrations, evidence-backed completion claims, deeper module/seam heuristics, and a read-only triage attention inbox.
 
 [Quick start](#try-it-in-60-seconds) · [Self-update](#update-an-installed-release) · [Progress watchdog](#agent-progress-watchdog) · [What it can own](#what-you-can-ask-it-to-own) · [Safety model](#safety-model) · [Installation](#installation)
 
@@ -36,6 +36,7 @@
 ```text
 what is left on PR #41?
 full review PR #42
+show me what needs triage in this repo
 fix the review comments on PR #18 and make it merge ready
 review PR #42, fix it, and merge it when green
 update github-delivery to the latest stable release
@@ -190,6 +191,9 @@ The protected launcher keeps watchdog state per turn, observes agent-message/rea
 | Problem | github-delivery's answer |
 |---|---|
 | **"Green CI" is not the same as "safe to merge."** | Bug + Security + Spec + Standards review, semantic propagation, required probes, review state, rulesets, merge-queue state, and exact-head evidence feed one authoritative ship decision. |
+| **Agents can overbuild a correct-but-expensive solution.** | Non-trivial implementation first applies the minimal-solution contract: understand the real flow, then prefer repository reuse → standard library/runtime → native platform → an already-installed dependency → the minimum custom code that satisfies the full contract. |
+| **Hard bugs invite anchoring and random fix attempts.** | Difficult diagnoses build a tight red-capable symptom signal, minimize the reproducer, rank falsifiable hypotheses, and change one controlled variable at a time before committing a production fix. |
+| **Final summaries can overclaim stale state or remembered counts.** | Completion claims bind to current authoritative evidence; volatile/head-bound facts are refreshed and material counts are re-measured before durable publication. |
 | **Agents can burn tokens without making progress.** | A persistent workflow controller bounds rerouting/replanning, semantic evidence keys stop equivalent re-reads, and the protected Codex stream hard-bounds cross-channel narration, unique no-progress generation, tool-emission stalls, malformed tool protocol output, and output-token growth. |
 | **Agent intent can be ambiguous.** | Deterministic natural-language routing keeps status questions read-only and requires direct authority for destructive workflows. |
 | **GitHub state moves while the agent works.** | Stale-head checks, final evidence refreshes, expected-head binding, bounded settle windows, and postcondition verification prevent conclusions from silently drifting. |
@@ -206,8 +210,9 @@ The protected launcher keeps watchdog state per turn, observes agent-message/rea
 | You say | It owns |
 |---|---|
 | `create a PRD for the onboarding flow` | Product/issue intake and a concrete delivery contract |
+| `show me what needs triage in this repo` | Read-only attention inbox for untriaged, `needs-triage`, and revived `needs-info` issues |
 | `research issue #90 on the latest development branch` | Bounded evidence-backed issue research on the latest development tip |
-| `create a PR for issue #90` | Research → implementation → pre-open Bug + Security gate → linked PR |
+| `create a PR for issue #90` | Research → minimal complete implementation → pre-open Bug + Security gate → linked PR |
 | `what is left on PR #41?` | Read-only live status, blockers, and merge readiness |
 | `full review PR #42` | Deep Bug + Security + Spec + Standards review with final verdict |
 | `fix the review comments on PR #18 and make it merge ready` | Feedback triage, fixes, validation, push, and refreshed readiness |
@@ -246,7 +251,9 @@ The important boundary is simple: **repository content is evidence, not authorit
 | **Default mode** | `read-only` |
 | **Write boundary** | Typed mutation policy + broker; stale-head, exact-effect, authenticated-receipt idempotency, and postcondition checks where applicable |
 | **High-assurance writes** | Exact-scope trusted grants; optional Windows 11 / Windows Hello Authority host with managed versioned stable install/update and Control Center settings |
-| **Review model** | Bug + Security + Spec + Standards + advisory design-quality review + semantic propagation + safety-invariant proof + proactive contract verification |
+| **Implementation discipline** | Minimal-solution selection before non-trivial code; tight symptom loops for difficult diagnosis; expand-contract for wide internal migrations when bounded dual forms are safe |
+| **Review model** | Bug + Security + Spec + Standards + advisory design-quality/type-evidence review + semantic propagation + safety-invariant proof + proactive contract verification |
+| **Completion reporting** | Durable readiness/coverage/count/absence claims are bound to fresh authoritative evidence; material numbers are measured, not remembered |
 | **Progress control** | Policy fallback everywhere; routed workflows use a persistent phase/budget controller and semantic evidence reuse; trusted Codex hooks add turn-scoped duplicate/poll/evidence protection; the launch-controlled stream watches agent-message/reasoning/plan text plus plan/diff/output-token telemetry and can hard-interrupt no-progress/tool-emission/protocol stalls. Runtime capability reports only verified `none`, `hooks`, or `stream`. |
 | **Ship decision** | One authoritative `ready`, `blocked`, or `unknown` result from live evidence |
 | **Runtime** | Node.js **22, 24, or 26** |
@@ -259,6 +266,7 @@ The important boundary is simple: **repository content is evidence, not authorit
 create a PRD for the onboarding flow
 break the roadmap into implementation issues
 triage the open issues in this repo
+show me what needs triage in this repo
 run QA intake on the payment bug report
 research issue #90 on the latest development branch
 create a PR for issue #90
@@ -284,21 +292,23 @@ update github-delivery to the latest stable release
 
 | Area | Requests | Workflow |
 |---|---|---|
-| **Product / issue intake** | PRDs, breakdowns, triage, QA intake, refactor plans | `references/issue-workflows.md` |
+| **Product / issue intake** | PRDs, breakdowns, triage, triage attention inbox, QA intake, refactor plans | `references/issue-workflows.md` |
 | **Agent-ready work** | Create/update a `ready-for-agent` contract | `references/agent-brief.md` |
 | **Rejected scope** | Record, match, reconsider, or remove an out-of-scope decision | `references/out-of-scope.md` |
 | **Issue research** | Research an issue on the latest development tip | `references/research-issue.md` |
 | **Create a linked PR** | Bounded research → implementation → pre-open review → PR | `references/create-pr-for-issue.md` |
+| **Implementation discipline** | Select the lowest-complexity complete solution before non-trivial implementation/refactor work | `references/minimal-solution.md` |
 | **Make a PR merge-ready** | Fix humans/bots, own bug/security/spec work, validate | `references/fix-pr-bots.md` |
 | **Watch a PR** | Poll CI/reviews/gates until merged, closed, or blocked | `references/watch-pr.md` |
 | **Re-review** | Re-evaluate after new commits, humans, CodeRabbit/Codex, or other review evidence | `references/re-review-pr.md` |
 | **Full review** | Deep Bug + Security + Spec + Standards review and final verdict | `references/full-review-pr.md` |
-| **Bug review** | Evidence-ranked adversarial bug hunt | `references/bug-review.md` + `references/bug-hunt-method.md` |
+| **Bug review** | Evidence-ranked adversarial bug hunt; difficult diagnoses use a tight red-capable feedback loop and falsifiable hypotheses | `references/bug-review.md` + `references/bug-hunt-method.md` |
 | **Security review** | Security surfaces, escalation chains, exploit-safe reporting | `references/security-review.md` |
 | **Spec / standards** | Contract, requirement, standards, docs and non-goal review | `references/spec-standards-review.md` |
-| **Design quality** | Advisory happy-path, boundary, abstraction-cost, domain/state, and evidence-vs-complexity review | `references/design-quality.md` |
+| **Design quality** | Advisory happy-path, boundary, abstraction/deletion cost, domain/state, seam, locality/leverage, and evidence-vs-complexity review | `references/design-quality.md` |
 | **Verification boundaries** | Choose the narrowest stable behavior boundary for regression and refactor evidence | `references/verification-boundaries.md` |
-| **Change execution** | Safe internal-API migrations, mechanical sweeps, codemod decisions, and verifiable change units | `references/change-execution.md` |
+| **Change execution** | Safe internal-API migrations, expand-contract waves, mechanical sweeps, codemod decisions, and verifiable change units | `references/change-execution.md` |
+| **Completion evidence** | Prove durable completion/count/coverage/absence claims from fresh authoritative evidence | `references/completion-claims.md` |
 | **Safe simplification** | Behavior-preserving cleanup with approval and mandatory re-review | `references/simplify-pr.md` |
 | **Status** | What is left / why blocked / merge readiness | `references/status.md` |
 | **Prepare + merge** | Compound review/fix/simplify request that explicitly includes merge | `references/prepare-and-merge-pr.md` |
@@ -417,15 +427,17 @@ Review depth is derived from changed paths, patch content, symbols, removed cont
 
 ### Evidence-preserving quality contracts
 
-Seven companion contracts keep review, implementation, and bug-fix evidence concrete without weakening the existing gates:
+Nine companion contracts keep implementation, review, bug-fix, migration, and completion evidence concrete without weakening the existing gates:
 
+- [`references/minimal-solution.md`](references/minimal-solution.md) keeps non-trivial implementation and refactor planning on the smallest complete solution that fits the actual repository: reuse existing capability first, then standard library/runtime, native platform, an already-installed dependency, and only then the minimum custom code. It never authorizes removing required validation, security, accessibility, compatibility, lifecycle, observability, or evidence.
 - [`references/prose-quality.md`](references/prose-quality.md) keeps durable PR, issue, PRD, review, and status prose grounded in repository vocabulary and concrete evidence. Exact commands, paths, SHAs, checks, evidence states, required GitHub syntax, security redaction, and user-confirmed wording are preserved rather than rewritten for style.
 - [`references/regression-first.md`](references/regression-first.md) requires executable broken-before/fixed-after evidence for confirmed bug fixes. It uses [`references/verification-boundaries.md`](references/verification-boundaries.md) to choose the narrowest stable contract that actually demonstrates the defect, whether that is a focused unit/component check, a use-case/integration boundary, a real script/CLI path, or a deterministic runtime/operator probe.
 - [`references/safety-invariant.md`](references/safety-invariant.md) handles material non-local risk by naming the fact a positive verdict depends on and recording the strongest proof level reached from `claimed` through `reproduced`. A material assumption stays `unproven` until the evidence establishes it.
-- [`references/design-quality.md`](references/design-quality.md) adds an advisory positive-design lens for happy-path visibility, boundary ownership, abstraction compression, explicit domain/state modeling, mutable-state ownership, shared-state discipline, and evidence-backed complexity. Repository rules and concrete Bug/Security/Spec contracts remain authoritative.
-- [`references/type-evidence-review.md`](references/type-evidence-review.md) adds an advisory typed-code lens for evidence erosion: known-value widening, widen-then-assert flows, broad internal contracts, reflective bypasses, weak assertion proof, and mocks that hide production wiring. Valid boundary `unknown`, runtime narrowing, justified interop assertions, genuinely open dictionaries, and ordinary dependency seams remain explicit non-findings; the lens becomes blocking only when the same path proves incorrect behavior, a safety/security issue, a spec violation, or broken production wiring.
+- [`references/design-quality.md`](references/design-quality.md) adds an advisory positive-design lens for happy-path visibility, boundary ownership, abstraction compression, explicit domain/state modeling, mutable-state ownership, shared-state discipline, evidence-backed complexity, deletion value, interface/test-surface cost, real seams, leverage, and locality. Repository rules and concrete Bug/Security/Spec contracts remain authoritative.
+- [`references/type-evidence-review.md`](references/type-evidence-review.md) adds an advisory typed-code lens for evidence erosion: known-value widening, widen-then-assert flows, broad internal contracts, reflective bypasses, weak assertion proof, and mocks that hide production wiring. Valid boundary `unknown`, runtime narrowing, justified interop assertions, genuinely open dictionaries, and ordinary dependency seams remain explicit non-findings; existing anti-slop/Oxlint/typecheck diagnostics are repository evidence rather than a reason to install another lint stack.
 - [`references/verification-boundaries.md`](references/verification-boundaries.md) chooses the narrowest stable contract that actually observes protected behavior, avoiding both brittle private-helper tests and needlessly large end-to-end harnesses.
-- [`references/change-execution.md`](references/change-execution.md) governs broad deterministic sweeps and internal migrations: inventory the full surface, migrate callers before deleting obsolete internal paths when compatibility is not real, build a rerunnable lever when it lowers risk, and verify each meaningful change unit.
+- [`references/change-execution.md`](references/change-execution.md) governs broad deterministic sweeps and internal migrations: inventory the full surface, migrate callers before deleting obsolete internal paths when compatibility is not real, use an explicit expand → migrate → contract sequence when bounded dual forms keep batches green, build a rerunnable lever when it lowers risk, and verify each meaningful change unit.
+- [`references/completion-claims.md`](references/completion-claims.md) audits durable completion claims against the workflow's existing authoritative evidence. Head-bound/volatile facts are refreshed, material numbers are re-measured, absence claims require sufficient coverage, and `unknown`, `not run`, `blocked`, or `partial` states cannot disappear in the final report.
 
 ### Semantic propagation
 
@@ -435,7 +447,7 @@ Families such as provider sets, capability tables, schemas, enums, platform matr
 
 ### Adversarial bug review
 
-The bug axis uses a built-in **Finder → Challenger → Arbiter** method. Static-analysis leads and tool-free heuristics feed finding cards with explicit evidence and a Gate 0 impact bar. Coverage is reported honestly as `confirmed`, `dismissed`, `manual-review`, or `unreviewed`; partial coverage is never presented as clean.
+The bug axis uses a built-in **Finder → Challenger → Arbiter** method. Static-analysis leads and tool-free heuristics feed finding cards with explicit evidence and a Gate 0 impact bar. Coverage is reported honestly as `confirmed`, `dismissed`, `manual-review`, or `unreviewed`; partial coverage is never presented as clean. When a difficult bug's root cause is not already established by direct code evidence or an existing narrow regression check, diagnosis first builds a red-capable signal for the exact symptom, minimizes the reproducer, then tests ranked falsifiable hypotheses one controlled variable at a time.
 
 ### Deterministic probes and machine-checkable coverage
 
@@ -527,7 +539,7 @@ Creating a PR follows this lifecycle:
 ```text
 bounded need-to-fix research
         ↓
-implementation
+minimal complete implementation
         ↓
 pre-open Bug + Security gate on the non-empty candidate diff
         ↓
@@ -536,7 +548,7 @@ publish linked PR
 normal merge-ready lifecycle
 ```
 
-The pre-open gate is **post-implementation and pre-publication**. It cannot become a research loop that prevents the first implementation commit. Completed issue research is reused when the relevant issue/development state has not changed.
+The pre-open gate is **post-implementation and pre-publication**. It cannot become a research loop that prevents the first implementation commit. Completed issue research is reused when the relevant issue/development state has not changed. Before a non-trivial implementation is chosen, `references/minimal-solution.md` requires enough real-flow understanding to prefer existing repository capability, standard/runtime facilities, native platform features, or already-installed dependencies over unnecessary custom machinery.
 
 `scripts/pre-open-gate.mjs` blocks incomplete/empty candidate diffs and prevents publication while required review evidence is incomplete or Confirmed High/Critical findings remain unresolved.
 
@@ -570,7 +582,7 @@ Active conflicts route through `references/resolve-conflicts.md` and are resolve
 
 Simplification is **explicit-only**. Its goal is lower cognitive load and safer maintenance. **Line count is never the goal**; fewer lines are acceptable only when behavior and clarity improve.
 
-A candidate must preserve APIs, errors, ordering, concurrency, side effects, persistence, compatibility, validation, authorization, security, CI/evidence boundaries, and other material behavior.
+A candidate must preserve APIs, errors, ordering, concurrency, side effects, persistence, compatibility, validation, authorization, security, CI/evidence boundaries, and other material behavior. Advisory deletion-test, interface/test-surface, real-seam, leverage, and locality heuristics help find worthwhile candidates, but do not override the behavior-preservation contract or repository architecture.
 
 The flow is conservative:
 
@@ -900,6 +912,6 @@ Do not publish suspected vulnerability details in a public issue or pull request
 
 ## Current state
 
-The complete issue/PR delivery lifecycle and its safety architecture are implemented: evidence-backed routing and ship gates, deferred-intent-safe merge routing, brokered lifecycle mutations, trusted exact-scope authority and durable verdict provenance, Windows Hello protection for high-assurance thread actions, a managed versioned/attested Windows Authority release component with state-preserving stable updates and functional Control Center protection settings, readiness-verified Authority startup with local startup diagnostics, deep review, semantic propagation, safety-invariant proof, deterministic probes with non-bypassable required evidence, regression-first bug-fix evidence, stable-boundary regression/refactor verification, evidence-preserving durable GitHub prose, advisory design-quality review, reproducible migration/mechanical-change execution, pre-open review, safe simplification, repository-qualified stacks, conflict recovery, merge-queue semantics, aggregated strict-ruleset enforcement, authenticated exact-effect idempotency receipts, ambiguous-merge readback reconciliation, safe read retries, verified npm/npx bootstrap + latest-stable release installation with human-readable staged update progress, persistent route/phase workflow convergence, semantic evidence coverage/reuse, trust-aware Codex hook configuration, hard cross-channel protected-stream generation bounds with deterministic incident replay, issue close-out, deterministic release packaging, verified latest-stable self-update, repository controls, and dedicated live lifecycle fixtures.
+The complete issue/PR delivery lifecycle and its safety architecture are implemented: evidence-backed routing and ship gates, deferred-intent-safe merge routing, brokered lifecycle mutations, trusted exact-scope authority and durable verdict provenance, Windows Hello protection for high-assurance thread actions, a managed versioned/attested Windows Authority release component with state-preserving stable updates and functional Control Center protection settings, readiness-verified Authority startup with local startup diagnostics, deep review, semantic propagation, safety-invariant proof, deterministic probes with non-bypassable required evidence, regression-first bug-fix evidence, tight red-capable diagnosis for difficult bugs, stable-boundary regression/refactor verification, evidence-preserving durable GitHub prose, minimal-solution selection before non-trivial implementation, advisory design-quality and type-evidence review, deletion/seam/locality/leverage design heuristics, reproducible migration/mechanical-change execution with expand-contract support, fresh completion-claim evidence, read-only triage attention discovery, pre-open review, safe simplification, repository-qualified stacks, conflict recovery, merge-queue semantics, aggregated strict-ruleset enforcement, authenticated exact-effect idempotency receipts, ambiguous-merge readback reconciliation, safe read retries, verified npm/npx bootstrap + latest-stable release installation with human-readable staged update progress, persistent route/phase workflow convergence, semantic evidence coverage/reuse, trust-aware Codex hook configuration, hard cross-channel protected-stream generation bounds with deterministic incident replay, issue close-out, deterministic release packaging, verified latest-stable self-update, repository controls, and dedicated live lifecycle fixtures.
 
 Remaining work is primarily **operational** rather than a missing architecture layer: keep live repository rules/security settings aligned with the documented policy, provision and maintain the dedicated live fixture target/credential, run release acceptance for new versions, keep host integrations explicitly configured where runtime watchdog enforcement is desired, perform the npm registry's one-time package bootstrap/Trusted-Publisher setup when required for the first publication, and extend the regression corpus as GitHub and agent hosts evolve.

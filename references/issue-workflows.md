@@ -46,15 +46,16 @@ Use when converting a plan, PRD, spec, or issue into implementation tickets.
 2. Break work into tracer-bullet vertical slices.
 3. Each slice must be independently verifiable and preferably demoable.
 4. Mark slices as `AFK` when an agent can implement them without human judgment; mark `HITL` when a design or product decision is still needed.
-5. Present the breakdown for approval before publishing unless the user already requested direct issue creation.
-6. Publish direct requested issues with `create_issue`. Use `create_follow_up_issue` only for an explicitly identified follow-up issue from the governing workflow.
-7. Publish with this shape:
+5. When one broad internal migration cannot be expressed as independently green vertical slices, apply the expand-contract branch in `references/change-execution.md`: expand the new form beside the old, migrate real blast-radius partitions, then contract only after every migration batch and residual check is complete.
+6. Present the breakdown for approval before publishing unless the user already requested direct issue creation.
+7. Publish direct requested issues with `create_issue`. Use `create_follow_up_issue` only for an explicitly identified follow-up issue from the governing workflow.
+8. Publish with this shape:
    - Parent
    - What to build
    - Acceptance criteria
    - Blocked by
 
-Prefer many thin slices over a few broad issues.
+Prefer many thin slices over a few broad issues, except when a real wide-refactor dependency requires the bounded expand-contract sequence above.
 
 ## Triage Workflow
 
@@ -66,6 +67,16 @@ Roles:
 - State: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, or `wontfix`
 
 Every triaged issue should have exactly one category and one state. If state roles conflict, stop and ask the maintainer.
+
+### Triage inbox
+
+When the user asks what needs attention, what should be triaged next, or for the current triage queue, return a read-only inbox before mutating anything. Build these buckets, oldest first inside each bucket:
+
+1. **Untriaged:** open issues with no canonical triage state yet.
+2. **Needs triage:** open issues currently in `needs-triage`.
+3. **Needs-info with new reporter activity:** open `needs-info` issues where the reporter added relevant information after the last maintainer/[GD] triage note.
+
+Show counts and a one-line evidence-backed summary per item. Do not treat maintainer/bot chatter as reporter activity. Do not move labels merely because an item appears in the inbox; the user may pick an item or ask for a batch triage separately.
 
 For a specific issue:
 
@@ -116,10 +127,10 @@ Use when the user wants a refactor request, refactoring RFC, or tiny-commit plan
 
 1. Ask for the problem and any solution ideas if not already clear.
 2. Verify the current codebase shape before accepting assumptions.
-3. Present alternative approaches and tradeoffs.
+3. Apply `references/minimal-solution.md` before inventing new architecture: check whether the goal is best met by deletion, existing repository capability, standard library/runtime, native platform behavior, an already-installed dependency, or only then custom structure. Present genuinely credible alternatives and tradeoffs; do not manufacture options for ceremony.
 4. Interview until scope, non-scope, and testing expectations are explicit.
 5. Inspect existing test coverage in the area.
-6. If the refactor migrates an internal API/shape, repeats a deterministic edit across many targets, or has dependent migration phases, apply `references/change-execution.md`. Inventory the old/new contract and callers, decide whether compatibility is real, decide whether a script/codemod/generator lowers change risk, and define the checks that make each migration unit verifiable.
+6. If the refactor migrates an internal API/shape, repeats a deterministic edit across many targets, or has dependent migration phases, apply `references/change-execution.md`. Inventory the old/new contract and callers, decide whether compatibility is real, select direct vs expand-contract vs bounded non-shippable migration, decide whether a script/codemod/generator lowers change risk, and define the checks that make each migration unit verifiable.
 7. Break the refactor into the smallest meaningful units that leave a checkable state. Prefer units that keep the codebase working; when a temporary non-shippable intermediate state is unavoidable, bound it explicitly and do not present it as merge-ready.
 8. Publish a refactor issue with:
    - Problem Statement
@@ -128,6 +139,9 @@ Use when the user wants a refactor request, refactoring RFC, or tiny-commit plan
    - Decision Document
    - Testing Decisions
    - Migration Surface and Compatibility Decision (when `references/change-execution.md` applies)
+   - Migration Strategy (direct | expand-contract | bounded non-shippable, when `references/change-execution.md` applies)
    - Lever Decision and Completion Proof (when `references/change-execution.md` applies)
    - Out of Scope
    - Further Notes
+
+The triage-inbox shape is adapted from Matt Pocock's MIT-licensed `triage` skill. GitHub Delivery keeps it read-only until the user selects work and retains its own issue-state, evidence, mutation-authority, and publication rules.
