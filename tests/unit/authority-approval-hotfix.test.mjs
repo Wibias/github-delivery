@@ -6,8 +6,16 @@ const approvalWindowPath = new URL(
   "../../authority-host/windows/GitHubDeliveryAuthority/ApprovalWindow.xaml",
   import.meta.url,
 );
+const approvalWindowCodePath = new URL(
+  "../../authority-host/windows/GitHubDeliveryAuthority/ApprovalWindow.xaml.cs",
+  import.meta.url,
+);
 const authorityServicePath = new URL(
   "../../authority-host/windows/GitHubDeliveryAuthority/AuthorityService.cs",
+  import.meta.url,
+);
+const helloVerifierPath = new URL(
+  "../../authority-host/windows/GitHubDeliveryAuthority/HelloVerifier.cs",
   import.meta.url,
 );
 
@@ -37,4 +45,15 @@ test("approval summary shows the exact branch-driving fields", async () => {
   assert.match(source, /operation\.TryGetProperty\("branch"/);
   assert.match(source, /operation\.TryGetProperty\("head"/);
   assert.match(source, /operation\.TryGetProperty\("base"/);
+});
+
+test("Windows Hello TPM parameter failures are classified and retryable", async () => {
+  const verifier = await read(helloVerifierPath);
+  const window = await read(approvalWindowCodePath);
+
+  assert.match(verifier, /0x80284002/);
+  assert.match(verifier, /TBS_E_BAD_PARAMETER/);
+  assert.match(verifier, /CanRetry:\s*true/);
+  assert.match(window, /PrimaryButtonText = verification\.CanRetry/);
+  assert.match(window, /WindowsSettings\.OpenSignInOptions\(\)/);
 });
