@@ -41,7 +41,9 @@ Look for high-confidence opportunities such as:
 - repository facilities, standard library/runtime functions, native platform behavior, or already-installed dependencies that are behaviorally equivalent and clearer
 - comments, names, or structure that obscure intent and can be clarified without changing behavior
 
-### Readability, vocabulary, state, and seam lenses
+### Readability, vocabulary, and state lenses
+
+This lens also covers seam/deep-module signals when they are relevant to a behavior-preserving candidate.
 
 Also inspect for:
 
