@@ -138,7 +138,7 @@ Production defaults for active no-progress generation in protected stream mode a
 
 - generated characters: warning at **4,000**, hard interrupt at **8,000**;
 - cumulative generated output tokens since the last real progress: warning at **1,024**, hard interrupt at **2,048**;
-- imminent tool-execution clauses without a real tool start: hard interrupt at **4**;
+- imminent tool-execution clauses without a real tool start: hard interrupt at **6**;
 - malformed protocol-emission chunks: hard interrupt at **2**.
 
 These stream-specific defaults deliberately spend far less output on a fast pathological model than the generic watchdog constructor defaults. They are backstops. Exact/low-novelty intent detection or semantic evidence blocking can stop a loop earlier, and callers can still provide explicit watchdog overrides for controlled tests or integrations.
