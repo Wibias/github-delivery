@@ -58,5 +58,45 @@
     "forbiddenActions": ["merge-block-for-module-mock"],
     "requiredCoverage": ["test-honesty", "type-evidence"],
     "expectedMergeReady": true
+  },
+  {
+    "id": "TYPE-EVID-007-broad-object-parameter",
+    "prompt": "Review the TypeScript fixture. The HTTP boundary has already parsed a `ProviderConfig`, but the next internal helper accepts `object` and immediately casts it back to `ProviderConfig`. The repository has no rule requiring the broad parameter.",
+    "requiredFindings": ["TYPE-EVID-OBJECT-PARAM-001"],
+    "forbiddenFindings": ["TYPE-EVID-UNKNOWN-001"],
+    "requiredActions": ["standards-review"],
+    "forbiddenActions": ["merge-block-for-boundary-object"],
+    "requiredCoverage": ["type-evidence", "internal-contract"],
+    "expectedMergeReady": true
+  },
+  {
+    "id": "TYPE-EVID-008-reflect-get-typed-contract",
+    "prompt": "Review the TypeScript fixture. A stable `Provider` interface exposes `id: string`, but new internal code reads the property with `Reflect.get(provider, \"id\")` and casts the result to string. No dynamic registry, proxy, or interop boundary is involved.",
+    "requiredFindings": ["TYPE-EVID-REFLECT-GET-001"],
+    "forbiddenFindings": ["TYPE-EVID-REFLECTION-BAN-001"],
+    "requiredActions": ["standards-review"],
+    "forbiddenActions": ["merge-block-for-all-reflection"],
+    "requiredCoverage": ["type-evidence", "typed-property-contract"],
+    "expectedMergeReady": true
+  },
+  {
+    "id": "TYPE-EVID-009-reflect-apply-typed-contract",
+    "prompt": "Review the TypeScript fixture. A typed local function `(request: Request) => Response` is invoked with `Reflect.apply` and an asserted argument array even though a direct typed call is available. There is no dynamic dispatch requirement.",
+    "requiredFindings": ["TYPE-EVID-REFLECT-APPLY-001"],
+    "forbiddenFindings": ["TYPE-EVID-REFLECTION-BAN-001"],
+    "requiredActions": ["standards-review"],
+    "forbiddenActions": ["merge-block-for-all-reflection"],
+    "requiredCoverage": ["type-evidence", "typed-call-contract"],
+    "expectedMergeReady": true
+  },
+  {
+    "id": "TYPE-EVID-010-repository-safety-comment",
+    "prompt": "Review the TypeScript fixture. The repository's checked-in Oxlint configuration requires a `SAFETY:` justification for non-const assertions. New code adds an assertion with a credible invariant in prose but omits the required `SAFETY:` marker, so repository lint fails.",
+    "requiredFindings": ["TYPE-EVID-REPO-LINT-001"],
+    "forbiddenFindings": ["TYPE-EVID-SAFETY-COMMENT-BAN-001"],
+    "requiredActions": ["standards-review"],
+    "forbiddenActions": ["ignore-repository-lint"],
+    "requiredCoverage": ["type-evidence", "repository-standard"],
+    "expectedMergeReady": false
   }
 ]
