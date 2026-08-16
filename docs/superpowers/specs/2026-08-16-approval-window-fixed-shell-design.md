@@ -45,11 +45,11 @@ The action text remains selectable and wrapped. Long content scrolls inside this
 
 The window must set both a minimum width and a minimum height through OverlappedPresenter.
 
-Initial target constraints:
+The constraints are:
 
 - minimum width: 560 px;
-- minimum height: approximately 640 px, adjusted only if the fixed controls demonstrably require a slightly different value;
-- proposed-action viewport minimum height: approximately 110 px.
+- minimum height: 640 px;
+- proposed-action viewport minimum height: 110 px.
 
 The minimum height exists so the fixed shell always fits. Windows should stop further shrinking rather than introducing an outer scrollbar.
 
