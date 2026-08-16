@@ -5,6 +5,8 @@ import {
 } from "./watchdog-evidence-registry.mjs";
 import { classifyHookTool } from "./watchdog-progress-classifier.mjs";
 
+const DEFAULT_MAX_NARRATION_RECOVERY_ATTEMPTS = 3;
+
 export function classifyCodexTool(toolName, toolInput = {}) {
   const classification = classifyHookTool({ tool_name: toolName, tool_input: toolInput });
   if (classification.kind === "evidence") {
@@ -29,10 +31,16 @@ function hydrateEvidence(state) {
   return createEvidenceRegistry(state?.evidenceRegistry || null);
 }
 
-function stateOf(watchdog, evidenceRegistry) {
+function hydrateNarrationRecoveryAttempts(state) {
+  const value = state?.narrationRecoveryAttempts;
+  return Number.isInteger(value) && value >= 0 ? value : 0;
+}
+
+function stateOf(watchdog, evidenceRegistry, narrationRecoveryAttempts) {
   return {
     watchdog: watchdog.snapshot(),
     evidenceRegistry: evidenceRegistry.snapshot(),
+    narrationRecoveryAttempts,
   };
 }
 
@@ -78,26 +86,46 @@ function responseExplicitlyFailed(response) {
   return ["failed", "failure", "error", "cancelled", "canceled", "rejected"].includes(status);
 }
 
-function stopDecision(watchdog, input) {
+function recoveryReason(attempt, maxAttempts) {
+  return `GitHub Delivery recovery ${attempt}/${maxAttempts}: no tool/action boundary followed the selected next step. Do not narrate or restate the plan. The next assistant action must invoke the already-selected tool/action if authorised; if it cannot run, report the concrete blocker once.`;
+}
+
+function stopDecision(watchdog, input, recoveryAttempts, maxRecoveryAttempts) {
   const decision = watchdog.observeAssistantDelta(input.last_assistant_message || "");
-  if (decision.action !== "interrupt") return null;
   if (decision.reason === "tool_protocol_emission_stall") {
     return {
-      continue: false,
-      stopReason: decision.reason,
-      systemMessage: "GitHub Delivery stopped a repeated tool-protocol artifact stall.",
+      output: {
+        continue: false,
+        stopReason: decision.reason,
+        systemMessage: "GitHub Delivery stopped a repeated tool-protocol artifact stall.",
+      },
+      recoveryAttempts,
     };
   }
-  if (input.stop_hook_active) {
+
+  const recoveryActive = recoveryAttempts > 0;
+  if (decision.action !== "interrupt" && !recoveryActive) {
+    return { output: null, recoveryAttempts: 0 };
+  }
+
+  const nextAttempt = recoveryAttempts + 1;
+  if (nextAttempt > maxRecoveryAttempts) {
     return {
-      continue: false,
-      stopReason: "no_progress_stall_after_corrective_continuation",
-      systemMessage: "GitHub Delivery stopped a repeated no-progress narration stall.",
+      output: {
+        continue: false,
+        stopReason: "no_progress_stall_after_bounded_recovery",
+        systemMessage: `GitHub Delivery stopped a no-progress narration stall after ${maxRecoveryAttempts} corrective continuations without a real tool/action boundary.`,
+      },
+      recoveryAttempts: nextAttempt,
     };
   }
+
   return {
-    decision: "block",
-    reason: "GitHub Delivery detected a no-progress narration stall. Do not restate the plan. Execute the already-selected tool call/action if authorised, otherwise report the concrete blocker.",
+    output: {
+      decision: "block",
+      reason: recoveryReason(nextAttempt, maxRecoveryAttempts),
+    },
+    recoveryAttempts: nextAttempt,
   };
 }
 
@@ -108,13 +136,28 @@ export function evaluateCodexHook(input, state = {}, options = {}) {
     maxSubagentInputChars: options.maxSubagentInputChars ?? 6_000,
     evidenceSoftLimit: options.evidenceSoftLimit ?? 8,
     evidenceHardLimit: options.evidenceHardLimit ?? 12,
+    maxNarrationRecoveryAttempts:
+      options.maxNarrationRecoveryAttempts ?? DEFAULT_MAX_NARRATION_RECOVERY_ATTEMPTS,
   };
+  if (
+    !Number.isInteger(config.maxNarrationRecoveryAttempts)
+    || config.maxNarrationRecoveryAttempts < 1
+  ) {
+    throw new Error("maxNarrationRecoveryAttempts must be a positive integer");
+  }
+
   const watchdog = hydrate(state, config);
   const evidenceRegistry = hydrateEvidence(state);
   const event = input?.hook_event_name;
+  let narrationRecoveryAttempts = hydrateNarrationRecoveryAttempts(state);
   let output = null;
 
   if (event === "PreToolUse") {
+    // Reaching the real tool boundary resolves a narration-only recovery even if
+    // economy policy later blocks the selected tool as duplicate or too broad.
+    watchdog.recordToolStart();
+    narrationRecoveryAttempts = 0;
+
     const classification = classifyHookTool(input);
     if (classification.kind === "evidence") {
       const descriptor = shellEvidenceDescriptor(input);
@@ -189,8 +232,18 @@ export function evaluateCodexHook(input, state = {}, options = {}) {
     // so destroys evidence after the tool ran and can cause the model to re-read
     // the same source with another command. Compact at the source/helper instead.
   } else if (event === "Stop" || event === "SubagentStop") {
-    output = stopDecision(watchdog, input);
+    const stop = stopDecision(
+      watchdog,
+      input,
+      narrationRecoveryAttempts,
+      config.maxNarrationRecoveryAttempts,
+    );
+    output = stop.output;
+    narrationRecoveryAttempts = stop.recoveryAttempts;
   }
 
-  return { output, state: stateOf(watchdog, evidenceRegistry) };
+  return {
+    output,
+    state: stateOf(watchdog, evidenceRegistry, narrationRecoveryAttempts),
+  };
 }
