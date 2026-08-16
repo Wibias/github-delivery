@@ -16,8 +16,8 @@
                         <AdaptiveTrigger MinWindowWidth="0" />
                     </VisualState.StateTriggers>
                     <VisualState.Setters>
-                        <Setter Target="OverviewContent.Padding" Value="16,16,16,20" />
-                        <Setter Target="SettingsContent.Padding" Value="16,16,16,20" />
+                        <Setter Target="OverviewContent.Padding" Value="18,16,18,20" />
+                        <Setter Target="SettingsContent.Padding" Value="18,16,18,20" />
                         <Setter Target="ActivityColumnsHeader.Visibility" Value="Collapsed" />
 
 
@@ -51,8 +51,8 @@
                         <AdaptiveTrigger MinWindowWidth="900" />
                     </VisualState.StateTriggers>
                     <VisualState.Setters>
-                        <Setter Target="OverviewContent.Padding" Value="22,20,22,24" />
-                        <Setter Target="SettingsContent.Padding" Value="22,20,22,24" />
+                        <Setter Target="OverviewContent.Padding" Value="24,20,24,24" />
+                        <Setter Target="SettingsContent.Padding" Value="24,20,24,24" />
                         <Setter Target="ActivityColumnsHeader.Visibility" Value="Visible" />
 
 
@@ -86,8 +86,8 @@
                         <AdaptiveTrigger MinWindowWidth="1360" />
                     </VisualState.StateTriggers>
                     <VisualState.Setters>
-                        <Setter Target="OverviewContent.Padding" Value="28,24,28,28" />
-                        <Setter Target="SettingsContent.Padding" Value="28,24,28,28" />
+                        <Setter Target="OverviewContent.Padding" Value="31,24,31,28" />
+                        <Setter Target="SettingsContent.Padding" Value="31,24,31,28" />
                         <Setter Target="ActivityColumnsHeader.Visibility" Value="Visible" />
 
 
@@ -140,7 +140,7 @@
                               HorizontalScrollBarVisibility="Disabled"
                               HorizontalContentAlignment="Stretch">
                     <Grid x:Name="OverviewContent"
-                          Padding="16,16,16,20"
+                          Padding="18,16,18,20"
                           HorizontalAlignment="Stretch">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
@@ -312,7 +312,9 @@
                                               SelectionMode="None"
                                               IsItemClickEnabled="False"
                                               MinHeight="280"
+                                              MaxHeight="420"
                                               HorizontalContentAlignment="Stretch"
+                                              ScrollViewer.VerticalScrollBarVisibility="Auto"
                                               ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                                         <ListView.ItemTemplate>
                                             <DataTemplate>
@@ -499,7 +501,7 @@
                               HorizontalScrollBarVisibility="Disabled"
                               HorizontalContentAlignment="Stretch">
                     <Grid x:Name="SettingsContent"
-                          Padding="16,16,16,20"
+                          Padding="18,16,18,20"
                           HorizontalAlignment="Stretch">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
