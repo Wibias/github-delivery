@@ -88,19 +88,27 @@ This layer can:
 - classify Windows/PowerShell forms such as `git -C`, `Get-ChildItem`, compound/grouped commands, GitHub CLI reads/writes, and owned GitHub Delivery helpers conservatively;
 - reject an oversized `Agent`/subagent tool input and require a focused source-referenced brief;
 - detect a completed no-progress assistant or subagent message and keep a bounded corrective continuation active until a real `PreToolUse` boundary is reached;
-- allow up to three corrective continuations by default, then fail closed if the model still does not reach a real tool/action boundary;
+- allow up to three corrective continuations by default while one stall still has not reached a real tool/action boundary, then fail closed;
+- if the first stopped assistant message is at least 8,000 characters, allow the selected recovery tool to run and then return `continue: false` from `PostToolUse` before another model response can start;
+- quarantine the same model for the task after that severe recovered-tool stop, requiring a model change or a new task before resuming;
+- retain per-turn recovery probation for smaller recovered stalls, so a second fresh narration stall in that same turn hard-stops instead of receiving a new 1/3 recovery cycle;
+- quarantine the same model for the task after that second post-recovery stall, requiring a model change or a new task before resuming;
 - hard-stop malformed tool-protocol emission stalls immediately rather than spending the narration-recovery budget on them;
 - delete all hashed turn/agent state for a session at `SessionEnd`.
 
-The narration-recovery obligation persists across short follow-up messages that would not independently cross the repeated-intent detector threshold. Reaching `PreToolUse` clears that obligation and the pending "tool never emitted" signal even when evidence-economy policy then blocks the selected tool as a duplicate or otherwise disallowed read. A tool boundary is not itself execution or state progress; the ordinary progress counters still require the corresponding successful execution/state evidence.
+The narration-recovery obligation persists across short follow-up messages that would not independently cross the repeated-intent detector threshold. Reaching `PreToolUse` clears the active recovery obligation and the pending "tool never emitted" signal even when evidence-economy policy then blocks the selected tool as a duplicate or otherwise disallowed read.
+
+For a severe hook-mode stall, defined by a completed stopped assistant message of at least 8,000 characters, the recovery is terminal for that model in the current task. GitHub Delivery still allows the already-selected recovery tool to execute so useful work is not discarded. Its following `PostToolUse` result then stops execution before the model can generate another assistant response and persists task-level quarantine. This cannot refund the tokens already generated in the first bad response, but it prevents the exact pattern where the same unstable model immediately produces a second large loop after a successful recovery tool call.
+
+For a smaller recovered stall, a separate probation marker remains for the rest of the turn. A later fresh no-progress narration stall fails closed rather than starting another recovery sequence. A tool boundary is not itself execution or state progress; the ordinary progress counters still require the corresponding successful execution/state evidence.
 
 The 8/12 evidence limits are defaults and are intentionally turn-scoped. Exact duplicate/poll/semantic-coverage protection is independent and can block earlier. The default subagent-input budget is 6,000 serialised characters. These are context/progress budgets, not authority or correctness gates.
 
-**Successful `PostToolUse` results are never replaced or truncated by the generic watchdog.** Destroying a successful tool result can force the model to reacquire the same evidence through another command. When output must be reduced, the authoritative helper/source should emit a compact result with an explicit contract; the hook retains only compact internal counters/evidence metadata.
+**Successful `PostToolUse` results are never replaced or truncated by the generic watchdog.** Destroying a successful tool result can force the model to reacquire the same evidence through another command. The severe-recovery stop is a control effect after the tool result, not a replacement for that result. When output must be reduced, the authoritative helper/source should emit a compact result with an explicit contract; the hook retains only compact internal counters/evidence metadata.
 
 Hook state is stored outside repository content under a hashed session directory. Every turn-scoped event includes `session_id + turn_id`; when Codex actually supplies `agent_id`, that value is included in the hashed state scope too. Updates use an exclusive per-scope lock with bounded acquisition, stale-lock recovery, restrictive permissions where supported, and atomic replacement. Malformed state fails explicitly rather than silently resetting protection. Persisted state contains only counters, generations, timestamps, evidence metadata and SHA-256 fingerprints. Raw prompts, assistant text, tool arguments, tool output, bearer tokens and repository secrets are not persisted.
 
-Codex local tool hooks do not cover every host/tool surface. Hosted tools such as WebSearch are not assumed to pass through `PreToolUse`/`PostToolUse`, and lifecycle hooks cannot reclaim tokens already emitted inside the assistant message that reaches `Stop` or `SubagentStop`. Hook mode is therefore a deterministic supported-tool boundary, not a universal hard interrupt.
+Codex local tool hooks do not cover every host/tool surface. Hosted tools such as WebSearch are not assumed to pass through `PreToolUse`/`PostToolUse`, and lifecycle hooks cannot reclaim tokens already emitted inside the assistant message that reaches `Stop` or `SubagentStop`. Hook mode is therefore a deterministic supported-tool boundary, not a universal hard interrupt. Severe-recovery termination prevents another model response only after the first bad response has ended and the recovery tool has completed. True mid-response interruption still requires stream mode.
 
 After a fresh or changed hook definition, use Codex `/hooks` to review and trust it. A host/operator can then refresh the same installer with `--hook-trust-verified --apply`; same-version activation refreshes do not reinstall the skill. The installer accepts that trust assertion only when its expected hook definition is unchanged.
 
@@ -132,14 +140,14 @@ All generated-text channels share one detector. Switching from reasoning to plan
 
 ### Active-turn hard bounds
 
-Production defaults for active no-progress generation are:
+Production defaults for active no-progress generation in protected stream mode are:
 
-- generated characters: warning at **6,000**, hard interrupt at **12,000**;
-- cumulative generated output tokens since the last real progress: warning at **4,000**, hard interrupt at **8,000**;
+- generated characters: warning at **4,000**, hard interrupt at **8,000**;
+- cumulative generated output tokens since the last real progress: warning at **1,024**, hard interrupt at **2,048**;
 - imminent tool-execution clauses without a real tool start: hard interrupt at **6**;
 - malformed protocol-emission chunks: hard interrupt at **2**.
 
-These are backstops. Exact/low-novelty intent detection or semantic evidence blocking can stop a loop earlier.
+These stream-specific defaults deliberately spend far less output on a fast pathological model than the generic watchdog constructor defaults. They are backstops. Exact/low-novelty intent detection or semantic evidence blocking can stop a loop earlier, and callers can still provide explicit watchdog overrides for controlled tests or integrations.
 
 When the plan is fully completed, final answer generation receives a separate allowance so a legitimate long verdict is not mistaken for active-workflow stalling:
 

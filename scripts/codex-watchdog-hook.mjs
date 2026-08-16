@@ -12,6 +12,14 @@ import {
 } from "./lib/watchdog-state-store.mjs";
 
 const PROTOCOL_QUARANTINE_SESSION_PREFIX = "github-delivery-protocol-quarantine:";
+const REPEATED_STALL_STOP_REASON = "repeated_no_progress_stall_after_recovery";
+const SEVERE_RECOVERY_STOP_REASON = "severe_no_progress_recovery_completed";
+const HOOK_SEVERE_RECOVERY_CHAR_LIMIT = 8_000;
+const QUARANTINE_STOP_REASONS = new Set([
+  "tool_protocol_emission_stall",
+  REPEATED_STALL_STOP_REASON,
+  SEVERE_RECOVERY_STOP_REASON,
+]);
 
 function defaultStateRoot() {
   return resolve(
@@ -45,8 +53,14 @@ function sameModel(quarantine, model) {
 function quarantineReason(quarantine) {
   const model = String(quarantine?.model || "");
   const subject = model ? `model ${model}` : "the current model";
+  let failure = "repeated tool-protocol output";
+  if (quarantine?.reason === REPEATED_STALL_STOP_REASON) {
+    failure = "repeated no-progress narration";
+  } else if (quarantine?.reason === SEVERE_RECOVERY_STOP_REASON) {
+    failure = "excessive no-progress narration";
+  }
   return (
-    `This task is quarantined after repeated tool-protocol output from ${subject}. `
+    `This task is quarantined after ${failure} from ${subject}. `
     + "Change model or start a new task before resuming."
   );
 }
@@ -72,7 +86,7 @@ function checkSessionQuarantine(input, stateRoot, options) {
   );
 }
 
-function quarantineSession(input, stateRoot, options) {
+function quarantineSession(input, stateRoot, options, reason) {
   return withWatchdogState(
     sessionGuardScope(input),
     () => ({
@@ -83,12 +97,93 @@ function quarantineSession(input, stateRoot, options) {
           active: true,
           model: String(input.model || ""),
           turnId: String(input.turn_id || ""),
-          reason: "tool_protocol_emission_stall",
+          reason,
         },
       },
     }),
     stateOptions(stateRoot, options),
   );
+}
+
+function nonNegativeInteger(value) {
+  return Number.isInteger(value) && value >= 0 ? value : 0;
+}
+
+function assistantMessageChars(input) {
+  return typeof input?.last_assistant_message === "string"
+    ? input.last_assistant_message.length
+    : 0;
+}
+
+function applyNarrationRecoveryProbation(input, priorState, result) {
+  const event = input?.hook_event_name;
+  const stopEvent = event === "Stop" || event === "SubagentStop";
+  const priorAttempts = nonNegativeInteger(priorState?.narrationRecoveryAttempts);
+  let probation = Boolean(priorState?.narrationRecoveryProbation);
+  let stopAfterRecoveredTool = Boolean(priorState?.stopAfterRecoveredTool);
+
+  if (event === "PreToolUse" && priorAttempts > 0) probation = true;
+
+  if (event === "PostToolUse" && stopAfterRecoveredTool) {
+    const reason = "GitHub Delivery stopped after the recovered tool completed because the preceding assistant response exceeded the hook-mode no-progress budget. Change model or use protected stream mode before resuming so another large response cannot be generated before enforcement.";
+    return {
+      ...result,
+      output: {
+        continue: false,
+        stopReason: SEVERE_RECOVERY_STOP_REASON,
+        reason,
+        systemMessage: "GitHub Delivery stopped after the recovered tool completed, before another model response could start.",
+      },
+      state: {
+        ...result.state,
+        narrationRecoveryProbation: true,
+        stopAfterRecoveredTool: false,
+      },
+    };
+  }
+
+  if (stopEvent) {
+    const currentAttempts = nonNegativeInteger(result?.state?.narrationRecoveryAttempts);
+    const startedFreshRecovery = (
+      priorAttempts === 0
+      && currentAttempts === 1
+      && result?.output?.decision === "block"
+    );
+
+    if (startedFreshRecovery && probation) {
+      return {
+        ...result,
+        output: {
+          continue: false,
+          stopReason: REPEATED_STALL_STOP_REASON,
+          systemMessage: "GitHub Delivery stopped a second no-progress narration stall in the same turn after an earlier recovery reached a real tool/action boundary.",
+        },
+        state: {
+          ...result.state,
+          narrationRecoveryProbation: true,
+          stopAfterRecoveredTool,
+        },
+      };
+    }
+
+    if (
+      startedFreshRecovery
+      && !probation
+      && assistantMessageChars(input) >= HOOK_SEVERE_RECOVERY_CHAR_LIMIT
+    ) {
+      stopAfterRecoveredTool = true;
+    }
+    if (startedFreshRecovery || priorAttempts > 0) probation = true;
+  }
+
+  return {
+    ...result,
+    state: {
+      ...result.state,
+      narrationRecoveryProbation: probation,
+      stopAfterRecoveredTool,
+    },
+  };
 }
 
 export function statePathForSession(
@@ -132,18 +227,26 @@ export function runCodexWatchdogHook(input, options = {}) {
   const scope = watchdogStateScope(input);
   const result = withWatchdogState(
     scope,
-    (state) => evaluateCodexHook(input, state, options),
+    (state) => applyNarrationRecoveryProbation(
+      input,
+      state,
+      evaluateCodexHook(input, state, options),
+    ),
     stateOptions(stateRoot, options),
   );
   let output = result.output;
   let quarantinePersisted = null;
-  if (
+  const canPersistQuarantine = (
     input.hook_event_name === "Stop"
+    || input.hook_event_name === "PostToolUse"
+  );
+  if (
+    canPersistQuarantine
     && result.output?.continue === false
-    && result.output?.stopReason === "tool_protocol_emission_stall"
+    && QUARANTINE_STOP_REASONS.has(result.output?.stopReason)
   ) {
     try {
-      quarantineSession(input, stateRoot, options);
+      quarantineSession(input, stateRoot, options, result.output.stopReason);
       quarantinePersisted = true;
     } catch {
       quarantinePersisted = false;

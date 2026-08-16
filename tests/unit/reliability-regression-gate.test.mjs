@@ -220,11 +220,11 @@ test("active workflow unique no-progress generation is hard bounded by productio
   assert.ok(result.firstInterruptEvent <= 16, `unbounded until event ${result.firstInterruptEvent}`);
 });
 
-test("active workflow cumulative output tokens are bounded while large input growth is ignored", () => {
+test("active workflow cumulative output tokens are bounded at the stream budget while large input growth is ignored", () => {
   const result = replay([
     usage(100, 50_000),
-    usage(4_000, 90_000),
-    usage(8_101, 150_000),
+    usage(1_100, 90_000),
+    usage(2_149, 150_000),
   ]);
   assert.equal(result.interruptCount, 1);
   assert.equal(result.firstInterruptEvent, 3);
