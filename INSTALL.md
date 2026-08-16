@@ -10,7 +10,7 @@ The scripts below are maintainer and installation tooling, not the normal way to
 
 ## Requirements
 
-- Node.js 22 or 24
+- Node.js 22, 24, or 26
 - Git
 - GitHub network access
 - An authenticated GitHub CLI or a host-provided brokered connector for GitHub writes
@@ -221,7 +221,10 @@ The optional Windows Authority host uses built-in defaults:
 - `GITHUB_DELIVERY_AUTHORITY_PIPE` defaults to `github-delivery-authority-v1`.
 
 Normal installations do not need these variables. They remain available as explicit overrides for custom installations or testing. Existing user-level values are not removed automatically.
-The optional Windows 11 Authority host turns local Windows Hello approvals into short-lived, exact-scope trusted grants for high-assurance mutations. It does not automatically enable a stricter global protection mode.
+
+A missing persistent config defaults to `authorityMode=high-assurance`. On Windows, protected high-assurance writes use the local Windows Hello Authority host. On platforms where that bundled host is unsupported, setup completes with `authority_provider_required`: local/read-only workflows remain usable, but protected GitHub writes stay blocked until a compatible authority provider is configured or the user explicitly chooses `authorityMode=off`. `off` is an opt-out, not the default.
+
+The optional Windows 11 Authority host turns local Windows Hello approvals into short-lived, exact-scope trusted grants for high-assurance mutations. Installing the host does not itself broaden mutation permissions or change an explicit user protection-mode choice.
 
 For a normal stable installation, the **guided setup** is managed by the github-delivery bootstrap; do **not** build the Authority host manually. Use:
 
