@@ -5,6 +5,21 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+export const DEFAULT_PUBLISH_VERIFY_DELAYS_MS = Object.freeze([
+  1_000,
+  2_000,
+  4_000,
+  8_000,
+  15_000,
+  30_000,
+]);
+
+const SLEEP_SIGNAL = new Int32Array(new SharedArrayBuffer(4));
+
+function sleepSync(milliseconds) {
+  Atomics.wait(SLEEP_SIGNAL, 0, 0, milliseconds);
+}
+
 function run(npmCli, args, { allowNotFound = false } = {}) {
   const result = spawnSync(process.execPath, [npmCli, ...args], {
     cwd: process.cwd(),
@@ -27,6 +42,12 @@ function parseIntegrity(output, code) {
     if (/^sha\d+-/.test(output)) return output;
   }
   throw new Error(code);
+}
+
+function publishVerificationError(spec, expectedIntegrity, observedIntegrity) {
+  return new Error(
+    `npm_publish_verification_failed:${spec}: expected ${expectedIntegrity}, observed ${observedIntegrity || "missing"}`,
+  );
 }
 
 export function localPackageIntegrity(npmCli) {
@@ -54,6 +75,32 @@ export function publishedPackageIntegrity(npmCli, spec) {
   return parseIntegrity(output, "npm_published_integrity_invalid");
 }
 
+export function verifyPublishedPackageIntegrity({
+  npmCli,
+  spec,
+  expectedIntegrity,
+  delaysMs = DEFAULT_PUBLISH_VERIFY_DELAYS_MS,
+  sleep = sleepSync,
+  lookup = publishedPackageIntegrity,
+}) {
+  let observedIntegrity = lookup(npmCli, spec);
+  if (observedIntegrity === expectedIntegrity) return observedIntegrity;
+  if (observedIntegrity) {
+    throw publishVerificationError(spec, expectedIntegrity, observedIntegrity);
+  }
+
+  for (const delayMs of delaysMs) {
+    sleep(delayMs);
+    observedIntegrity = lookup(npmCli, spec);
+    if (observedIntegrity === expectedIntegrity) return observedIntegrity;
+    if (observedIntegrity) {
+      throw publishVerificationError(spec, expectedIntegrity, observedIntegrity);
+    }
+  }
+
+  throw publishVerificationError(spec, expectedIntegrity, null);
+}
+
 export function publishNpmIdempotent({ npmCli, packageJsonPath = "package.json" }) {
   const packageJson = JSON.parse(readFileSync(resolve(packageJsonPath), "utf8"));
   const name = String(packageJson.name || "").trim();
@@ -74,12 +121,11 @@ export function publishNpmIdempotent({ npmCli, packageJsonPath = "package.json" 
   }
 
   run(npmCli, ["publish", "--access", "public", "--ignore-scripts"]);
-  const publishedIntegrity = publishedPackageIntegrity(npmCli, spec);
-  if (!publishedIntegrity || publishedIntegrity !== localIntegrity) {
-    throw new Error(
-      `npm_publish_verification_failed:${spec}: expected ${localIntegrity}, observed ${publishedIntegrity || "missing"}`,
-    );
-  }
+  verifyPublishedPackageIntegrity({
+    npmCli,
+    spec,
+    expectedIntegrity: localIntegrity,
+  });
   return { spec, status: "published", integrity: localIntegrity };
 }
 
