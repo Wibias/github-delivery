@@ -43,12 +43,9 @@ test("Control Center switches at the approved 900 and 1360 responsive breakpoint
   assert.match(wide, /<AdaptiveTrigger MinWindowWidth="1360"\s*\/>/);
   assert.doesNotMatch(xaml, /MinWindowWidth="840"/);
 
-  assertSetter(compact, "OverviewContent.Padding", "16,16,16,20");
-  assertSetter(compact, "SettingsContent.Padding", "16,16,16,20");
-  assertSetter(medium, "OverviewContent.Padding", "22,20,22,24");
-  assertSetter(medium, "SettingsContent.Padding", "22,20,22,24");
-  assertSetter(wide, "OverviewContent.Padding", "28,24,28,28");
-  assertSetter(wide, "SettingsContent.Padding", "28,24,28,28");
+  // Horizontal gutters are now proportional and are covered by
+  // authority-activity-spacing.test.mjs. This contract owns layout breakpoints.
+  assert.match(code, /Math\.Clamp\(Math\.Round\(width \* 0\.05\),\s*28,\s*64\)/);
 
   assertSetter(compact, "ActivityColumnsHeader.Visibility", "Collapsed");
   assertSetter(medium, "ActivityColumnsHeader.Visibility", "Visible");
