@@ -139,7 +139,8 @@ Use when the user wants a refactor request, refactoring RFC, or tiny-commit plan
    - Decision Document
    - Testing Decisions
    - Migration Surface and Compatibility Decision (when `references/change-execution.md` applies)
-   - Migration Strategy, Lever Decision, and Completion Proof (when `references/change-execution.md` applies)
+   - Migration Strategy (direct | expand-contract | bounded non-shippable, when `references/change-execution.md` applies)
+   - Lever Decision and Completion Proof (when `references/change-execution.md` applies)
    - Out of Scope
    - Further Notes
 
