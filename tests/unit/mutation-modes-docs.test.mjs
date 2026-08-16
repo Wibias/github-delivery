@@ -27,7 +27,7 @@ test("skill defaults to read-only and names every mutation profile", () => {
   assert.match(skill, /Human replies always require exact-text confirmation/);
 });
 
-test("mutation mode reference separates normal policy from optional trusted authority", () => {
+test("mutation mode reference separates normal policy from secure-by-default trusted authority", () => {
   const reference = read("references/mutation-modes.md");
   assert.match(reference, /Mutation mode and trusted-authority protection are separate controls/);
   assert.match(reference, /Reply to a human thread/);
@@ -38,11 +38,12 @@ test("mutation mode reference separates normal policy from optional trusted auth
   for (const authorityMode of ["off", "high-assurance", "all"]) {
     assert.match(reference, new RegExp(`\\b${authorityMode}\\b`));
   }
-  assert.match(reference, /persistent user config defaults to `off`/i);
-  assert.match(reference, /`off` means \*\*no Windows Hello \/ trusted-authority prompt\*\*/);
+  assert.match(reference, /persistent user config defaults to `high-assurance`/i);
+  assert.match(reference, /`off` is an explicit opt-out/);
   assert.match(reference, /Direct merge instruction[\s\S]*exact-text confirmation[\s\S]*expected-head checks/i);
   assert.match(reference, /profile is an upper bound, not a waiver/);
   assert.match(reference, /generic `post_comment`[\s\S]*never satisfies merge review evidence/i);
+  assert.match(reference, /`merge_pr` is deliberately rejected[\s\S]*merge-pr-driver\.mjs/i);
 });
 
 test("documented high-assurance actions exactly match the executable registry", () => {
@@ -57,8 +58,8 @@ test("bare full review selects review mode and follows configured authority prot
   const reference = read("references/mutation-modes.md");
   assert.match(reference, /full review PR #32/);
   assert.match(reference, /full review PR #32[\s\S]*→ `review`/);
-  assert.match(reference, /full-review verdict[\s\S]*trusted authority is added when the configured protection mode requires it/i);
-  assert.match(reference, /When `authorityMode` is `off`[\s\S]*does not require OS-backed provenance/i);
+  assert.match(reference, /full-review workflow[\s\S]*trusted authority is required by the default protection mode/i);
+  assert.match(reference, /When `authorityMode` is explicitly `off`[\s\S]*does not require OS-backed provenance/i);
   assert.match(reference, /reports `trusted:false`/);
 });
 
