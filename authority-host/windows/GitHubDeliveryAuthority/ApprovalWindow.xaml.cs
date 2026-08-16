@@ -34,6 +34,7 @@ internal sealed partial class ApprovalWindow : Window
 
     public Task<ApprovalDecision> ShowAsync()
     {
+        TryKeepApprovalOnTop();
         Activate();
         return _completion.Task;
     }
@@ -139,6 +140,21 @@ internal sealed partial class ApprovalWindow : Window
         catch
         {
             return null;
+        }
+    }
+
+    private void TryKeepApprovalOnTop()
+    {
+        try
+        {
+            if (TryResolveAppWindow()?.Presenter is OverlappedPresenter presenter)
+            {
+                presenter.IsAlwaysOnTop = true;
+            }
+        }
+        catch
+        {
+            // Foreground priority is best effort; activation still presents the approval window.
         }
     }
 
