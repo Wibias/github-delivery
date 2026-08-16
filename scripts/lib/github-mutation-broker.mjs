@@ -2,7 +2,10 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 
 import { classifyAuthority } from "./authority-grant.mjs";
-import { acquireAutonomousIdempotencyClaim } from "./autonomous-idempotency-claim.mjs";
+import {
+  acquireAutonomousIdempotencyClaim,
+  verifyAutonomousIdempotencyClaim,
+} from "./autonomous-idempotency-claim.mjs";
 import { authorizeMutation } from "./mutation-policy.mjs";
 import { evaluateHeadBranchCleanup } from "./merge-branch-cleanup.mjs";
 import { classifyMergeOutcome, readMergeState } from "./merge-outcome.mjs";
@@ -824,6 +827,31 @@ export function executeMutationRequest({
 
   const idempotencyClaim = acquireAutonomousIdempotencyClaim({
     request: plan.request,
+    runner,
+  });
+  const racedMutation = findExistingIdempotentMutation({
+    request: plan.request,
+    runner,
+  });
+  if (racedMutation) {
+    return {
+      ...plan,
+      executed: false,
+      status: "already_applied",
+      outcome: null,
+      observedHead,
+      observedBase: retargetState?.observedBase ?? null,
+      threadTarget,
+      commentEditTarget,
+      existingMutation: racedMutation,
+      idempotencyClaim,
+      stdout: "",
+      verification: racedMutation,
+    };
+  }
+  verifyAutonomousIdempotencyClaim({
+    request: plan.request,
+    claim: idempotencyClaim,
     runner,
   });
   const stdout = runOrThrow(runner, plan.command);
