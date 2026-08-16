@@ -53,7 +53,7 @@ Review author-provided screenshots/images before implementation. If required scr
 - **Still needs fix:** continue.
 - **Evidence incomplete:** restore the missing evidence; do not guess.
 
-Reuse an unchanged `research-issue.md` verdict on the same development tip/issue conversation. Re-enter preflight only when new evidence invalidates it.
+If the same `research-issue.md` verdict remains valid on the same development tip/issue conversation, reuse it. Re-enter preflight only when new evidence invalidates it.
 
 ## B. Confirm scope
 
