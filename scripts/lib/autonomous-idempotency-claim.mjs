@@ -157,7 +157,9 @@ function readExistingClaim({ request, runner }) {
   );
   const objectSha = String(reference.object?.sha || "").trim();
   if (!objectSha || reference.object?.type !== "tag") {
-    throw new Error(`autonomous_idempotency_claim_legacy_or_invalid:${ref}`);
+    throw new Error(
+      `autonomous_idempotency_claim_legacy_or_invalid:${ref}: legacy claims require one-time manual cleanup because their creation time was never recorded`,
+    );
   }
   const tag = parseObject(
     runOrThrow(
@@ -267,14 +269,9 @@ export function acquireAutonomousIdempotencyClaim({
 
   const existing = readExistingClaim({ request, runner });
   const recoverAfterMs = existing.createdAtMs + AUTONOMOUS_CLAIM_RECOVERY_AGE_MS;
-  if (request.recoverStaleIdempotencyClaim !== true) {
-    throw new Error(
-      `autonomous_idempotency_claim_conflict:${ref}:recoverable_after=${new Date(recoverAfterMs).toISOString()}`,
-    );
-  }
   if (now < recoverAfterMs) {
     throw new Error(
-      `autonomous_idempotency_claim_not_stale:${ref}:recoverable_after=${new Date(recoverAfterMs).toISOString()}`,
+      `autonomous_idempotency_claim_conflict:${ref}:recoverable_after=${new Date(recoverAfterMs).toISOString()}`,
     );
   }
 
