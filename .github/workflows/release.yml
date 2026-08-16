@@ -206,25 +206,37 @@ jobs:
       - name: Install trusted-publishing npm CLI
         run: npm ci --prefix .github/npm-publish --include=dev --allow-remote=all --ignore-scripts
 
-      - name: Publish npm package
-        run: node .github/npm-publish/node_modules/npm/bin/npm-cli.js publish --access public
-
-      - name: Publish GitHub Release
+      # Publish/verify GitHub first. npm is the final irreversible cross-system
+      # write, so a later GitHub failure can no longer strand an npm-only release.
+      - name: Publish or verify GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+        shell: bash
         run: |
-          gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1 && {
-            echo "release ${GITHUB_REF_NAME} already exists" >&2
-            exit 1
-          }
-          gh release create "${GITHUB_REF_NAME}" \
-            dist/github-delivery-v*.zip \
-            dist/github-delivery-v*.tar.gz \
-            dist/manifest.json \
-            dist/SHA256SUMS \
-            dist/sbom.spdx.json \
-            dist/authority-host/github-delivery-authority-v*.zip \
-            dist/authority-host/github-delivery-authority-v*.json \
-            --verify-tag \
-            --title "github-delivery ${GITHUB_REF_NAME}" \
-            --notes-file dist/RELEASE_NOTES.md
+          set -euo pipefail
+          assets=(
+            dist/github-delivery-v*.zip
+            dist/github-delivery-v*.tar.gz
+            dist/manifest.json
+            dist/SHA256SUMS
+            dist/sbom.spdx.json
+            dist/authority-host/github-delivery-authority-v*.zip
+            dist/authority-host/github-delivery-authority-v*.json
+          )
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            node scripts/verify-existing-release.mjs \
+              "${GITHUB_REPOSITORY}" \
+              "${GITHUB_REF_NAME}" \
+              "${assets[@]}"
+          else
+            gh release create "${GITHUB_REF_NAME}" \
+              "${assets[@]}" \
+              --verify-tag \
+              --title "github-delivery ${GITHUB_REF_NAME}" \
+              --notes-file dist/RELEASE_NOTES.md
+          fi
+
+      - name: Publish or verify npm package
+        run: >-
+          node scripts/publish-npm-idempotent.mjs
+          .github/npm-publish/node_modules/npm/bin/npm-cli.js
