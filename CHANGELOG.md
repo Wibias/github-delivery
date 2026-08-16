@@ -4,6 +4,20 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-08-16
+
+### Changed
+
+- Delivery Authority approval now uses a fixed window shell: repository, security, branch controls, and approval buttons stay visible while only long proposed-action content scrolls. The window keeps a 560 × 640 minimum size and uses responsive horizontal gutters (PR #276).
+- Temporary exact-branch grants can now be selected for 1 through 10 minutes while retaining the same exact repository and branch scope (PR #276).
+- The Control Center now caps Recent activity / Audit trail at 420 px with internal scrolling and uses responsive horizontal gutters for clearer edge spacing (PR #276).
+
+### Fixed
+
+- Approval windows now stay above other windows while a protected mutation is waiting, so a required Windows Hello approval is not left unnoticed in the background (PR #276).
+- Windows Hello desktop verification now uses the approval window handle, reports TPM/TBS failures such as `0x80284002` without bypassing verification, and keeps retry and sign-in recovery fail-closed (PR #276).
+- Approval summaries now show the exact branch-driving fields used by the protected mutation instead of ambiguous branch context (PR #276).
+
 ## [0.8.0] - 2026-08-16
 
 ### Added
