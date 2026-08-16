@@ -11,11 +11,11 @@ import {
   writeUserConfig,
 } from "../../scripts/lib/user-config.mjs";
 
-test("authority mode schema is exact and defaults to off", () => {
+test("authority mode schema is exact and defaults to high assurance", () => {
   assert.deepEqual(AUTHORITY_MODES, ["off", "high-assurance", "all"]);
   assert.deepEqual(DEFAULT_USER_CONFIG, {
     schemaVersion: 1,
-    authorityMode: "off",
+    authorityMode: "high-assurance",
   });
   assert.deepEqual(normalizeUserConfig({ schemaVersion: 1, authorityMode: "high-assurance" }), {
     schemaVersion: 1,
@@ -58,7 +58,7 @@ test("config path is outside the skill install and follows each OS convention", 
   );
 });
 
-test("missing config is a non-writing default-off state", () => {
+test("missing config is a non-writing secure-default state", () => {
   let read = false;
   const result = readUserConfig({
     path: "/tmp/github-delivery/config.json",
@@ -74,6 +74,7 @@ test("missing config is a non-writing default-off state", () => {
   assert.equal(result.source, "default");
   assert.equal(result.path, "/tmp/github-delivery/config.json");
   assert.deepEqual(result.config, DEFAULT_USER_CONFIG);
+  assert.equal(result.config.authorityMode, "high-assurance");
 });
 
 test("existing config is parsed and invalid JSON fails closed", () => {
