@@ -68,7 +68,7 @@ test("Type-evidence guidance rejects blanket anti-slop rules", () => {
 
 test("Type-evidence behavioural cases include positive and false-positive controls", () => {
   const cases = JSON.parse(read("tests/evals/behavioural-type-evidence-cases.json"));
-  assert.ok(cases.length >= 6, "expected a compact positive/control suite");
+  assert.ok(cases.length >= 10, "expected the anti-slop positive/control suite");
 
   for (const item of cases) validateBehaviouralCase(item);
 
@@ -80,6 +80,10 @@ test("Type-evidence behavioural cases include positive and false-positive contro
     "TYPE-EVID-004-interop-assertion-control",
     "TYPE-EVID-005-wiring-mock",
     "TYPE-EVID-006-unit-mock-control",
+    "TYPE-EVID-007-broad-object-parameter",
+    "TYPE-EVID-008-reflect-get-typed-contract",
+    "TYPE-EVID-009-reflect-apply-typed-contract",
+    "TYPE-EVID-010-repository-safety-comment",
   ]) {
     assert.ok(ids.has(id), `missing behavioural case ${id}`);
   }
