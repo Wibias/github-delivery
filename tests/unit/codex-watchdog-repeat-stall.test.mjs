@@ -1,45 +1,69 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 
+import { runCodexWatchdogHook } from "../../scripts/codex-watchdog-hook.mjs";
 import { createAppServerWatchdogRouter } from "../../scripts/lib/codex-app-server-watchdog-proxy.mjs";
-import { evaluateCodexHook } from "../../scripts/lib/codex-watchdog-hook.mjs";
 
-function stop(message, state = {}) {
-  return evaluateCodexHook(
-    {
-      hook_event_name: "Stop",
-      session_id: "deepseek-repeat-session",
-      turn_id: "deepseek-repeat-turn",
-      model: "cline-pass/deepseek-v4flash",
-      last_assistant_message: message,
-    },
-    state,
-  );
+const MODEL = "cline-pass/deepseek-v4flash";
+
+function hookInput(hook_event_name, extra = {}) {
+  return {
+    hook_event_name,
+    session_id: "deepseek-repeat-session",
+    turn_id: "deepseek-repeat-turn",
+    model: MODEL,
+    ...extra,
+  };
 }
 
-test("a second narration stall in one turn hard-stops after an earlier recovery reached a tool boundary", () => {
-  const first = stop("Let me read that region of the file.\n".repeat(4));
-  assert.equal(first.output.decision, "block");
-  assert.match(first.output.reason, /recovery 1\/3/i);
+test("a second narration stall in one turn hard-stops and quarantines after recovery reached a tool boundary", () => {
+  const stateRoot = mkdtempSync(join(tmpdir(), "gd-repeat-stall-"));
+  try {
+    const first = runCodexWatchdogHook(
+      hookInput("Stop", {
+        last_assistant_message: "Let me read that region of the file.\n".repeat(4),
+      }),
+      { stateRoot },
+    );
+    assert.equal(first.output.decision, "block");
+    assert.match(first.output.reason, /recovery 1\/3/i);
+    assert.equal(first.state.narrationRecoveryProbation, true);
 
-  const toolBoundary = evaluateCodexHook(
-    {
-      hook_event_name: "PreToolUse",
-      session_id: "deepseek-repeat-session",
-      turn_id: "deepseek-repeat-turn",
-      model: "cline-pass/deepseek-v4flash",
-      tool_name: "exec_command",
-      tool_input: { cmd: "Get-Content popup.js" },
-    },
-    first.state,
-  );
-  assert.equal(toolBoundary.output, null);
-  assert.equal(toolBoundary.state.narrationRecoveryAttempts, 0);
+    const toolBoundary = runCodexWatchdogHook(
+      hookInput("PreToolUse", {
+        tool_name: "exec_command",
+        tool_input: { cmd: "Get-Content popup.js" },
+      }),
+      { stateRoot },
+    );
+    assert.equal(toolBoundary.output, null);
+    assert.equal(toolBoundary.state.narrationRecoveryAttempts, 0);
+    assert.equal(toolBoundary.state.narrationRecoveryProbation, true);
 
-  const repeated = stop("Fixing now.\nApplying now.\nRunning now.\nEmitting now.\n", toolBoundary.state);
-  assert.equal(repeated.output.continue, false);
-  assert.equal(repeated.output.stopReason, "repeated_no_progress_stall_after_recovery");
-  assert.match(repeated.output.systemMessage, /second no-progress narration stall/i);
+    const repeated = runCodexWatchdogHook(
+      hookInput("Stop", {
+        last_assistant_message: "Fixing now.\nRunning the patch.\nExecuting the edit.\nEmitting the tool call.\n",
+      }),
+      { stateRoot },
+    );
+    assert.equal(repeated.output.continue, false);
+    assert.equal(repeated.output.stopReason, "repeated_no_progress_stall_after_recovery");
+    assert.match(repeated.output.systemMessage, /second no-progress narration stall/i);
+    assert.equal(repeated.quarantinePersisted, true);
+
+    const quarantined = runCodexWatchdogHook(
+      hookInput("UserPromptSubmit", { prompt: "continue" }),
+      { stateRoot },
+    );
+    assert.equal(quarantined.output.decision, "block");
+    assert.match(quarantined.output.reason, /repeated no-progress narration/i);
+    assert.match(quarantined.output.reason, /change model|new task/i);
+  } finally {
+    rmSync(stateRoot, { recursive: true, force: true });
+  }
 });
 
 test("default stream watchdog interrupts after four distinct imminent-tool clauses", () => {
