@@ -12,9 +12,9 @@ internal static class ControlCenterXamlSelfTest
         try
         {
             using var store = new StateStore(Path.Combine(root, "authority.db"));
-            var controlCenter = new ControlCenterWindow(store);
-            controlCenter.PrepareForExit();
-            controlCenter.Close();
+            var window = new ControlCenterWindow(store);
+            window.PrepareForExit();
+            window.Close();
 
             var longSummary = string.Join(
                 Environment.NewLine,
