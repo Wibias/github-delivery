@@ -19,6 +19,54 @@ function hookInput(hook_event_name, extra = {}) {
   };
 }
 
+test("a severe hook-mode stall stops after the recovered tool before another model response", () => {
+  const stateRoot = mkdtempSync(join(tmpdir(), "gd-severe-stall-"));
+  try {
+    const first = runCodexWatchdogHook(
+      hookInput("Stop", {
+        last_assistant_message: "Let me read that region of the file.\n".repeat(260),
+      }),
+      { stateRoot },
+    );
+    assert.equal(first.output.decision, "block");
+    assert.match(first.output.reason, /recovery 1\/3/i);
+    assert.equal(first.state.stopAfterRecoveredTool, true);
+
+    const toolBoundary = runCodexWatchdogHook(
+      hookInput("PreToolUse", {
+        tool_name: "exec_command",
+        tool_input: { cmd: "Get-Content popup.js" },
+      }),
+      { stateRoot },
+    );
+    assert.equal(toolBoundary.output, null);
+    assert.equal(toolBoundary.state.stopAfterRecoveredTool, true);
+
+    const postTool = runCodexWatchdogHook(
+      hookInput("PostToolUse", {
+        tool_name: "exec_command",
+        tool_input: { cmd: "Get-Content popup.js" },
+        tool_response: { success: true },
+      }),
+      { stateRoot },
+    );
+    assert.equal(postTool.output.continue, false);
+    assert.equal(postTool.output.stopReason, "severe_no_progress_recovery_completed");
+    assert.match(postTool.output.systemMessage, /before another model response/i);
+    assert.equal(postTool.quarantinePersisted, true);
+
+    const quarantined = runCodexWatchdogHook(
+      hookInput("UserPromptSubmit", { prompt: "continue" }),
+      { stateRoot },
+    );
+    assert.equal(quarantined.output.decision, "block");
+    assert.match(quarantined.output.reason, /excessive no-progress narration/i);
+    assert.match(quarantined.output.reason, /change model|new task/i);
+  } finally {
+    rmSync(stateRoot, { recursive: true, force: true });
+  }
+});
+
 test("a second narration stall in one turn hard-stops and quarantines after recovery reached a tool boundary", () => {
   const stateRoot = mkdtempSync(join(tmpdir(), "gd-repeat-stall-"));
   try {
