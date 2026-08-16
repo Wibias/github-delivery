@@ -131,16 +131,9 @@ no GitHub write authority.
 - Merge-ready paths run their required Bug + Security + Spec + Standards review
   and **proactive contract verification**; passing bots/checks alone is not
   sufficient. See `references/policy/reviews.md` and focused review methods.
-- Routine non-merge GitHub writes use `node scripts/github-mutate.mjs --request <file> --execute`.
-  The CLI owns routine single/batch authority acquisition and dispatch through
-  `scripts/lib/github-mutation-router.mjs`; router + action registry remain the
-  public action-discovery boundary. **Merge is intentionally different:** a merge
-  must run through `scripts/merge-pr-driver.mjs`, and generic mutation documents
-  containing `merge_pr` are rejected so the ship gate, review evidence, settle,
-  final live boundaries, and expected-head merge cannot be skipped. **Do not invoke
-  `scripts/github-authorize.mjs` separately** during routine workflows, infer
-  capabilities from one backend, or inspect brokers unless the governing public
-  entrypoint actually fails or the task audits/debugs this skill. See
+- Non-merge writes use `github-mutate.mjs`; merges use only `merge-pr-driver.mjs`.
+  Generic `merge_pr` mutation documents are rejected. Do not invoke
+  `github-authorize.mjs` separately in routine workflows. See
   `references/policy/mutation.md` and `references/merge-pr.md`.
 - Never use bare force, never silently discard unrelated work, and honor the PR
   ownership/fork-write boundary. See `references/policy/git.md`.
