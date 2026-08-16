@@ -30,7 +30,7 @@ internal sealed class ApprovalCoordinator
                     approval.Repo,
                     approval.Branch);
                 var decision = await window.ShowAsync();
-                if (decision.BranchLeaseMinutes is int minutes && (minutes < 1 || minutes > 5))
+                if (decision.BranchLeaseMinutes is int minutes && (minutes < 1 || minutes > 10))
                 {
                     throw new AuthorityException("branch_lease_minutes_invalid");
                 }

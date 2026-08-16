@@ -4,6 +4,20 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-08-16
+
+### Changed
+
+- Delivery Authority approval windows now use a fixed shell: header, repository, security, branch controls, and footer remain visible while only long proposed-action content scrolls. The window enforces a 560 × 640 minimum and uses responsive horizontal gutters.
+- Exact repository + branch temporary grants can now be selected for 1 through 10 minutes.
+- The Control Center Recent activity / Audit trail viewport is capped at 420 px with internal scrolling, and Control Center content uses responsive horizontal gutters.
+
+### Fixed
+
+- Fixed Windows Hello desktop approval startup and recovery handling, including fail-closed classification of TPM/TBS error `0x80284002`, retry/sign-in recovery, and exact owner-window verification.
+- Fixed approval windows appearing behind other windows by keeping a pending approval window above other application windows until the approval is completed or cancelled.
+- Fixed approval summaries so branch-driving fields are explicit and temporary branch grants remain bound to one exact repository and branch.
+
 ## [0.8.0] - 2026-08-16
 
 ### Added

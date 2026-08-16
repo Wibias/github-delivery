@@ -15,6 +15,16 @@ internal static class ControlCenterXamlSelfTest
             var window = new ControlCenterWindow(store);
             window.PrepareForExit();
             window.Close();
+
+            var longSummary = string.Join(
+                Environment.NewLine,
+                Enumerable.Range(1, 250).Select(index => $"approval smoke line {index}: {new string('x', 96)}"));
+            var approval = new ApprovalWindow(
+                new[] { longSummary },
+                "Approval window XAML smoke test",
+                "Wibias/github-delivery",
+                "test/approval-window");
+            approval.Close();
             return 0;
         }
         catch (Exception exception)

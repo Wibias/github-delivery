@@ -229,7 +229,7 @@ internal sealed class StateStore : IDisposable
     {
         ValidateRepo(repo);
         branch = ValidateBranch(branch);
-        if (minutes is < 1 or > 5) throw new AuthorityException("branch_lease_minutes_invalid");
+        if (minutes is < 1 or > 10) throw new AuthorityException("branch_lease_minutes_invalid");
         var lease = new BranchLeaseRecord(
             Guid.NewGuid().ToString("N"),
             repo,

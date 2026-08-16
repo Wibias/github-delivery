@@ -34,6 +34,8 @@ internal sealed partial class ControlCenterWindow : Window
         TrySetWindowIcon();
         _appWindow.Closing += OnAppWindowClosing;
         _store = store;
+        RootLayout.Loaded += (_, _) => QueueEdgeSpacingUpdate(RootLayout.ActualWidth);
+        RootLayout.SizeChanged += (_, args) => QueueEdgeSpacingUpdate(args.NewSize.Width);
         Activated += (_, _) => Refresh();
         TryResize(1080, 760);
     }
@@ -311,6 +313,25 @@ internal sealed partial class ControlCenterWindow : Window
     private void OpenSettings_Click(object sender, RoutedEventArgs e)
     {
         Navigation.SelectedItem = Navigation.SettingsItem;
+    }
+
+    private void QueueEdgeSpacingUpdate(double width)
+    {
+        if (width <= 0) return;
+        RootLayout.DispatcherQueue.TryEnqueue(() => ApplyEdgeSpacing(width));
+    }
+
+    private void ApplyEdgeSpacing(double width)
+    {
+        var horizontal = Math.Clamp(Math.Round(width * 0.05), 28, 64);
+        var (top, bottom) = width >= 1360
+            ? (24d, 28d)
+            : width >= 900
+                ? (20d, 24d)
+                : (16d, 20d);
+        var padding = new Thickness(horizontal, top, horizontal, bottom);
+        OverviewContent.Padding = padding;
+        SettingsContent.Padding = padding;
     }
 
     private AppWindow ResolveAppWindow()

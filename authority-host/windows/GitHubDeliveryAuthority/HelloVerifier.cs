@@ -4,7 +4,13 @@ namespace GitHubDeliveryAuthority;
 
 internal static class HelloVerifier
 {
-    internal readonly record struct Verification(bool Verified, string? FailureMessage, bool CanOpenSignInOptions = false);
+    private const int TbsBadParameter = unchecked((int)0x80284002);
+
+    internal readonly record struct Verification(
+        bool Verified,
+        string? FailureMessage,
+        bool CanOpenSignInOptions = false,
+        bool CanRetry = false);
 
     internal readonly record struct Readiness(
         bool Available,
@@ -43,6 +49,20 @@ internal static class HelloVerifier
         {
             return new Verification(false, "Windows 11 build 22000 or newer is required for Windows Hello desktop verification.");
         }
+        if (ownerWindow == IntPtr.Zero)
+        {
+            return new Verification(false, "Windows Hello cannot start because the approval window handle is unavailable.", CanRetry: true);
+        }
+
+        var readiness = await CheckReadinessAsync();
+        if (!readiness.Available)
+        {
+            return new Verification(
+                false,
+                readiness.Message,
+                readiness.CanOpenSignInOptions,
+                readiness.Availability == UserConsentVerifierAvailability.DeviceBusy);
+        }
 
         try
         {
@@ -50,12 +70,31 @@ internal static class HelloVerifier
             return new Verification(
                 result == UserConsentVerificationResult.Verified,
                 DescribeFailure(result),
-                CanOpenSignInOptions(result));
+                CanOpenSignInOptions(result),
+                result == UserConsentVerificationResult.DeviceBusy);
         }
         catch (Exception error)
         {
-            return new Verification(false, $"Windows Hello could not start (0x{error.HResult:X8}): {error.Message}");
+            return DescribeInteropFailure(error.HResult, error.Message);
         }
+    }
+
+    internal static Verification DescribeInteropFailure(int hresult, string? detail)
+    {
+        if (hresult == TbsBadParameter)
+        {
+            return new Verification(
+                false,
+                "Windows Hello returned TPM error 0x80284002 (TBS_E_BAD_PARAMETER). The approval was not granted. Retry Windows Hello. If the error repeats, open Windows sign-in options and verify the PIN and TPM state.",
+                CanOpenSignInOptions: true,
+                CanRetry: true);
+        }
+
+        var suffix = string.IsNullOrWhiteSpace(detail) ? string.Empty : $": {detail}";
+        return new Verification(
+            false,
+            $"Windows Hello verification failed (0x{hresult:X8}){suffix}",
+            CanRetry: true);
     }
 
     internal static Readiness DescribeAvailability(UserConsentVerifierAvailability availability)

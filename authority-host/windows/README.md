@@ -20,7 +20,7 @@ Installing the host does **not** switch the global protection mode to a stricter
 
 ## Temporary branch grants
 
-When an approval batch can be bound to one exact repository and branch, the approval window offers **Only this branch** for **1 to 5 minutes**.
+When an approval batch can be bound to one exact repository and branch, the approval window offers **Only this branch** for **1 to 10 minutes**.
 
 A temporary branch grant has deliberately narrow semantics:
 
