@@ -1,0 +1,44 @@
+name: Clean orphaned workflow runs
+
+# GitHub keeps workflow identities in the Actions sidebar after a temporary
+# workflow file is removed. Deleting all runs for an orphan lets GitHub drop
+# the stale workflow entry as well.
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/cleanup-orphaned-workflows.yml"
+      - "scripts/cleanup-orphaned-workflows.mjs"
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: cleanup-orphaned-workflows
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    name: Delete orphaned workflow runs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out trusted default-branch code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+
+      - name: Remove stale workflow histories
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/cleanup-orphaned-workflows.mjs
