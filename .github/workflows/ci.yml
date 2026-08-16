@@ -199,27 +199,3 @@ jobs:
             if (Test-Path $Diagnostics -PathType Leaf) { Get-Content $Diagnostics }
             throw "Installed Authority XAML smoke test failed with exit code $LASTEXITCODE."
           }
-
-      - name: Build Windows authority hotfix ZIP
-        if: runner.os == 'Windows' && matrix.node == 24
-        shell: pwsh
-        run: |
-          $Version = (Get-Content package.json -Raw | ConvertFrom-Json).version
-          $PublishDir = Join-Path $env:RUNNER_TEMP 'github-delivery-authority-publish'
-          node scripts/build-authority-host-release.mjs `
-            --publish-dir "$PublishDir" `
-            --out-dir "dist/authority-hotfix" `
-            --version "$Version" `
-            --source-commit "$env:GITHUB_SHA"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-      - name: Upload Windows authority hotfix ZIP
-        if: runner.os == 'Windows' && matrix.node == 24
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: github-delivery-authority-hotfix-${{ github.sha }}
-          path: |
-            dist/authority-hotfix/github-delivery-authority-v*.zip
-            dist/authority-hotfix/github-delivery-authority-v*.json
-          if-no-files-found: error
-          retention-days: 3
