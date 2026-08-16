@@ -204,7 +204,20 @@ internal sealed class AuthorityService
             : operation.TryGetProperty("issue", out var issue) ? $"issue #{issue.GetInt32()}"
             : repo;
         var lines = new List<string> { $"{index + 1}. {action} — {target}", $"   repo: {repo}" };
-        if (operation.TryGetProperty("authorityBranch", out var branch) && branch.ValueKind == JsonValueKind.String) lines.Add($"   branch: {branch.GetString()}");
+        if (string.Equals(action, "push_code", StringComparison.Ordinal) &&
+            operation.TryGetProperty("branch", out var pushBranch) && pushBranch.ValueKind == JsonValueKind.String)
+        {
+            lines.Add($"   branch: {pushBranch.GetString()}");
+        }
+        else if (string.Equals(action, "create_pr", StringComparison.Ordinal))
+        {
+            if (operation.TryGetProperty("base", out var baseRef) && baseRef.ValueKind == JsonValueKind.String) lines.Add($"   base: {baseRef.GetString()}");
+            if (operation.TryGetProperty("head", out var headRef) && headRef.ValueKind == JsonValueKind.String) lines.Add($"   head: {headRef.GetString()}");
+        }
+        else if (operation.TryGetProperty("authorityBranch", out var authorityBranch) && authorityBranch.ValueKind == JsonValueKind.String)
+        {
+            lines.Add($"   branch: {authorityBranch.GetString()}");
+        }
         if (operation.TryGetProperty("expectedHead", out var head) && head.ValueKind == JsonValueKind.String) lines.Add($"   head: {head.GetString()}");
         if (operation.TryGetProperty("mergeMethod", out var method) && method.ValueKind == JsonValueKind.String) lines.Add($"   merge method: {method.GetString()}");
         if (operation.TryGetProperty("body", out var body) && body.ValueKind == JsonValueKind.String)
