@@ -30,9 +30,14 @@ test("the merge workflow uses the driver + mutation broker instead of a bare mer
 test("merge documentation requires merge before the success-looking thank-you", () => {
   const merge = read("references/merge-pr.md");
   assert.match(merge, /Driver transaction order/);
-  assert.match(merge, /1\. \*\*Merge\*\*/);
-  assert.match(merge, /2\. \*\*Verify merge success\*\*/);
-  assert.match(merge, /3\. \*\*Post-merge PR thank-you\*\*/);
+  assert.match(merge, /1\. \*\*Final immediate boundary\*\*/);
+  assert.match(merge, /2\. \*\*Merge\*\*/);
+  assert.match(merge, /3\. \*\*Verify merge success\*\*/);
+  assert.match(merge, /4\. \*\*Post-merge PR thank-you\*\*/);
+  assert.ok(
+    merge.indexOf("2. **Merge**") < merge.indexOf("4. **Post-merge PR thank-you**"),
+    "merge must precede its success-looking thank-you",
+  );
   assert.match(merge, /do \*\*not\*\* post a success-looking/i);
   assert.doesNotMatch(merge, /\*\*Pre-merge PR comment\*\*/);
   assert.doesNotMatch(merge, /pre-merge why\/comment was posted/i);

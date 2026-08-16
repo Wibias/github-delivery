@@ -66,6 +66,6 @@ The independent trusted-authority layer is controlled by the global `authorityMo
 
 ### GD-AUTH-012 — Prepared writes execute through the governing boundary
 
-Once a prepared non-merge mutation request has the evidence and authority required by the selected workflow, hand it directly to `github-mutate.mjs`. That entrypoint owns the fresh-head, target, idempotency, and authority preflight required above. Do not duplicate or repeat that preflight with ad-hoc `gh`, repeated payload/body reads, or extra final checks unless relevant state changed, the entrypoint failed or returned ambiguous evidence, or the workflow explicitly requires a fresh check.
+Once a prepared mutation request for a non-merge write has the evidence and authority required by the selected workflow, hand it directly to `github-mutate.mjs`. That entrypoint owns the fresh-head, target, idempotency, and authority preflight required above. Do not duplicate or repeat that preflight with ad-hoc `gh`, repeated payload/body reads, or extra final checks unless relevant state changed, the entrypoint failed or returned ambiguous evidence, or the workflow explicitly requires a fresh check.
 
 Merge is the deliberate exception: hand the target to `merge-pr-driver.mjs`, never to a generic mutation document. The driver must perform its own final live recaptures because merge safety depends on more state than the atomic GitHub expected-head condition can bind.

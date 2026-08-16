@@ -183,15 +183,14 @@ test("retry after crash between merge and thanks completes the missing social ef
     return { action: "post_comment", status: "succeeded" };
   };
 
-  assert.throws(
-    () =>
-      executeMergeTransaction({
-        mergeRequest: { action: "merge_pr" },
-        thankRequest: { action: "post_comment" },
-        executeRequest,
-      }),
-    /process_crash_before_thanks/,
-  );
+  const first = executeMergeTransaction({
+    mergeRequest: { action: "merge_pr" },
+    thankRequest: { action: "post_comment" },
+    executeRequest,
+  });
+  assert.equal(first[0].receipt.outcome, "merged");
+  assert.equal(first[1].receipt, null);
+  assert.match(first[1].error, /process_crash_before_thanks/);
   assert.equal(merged, true);
   assert.equal(thankEffects, 0);
 
@@ -229,15 +228,14 @@ test("retry after remote thanks write but lost receipt does not duplicate the so
     return { action: "post_comment", status: "succeeded" };
   };
 
-  assert.throws(
-    () =>
-      executeMergeTransaction({
-        mergeRequest: { action: "merge_pr" },
-        thankRequest: { action: "post_comment" },
-        executeRequest,
-      }),
-    /process_crash_after_remote_thanks/,
-  );
+  const first = executeMergeTransaction({
+    mergeRequest: { action: "merge_pr" },
+    thankRequest: { action: "post_comment" },
+    executeRequest,
+  });
+  assert.equal(first[0].receipt.outcome, "merged");
+  assert.equal(first[1].receipt, null);
+  assert.match(first[1].error, /process_crash_after_remote_thanks/);
   assert.equal(thankEffects, 1);
 
   const retry = executeMergeTransaction({
