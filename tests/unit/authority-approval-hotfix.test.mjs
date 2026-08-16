@@ -63,6 +63,13 @@ test("approval window enforces the fixed-shell minimum size", async () => {
   assert.match(source, /TrySetMinimumWindowSize\(560,\s*640\)/);
 });
 
+test("approval window stays above other windows while approval is pending", async () => {
+  const source = await read(approvalWindowCodePath);
+
+  assert.match(source, /presenter\.IsAlwaysOnTop\s*=\s*true/);
+  assert.match(source, /public Task<ApprovalDecision> ShowAsync\(\)[\s\S]*?Activate\(\)/);
+});
+
 test("branch lease controls are vertically aligned and offer one through ten minutes", async () => {
   const xaml = await read(approvalWindowPath);
 
