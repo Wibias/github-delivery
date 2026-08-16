@@ -87,9 +87,12 @@ This layer can:
 - derive semantic evidence identities for supported shell/GitHub Delivery helper reads and block a later read when authoritative evidence already covers the requested dimensions in the same state generation;
 - classify Windows/PowerShell forms such as `git -C`, `Get-ChildItem`, compound/grouped commands, GitHub CLI reads/writes, and owned GitHub Delivery helpers conservatively;
 - reject an oversized `Agent`/subagent tool input and require a focused source-referenced brief;
-- detect a completed no-progress assistant or subagent message and request one corrective continuation;
-- fail closed if that corrective continuation stalls again;
+- detect a completed no-progress assistant or subagent message and keep a bounded corrective continuation active until a real `PreToolUse` boundary is reached;
+- allow up to three corrective continuations by default, then fail closed if the model still does not reach a real tool/action boundary;
+- hard-stop malformed tool-protocol emission stalls immediately rather than spending the narration-recovery budget on them;
 - delete all hashed turn/agent state for a session at `SessionEnd`.
+
+The narration-recovery obligation persists across short follow-up messages that would not independently cross the repeated-intent detector threshold. Reaching `PreToolUse` clears that obligation and the pending "tool never emitted" signal even when evidence-economy policy then blocks the selected tool as a duplicate or otherwise disallowed read. A tool boundary is not itself execution or state progress; the ordinary progress counters still require the corresponding successful execution/state evidence.
 
 The 8/12 evidence limits are defaults and are intentionally turn-scoped. Exact duplicate/poll/semantic-coverage protection is independent and can block earlier. The default subagent-input budget is 6,000 serialised characters. These are context/progress budgets, not authority or correctness gates.
 
