@@ -75,9 +75,24 @@ When the user decreases window height, the proposed-action region shrinks until 
 
 The footer remains pinned and visible throughout resizing.
 
+## Temporary branch lease duration
+
+The existing exact-repository plus exact-branch temporary approval lease remains unchanged in scope and security semantics, but its selectable duration is extended from 1-5 minutes to 1-10 minutes.
+
+Requirements:
+
+- the approval UI offers every whole-minute option from 1 through 10 minutes;
+- 1 minute remains the default selection;
+- the selected duration is accepted only when it is between 1 and 10 minutes inclusive;
+- both UI-side and persistence-side validation use the same inclusive 1-10 minute bound;
+- an active lease continues to suppress repeated Windows Hello prompts only for the same exact repository and exact branch;
+- every actual mutation still receives a fresh short-lived exact-effect grant and passes the existing redemption and mutation-policy checks.
+
 ## Error handling and security
 
-This layout change does not change approval semantics, Windows Hello handling, authority scope construction, lease behaviour, or fail-closed mutation behaviour.
+The layout change does not change approval semantics, Windows Hello handling, authority scope construction, branch-lease matching, or fail-closed mutation behaviour.
+
+The only lease-policy change is the maximum selectable duration from 5 minutes to 10 minutes.
 
 If Windows Hello fails, the existing retry/sign-in-options flow remains unchanged.
 
@@ -91,9 +106,13 @@ Update static ApprovalWindow regression tests to assert:
 - ActionScrollViewer is not constrained by the previous fixed MaxHeight behaviour;
 - the footer remains outside the scrollable action region;
 - branch controls keep their existing narrow/wide responsive setters;
-- minimum window width and height are configured in code.
+- minimum window width and height are configured in code;
+- branch lease options include 1 through 10 minutes and no value above 10;
+- code-side branch lease validation accepts 10 and rejects values above 10.
 
 Keep the existing Windows XAML smoke test with a very large approval body to verify the resulting XAML can instantiate successfully.
+
+Keep branch-lease self-tests covering exact repo/branch isolation, expiry, atomic reuse, audit recording, and revocation.
 
 ## Acceptance criteria
 
@@ -105,5 +124,7 @@ The change is accepted when:
 4. Resizing shorter reduces the description area until the minimum window size is reached.
 5. The footer never scrolls away.
 6. Narrow-width branch controls remain usable and aligned.
-7. Existing authority and Windows Hello tests still pass.
-8. A published Windows test ZIP passes self-test and XAML smoke-test before manual validation.
+7. The duration selector offers 1 through 10 minutes and a 10-minute lease is valid.
+8. Existing exact repo/branch lease reuse remains unchanged apart from the longer maximum duration.
+9. Existing authority and Windows Hello tests still pass.
+10. A published Windows test ZIP passes self-test and XAML smoke-test before manual validation.
