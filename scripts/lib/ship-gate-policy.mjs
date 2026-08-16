@@ -1,3 +1,11 @@
+const UNDERSTOOD_ACTIVE_RULE_TYPES = new Set([
+  "deletion",
+  "non_fast_forward",
+  "pull_request",
+  "required_status_checks",
+  "merge_queue",
+]);
+
 function blockerValue(componentName, blocker) {
   if (typeof blocker === "string") return `${componentName}:${blocker}`;
   const reason = blocker?.reason || "blocked";
@@ -24,6 +32,16 @@ function componentSummary(component) {
       ? component.unknowns.length
       : 0,
   };
+}
+
+function unsupportedActiveRuleTypes(snapshot) {
+  const rules = snapshot?.evidence?.activeRules;
+  if (!Array.isArray(rules)) return [];
+  return [...new Set(
+    rules
+      .map((rule) => String(rule?.type || "").trim())
+      .filter((type) => type && !UNDERSTOOD_ACTIVE_RULE_TYPES.has(type)),
+  )].sort();
 }
 
 export function combineShipGateResults({
@@ -62,6 +80,17 @@ export function combineShipGateResults({
     ) {
       unknowns.push(`${name}:incomplete`);
     }
+  }
+
+  for (const type of unsupportedActiveRuleTypes(snapshot)) {
+    unknowns.push(`policy:unsupported_active_ruleset_rule:${type}`);
+  }
+
+  const mergeStateStatus = String(
+    snapshot?.evidence?.pullRequest?.mergeStateStatus || "",
+  ).toUpperCase();
+  if (mergeStateStatus === "BLOCKED") {
+    unknowns.push("policy:github_merge_state_blocked");
   }
 
   const mergeQueueEnabled = reviewPolicy?.mergeQueue?.enabled === true;
