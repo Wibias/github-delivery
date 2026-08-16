@@ -73,7 +73,7 @@ test("a second narration stall in one turn hard-stops and quarantines after reco
   }
 });
 
-test("default stream watchdog interrupts after four distinct imminent-tool clauses", () => {
+test("default stream watchdog retains the six-clause imminent-tool boundary", () => {
   const router = createAppServerWatchdogRouter({
     internalRequestIdPrefix: "gd-repeat-stall",
   });
@@ -90,7 +90,9 @@ test("default stream watchdog interrupts after four distinct imminent-tool claus
   assert.equal(emit("Fixing now.\n").internalRequests.length, 0);
   assert.equal(emit("Running the patch.\n").internalRequests.length, 0);
   assert.equal(emit("Executing the edit.\n").internalRequests.length, 0);
-  const tripped = emit("Emitting the tool call.\n");
+  assert.equal(emit("Emitting the tool call.\n").internalRequests.length, 0);
+  assert.equal(emit("Writing the change.\n").internalRequests.length, 0);
+  const tripped = emit("Calling the tool.\n");
   assert.equal(tripped.internalRequests.length, 1);
   assert.equal(tripped.internalRequests[0].method, "turn/interrupt");
 });
