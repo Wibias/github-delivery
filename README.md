@@ -6,7 +6,7 @@
 
 **Say the outcome, not the orchestration.**
 
-`github-delivery` turns natural-language requests into evidence-backed GitHub workflows: PRDs, issue research, implementation, deep review, CI, fixes, stacks, verified merges, and verified stable self-update. Its v0.7 quality stack adds evidence-backed design review, stable behavior-boundary verification, and reproducible migration/change execution on top of the existing fail-closed delivery, authority, and progress controls. v0.7.3 extends that stack with minimal-solution selection before implementation, tight red-capable diagnosis for difficult bugs, explicit expand-contract migrations, evidence-backed completion claims, deeper module/seam heuristics, and a read-only triage attention inbox.
+`github-delivery` turns natural-language requests into evidence-backed GitHub workflows: PRDs, issue research, implementation, deep review, CI, fixes, stacks, verified merges, and verified stable self-update. v0.8.0 extends the quality and safety stack with an explicit typed-code anti-slop review checklist, feedback-bound merge freshness, fail-closed handling for unknown active GitHub rules, stronger default trusted-authority posture, resumable release publication, and recovery-aware merge transactions.
 
 [Quick start](#try-it-in-60-seconds) · [Self-update](#update-an-installed-release) · [Progress watchdog](#agent-progress-watchdog) · [What it can own](#what-you-can-ask-it-to-own) · [Safety model](#safety-model) · [Installation](#installation)
 
@@ -25,7 +25,7 @@
 > **Natural language is the public API.** The Node scripts, policy modules, authority layer, evaluators, and mutation broker are internal safety and evidence machinery. You normally do not invoke them yourself.
 
 > [!NOTE]
-> The optional Windows Authority host uses built-in defaults for its trust-store path and named pipe. `GITHUB_DELIVERY_AUTHORITY_TRUST_STORE` and `GITHUB_DELIVERY_AUTHORITY_PIPE` remain available as explicit overrides for custom installations or testing; normal installation does not persist them in the user environment.
+> The optional Windows Authority host uses built-in defaults for its trust-store path and named pipe. `GITHUB_DELIVERY_AUTHORITY_TRUST_STORE` and `GITHUB_DELIVERY_AUTHORITY_PIPE` remain available as explicit overrides for custom installations or testing; normal installation does not persist them in the user environment. If no persistent GitHub Delivery user config exists, the authority preference defaults to **Sensitive actions** (`high-assurance`); an explicitly stored `off` preference remains supported and is respected.
 
 <p align="center">
   <img src="docs/assets/github-delivery-demo.svg" alt="github-delivery natural-language workflow demo" width="100%">
@@ -196,8 +196,8 @@ The protected launcher keeps watchdog state per turn, observes agent-message/rea
 | **Final summaries can overclaim stale state or remembered counts.** | Completion claims bind to current authoritative evidence; volatile/head-bound facts are refreshed and material counts are re-measured before durable publication. |
 | **Agents can burn tokens without making progress.** | A persistent workflow controller bounds rerouting/replanning, semantic evidence keys stop equivalent re-reads, and the protected Codex stream hard-bounds cross-channel narration, unique no-progress generation, tool-emission stalls, malformed tool protocol output, and output-token growth. |
 | **Agent intent can be ambiguous.** | Deterministic natural-language routing keeps status questions read-only and requires direct authority for destructive workflows. |
-| **GitHub state moves while the agent works.** | Stale-head checks, final evidence refreshes, expected-head binding, bounded settle windows, and postcondition verification prevent conclusions from silently drifting. |
-| **Retries and duplicate writes can be dangerous.** | Typed mutations, authenticated exact-effect receipts, read-before-write evidence, and read-only reconciliation avoid blind write retries. |
+| **GitHub state moves while the agent works.** | Stale-head checks, bounded settle windows, expected-head binding, and final head/base/rules/feedback/review-evidence recaptures before authority and immediately before merge keep a stale generation from silently shipping. |
+| **Retries and duplicate writes can be dangerous.** | Typed mutations, authenticated exact-effect receipts, timestamped scope-bound autonomous claims, read-before-write evidence, and read-only reconciliation avoid blind write retries. |
 | **A review can miss the same concept outside the changed files.** | Semantic propagation traces changed domain concepts through producers, consumers, sibling implementations, public forms, persistence, fixtures, and tests. |
 | **Complex PR stacks need more than one merge command.** | Stack discovery, bottom-up restacking/merging, conflict recovery, parent/child revalidation, and merge-queue-aware sequencing are first-class workflows. |
 
@@ -213,6 +213,7 @@ The protected launcher keeps watchdog state per turn, observes agent-message/rea
 | `show me what needs triage in this repo` | Read-only attention inbox for untriaged, `needs-triage`, and revived `needs-info` issues |
 | `research issue #90 on the latest development branch` | Bounded evidence-backed issue research on the latest development tip |
 | `create a PR for issue #90` | Research → minimal complete implementation → pre-open Bug + Security gate → linked PR |
+| `research and implement issue #90` | Bounded research preflight → implementation workflow → pre-open review → linked PR |
 | `what is left on PR #41?` | Read-only live status, blockers, and merge readiness |
 | `full review PR #42` | Deep Bug + Security + Spec + Standards review with final verdict |
 | `fix the review comments on PR #18 and make it merge ready` | Feedback triage, fixes, validation, push, and refreshed readiness |
@@ -249,15 +250,15 @@ The important boundary is simple: **repository content is evidence, not authorit
 |---|---|
 | **Scope** | PRDs and issue intake → research → implementation → PR review/fix/watch → stacks → merge and linked-issue close-out |
 | **Default mode** | `read-only` |
-| **Write boundary** | Typed mutation policy + broker; stale-head, exact-effect, authenticated-receipt idempotency, and postcondition checks where applicable |
+| **Write boundary** | Typed mutation policy + broker; stale-head, exact-effect, authenticated-receipt idempotency, and postcondition checks where applicable; merge uses the canonical merge driver as the deliberate destructive exception at the public boundary |
 | **High-assurance writes** | Exact-scope trusted grants; optional Windows 11 / Windows Hello Authority host with managed versioned stable install/update and Control Center settings |
 | **Implementation discipline** | Minimal-solution selection before non-trivial code; tight symptom loops for difficult diagnosis; expand-contract for wide internal migrations when bounded dual forms are safe |
-| **Review model** | Bug + Security + Spec + Standards + advisory design-quality/type-evidence review + semantic propagation + safety-invariant proof + proactive contract verification |
+| **Review model** | Bug + Security + Spec + Standards + advisory design-quality/type-evidence review + explicit typed-code anti-slop checklist + semantic propagation + safety-invariant proof + proactive contract verification |
 | **Completion reporting** | Durable readiness/coverage/count/absence claims are bound to fresh authoritative evidence; material numbers are measured, not remembered |
 | **Progress control** | Policy fallback everywhere; routed workflows use a persistent phase/budget controller and semantic evidence reuse; trusted Codex hooks add turn-scoped duplicate/poll/evidence protection; the launch-controlled stream watches agent-message/reasoning/plan text plus plan/diff/output-token telemetry and can hard-interrupt no-progress/tool-emission/protocol stalls. Runtime capability reports only verified `none`, `hooks`, or `stream`. |
 | **Ship decision** | One authoritative `ready`, `blocked`, or `unknown` result from live evidence |
 | **Runtime** | Node.js **22, 24, or 26** |
-| **Required CI matrix** | Node 22/24/26 × Ubuntu/Windows/macOS, with architecture contracts inside every required matrix job |
+| **Required CI matrix** | Protected Node 22 and Node 24 lanes on Ubuntu, Windows, and macOS; every required Node 24 lane also runs the full Node 26 compatibility checks before returning to Node 24 for lane-specific follow-up |
 | **Live lifecycle tests** | Dedicated, explicitly opted-in fixture repository bound by immutable repository identity |
 
 ## More natural-language examples
@@ -270,6 +271,7 @@ show me what needs triage in this repo
 run QA intake on the payment bug report
 research issue #90 on the latest development branch
 create a PR for issue #90
+research and implement issue #90
 
 what is left on PR #41?
 is PR #42 safe to merge?
@@ -296,7 +298,7 @@ update github-delivery to the latest stable release
 | **Agent-ready work** | Create/update a `ready-for-agent` contract | `references/agent-brief.md` |
 | **Rejected scope** | Record, match, reconsider, or remove an out-of-scope decision | `references/out-of-scope.md` |
 | **Issue research** | Research an issue on the latest development tip | `references/research-issue.md` |
-| **Create a linked PR** | Bounded research → implementation → pre-open review → PR | `references/create-pr-for-issue.md` |
+| **Create a linked PR** | Create a PR or compound `research and implement` request: bounded research → implementation → pre-open review → PR | `references/create-pr-for-issue.md` |
 | **Implementation discipline** | Select the lowest-complexity complete solution before non-trivial implementation/refactor work | `references/minimal-solution.md` |
 | **Make a PR merge-ready** | Fix humans/bots, own bug/security/spec work, validate | `references/fix-pr-bots.md` |
 | **Watch a PR** | Poll CI/reviews/gates until merged, closed, or blocked | `references/watch-pr.md` |
@@ -312,7 +314,7 @@ update github-delivery to the latest stable release
 | **Safe simplification** | Behavior-preserving cleanup with approval and mandatory re-review | `references/simplify-pr.md` |
 | **Status** | What is left / why blocked / merge readiness | `references/status.md` |
 | **Prepare + merge** | Compound review/fix/simplify request that explicitly includes merge | `references/prepare-and-merge-pr.md` |
-| **Merge** | Final gate, exact transaction authorization, final-boundary recheck, head-pinned merge, thanks, linked-issue close-out | `references/merge-pr.md` |
+| **Merge** | Final gate, settle, exact transaction authorization, two final live boundary recaptures, head-pinned merge, recovery-aware thanks, linked-issue close-out | `references/merge-pr.md` |
 | **Supersede** | Close an obsolete PR in favor of a replacement | `references/supersede-pr.md` |
 | **Maintainer overtake** | Take over an unresponsive author's PR under explicit maintainer scope | `references/overtake-pr.md` |
 | **Conflicts** | Resolve active conflicts from both sides' intent/evidence, then resume | `references/resolve-conflicts.md` |
@@ -339,9 +341,11 @@ The profile is not a waiver. Maintainer-grade actions such as merge, close, supe
 
 The merge router uses a narrow positive command grammar. Status questions containing words such as *merge* or *ship* do not silently become destructive requests. Future or conditional permission is also excluded: confirmation/approval that the user explicitly defers until later remains read-only until the later confirmation actually happens.
 
-### 2. Every network-visible GitHub write crosses one mutation boundary
+### 2. Every network-visible GitHub write crosses one controlled boundary
 
-Creating/editing issues or PRs, labels, assignments, comments, reviews, thread state, draft state, reviewers, remote branches, closes, merges, and follow-up objects are brokered through `scripts/github-mutate.mjs`, `scripts/lib/github-mutation-router.mjs`, and the lifecycle/legacy broker implementations behind that router.
+Routine issue/PR creation and editing, labels, assignments, comments, reviews, thread state, draft state, reviewers, remote branches, closes, and follow-up objects are brokered through `scripts/github-mutate.mjs`, `scripts/lib/github-mutation-router.mjs`, and the lifecycle/legacy broker implementations behind that router.
+
+**Merge is the deliberate public-boundary exception.** Generic `merge_pr` mutation documents are rejected. `scripts/merge-pr-driver.mjs` owns the authoritative gate, required settle, review evidence, final head/base/rules/feedback generation checks, exact destructive authority, head-pinned merge, recovery-aware post-merge ceremony, and the lower broker primitive it invokes only after those checks pass. Bare `gh pr merge` and hand-built generic merge requests remain forbidden.
 
 The action model is centralized in `scripts/lib/mutation-action-registry.mjs`. Policy, broker behavior, routing/high-assurance semantics, and architecture tests are derived or cross-checked from that registry so adding an action cannot silently skip a safety layer.
 
@@ -353,7 +357,7 @@ A repository-wide mutation-boundary regression check rejects direct production G
 
 Caller fields such as `mutationMode`, `explicitInstruction`, `exactTextConfirmed`, `source: user`, or `trusted: true` are policy assertions — not proof of consent.
 
-Where trusted authority is required, a host-issued grant binds a deterministic `scopeSha256` over the semantically relevant effect: repository, action, mode, PR/head, merge method, targets, idempotency key, and hashes of human-visible text. Redemption-required grants are short-lived and one-time.
+Where trusted authority is required, a host-issued grant binds a deterministic `scopeSha256` over the semantically relevant effect: repository, action, mode, PR/head, merge method, targets, idempotency key, and hashes of human-visible text. Redemption-required grants are short-lived and one-time. When persistent user config is absent, the default authority mode is `high-assurance`; an explicit stored `off` or `all` preference still controls the effective policy.
 
 Protected thread-state mutations are part of that high-assurance boundary. In particular, `resolve_bot_thread` cannot be authorized merely because repository/bot content caused the request; the Windows authority host classifies it as Windows Hello-protected even in `review` mode.
 
@@ -376,7 +380,7 @@ Full-review publication is a high-assurance special case: `scripts/github-author
 
 Durable creates and social writes use stable idempotency keys plus remote read-before-write evidence, but a predictable hidden marker is **not** sufficient proof that the intended effect already happened.
 
-Receipt reuse is bound to the authenticated GitHub actor and the exact visible effect. The verifier rejects foreign-actor marker collisions, rejects pull requests returned by the Issues API when verifying issue creation, binds PR creation to the intended title/base/head, and binds review-thread replies to the intended parent comment. Autonomous same-key effects still use a remote claim so competing workers cannot both publish the same durable effect.
+Receipt reuse is bound to the authenticated GitHub actor and the exact visible effect. The verifier rejects foreign-actor marker collisions, rejects pull requests returned by the Issues API when verifying issue creation, binds PR creation to the intended title/base/head, and binds review-thread replies to the intended parent comment. Autonomous same-key visible effects additionally use timestamped, scope-bound annotated Git tag claims with bounded stale recovery; ownership and visible idempotency evidence are rechecked immediately before the write so competing workers cannot both publish the same durable effect.
 
 GitHub rate-limit retries are deliberately asymmetric:
 
@@ -434,7 +438,7 @@ Nine companion contracts keep implementation, review, bug-fix, migration, and co
 - [`references/regression-first.md`](references/regression-first.md) requires executable broken-before/fixed-after evidence for confirmed bug fixes. It uses [`references/verification-boundaries.md`](references/verification-boundaries.md) to choose the narrowest stable contract that actually demonstrates the defect, whether that is a focused unit/component check, a use-case/integration boundary, a real script/CLI path, or a deterministic runtime/operator probe.
 - [`references/safety-invariant.md`](references/safety-invariant.md) handles material non-local risk by naming the fact a positive verdict depends on and recording the strongest proof level reached from `claimed` through `reproduced`. A material assumption stays `unproven` until the evidence establishes it.
 - [`references/design-quality.md`](references/design-quality.md) adds an advisory positive-design lens for happy-path visibility, boundary ownership, abstraction compression, explicit domain/state modeling, mutable-state ownership, shared-state discipline, evidence-backed complexity, deletion value, interface/test-surface cost, real seams, leverage, and locality. Repository rules and concrete Bug/Security/Spec contracts remain authoritative.
-- [`references/type-evidence-review.md`](references/type-evidence-review.md) adds an advisory typed-code lens for evidence erosion: known-value widening, widen-then-assert flows, broad internal contracts, reflective bypasses, weak assertion proof, and mocks that hide production wiring. Valid boundary `unknown`, runtime narrowing, justified interop assertions, genuinely open dictionaries, and ordinary dependency seams remain explicit non-findings; existing anti-slop/Oxlint/typecheck diagnostics are repository evidence rather than a reason to install another lint stack.
+- [`references/type-evidence-review.md`](references/type-evidence-review.md) adds an advisory typed-code lens for evidence erosion and an explicit rule-by-rule anti-slop checklist for chained assertions, known-value widening, broad internal `object` parameters, `Reflect.apply`, `Reflect.get`, widen-then-assert flows, and assertion safety justification. Valid boundary `unknown`, runtime narrowing, justified dynamic/library interop, genuinely open dictionaries, and ordinary repository test seams remain explicit non-findings; existing anti-slop/Oxlint/typecheck diagnostics are repository evidence rather than a reason to install another lint stack.
 - [`references/verification-boundaries.md`](references/verification-boundaries.md) chooses the narrowest stable contract that actually observes protected behavior, avoiding both brittle private-helper tests and needlessly large end-to-end harnesses.
 - [`references/change-execution.md`](references/change-execution.md) governs broad deterministic sweeps and internal migrations: inventory the full surface, migrate callers before deleting obsolete internal paths when compatibility is not real, use an explicit expand → migrate → contract sequence when bounded dual forms keep batches green, build a rerunnable lever when it lowers risk, and verify each meaningful change unit.
 - [`references/completion-claims.md`](references/completion-claims.md) audits durable completion claims against the workflow's existing authoritative evidence. Head-bound/volatile facts are refreshed, material numbers are re-measured, absence claims require sufficient coverage, and `unknown`, `not run`, `blocked`, or `partial` states cannot disappear in the final report.
@@ -497,10 +501,12 @@ The ship path deliberately models platform details that commonly cause "green bu
 - Check evidence preserves expected workflow/app/integration identity; same-name Check Run / Commit Status collisions cannot impersonate an app-bound required check.
 - GitHub's authoritative check target is used where the platform evaluates a test-merge/merge-queue generation instead of naively trusting a convenient head result.
 - Active applicable `required_status_checks` rules are aggregated; strict server-enforced base coherence is present when **any** applicable active rule requires strict required checks, independent of ruleset ordering.
+- Any active ruleset rule type the evaluator does not understand, or an unexplained GitHub `BLOCKED` merge state, makes the gate `unknown` rather than ready.
 - GitHub review decision, stale approvals, last-push approval requirements, unresolved review threads, conflicts, behind state, and merge-queue state are evaluated.
-- The canonical merge driver precomputes the exact merge + optional post-merge-thanks transaction, obtains trusted grants for that exact batch, then recaptures live state and re-verifies the final merge boundary and review evidence **before** redeeming a grant or writing.
+- Merge execution requires settle. The canonical driver captures the approved head/base/rules/feedback/review-evidence generation, recaptures it once before requesting destructive authority, and recaptures it again immediately before the merge write after any approval delay. The merge itself remains pinned to the expected head.
 - `gh pr merge`/API success is not automatically reported as an immediate merge: queued/auto-merge and actual merged outcomes remain distinct.
 - An error after an attempted merge write is reconciled from read-only exact-head state; the write is never blindly retried.
+- If the merge succeeds but post-merge thanks fail, the result is explicit partial success. A later invocation against the same already-merged head can reconcile only the missing idempotent ceremony; it does not merge again.
 - Unknown future GitHub enum/state values fail closed instead of being treated as success.
 - Dependency Review degradation fails closed across real dependency surfaces, including nested/non-Node dependency graphs such as NuGet.
 - Merge execution requires same-head github-delivery review evidence, not merely a green ship gate.
@@ -532,7 +538,7 @@ There is no path to a positive readiness, publication, or merge claim without on
 
 ## Create-PR flow: bounded research, then forward progress
 
-Creating a linked PR uses a bounded **research → implementation → pre-open review** sequence before publication.
+Creating a linked PR uses a bounded **research → implementation → pre-open review** sequence before publication. Compound requests such as `research and implement issue #N` route directly to this implementation workflow and retain the same bounded research preflight instead of stopping at a research-only result.
 
 Creating a PR follows this lifecycle:
 
@@ -602,7 +608,7 @@ There is no recursive simplification loop.
 
 ## Agent progress watchdog
 
-GitHub Delivery v0.7 treats convergence as a layered runtime + workflow problem rather than a prompt-only rule. The target failure classes include repeated narration, long unique no-progress generation, channel hopping, read/evidence spirals, tool-call emission stalls (`Run`, `exec`, `Let me wire...` with no real tool), and malformed protocol output such as repeated `<atool>...</atool>`.
+GitHub Delivery v0.8 treats convergence as a layered runtime + workflow problem rather than a prompt-only rule. The target failure classes include repeated narration, long unique no-progress generation, channel hopping, read/evidence spirals, tool-call emission stalls (`Run`, `exec`, `Let me wire...` with no real tool), and malformed protocol output such as repeated `<atool>...</atool>`.
 
 The watchdog is deliberately separate from mutation authority. It can interrupt, block, rate-limit, reuse evidence, or request a focused retry; it cannot authorize or execute a GitHub write.
 
@@ -663,7 +669,7 @@ The target is intentionally fail-closed and must be explicitly opted in with all
 
 A writable but unrelated repository therefore fails identity verification **before the first fixture mutation**, even if its repository name was accidentally configured.
 
-The lifecycle exercises issues, branches, PRs, the Node 22/24/26 required check matrix, evidence snapshots, delayed head propagation, stale-head rejection, close behavior, and independent cleanup with versioned evidence artifacts. Cleanup re-verifies target identity before destructive cleanup actions.
+The lifecycle exercises issues, branches, PRs, the protected Node 22/24 platform lanes with Node 26 compatibility checked inside the Node 24 lanes, evidence snapshots, delayed head propagation, stale-head rejection, close behavior, and independent cleanup with versioned evidence artifacts. Cleanup re-verifies target identity before destructive cleanup actions.
 
 The hosted workflow intentionally uses `--disposition close`; it does not bypass the trusted-authority requirement by merging fixture PRs.
 
@@ -688,12 +694,12 @@ See [`docs/live-integration.md`](docs/live-integration.md) and [`docs/live-githu
 | `scripts/workflow-brief.mjs` | One-shot selected workflow + policy packet for controller-driven execution |
 | `scripts/ship-gate-snapshot.mjs` | Capture one paginated evidence snapshot |
 | `scripts/ship-gate.mjs` | Produce the authoritative `ready` / `blocked` / `unknown` decision |
-| `scripts/lib/merge-boundary.mjs` | Bind head/base/rules fingerprints and aggregate strict ruleset enforcement |
-| `scripts/merge-pr-driver.mjs` | Authorize the exact merge transaction, recapture final state, execute and summarize |
+| `scripts/lib/merge-boundary.mjs` | Bind head/base/rules/feedback fingerprints and aggregate strict ruleset enforcement |
+| `scripts/merge-pr-driver.mjs` | Own settle, two final live boundary recaptures, exact merge authority, head-pinned execution, partial-success reporting, and post-merge reconciliation |
 | `scripts/lib/mutation-action-registry.mjs` | Central mutation action semantics and propagation contract |
-| `scripts/github-mutate.mjs` | Dry-run and execute authorized GitHub writes |
-| `scripts/lib/github-mutation-router.mjs` | Route lifecycle and legacy mutation execution through one public mutation surface |
-| `scripts/lib/github-mutation-broker.mjs` | Typed legacy/social executors, stale checks, idempotency and postconditions |
+| `scripts/github-mutate.mjs` | Dry-run and execute authorized non-merge GitHub writes; generic merge documents are rejected |
+| `scripts/lib/github-mutation-router.mjs` | Route lifecycle and legacy non-merge mutation execution through one public mutation surface |
+| `scripts/lib/github-mutation-broker.mjs` | Typed legacy/social executors, stale checks, idempotency, postconditions, and lower merge primitive used by the canonical driver |
 | `scripts/lib/github-lifecycle-mutation-broker.mjs` | Typed lifecycle creates/updates with exact remote receipt verification |
 | `scripts/lib/idempotency-receipt.mjs` | Authenticated actor + exact-effect receipt matching |
 | `scripts/lib/idempotency-receipt-runner.mjs` | Filter forged/non-exact marker hits from social idempotency reads |
@@ -826,6 +832,8 @@ A genuine pre-manifest installation can enter this path only after multiple GitH
 
 When a Windows Authority host is required or already installed, the updater separately verifies its versioned archive + metadata + exact tag/source + release-workflow attestation before installation. Persistent Authority database/trust state is kept outside the versioned runtime directory and survives upgrades. An absent Authority host remains absent when protection is `off`; an ahead host is not downgraded.
 
+Release publication itself is resumable: the protected release workflow publishes or verifies the GitHub Release assets first, then performs npm as the final irreversible cross-system write. If the npm version already exists during recovery, publication succeeds only when registry integrity matches the package being released.
+
 ### Codex progress watchdog
 
 On Codex, the normal installer configures the lifecycle-hook definitions along with the skill. New or changed non-managed hooks still require explicit review/trust in `/hooks`; GitHub Delivery does not bypass that trust gate. A previously verified trust receipt is preserved across normal reinstalls while the exact definitions remain unchanged, and is invalidated when they change.
@@ -859,11 +867,11 @@ The launcher starts the real App Server over stdio, interposes an authenticated 
 
 The stable user path is managed through `npx github-delivery setup` / `update --apply`; it uses a separately built, versioned, attested self-contained `win-x64` release component and does **not** require a local .NET SDK. If the component is already installed, stable update keeps it aligned with the skill while preserving `authority.db`, `trust-store.json`, and persistent user config. If protection is `off` and Authority has never been installed, it stays uninstalled. Explicit `npx github-delivery start` waits for the host's `status: ready` response before claiming success; startup exceptions are written best-effort to `%LOCALAPPDATA%\GitHubDeliveryAuthority\startup-error.log` so an early process exit leaves actionable local evidence.
 
-The Control Center now has a functional **Settings** destination for **Off**, **Sensitive actions** (recommended), and **Every GitHub write**. It writes the same persistent `authorityMode` preference as the CLI and shows stored/effective mode plus Authority version/source status.
+The Control Center has a functional **Settings** destination for **Off**, **Sensitive actions** (recommended), and **Every GitHub write**. It writes the same persistent `authorityMode` preference as the CLI and shows stored/effective mode plus Authority version/source status. If the preference file does not exist yet, **Sensitive actions** (`high-assurance`) is the default rather than silently disabling trusted authority.
 
 The repository `authority-host/windows/install.ps1` path remains available specifically for source/development builds and requires the .NET 8 SDK.
 
-Authority is optional and does **not** automatically enable global strict-authority mode. See [`authority-host/windows/README.md`](authority-host/windows/README.md).
+Authority is optional and does **not** force global strict-authority mode; users can explicitly select `off`. See [`authority-host/windows/README.md`](authority-host/windows/README.md).
 
 ---
 
@@ -875,18 +883,19 @@ Run the authoritative local suite:
 npm run check
 ```
 
-The required CI matrix runs **Node 22, 24, and 26** on:
+The protected required CI matrix runs **Node 22 and Node 24** on:
 
 - Ubuntu
 - Windows
 - macOS
 
-Every required matrix leg runs the normal repository checks **and** the architecture contract tests for mutation-action propagation and review-context integrity. Windows legs additionally restore/build the Authority host in locked mode and run its self-test; the Node 24 Windows leg also publishes the self-contained host and executes that published executable with `--self-test` so packaging/runtime regressions are exercised after publish.
+Every required Node 24 platform lane then switches to **Node 26** and runs the full repository checks before restoring Node 24 for lane-specific follow-up. This keeps declared Node 26 compatibility inside already-protected required contexts instead of relying on separate unrequired jobs. Every required matrix leg also runs the architecture contract tests for mutation-action propagation and review-context integrity. Windows legs additionally restore/build the Authority host in locked mode and run its self-test; the Node 24 Windows leg also publishes the self-contained host and executes that published executable with `--self-test` so packaging/runtime regressions are exercised after publish.
 
 Repository controls also include:
 
 - CodeQL for JavaScript/TypeScript and C#;
 - Dependency Review;
+- Dependabot coverage for both the repository root and the nested `.github/npm-publish` toolchain;
 - repository/workflow policy validation;
 - deterministic distribution checks;
 - exact npm package-surface validation plus the release-blocking `npm run reliability:gate`;
@@ -900,7 +909,7 @@ Repository controls also include:
 
 The separate **Architecture Contracts** workflow provides focused feedback, while the safety-critical architecture tests also live inside the required CI matrix so a path-filtered advisory workflow cannot be the only enforcement point.
 
-The declared repository rules in `.github/repository-policy.json` currently require the nine Node 22/24/26 matrix jobs, Dependency Review, and both CodeQL analyses with strict up-to-date-branch semantics.
+The declared repository rules in `.github/repository-policy.json` currently require the six Node 22/24 platform jobs, Dependency Review, and both CodeQL analyses with strict up-to-date-branch semantics. Node 26 compatibility is enforced inside every required Node 24 platform lane.
 
 ---
 
@@ -912,6 +921,6 @@ Do not publish suspected vulnerability details in a public issue or pull request
 
 ## Current state
 
-The complete issue/PR delivery lifecycle and its safety architecture are implemented: evidence-backed routing and ship gates, deferred-intent-safe merge routing, brokered lifecycle mutations, trusted exact-scope authority and durable verdict provenance, Windows Hello protection for high-assurance thread actions, a managed versioned/attested Windows Authority release component with state-preserving stable updates and functional Control Center protection settings, readiness-verified Authority startup with local startup diagnostics, deep review, semantic propagation, safety-invariant proof, deterministic probes with non-bypassable required evidence, regression-first bug-fix evidence, tight red-capable diagnosis for difficult bugs, stable-boundary regression/refactor verification, evidence-preserving durable GitHub prose, minimal-solution selection before non-trivial implementation, advisory design-quality and type-evidence review, deletion/seam/locality/leverage design heuristics, reproducible migration/mechanical-change execution with expand-contract support, fresh completion-claim evidence, read-only triage attention discovery, pre-open review, safe simplification, repository-qualified stacks, conflict recovery, merge-queue semantics, aggregated strict-ruleset enforcement, authenticated exact-effect idempotency receipts, ambiguous-merge readback reconciliation, safe read retries, verified npm/npx bootstrap + latest-stable release installation with human-readable staged update progress, persistent route/phase workflow convergence, semantic evidence coverage/reuse, trust-aware Codex hook configuration, hard cross-channel protected-stream generation bounds with deterministic incident replay, issue close-out, deterministic release packaging, verified latest-stable self-update, repository controls, and dedicated live lifecycle fixtures.
+The complete issue/PR delivery lifecycle and its safety architecture are implemented: evidence-backed routing and ship gates, deferred-intent-safe merge routing, canonical merge-driver ownership with settle and two final head/base/rules/feedback/review-evidence recaptures, fail-closed unsupported-ruleset and unexplained `BLOCKED` handling, brokered lifecycle mutations, trusted exact-scope authority with a `high-assurance` missing-config default and durable verdict provenance, Windows Hello protection for high-assurance thread actions, a managed versioned/attested Windows Authority release component with state-preserving stable updates and functional Control Center protection settings, readiness-verified Authority startup with local startup diagnostics, deep review, semantic propagation, safety-invariant proof, deterministic probes with non-bypassable required evidence, regression-first bug-fix evidence, tight red-capable diagnosis for difficult bugs, stable-boundary regression/refactor verification, evidence-preserving durable GitHub prose, minimal-solution selection before non-trivial implementation, advisory design-quality and type-evidence review with explicit typed-code anti-slop checks, deletion/seam/locality/leverage design heuristics, reproducible migration/mechanical-change execution with expand-contract support, fresh completion-claim evidence, read-only triage attention discovery, pre-open review, safe simplification, repository-qualified stacks, conflict recovery, merge-queue semantics, authenticated exact-effect idempotency receipts with timestamped scope-bound autonomous claims, ambiguous-merge readback reconciliation, post-merge partial-success recovery, safe read retries, verified npm/npx bootstrap + latest-stable release installation with human-readable staged update progress, resumable GitHub-first/npm-final release publication, persistent route/phase workflow convergence, semantic evidence coverage/reuse, trust-aware Codex hook configuration, hard cross-channel protected-stream generation bounds with deterministic incident replay, issue close-out, deterministic release packaging, repository controls, and dedicated live lifecycle fixtures.
 
 Remaining work is primarily **operational** rather than a missing architecture layer: keep live repository rules/security settings aligned with the documented policy, provision and maintain the dedicated live fixture target/credential, run release acceptance for new versions, keep host integrations explicitly configured where runtime watchdog enforcement is desired, perform the npm registry's one-time package bootstrap/Trusted-Publisher setup when required for the first publication, and extend the regression corpus as GitHub and agent hosts evolve.
