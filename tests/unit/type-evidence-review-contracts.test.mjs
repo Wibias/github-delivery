@@ -34,6 +34,28 @@ test("Standards review loads the type-evidence companion only for relevant typed
   assert.match(standards, /type-evidence.*`n\/a`|`n\/a`.*type-evidence/is);
 });
 
+test("Type-evidence review maps the practical anti-slop subset rule by rule", () => {
+  const typeEvidence = read("references/type-evidence-review.md");
+
+  for (const rule of [
+    "no-chained-type-assertions",
+    "no-known-value-widening",
+    "no-object-parameters",
+    "no-reflect-apply",
+    "no-reflect-get",
+    "no-widen-then-assert",
+    "require-safety-comment-for-type-assertion",
+  ]) {
+    assert.match(typeEvidence, new RegExp(`\\b${rule}\\b`), `missing review mapping for ${rule}`);
+  }
+
+  assert.match(typeEvidence, /rule-by-rule|rule mapping|anti-slop checklist/i);
+  assert.match(typeEvidence, /repository.*lint.*binding|binding.*repository.*lint/is);
+  assert.match(typeEvidence, /SAFETY.*repository.*requires|repository.*requires.*SAFETY/is);
+  assert.match(typeEvidence, /Reflect\.get.*typed|typed.*Reflect\.get/is);
+  assert.match(typeEvidence, /Reflect\.apply.*typed|typed.*Reflect\.apply/is);
+});
+
 test("Type-evidence guidance rejects blanket anti-slop rules", () => {
   const typeEvidence = read("references/type-evidence-review.md");
 
