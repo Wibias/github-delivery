@@ -1,8 +1,9 @@
 #!/usr/bin/env node
+import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
 function run(npmCli, args, { allowNotFound = false } = {}) {
   const result = spawnSync(process.execPath, [npmCli, ...args], {
@@ -72,7 +73,7 @@ export function publishNpmIdempotent({ npmCli, packageJsonPath = "package.json" 
     return { spec, status: "already_published", integrity: localIntegrity };
   }
 
-  run(npmCli, ["publish", "--access", "public"]);
+  run(npmCli, ["publish", "--access", "public", "--ignore-scripts"]);
   const publishedIntegrity = publishedPackageIntegrity(npmCli, spec);
   if (!publishedIntegrity || publishedIntegrity !== localIntegrity) {
     throw new Error(
@@ -82,7 +83,9 @@ export function publishNpmIdempotent({ npmCli, packageJsonPath = "package.json" 
   return { spec, status: "published", integrity: localIntegrity };
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === resolve(new URL(import.meta.url).pathname)) {
+const invokedPath = process.argv[1] ? resolve(process.argv[1]) : null;
+const modulePath = resolve(fileURLToPath(import.meta.url));
+if (invokedPath && invokedPath === modulePath) {
   const npmCli = process.argv[2];
   if (!npmCli) {
     console.error("Usage: node scripts/publish-npm-idempotent.mjs <npm-cli.js>");
