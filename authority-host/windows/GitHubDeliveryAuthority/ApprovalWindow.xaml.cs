@@ -26,7 +26,7 @@ internal sealed partial class ApprovalWindow : Window
             ? "Unavailable: this batch does not resolve to one exact branch."
             : $"Branch: {_branch}";
         Closed += (_, _) => Complete(new ApprovalDecision(false));
-        TrySetMinimumWindowSize(560, 480);
+        TrySetMinimumWindowSize(560, 640);
         TryResize(820, 760);
     }
 
@@ -101,7 +101,7 @@ internal sealed partial class ApprovalWindow : Window
     {
         if (_branch is null || !BranchGrantToggle.IsEnabled || !BranchGrantToggle.IsOn) return null;
         if (BranchGrantDuration.SelectedItem is not ComboBoxItem item) return null;
-        return int.TryParse(item.Tag?.ToString(), out var minutes) && minutes is >= 1 and <= 5
+        return int.TryParse(item.Tag?.ToString(), out var minutes) && minutes is >= 1 and <= 10
             ? minutes
             : null;
     }
@@ -139,7 +139,7 @@ internal sealed partial class ApprovalWindow : Window
         }
         catch
         {
-            // Minimum sizing is best effort; scrolling keeps the approval controls reachable.
+            // Minimum sizing is best effort. The fixed shell expects the configured minimum dimensions.
         }
     }
 
