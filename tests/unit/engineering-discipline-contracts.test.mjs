@@ -37,7 +37,7 @@ test("difficult bug fixes build a tight symptom signal before testing ranked hyp
   assert.match(bugHunt, /Phase 0 — Tight symptom signal/);
   assert.match(bugHunt, /red-capable/i);
   assert.match(bugHunt, /Minimize the reproducer/i);
-  assert.match(bugHunt, /3–5 ranked candidate hypotheses/);
+  assert.match(bugHunt, /3–5 ranked candidate\s+hypotheses/);
   assert.match(bugHunt, /one variable at a time/i);
   assert.match(bugHunt, /Do not manufacture a broad\s+harness for an obvious defect/i);
   assert.match(bugHunt, /Matt Pocock.*diagnosing-bugs/is);
