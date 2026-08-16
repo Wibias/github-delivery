@@ -45,7 +45,14 @@ test("a second narration stall in one turn hard-stops and quarantines after reco
 
     const repeated = runCodexWatchdogHook(
       hookInput("Stop", {
-        last_assistant_message: "Fixing now.\nRunning the patch.\nExecuting the edit.\nEmitting the tool call.\n",
+        last_assistant_message: [
+          "Fixing now.",
+          "Running the patch.",
+          "Executing the edit.",
+          "Emitting the tool call.",
+          "Writing the change.",
+          "Calling the tool.",
+        ].join("\n"),
       }),
       { stateRoot },
     );
@@ -109,4 +116,33 @@ test("default stream watchdog caps no-progress output near two thousand generate
   const tripped = usage(2_149);
   assert.equal(tripped.internalRequests.length, 1);
   assert.equal(tripped.internalRequests[0].method, "turn/interrupt");
+});
+
+test("tight action budgets do not replace the larger finalization budget", () => {
+  const router = createAppServerWatchdogRouter({
+    internalRequestIdPrefix: "gd-repeat-finalization",
+  });
+  router.onServerMessage({
+    method: "turn/plan/updated",
+    params: {
+      threadId: "deepseek-final-thread",
+      turnId: "deepseek-final-turn",
+      plan: [{ step: "implement", status: "completed" }],
+    },
+  });
+
+  const usage = (outputTokens) => router.onServerMessage({
+    method: "thread/tokenUsage/updated",
+    params: {
+      threadId: "deepseek-final-thread",
+      turnId: "deepseek-final-turn",
+      tokenUsage: {
+        total: { totalTokens: 100_000 + outputTokens, outputTokens },
+        last: { totalTokens: outputTokens, outputTokens },
+      },
+    },
+  });
+
+  assert.equal(usage(100).internalRequests.length, 0);
+  assert.equal(usage(3_000).internalRequests.length, 0);
 });
