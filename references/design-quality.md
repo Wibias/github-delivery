@@ -54,6 +54,17 @@ Evaluate the total reader cost, not line count:
 
 A useful abstraction shortens the set of facts callers must understand. If ten obvious local lines become several layers with no stronger contract, the abstraction has negative value even if each individual file looks "cleaner".
 
+### Deep-module checks
+
+When a changed abstraction or seam is material, use these as **advisory tests**, not mandatory vocabulary or automatic violations:
+
+- **Deletion test:** imagine deleting the abstraction. If the complexity actually disappears, the abstraction may be pass-through ceremony. If the same policy/invariants would spread back across many callers, the abstraction is probably earning its keep.
+- **Interface as test surface:** callers and stable tests should usually be able to exercise the behavior through the same owning interface. Repeated testing past the public/owning surface can signal that the boundary is too shallow or that important behavior lives in caller choreography.
+- **Real seam test:** a configurable interface/port with only one concrete use can be speculative. A second real adapter/variant, including a justified production-vs-test adapter at an actual external seam, is stronger evidence that the seam represents real variation.
+- **Leverage and locality:** prefer boundaries that give callers substantial behavior through a small understandable contract and concentrate change, bugs, invariants, and verification in one owner rather than scattering them across callers.
+
+Do not force repository terminology such as `module`, `port`, `adapter`, or `service` when the project already has established domain/architecture language. Judge the underlying ownership and complexity, not the label.
+
 Do not inline a boundary that genuinely owns policy, security, lifecycle, compatibility, observability, or independently changing behavior.
 
 ## 4. Model domain states and invariants explicitly
@@ -108,10 +119,11 @@ Use `none` when no material design-quality issue exists. Do not pad a clean Stan
 ## Relationship to existing companions
 
 - `references/code-smells.md` supplies negative heuristic smells. This file supplies positive design questions and the cost test for deciding whether a smell matters.
+- `references/minimal-solution.md` helps choose a solution shape before implementation; this file reviews the design cost of the result.
 - `references/semantic-propagation-review.md` maps changed concepts across the system. Domain/source-of-truth concerns found here can trigger that deeper propagation check.
 - `references/safety-invariant.md` proves the material fact a positive verdict depends on when design risk is non-local.
 - `references/simplify-pr.md` remains explicit-only for edits. A Standards reviewer may report a material design issue, but must not silently perform optional simplification.
 
 ## Provenance
 
-This reference adapts and combines design ideas from Cursor's MIT-licensed `pstack` principles, including boundary discipline, domain modeling, reader-load reduction, and separating shared state before serialization, with happy-path, abstraction-cost, state-ownership, and pragmatic complexity ideas from Hona's publicly shared engineering-design gist. The wording and review contract are rewritten for `github-delivery`'s evidence-first, fail-closed model; the gist is used as design input rather than copied text.
+This reference adapts and combines design ideas from Cursor's MIT-licensed `pstack` principles, including boundary discipline, domain modeling, reader-load reduction, and separating shared state before serialization, with happy-path, abstraction-cost, state-ownership, and pragmatic complexity ideas from Hona's publicly shared engineering-design gist. The deletion-test, interface-as-test-surface, real-seam, leverage, and locality checks additionally adapt deep-module ideas from Matt Pocock's MIT-licensed `codebase-design` skill. The wording and review contract are rewritten for `github-delivery`'s evidence-first, fail-closed model; repository language and decisions remain authoritative.

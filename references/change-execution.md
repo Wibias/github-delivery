@@ -40,6 +40,18 @@ Do not keep an internal legacy path solely because migrating callers is inconven
 
 A compatibility layer may remain only when there is concrete evidence that the old form was shipped, persisted, externally consumed, required by a supported version, or otherwise part of a real compatibility contract. Record the reason and the condition that allows its later removal. "Just in case" is not a compatibility contract.
 
+### Expand-contract when one-step migration cannot stay green
+
+Use an **expand-contract** sequence when the old and new internal forms can safely coexist for a bounded period but changing every caller in one step would create an unnecessarily large red or unreviewable intermediate state.
+
+1. **Expand:** add the new form beside the old without removing the old path. Keep the overlap minimal and prove that existing callers still work.
+2. **Migrate:** move caller families in independently checkable batches, for example by package, directory, provider family, or another real blast-radius partition. Each batch is blocked by the expand step and gets its own focused residual/check evidence.
+3. **Contract:** after every intended caller is on the new form and the final residual search is clean, delete the old internal form and its migration-only tests/fixtures. The contract step is blocked by every migration batch.
+
+The temporary old path in an expand-contract sequence is **migration scaffold**, not evidence of a supported compatibility contract. Do not preserve it after the contract gate merely because it existed during the migration.
+
+Do not force expand-contract when dual forms would create ambiguous writes, split-brain state, unsafe schema semantics, incompatible persistence, or another real correctness risk. In that case use the smallest bounded non-shippable local/integration phase allowed by §5 and make the broken/intermediate invariant explicit.
+
 ## 3. Build a lever when it lowers change risk
 
 For a broad, deterministic, repeatable transformation, prefer a small script/codemod/generator when it materially improves at least one of:
@@ -108,7 +120,7 @@ Before claiming the migration/sweep complete, verify:
 - repository-required tests/build/lint/security/CI gates pass on the final head;
 - removed legacy paths are not still referenced by tests, fixtures, docs, generated artifacts, or supported downstream contracts.
 
-For non-local safety claims, use `references/safety-invariant.md` rather than treating a successful sweep as proof of every semantic assumption.
+For non-local safety claims, use `references/safety-invariant.md` rather than treating a successful sweep as proof of every semantic assumption. Before publishing numeric residual/caller counts or a broad "migration complete" statement, apply `references/completion-claims.md` so the final report uses the current measured result rather than an earlier remembered count.
 
 ## Planning output
 
@@ -116,10 +128,11 @@ When this companion is used in a refactor plan, record:
 
 - **Migration surface:** old/new contract and caller/consumer inventory.
 - **Compatibility decision:** delete old path, or keep it with concrete reason/removal condition.
+- **Migration strategy:** direct | expand-contract | bounded non-shippable phase, with why.
 - **Lever decision:** manual | script/codemod/generator, with why.
 - **Verifiable units:** ordered effects and checks.
 - **Completion proof:** residual search, focused checks, and final gates.
 
 ## Provenance
 
-This reference adapts practical ideas from Cursor's MIT-licensed `pstack` principles for migrating callers before deleting legacy APIs, building a lever for non-trivial mechanical work, and sequencing work into verifiable units. The rules are rewritten to fit `github-delivery`'s existing scope, evidence, compatibility, and publication contracts rather than copied as standalone skills.
+This reference adapts practical ideas from Cursor's MIT-licensed `pstack` principles for migrating callers before deleting legacy APIs, building a lever for non-trivial mechanical work, and sequencing work into verifiable units. The explicit expand-contract branch and blocker-shaped migration batches additionally adapt the wide-refactor strategy from Matt Pocock's MIT-licensed `to-tickets` skill. The rules are rewritten to fit `github-delivery`'s existing scope, evidence, compatibility, and publication contracts rather than copied as standalone skills.

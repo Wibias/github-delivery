@@ -37,3 +37,7 @@ Public security communication should be useful but redacted. Do not publish secr
 ### GD-PUB-009 — Keep durable GitHub prose concrete
 
 Before publishing prose authored by `github-delivery`, apply `references/prose-quality.md`. Preserve exact evidence, required template structure, GitHub syntax, security redaction, and user-confirmed wording. Style cleanup must never turn `unknown`, `not run`, `blocked`, or another evidence state into a stronger claim.
+
+### GD-PUB-010 — Audit completion claims against current evidence
+
+Before publishing a final verdict, merge-ready statement, review-coverage statement, migration-complete statement, or another durable completion report, apply `references/completion-claims.md`. Reuse the governing workflow's authoritative evidence and freshness rules rather than a parallel ledger. Material numeric claims must be measured from the current result, head-bound claims must name or derive from the authoritative current SHA, and partial/unknown/blocked/not-run evidence must remain visible instead of being strengthened by summary prose.

@@ -62,7 +62,7 @@ Default to one issue and one cohesive PR. Do not split merely because several la
 ## C. Implement locally
 
 1. Start from the exact base/development tip captured in A. Use a task branch/worktree that preserves unrelated local user work.
-2. Implement the smallest complete change that satisfies the extracted issue contract.
+2. Before writing a non-trivial solution, apply `references/minimal-solution.md`: understand the real flow, then prefer existing repository capability → standard library/runtime → native platform → already-installed dependency → minimum custom implementation. Implement the smallest **complete** change that satisfies the extracted issue contract; never trade away required validation, security, accessibility, compatibility, lifecycle, observability, or evidence to make the diff smaller.
 3. Follow concrete dependencies as they appear; inspect and update required consumers instead of returning to broad preflight research. For broad migrations or deterministic sweeps, apply `references/change-execution.md`.
 4. Run focused validation appropriate to the changed code: tests, typecheck, build, repro, and repository-local checks as available.
 5. Require a non-empty base-to-head candidate diff. If no change is needed, return to the matching preflight outcome and do not open an empty PR.
@@ -115,6 +115,10 @@ Work on the current PR head until the authoritative merge-ready bar is satisfied
 6. Run the appropriate settle window, then re-read current reviews/checks/rules/base/head and run the authoritative final ship gate. If the head changes, invalidate head-bound evidence and revalidate.
 7. When ready, publish the merge-ready PR and linked-issue notifications through brokered actions. **Do not merge.**
 
+## H. Completion report
+
+Before publishing the final merge-ready status or final chat completion report, apply `references/completion-claims.md`. Reuse the authoritative evidence already produced by this workflow rather than creating a parallel ledger. Re-measure material numeric claims, bind head-dependent claims to the exact final SHA, refresh volatile sources required by G, and preserve `unknown`, `not run`, `blocked`, or partial states instead of strengthening them in prose.
+
 ## Done when
 
 - Requested PR count only; no surprise batch.
@@ -128,4 +132,5 @@ Work on the current PR head until the authoritative merge-ready bar is satisfied
 - Default-base closing reference is verified, or non-default-base linkage follows the explicit non-default rule above without futile `closingIssuesReferences` retries.
 - Issue self-assigned when possible; one complete opened-PR comment; no duplicates.
 - Own reviews, current review feedback, required CI, freshness checks, and final ship gate are satisfied on the final head.
+- Final completion claims are backed by current authoritative evidence and material counts are measured rather than recalled.
 - Merge-ready was published and **the PR was not merged**.
