@@ -18,6 +18,12 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Run hotfix source regression tests
+        shell: pwsh
+        run: |
+          node --test tests/unit/authority-approval-hotfix.test.mjs tests/unit/windows-authority-branch-grants-audit.test.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Set up .NET
         uses: actions/setup-dotnet@v6.0.0
         with:
