@@ -26,6 +26,8 @@ internal sealed partial class ApprovalWindow : Window
             ? "Unavailable: this batch does not resolve to one exact branch."
             : $"Branch: {_branch}";
         Closed += (_, _) => Complete(new ApprovalDecision(false));
+        RootLayout.Loaded += (_, _) => QueueEdgeSpacingUpdate(RootLayout.ActualWidth);
+        RootLayout.SizeChanged += (_, args) => QueueEdgeSpacingUpdate(args.NewSize.Width);
         TrySetMinimumWindowSize(560, 640);
         TryResize(820, 760);
     }
@@ -111,6 +113,19 @@ internal sealed partial class ApprovalWindow : Window
         if (_completed) return;
         _completed = true;
         _completion.TrySetResult(decision);
+    }
+
+    private void QueueEdgeSpacingUpdate(double width)
+    {
+        if (width <= 0) return;
+        RootLayout.DispatcherQueue.TryEnqueue(() => ApplyEdgeSpacing(width));
+    }
+
+    private void ApplyEdgeSpacing(double width)
+    {
+        var horizontal = Math.Clamp(Math.Round(width * 0.05), 28, 56);
+        var vertical = width >= 680 ? 28d : 16d;
+        RootLayout.Padding = new Thickness(horizontal, vertical, horizontal, vertical);
     }
 
     private AppWindow? TryResolveAppWindow()
