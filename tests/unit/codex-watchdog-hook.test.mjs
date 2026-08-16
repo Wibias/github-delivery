@@ -101,7 +101,7 @@ test("PostToolUse preserves oversized model-facing output", () => {
   assert.equal(result.output, null);
 });
 
-test("Stop requests one corrective continuation for a narration stall", () => {
+test("Stop keeps narration recovery active until a real tool boundary", () => {
   const stalled = "Let me read the reference.\n".repeat(4);
   const first = evaluateCodexHook(
     {
@@ -114,7 +114,8 @@ test("Stop requests one corrective continuation for a narration stall", () => {
     {},
   );
   assert.equal(first.output.decision, "block");
-  assert.match(first.output.reason, /no-progress|tool call|blocker/i);
+  assert.match(first.output.reason, /recovery 1\/3/i);
+  assert.equal(first.state.narrationRecoveryAttempts, 1);
 
   const second = evaluateCodexHook(
     {
@@ -122,12 +123,85 @@ test("Stop requests one corrective continuation for a narration stall", () => {
       session_id: "s1",
       turn_id: "t1",
       stop_hook_active: true,
-      last_assistant_message: stalled,
+      last_assistant_message: "Reading diagnostics now.",
     },
     first.state,
   );
-  assert.equal(second.output.continue, false);
-  assert.match(second.output.stopReason, /no_progress_stall/);
+  assert.equal(second.output.decision, "block");
+  assert.match(second.output.reason, /recovery 2\/3/i);
+  assert.equal(second.state.narrationRecoveryAttempts, 2);
+
+  const toolBoundary = evaluateCodexHook(
+    {
+      hook_event_name: "PreToolUse",
+      session_id: "s1",
+      turn_id: "t1",
+      tool_name: "future_special_tool",
+      tool_input: { path: "diagnostics.json" },
+    },
+    second.state,
+  );
+  assert.equal(toolBoundary.output, null);
+  assert.equal(toolBoundary.state.narrationRecoveryAttempts, 0);
+  assert.equal(toolBoundary.state.watchdog.toolEmissionIntentCount, 0);
+
+  const completed = evaluateCodexHook(
+    {
+      hook_event_name: "Stop",
+      session_id: "s1",
+      turn_id: "t1",
+      stop_hook_active: false,
+      last_assistant_message: "The requested inspection completed successfully.",
+    },
+    toolBoundary.state,
+  );
+  assert.equal(completed.output, null);
+});
+
+test("Stop hard-stops only after the bounded narration recovery is exhausted", () => {
+  const options = { maxNarrationRecoveryAttempts: 2 };
+  const stalled = "Let me inspect the diagnostics.\n".repeat(4);
+  const first = evaluateCodexHook(
+    {
+      hook_event_name: "Stop",
+      session_id: "s1",
+      turn_id: "t1",
+      last_assistant_message: stalled,
+    },
+    {},
+    options,
+  );
+  assert.equal(first.output.decision, "block");
+  assert.match(first.output.reason, /recovery 1\/2/i);
+
+  const second = evaluateCodexHook(
+    {
+      hook_event_name: "Stop",
+      session_id: "s1",
+      turn_id: "t1",
+      stop_hook_active: true,
+      last_assistant_message: "Reading diagnostics now.",
+    },
+    first.state,
+    options,
+  );
+  assert.equal(second.output.decision, "block");
+  assert.match(second.output.reason, /recovery 2\/2/i);
+
+  const exhausted = evaluateCodexHook(
+    {
+      hook_event_name: "Stop",
+      session_id: "s1",
+      turn_id: "t1",
+      stop_hook_active: true,
+      last_assistant_message: "I'll read the relevant diagnostic files.",
+    },
+    second.state,
+    options,
+  );
+  assert.equal(exhausted.output.continue, false);
+  assert.equal(exhausted.output.stopReason, "no_progress_stall_after_bounded_recovery");
+  assert.match(exhausted.output.systemMessage, /2 corrective continuations/i);
 });
 
 test("Stop hard-stops a repeated protocol-artifact stall without a corrective continuation", () => {
@@ -155,6 +229,7 @@ test("Stop hard-stops a repeated protocol-artifact stall without a corrective co
 });
 
 test("SubagentStop uses the same bounded recovery contract", () => {
+  const options = { maxNarrationRecoveryAttempts: 2 };
   const stalled = "Let me inspect the reference.\n".repeat(4);
   const first = evaluateCodexHook(
     {
@@ -167,8 +242,10 @@ test("SubagentStop uses the same bounded recovery contract", () => {
       last_assistant_message: stalled,
     },
     {},
+    options,
   );
   assert.equal(first.output.decision, "block");
+  assert.match(first.output.reason, /recovery 1\/2/i);
 
   const second = evaluateCodexHook(
     {
@@ -178,12 +255,29 @@ test("SubagentStop uses the same bounded recovery contract", () => {
       agent_id: "a1",
       agent_type: "explorer",
       stop_hook_active: true,
-      last_assistant_message: stalled,
+      last_assistant_message: "Reading the reference now.",
     },
     first.state,
+    options,
   );
-  assert.equal(second.output.continue, false);
-  assert.match(second.output.stopReason, /no_progress_stall/);
+  assert.equal(second.output.decision, "block");
+  assert.match(second.output.reason, /recovery 2\/2/i);
+
+  const exhausted = evaluateCodexHook(
+    {
+      hook_event_name: "SubagentStop",
+      session_id: "s1",
+      turn_id: "t1",
+      agent_id: "a1",
+      agent_type: "explorer",
+      stop_hook_active: true,
+      last_assistant_message: "I'll inspect the reference now.",
+    },
+    second.state,
+    options,
+  );
+  assert.equal(exhausted.output.continue, false);
+  assert.equal(exhausted.output.stopReason, "no_progress_stall_after_bounded_recovery");
 });
 
 test("unknown tools are never denied by economy classification", () => {
