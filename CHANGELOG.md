@@ -4,6 +4,20 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [0.7.3] - 2026-08-16
+
+### Added
+
+- Added a reusable minimal-solution contract for issue implementation and refactor planning (PR #266). Non-trivial work now starts by understanding the real call flow and choosing the lowest-complexity complete solution in this order: existing repository capability, standard library/runtime, native platform, already-installed dependency, then the minimum custom implementation. Required validation, security, accessibility, compatibility, lifecycle, observability, and evidence are never traded away for a smaller diff.
+- Added completion-claim evidence rules for durable final reports (PR #266). Merge-ready, migration-complete, review-coverage, absence, count, and other material completion claims must now come from current authoritative workflow evidence; volatile/head-bound state is refreshed and material numbers are re-measured instead of recalled from prose or memory.
+- Added a read-only triage attention inbox (PR #266) that surfaces unlabeled/untriaged issues, `needs-triage` issues, and `needs-info` issues with new reporter activity since the last triage note, ordered oldest-first within each bucket.
+
+### Changed
+
+- Difficult bug diagnosis now prefers a tight red-capable symptom signal before theory-building, minimizes the reproducer, and uses ranked falsifiable hypotheses with one controlled variable at a time. Obvious defects with an already-proved causal chain do not get forced into an unnecessary harness (PR #266).
+- Broad internal migrations can now use an explicit expand → migrate → contract strategy. Temporary overlap is treated as migration scaffold rather than permanent compatibility, caller families move in independently verifiable batches, and the old path is removed only after the final residual proof is clean (PR #266).
+- Advisory design/simplification review now includes deletion-test, interface/test-surface, real-seam, leverage, and locality signals while keeping repository standards and concrete Bug/Security/Spec contracts authoritative. Existing anti-slop/Oxlint/typecheck diagnostics remain evidence inputs rather than a reason to vendor or install a second lint stack (PR #266).
+
 ## [0.7.2] - 2026-08-15
 
 ### Added
@@ -357,8 +371,8 @@ All notable changes to `github-delivery` are documented here.
   The protected launcher terminates its Codex process tree rather than
   continuing under a false `stream` protection claim.
 - Hardened watchdog state storage against predictable temp-path redirection and
-  symlink/unowned path attacks without persisting prompts, assistant text, raw
-  tool inputs/outputs, bearer tokens, or repository secrets.
+  symlink/unowned path attacks without persisting prompts, conversations, bearer
+  tokens, or raw tool inputs.
 
 ## [0.3.0] - 2026-08-11
 
