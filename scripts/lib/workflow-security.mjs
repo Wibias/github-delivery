@@ -68,6 +68,19 @@ export function validateWorkflowFile(path, source) {
 
   const allowedWrites = WRITE_ALLOWLIST.get(path) || new Set();
   for (const write of facts.permissionWrites) {
+    if (write.topLevel) {
+      errors.push(
+        error(
+          "top_level_write_forbidden",
+          path,
+          write.line,
+          write.writeAll
+            ? "Top-level write-all is forbidden; keep top-level permissions read-only and declare writes at the job level."
+            : `Top-level ${write.permission}: write is forbidden; keep top-level permissions read-only and declare writes at the job level.`,
+        ),
+      );
+      continue;
+    }
     if (write.writeAll) {
       errors.push(
         error("write_all_forbidden", path, write.line, "write-all is forbidden."),

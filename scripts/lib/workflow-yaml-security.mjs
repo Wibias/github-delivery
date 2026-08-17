@@ -237,7 +237,7 @@ export function workflowSecurityFacts(source = "") {
     if (row.key === "permissions") {
       if (row.indent === 0) facts.topLevelPermissions.push(row);
       if (row.value === "write-all") {
-        facts.permissionWrites.push({ permission: "*", line: row.line, writeAll: true });
+        facts.permissionWrites.push({ permission: "*", line: row.line, writeAll: true, topLevel: row.indent === 0 });
       } else if (/^\{.*\}$/.test(row.value)) {
         const body = row.value.slice(1, -1);
         for (const item of body.split(",")) {
@@ -246,13 +246,13 @@ export function workflowSecurityFacts(source = "") {
           const permission = decodeScalar(pair[0]);
           const value = decodeScalar(pair[1]);
           if (value === "write") {
-            facts.permissionWrites.push({ permission, line: row.line, writeAll: false });
+            facts.permissionWrites.push({ permission, line: row.line, writeAll: false, topLevel: row.indent === 0 });
           }
         }
       } else if (!row.value) {
         for (const child of descendants(parsed.records, index)) {
           if (child.value === "write") {
-            facts.permissionWrites.push({ permission: child.key, line: child.line, writeAll: false });
+            facts.permissionWrites.push({ permission: child.key, line: child.line, writeAll: false, topLevel: row.indent === 0 });
           }
         }
       }

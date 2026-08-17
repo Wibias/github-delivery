@@ -117,7 +117,7 @@ test("quoted YAML keys cannot bypass pull_request_target or write checks", () =>
   const source = `name: Bad\n'on':\n  'pull_request_target':\n'permissions':\n  'contents': write\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - 'uses': 'actions/checkout@v6'\n`;
   const errors = validateWorkflowFile(".github/workflows/bad.yml", source);
   assert(errors.some((error) => error.code === "pull_request_target_forbidden"));
-  assert(errors.some((error) => error.code === "write_permission_not_allowed"));
+  assert(errors.some((error) => error.code === "top_level_write_forbidden" || error.code === "write_permission_not_allowed"));
   assert(errors.some((error) => error.code === "action_not_pinned"));
 });
 
@@ -125,7 +125,7 @@ test("inline trigger and permissions mappings are inspected semantically", () =>
   const source = `name: Bad\non: [push, 'pull_request_target']\npermissions: { contents: write }\njobs:\n  test:\n    runs-on: ubuntu-latest\n`;
   const errors = validateWorkflowFile(".github/workflows/bad.yml", source);
   assert(errors.some((error) => error.code === "pull_request_target_forbidden"));
-  assert(errors.some((error) => error.code === "write_permission_not_allowed"));
+  assert(errors.some((error) => error.code === "top_level_write_forbidden" || error.code === "write_permission_not_allowed"));
 });
 
 test("unsupported YAML indirection fails closed", () => {
@@ -150,9 +150,22 @@ test("accepts checkout only when its own step disables credential persistence", 
 });
 
 test("rejects write permissions outside approved workflows", () => {
-  const source = `name: Bad\non:\n  push:\npermissions:\n  contents: write\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@${"a".repeat(40)}\n        with:\n          persist-credentials: false\n`;
+  const source = `name: Bad\non:\n  push:\npermissions:\n  contents: read\njobs:\n  test:\n    runs-on: ubuntu-latest\n    permissions:\n      contents: write\n    steps:\n      - uses: actions/checkout@${"a".repeat(40)}\n        with:\n          persist-credentials: false\n`;
   const errors = validateWorkflowFile(".github/workflows/bad.yml", source);
   assert(errors.some((error) => error.code === "write_permission_not_allowed"));
+});
+
+test("rejects top-level write permissions even on allowlisted workflows", () => {
+  const source = `name: Clean\non:\n  push:\npermissions:\n  actions: write\n  contents: read\njobs:\n  cleanup:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@${"a".repeat(40)}\n        with:\n          persist-credentials: false\n`;
+  const errors = validateWorkflowFile(".github/workflows/cleanup-orphaned-workflows.yml", source);
+  assert(errors.some((error) => error.code === "top_level_write_forbidden"));
+});
+
+test("accepts job-level write permissions on allowlisted workflows", () => {
+  const source = `name: Clean\non:\n  push:\npermissions:\n  contents: read\njobs:\n  cleanup:\n    runs-on: ubuntu-latest\n    permissions:\n      actions: write\n      contents: read\n    steps:\n      - uses: actions/checkout@${"a".repeat(40)}\n        with:\n          persist-credentials: false\n`;
+  const errors = validateWorkflowFile(".github/workflows/cleanup-orphaned-workflows.yml", source);
+  assert.equal(errors.some((error) => error.code === "top_level_write_forbidden"), false);
+  assert.equal(errors.some((error) => error.code === "write_permission_not_allowed"), false);
 });
 
 test("desired repository policy is fail-closed", () => {
