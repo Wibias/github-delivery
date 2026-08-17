@@ -4,6 +4,17 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-08-17
+
+### Changed
+
+- Tightened protected-stream no-progress generation budgets for active workflow work to **4,000 / 8,000** generated characters and **1,024 / 2,048** generated output tokens soft/hard, while keeping completed-plan finalisation on the larger **12,000 / 16,000** output-token allowance and retaining the six-clause imminent-tool threshold that avoids legitimate tool-start false positives (PR #280).
+
+### Fixed
+
+- Fixed lifecycle-hook recovery after a severe no-progress stall of at least **8,000** characters so the already-selected recovery tool still runs, then `PostToolUse` returns `continue: false` before another model response can start, and the model is quarantined for the task until the model changes or a new task begins (PR #280).
+- Fixed repeated same-turn stalls after a smaller recovered narration recovery by retaining per-turn recovery probation and hard-stopping plus quarantining the model on a second fresh narration stall instead of restarting a full 1/3 recovery cycle (PR #280).
+
 ## [0.8.1] - 2026-08-16
 
 ### Changed
