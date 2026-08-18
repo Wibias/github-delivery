@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text;
 
 namespace GitHubDeliveryAuthority;
 
@@ -73,6 +74,19 @@ internal static class ActivityListBuilder
         if (day == today) return "Today";
         if (day == today.AddDays(-1)) return "Yesterday";
         return day.ToString("dddd, MMMM d, yyyy", CultureInfo.CurrentCulture);
+    }
+
+    internal static string BuildSnapshot(IReadOnlyList<ActivityListItem> items)
+    {
+        if (items.Count == 0) return string.Empty;
+
+        var builder = new StringBuilder(items.Count * 64);
+        foreach (var item in items)
+        {
+            builder.Append(item.ToString());
+            builder.Append('\n');
+        }
+        return builder.ToString();
     }
 }
 
