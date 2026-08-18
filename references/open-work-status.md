@@ -8,6 +8,11 @@ Policy modules:
 
 **Trigger:** “what do I have open in this repo?”, “what’s in review?”, “show my open PRs here”, “give me my open PR standup”, or equivalent repository-scoped requests for the authenticated user’s open pull requests.
 
+<!-- assertion-anchors -->
+<!-- assertion: open-work-workflow-route -->
+<!-- assertion: no-write-authority -->
+<!-- /assertion-anchors -->
+
 ## Goal
 
 Return a compact, trustworthy view of the authenticated GitHub user’s open PRs in the current repository, with durable work-item references and only the blockers that change the next action.
