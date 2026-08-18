@@ -103,8 +103,8 @@ test("PR creation scope binds exact content, topology, and idempotency key", () 
   assert.equal("body" in scope, false);
 });
 
-test("PR body update scope binds exact approved media removals as a canonical set", () => {
-  const request = {
+test("PR body update scope binds non-empty approved media removals as a canonical set", () => {
+  const base = {
     schemaVersion: 1,
     action: "update_pr_body",
     mutationMode: "maintainer",
@@ -112,6 +112,9 @@ test("PR body update scope binds exact approved media removals as a canonical se
     pr: 105,
     expectedHead: merge.expectedHead,
     body: "New body",
+  };
+  const request = {
+    ...base,
     approvedMediaRemovals: [
       "https://example.com/z.png",
       "https://example.com/a.png",
@@ -133,12 +136,12 @@ test("PR body update scope binds exact approved media removals as a canonical se
   );
   assert.notEqual(
     authorityScopeSha256(request),
-    authorityScopeSha256({ ...request, approvedMediaRemovals: [] }),
+    authorityScopeSha256({ ...base, approvedMediaRemovals: ["https://example.com/a.png"] }),
   );
-  assert.notEqual(
-    authorityScopeSha256(request),
-    authorityScopeSha256({ ...request, approvedMediaRemovals: ["https://example.com/a.png"] }),
-  );
+
+  const legacyScope = authorityScopeForRequest(base);
+  assert.equal("approvedMediaRemovals" in legacyScope, false);
+  assert.equal(authorityScopeSha256(base), authorityScopeSha256({ ...base, approvedMediaRemovals: [] }));
 });
 
 test("social writes bind exact visible content and idempotency key", () => {
