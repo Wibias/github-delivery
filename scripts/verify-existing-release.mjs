@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { spawnSync } from "node:child_process";
+import { boundedSpawnSync } from "./lib/subprocess-policy.mjs";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
@@ -10,7 +10,7 @@ function sha256File(path) {
 }
 
 function readRelease(repo, tag) {
-  const result = spawnSync("gh", ["api", `repos/${repo}/releases/tags/${tag}`], {
+  const result = boundedSpawnSync("gh", ["api", `repos/${repo}/releases/tags/${tag}`], {
     encoding: "utf8",
     maxBuffer: 20 * 1024 * 1024,
   });

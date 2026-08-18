@@ -1,6 +1,6 @@
 {
   "name": "github-delivery",
-  "version": "0.8.5",
+  "version": "0.8.6",
   "description": "Guided installer and safety tooling for GitHub Delivery workflows",
   "type": "module",
   "engines": {
@@ -22,6 +22,7 @@
     "scripts/lib/bootstrap-maintenance.mjs",
     "scripts/lib/distribution.mjs",
     "scripts/lib/release-self-update.mjs",
+    "scripts/lib/subprocess-policy.mjs",
     "scripts/lib/release-zip.mjs",
     "scripts/lib/stable-release-update.mjs",
     "scripts/lib/user-config.mjs",

@@ -4,6 +4,17 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [0.8.6] - 2026-08-18
+
+### Changed
+
+- Bound leftover GitHub and Git subprocesses on review, verdict, CI forensics, ship-gate, runtime, live-fixture, release, and npm helper paths so a stuck `gh`/`git` child cannot hang the delivery process indefinitely.
+- Bumped the package version from `0.8.5` to `0.8.6`.
+
+### Fixed
+
+- Fail closed when a reviewed PR head has moved instead of retargeting the signed scope, treat queued and auto-merge GitHub states as not merged, persist per-operation mutation receipts, stop a mutation batch at the first failed write, and route the remaining public workflows (PR #291).
+
 ## [0.8.5] - 2026-08-18
 
 ### Added

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { spawnSync } from "node:child_process";
+import { boundedSpawnSync } from "./lib/subprocess-policy.mjs";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -21,7 +21,7 @@ function sleepSync(milliseconds) {
 }
 
 function run(npmCli, args, { allowNotFound = false } = {}) {
-  const result = spawnSync(process.execPath, [npmCli, ...args], {
+  const result = boundedSpawnSync(process.execPath, [npmCli, ...args], {
     cwd: process.cwd(),
     encoding: "utf8",
     maxBuffer: 20 * 1024 * 1024,

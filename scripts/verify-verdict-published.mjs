@@ -18,7 +18,7 @@
  * real verifier with `--authority-public-key-file`; those fixtures stay strict
  * regardless of the user's local authority mode.
  */
-import { spawnSync } from "node:child_process";
+import { boundedSpawnSync } from "./lib/subprocess-policy.mjs";
 import { readFileSync } from "node:fs";
 
 import {
@@ -105,7 +105,7 @@ function parseArgs(argv) {
 }
 
 function fetchAuthenticatedPublisher() {
-  const result = spawnSync("gh", ["api", "user", "--jq", ".login"], {
+  const result = boundedSpawnSync("gh", ["api", "user", "--jq", ".login"], {
     encoding: "utf8",
     maxBuffer: 1024 * 1024,
   });

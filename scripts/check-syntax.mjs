@@ -2,7 +2,7 @@
 import { readdirSync } from "node:fs";
 import { resolve, relative, join, sep } from "node:path";
 import { pathToFileURL } from "node:url";
-import { spawnSync } from "node:child_process";
+import { boundedSpawnSync } from "./lib/subprocess-policy.mjs";
 
 function toPosix(path) {
   return path.split(sep).join("/");
@@ -25,7 +25,7 @@ export function syntaxCheckTargets(root = process.cwd()) {
   return [...new Set(targets)].sort();
 }
 
-export function checkSyntax({ root = process.cwd(), spawn = spawnSync } = {}) {
+export function checkSyntax({ root = process.cwd(), spawn = boundedSpawnSync } = {}) {
   root = resolve(root);
   const failures = [];
   for (const path of syntaxCheckTargets(root)) {

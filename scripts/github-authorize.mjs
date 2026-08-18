@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { readFileSync, writeFileSync } from "node:fs";
-import { spawnSync } from "node:child_process";
+import { boundedSpawnSync } from "./lib/subprocess-policy.mjs";
 
 import { attachAuthorityGrants } from "./lib/authority-batch.mjs";
 import { authorizeBatchSync } from "./lib/authority-host-client.mjs";
@@ -42,7 +42,7 @@ function operationsFromDocument(document) {
 
 function ghRunner(args) {
   const [executable, ...commandArgs] = args;
-  const result = spawnSync(executable, commandArgs, {
+  const result = boundedSpawnSync(executable, commandArgs, {
     encoding: "utf8",
     maxBuffer: 20 * 1024 * 1024,
   });

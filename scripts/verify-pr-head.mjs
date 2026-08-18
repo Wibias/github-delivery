@@ -16,7 +16,7 @@
 import { realpathSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { spawnSync } from "node:child_process";
+import { boundedSpawnSync } from "./lib/subprocess-policy.mjs";
 
 const USAGE =
   "Usage: node scripts/verify-pr-head.mjs OWNER/REPO PR_NUMBER [--worktree-root DIR] [--install-cmd CMD] [--typecheck-cmd CMD] [--gui-typecheck-cmd CMD] [--test-cmd CMD] [--test-filter TEXT] [--lint-cmd CMD] [--privacy-cmd CMD] [--keep-worktree] [--timeout-ms N] [--json]";
@@ -79,7 +79,7 @@ export function parseArgs(argv) {
 
 function run(cmd, { cwd, timeoutMs }) {
   const started = Date.now();
-  const result = spawnSync(cmd, { cwd, shell: true, encoding: "utf8", timeout: timeoutMs, maxBuffer: 200 * 1024 * 1024 });
+  const result = boundedSpawnSync(cmd, [], { cwd, shell: true, encoding: "utf8", timeout: timeoutMs, maxBuffer: 200 * 1024 * 1024 });
   return {
     cmd,
     status: result.status,

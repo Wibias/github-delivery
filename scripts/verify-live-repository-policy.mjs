@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { spawnSync } from "node:child_process";
+import { boundedSpawnSync } from "./lib/subprocess-policy.mjs";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -8,7 +8,7 @@ import { evaluateLiveRepositoryPolicy } from "./lib/workflow-security.mjs";
 const USAGE = "Usage: node scripts/verify-live-repository-policy.mjs OWNER/REPO [ROOT]";
 
 function runGhJson(args, context) {
-  const result = spawnSync("gh", args, {
+  const result = boundedSpawnSync("gh", args, {
     encoding: "utf8",
     maxBuffer: 20 * 1024 * 1024,
   });

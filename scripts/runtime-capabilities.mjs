@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { spawnSync } from "node:child_process";
+import { boundedSpawnSync } from "./lib/subprocess-policy.mjs";
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
@@ -23,12 +23,12 @@ function watchdogDeclaration(value) {
 }
 
 function commandAvailable(command, args = ["--version"]) {
-  const result = spawnSync(command, args, { encoding: "utf8" });
+  const result = boundedSpawnSync(command, args, { encoding: "utf8" });
   return result.status === 0;
 }
 
 function ghJson(args) {
-  const result = spawnSync("gh", args, {
+  const result = boundedSpawnSync("gh", args, {
     encoding: "utf8",
     maxBuffer: 20 * 1024 * 1024,
   });
@@ -44,7 +44,7 @@ function detectRepo(repo) {
   if (repo) return repo;
   const ghDetected = ghJson(["repo", "view", "--json", "nameWithOwner"]);
   if (ghDetected?.nameWithOwner) return ghDetected.nameWithOwner;
-  const gitUrl = spawnSync(
+  const gitUrl = boundedSpawnSync(
     "git",
     ["config", "--get", "remote.origin.url"],
     { encoding: "utf8" },
@@ -59,7 +59,7 @@ function detectRepo(repo) {
 function liveInput(repo) {
   const gh = commandAvailable("gh");
   const ghAuthenticated =
-    gh && spawnSync("gh", ["auth", "status"], { encoding: "utf8" }).status === 0;
+    gh && boundedSpawnSync("gh", ["auth", "status"], { encoding: "utf8" }).status === 0;
   const resolvedRepo = ghAuthenticated ? detectRepo(repo) : repo || null;
   const repoData =
     resolvedRepo && ghAuthenticated

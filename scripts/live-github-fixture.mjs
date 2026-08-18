@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { spawnSync } from "node:child_process";
+import { boundedSpawnSync } from "./lib/subprocess-policy.mjs";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -60,7 +60,7 @@ function execute(command, args, options = {}) {
   if (command === "gh") {
     return runGitHubCommandWithRetry(command, args, { options });
   }
-  return spawnSync(command, args, options);
+  return boundedSpawnSync(command, args, options);
 }
 
 function run(command, args, { allowFailure = false } = {}) {

@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { boundedSpawnSync } from "./subprocess-policy.mjs";
 
 const MARKER_ANCHOR =
   /github-delivery:full-review-verdict\s+run:([^\s]+)\s+head:([^\s]+)/;
@@ -350,7 +350,7 @@ export function fetchPrConversationComments({ repo, pr }) {
   const comments = [];
   let page = 1;
   for (;;) {
-    const result = spawnSync(
+    const result = boundedSpawnSync(
       "gh",
       [
         "api",

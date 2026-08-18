@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { spawnSync } from "node:child_process";
+import { boundedSpawnSync } from "./lib/subprocess-policy.mjs";
 import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
@@ -44,7 +44,7 @@ function parseArgs(argv) {
 }
 
 function run(command, args) {
-  return spawnSync(command, args, {
+  return boundedSpawnSync(command, args, {
     encoding: "utf8",
     maxBuffer: 100 * 1024 * 1024,
   });
