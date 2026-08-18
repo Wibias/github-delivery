@@ -8,11 +8,12 @@ import {
 } from "../../scripts/open-work-status.mjs";
 
 function apiRow(overrides = {}) {
+  const number = overrides.number ?? 12;
   return {
-    number: 12,
+    number,
     title: "ENG-12 Improve delivery",
-    url: "https://api.github.com/repos/Wibias/github-delivery/pulls/12",
-    html_url: "https://github.com/Wibias/github-delivery/pull/12",
+    url: `https://api.github.com/repos/Wibias/github-delivery/pulls/${number}`,
+    html_url: `https://github.com/Wibias/github-delivery/pull/${number}`,
     user: { login: "Wibias" },
     draft: false,
     updated_at: "2026-08-18T00:00:00Z",
@@ -39,7 +40,8 @@ test("normalizes every page, browser URL, and repository identity", () => {
   ], "Wibias/github-delivery");
 
   assert.deepEqual(rows.map((row) => row.number), [11, 12]);
-  assert.equal(rows[0].url, "https://github.com/Wibias/github-delivery/pull/12");
+  assert.equal(rows[0].url, "https://github.com/Wibias/github-delivery/pull/11");
+  assert.equal(rows[1].url, "https://github.com/Wibias/github-delivery/pull/12");
   assert.ok(rows.every((row) => row.targetRepoFullName === "Wibias/github-delivery"));
 });
 
