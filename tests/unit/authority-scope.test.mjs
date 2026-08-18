@@ -79,7 +79,7 @@ test("push authority scope binds repository remote, exact generation, new tip, a
   );
 });
 
-test("PR creation scope binds exact content, topology, and idempotency key", () => {
+test("PR creation scope binds exact content, topology, optional head repository, and idempotency key", () => {
   const request = {
     schemaVersion: 1,
     action: "create_pr",
@@ -87,7 +87,8 @@ test("PR creation scope binds exact content, topology, and idempotency key", () 
     explicitInstruction: true,
     repo: "Wibias/github-delivery",
     base: "main",
-    head: "feature/safe",
+    head: "fork-owner:feature/safe",
+    headRepo: "fork-owner/custom-fork",
     draft: true,
     idempotencyKey: "create-pr-feature-safe",
     title: "Fix safe lifecycle",
@@ -95,12 +96,21 @@ test("PR creation scope binds exact content, topology, and idempotency key", () 
   };
   const scope = authorityScopeForRequest(request);
   assert.equal(scope.base, "main");
-  assert.equal(scope.head, "feature/safe");
+  assert.equal(scope.head, "fork-owner:feature/safe");
+  assert.equal(scope.headRepo, "fork-owner/custom-fork");
   assert.equal(scope.draft, true);
   assert.match(scope.titleSha256, /^[0-9a-f]{64}$/);
   assert.match(scope.bodySha256, /^[0-9a-f]{64}$/);
   assert.equal("title" in scope, false);
   assert.equal("body" in scope, false);
+  assert.notEqual(
+    authorityScopeSha256(request),
+    authorityScopeSha256({ ...request, headRepo: "fork-owner/other-fork" }),
+  );
+
+  const sameRepoRequest = { ...request, head: "feature/safe" };
+  delete sameRepoRequest.headRepo;
+  assert.equal("headRepo" in authorityScopeForRequest(sameRepoRequest), false);
 });
 
 test("PR body update scope binds non-empty approved media removals as a canonical set", () => {
