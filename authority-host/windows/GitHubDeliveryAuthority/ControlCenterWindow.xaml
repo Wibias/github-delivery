@@ -4,6 +4,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:local="using:GitHubDeliveryAuthority"
     mc:Ignorable="d"
     Title="Delivery Authority">
 
@@ -316,13 +317,49 @@
                                               HorizontalContentAlignment="Stretch"
                                               ScrollViewer.VerticalScrollBarVisibility="Auto"
                                               ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                                        <ListView.ItemTemplate>
-                                            <DataTemplate>
-                                                <TextBlock Text="{Binding}"
-                                                           TextWrapping="WrapWholeWords"
-                                                           TextTrimming="CharacterEllipsis" />
-                                            </DataTemplate>
-                                        </ListView.ItemTemplate>
+                                        <ListView.ItemTemplateSelector>
+                                            <local:ActivityListItemTemplateSelector>
+                                                <local:ActivityListItemTemplateSelector.DaySeparatorTemplate>
+                                                    <DataTemplate x:DataType="local:ActivityDaySeparatorItem">
+                                                        <StackPanel Spacing="8" Margin="0,8,0,4">
+                                                            <TextBlock Text="{x:Bind Label}"
+                                                                       FontWeight="SemiBold"
+                                                                       Opacity="0.82" />
+                                                            <Border Height="1"
+                                                                    Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                                                        </StackPanel>
+                                                    </DataTemplate>
+                                                </local:ActivityListItemTemplateSelector.DaySeparatorTemplate>
+                                                <local:ActivityListItemTemplateSelector.EventTemplate>
+                                                    <DataTemplate x:DataType="local:ActivityEventItem">
+                                                        <Grid ColumnSpacing="12" Padding="0,2">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="56" />
+                                                                <ColumnDefinition Width="1.4*" />
+                                                                <ColumnDefinition Width="1.4*" />
+                                                                <ColumnDefinition Width="92" />
+                                                                <ColumnDefinition Width="90" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock Text="{x:Bind Time}"
+                                                                       FontFamily="Cascadia Mono, Consolas"
+                                                                       TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Grid.Column="1"
+                                                                       Text="{x:Bind RepositoryDisplay}"
+                                                                       TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Grid.Column="2"
+                                                                       Text="{x:Bind Action}"
+                                                                       TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Grid.Column="3"
+                                                                       Text="{x:Bind Status}"
+                                                                       TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Grid.Column="4"
+                                                                       Text="{x:Bind Actor}"
+                                                                       TextTrimming="CharacterEllipsis" />
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </local:ActivityListItemTemplateSelector.EventTemplate>
+                                            </local:ActivityListItemTemplateSelector>
+                                        </ListView.ItemTemplateSelector>
                                     </ListView>
                                 </StackPanel>
                             </Border>
