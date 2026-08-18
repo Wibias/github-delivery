@@ -139,13 +139,18 @@ function assertUpdatePrBodySafe(request, runner) {
   return { observedHead, media };
 }
 
+function sameRepo(left, right) {
+  return String(left || "").toLowerCase() === String(right || "").toLowerCase();
+}
+
 function splitHead(repo, head) {
   const targetOwner = String(repo).split("/")[0];
-  const value = String(head);
+  const value = String(head).trim();
   const separator = value.indexOf(":");
   if (separator < 0) return { owner: targetOwner, branch: value, explicitOwner: false };
-  const owner = value.slice(0, separator);
-  const branch = value.slice(separator + 1);
+  if (value.indexOf(":", separator + 1) >= 0) throw new Error("head_invalid");
+  const owner = value.slice(0, separator).trim();
+  const branch = value.slice(separator + 1).trim();
   if (!owner || !branch) throw new Error("head_invalid");
   return { owner, branch, explicitOwner: true };
 }
@@ -158,11 +163,29 @@ function optionalHeadRepo(request) {
   return value;
 }
 
+function createPrHeadIdentity(request) {
+  const repo = String(required(request.repo, "repo")).trim();
+  const head = splitHead(repo, required(request.head, "head"));
+  const headRepo = optionalHeadRepo(request);
+  if (headRepo) {
+    const headRepoOwner = headRepo.split("/")[0];
+    if (head.explicitOwner && headRepoOwner.toLowerCase() !== head.owner.toLowerCase()) {
+      throw new Error("head_owner_repo_mismatch");
+    }
+    if (!head.explicitOwner && !sameRepo(headRepo, repo)) {
+      throw new Error("head_repo_requires_qualified_head");
+    }
+  }
+  return {
+    ...head,
+    intendedHeadRepo: headRepo ?? (head.explicitOwner ? null : repo),
+  };
+}
+
 function assertCreatePrNotDuplicate(request, runner) {
   const repo = String(required(request.repo, "repo"));
   const base = String(required(request.base, "base"));
-  const { owner, branch, explicitOwner } = splitHead(repo, required(request.head, "head"));
-  const intendedHeadRepo = optionalHeadRepo(request) ?? (explicitOwner ? null : repo);
+  const { owner, branch, intendedHeadRepo } = createPrHeadIdentity(request);
   const headLabel = `${owner}:${branch}`;
   const endpoint = `repos/${repo}/pulls?state=open&head=${encodeURIComponent(headLabel)}&per_page=100`;
   const raw = run(runner, ["gh", "api", endpoint, "--paginate", "--slurp"]);
@@ -196,8 +219,7 @@ export function validateLifecycleMutation(request = {}) {
       break;
     case "create_pr":
       required(request.base, "base");
-      required(request.head, "head");
-      optionalHeadRepo(request);
+      createPrHeadIdentity(request);
       required(request.title, "title");
       required(request.body, "body");
       required(request.idempotencyKey, "idempotency_key");
@@ -239,6 +261,7 @@ export function lifecycleCommandFor(request = {}) {
       ];
     }
     case "create_pr": {
+      createPrHeadIdentity(request);
       const command = [
         "gh",
         "pr",
