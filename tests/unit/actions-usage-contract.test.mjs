@@ -40,6 +40,10 @@ test("compatibility and Windows lanes skip irrelevant pull-request diffs", () =>
   assert.match(ci, /scripts\/prepare-authority-host-runtime-smoke\.mjs/);
 });
 
+test("live fixture diffs force compatibility lanes for acceptance coverage", () => {
+  assert.ok(occurrences(ci, "\\.github-delivery-fixtures/") >= 2);
+});
+
 test("repository policy requires only the lean CI lanes", () => {
   const ciChecks = repositoryPolicy.requiredChecks.filter((name) => name.startsWith("Node "));
   assert.deepEqual(ciChecks, [
