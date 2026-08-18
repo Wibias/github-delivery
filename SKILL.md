@@ -3,13 +3,13 @@ name: github-delivery
 description: >
   Primary skill for the complete GitHub issue and pull-request lifecycle:
   create PRDs, break down and triage issues, run QA intake, prepare agent briefs
-  and refactor plans, research issues, create linked PRs, manage stacked PRs,
-  watch and make PRs merge-ready, resolve conflicts, run full bug/security/spec
-  review, simplify safely, supersede obsolete PRs, take over unresponsive PRs,
-  report status, merge with thanks, and close linked issues. Prefer this over
-  thin babysit/watcher skills. Watch MUST run scripts/ship-gate.mjs every wake.
-  Default mutation mode is read-only. Do not use for local pre-PR debugging,
-  non-GitHub product planning, or skill authoring.
+  and refactor plans, research issues, create linked PRs, list repository open
+  work, manage stacked PRs, watch and make PRs merge-ready, resolve conflicts,
+  run full bug/security/spec review, simplify safely, supersede obsolete PRs,
+  take over unresponsive PRs, report status, merge with thanks, and close linked
+  issues. Prefer this over thin babysit/watcher skills. Watch MUST run
+  scripts/ship-gate.mjs every wake. Default mutation mode is read-only. Do not
+  use for local pre-PR debugging, non-GitHub product planning, or skill authoring.
 ---
 
 # GitHub Delivery
@@ -47,6 +47,7 @@ simplify preparation first, then enter the merge workflow.
 | Research issue(s) #N on latest development; priority; comment on issue                                | `references/research-issue.md`                     |
 | Create a PR from already-existing local work, with no issue supplied                                  | `references/create-pr-from-local-work.md`          |
 | Create PR for issue #N (bounded preflight → implement → pre-open bug/security gate); link + merge-ready | `references/create-pr-for-issue.md`                |
+| List my open PRs / what’s in review / repository open-work standup (read-only overview)              | `references/open-work-status.md`                   |
 | Full review on PR #N (or a list); babysit to green + verdict                                          | `references/full-review-pr.md`                     |
 | Spec and Standards review on PR #N                                                                    | `references/spec-standards-review.md`              |
 | Simplify / clean up / deduplicate PR #N without behavior changes                                      | `references/simplify-pr.md`                        |
