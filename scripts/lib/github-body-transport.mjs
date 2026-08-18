@@ -1,3 +1,5 @@
+import { assertPublishedMarkdown, extractTransportedBody } from "./published-body-integrity.mjs";
+
 const BODY_FLAG = "--body";
 const BODY_FILE_FLAG = "--body-file";
 const API_FIELD_FLAGS = new Set(["-f", "--raw-field", "-F", "--field"]);
@@ -60,6 +62,8 @@ export function makeGitHubBodyTransportRunner(runner) {
   if (typeof runner !== "function") throw new Error("github_body_transport_runner_required");
   return function githubBodyTransportRunner(command, args, options) {
     const transported = transportGitHubBody(command, args, options);
+    const body = extractTransportedBody(transported.command, transported.args, transported.options);
+    if (body !== null) assertPublishedMarkdown(body);
     return runner(transported.command, transported.args, transported.options);
   };
 }

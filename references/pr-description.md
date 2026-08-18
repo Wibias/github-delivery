@@ -31,6 +31,8 @@ Use one to three bullets that describe the resulting behavior and impact.
 - Do not narrate every file, commit, refactor step, or review iteration.
 - Do not make broad claims such as “fully fixes”, “all cases”, or “no regressions” unless the evidence supports them.
 
+After publication, re-read the live GitHub body. Real newlines must survive; literal `\\n` sequences, collapsed `## Heading - bullet` lines, and escaped checklists are a failed publication, not a formatting preference.
+
 ### Validation
 
 List the exact commands, tests, or named checks that actually ran and their result.
