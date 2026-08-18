@@ -66,6 +66,13 @@ internal static partial class ScopeCanonicalizer
             case "create_pr":
                 scope["base"] = RequiredString(request, "base");
                 scope["head"] = RequiredString(request, "head");
+                var headRepo = OptionalString(request, "headRepo");
+                if (headRepo is not null)
+                {
+                    headRepo = headRepo.Trim();
+                    if (headRepo.Length == 0) throw new AuthorityException("authority_scope_head_repo_required");
+                    scope["headRepo"] = headRepo;
+                }
                 scope["draft"] = request.TryGetProperty("draft", out var draft) && draft.ValueKind == JsonValueKind.True;
                 scope["idempotencyKey"] = RequiredString(request, "idempotencyKey");
                 scope["titleSha256"] = Sha256(RequiredString(request, "title"));
@@ -190,7 +197,7 @@ internal static partial class ScopeCanonicalizer
     public static JsonObject BuildResource(JsonElement request)
     {
         var resource = new JsonObject();
-        foreach (var field in new[] { "pr", "issue", "commentId", "threadId", "expectedHead", "authorityBranch", "headRefName", "targetRepo", "supersedingPr", "remote", "branch", "expectedRemoteTip", "newTip", "base", "head", "assignee" })
+        foreach (var field in new[] { "pr", "issue", "commentId", "threadId", "expectedHead", "authorityBranch", "headRefName", "targetRepo", "supersedingPr", "remote", "branch", "expectedRemoteTip", "newTip", "base", "head", "headRepo", "assignee" })
         {
             if (!request.TryGetProperty(field, out var value) || value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
             {
