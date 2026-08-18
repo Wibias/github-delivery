@@ -43,8 +43,38 @@ test("prefers explicit external metadata over branch/title/body heuristics", () 
 
   assert.equal(result.state, "resolved");
   assert.equal(result.reference.key, "ENG-9");
+  assert.equal(result.reference.url, "https://linear.app/acme/issue/ENG-9/example");
   assert.equal(result.reference.source, "external-link");
   assert.equal(result.reference.tier, 2);
+});
+
+test("keeps an explicit external key but drops a non-HTTP display URL", () => {
+  const result = extractWorkItemReferences({
+    ...base,
+    externalLinks: [{ key: "ENG-9", url: "javascript:alert('ENG-9')" }],
+  });
+
+  assert.equal(result.state, "resolved");
+  assert.equal(result.reference.key, "ENG-9");
+  assert.equal(result.reference.url, null);
+  assert.equal(result.reference.source, "external-link");
+});
+
+test("drops a non-HTTP GitHub issue display URL without weakening issue precedence", () => {
+  const result = extractWorkItemReferences({
+    ...base,
+    issueLinks: [{
+      number: 42,
+      url: "javascript:alert(42)",
+      repository: "Wibias/github-delivery",
+    }],
+    headRefName: "feature/ENG-10-fallback",
+  });
+
+  assert.equal(result.state, "resolved");
+  assert.equal(result.reference.kind, "github-issue");
+  assert.equal(result.reference.key, "#42");
+  assert.equal(result.reference.url, null);
 });
 
 test("discovers an explicit work-item URL in PR text before branch heuristics", () => {
