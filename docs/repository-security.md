@@ -11,10 +11,10 @@ Apply `.github/repository-policy.json` to `main`:
 - reject force pushes and branch deletion
 - allow merge commits only
 - enable **Update branch** and auto-merge
-- require the six Node 22/24 CI jobs, Dependency Review, and both CodeQL analyses
+- require the Node 22 Ubuntu compatibility lane, the canonical Node 24 Ubuntu lane, the Node 24 Windows authority lane, Dependency Review, and both CodeQL analyses
 - keep bypass access limited to emergency administrators
 
-Do not require the separate path-filtered Architecture Contracts workflow as a branch rule. Its safety-critical tests also run inside every required Node 22/24 matrix job, avoiding permanently expected checks when the focused workflow is skipped by path.
+The architecture contracts run inside the canonical required Node 24 Ubuntu check instead of a separate per-PR workflow. Node 26 compatibility also runs inside that required lane, so a supported-runtime regression cannot be green-lit by an unrequired check.
 
 Do not require Scorecard as a pull-request check because it runs on `main`, schedules, and branch-protection changes rather than on every PR.
 
@@ -86,7 +86,7 @@ npm run security:repo
 
 The command validates workflow action pins, permission boundaries, checkout credentials, forbidden `pull_request_target` use, and the machine-readable repository policy. It does not claim that GitHub settings have been applied; live settings require a separate authenticated audit.
 
-Windows matrix jobs additionally build the authority host and run its unattended self-test. That self-test validates the Node/C# canonical-scope fixture, ephemeral ES256 verification, SQLite one-time redemption, and mutation classification without invoking TPM or Windows Hello in CI.
+The required Windows authority lane builds the authority host and runs its unattended self-test, XAML smoke test, self-contained publish validation, and install smoke. Those tests validate the Node/C# canonical-scope fixture, ephemeral ES256 verification, SQLite one-time redemption, mutation classification, compiled WinUI resources, bundled runtime identity, and installed-host startup without duplicating the full JavaScript repository suite on Windows.
 
 For live declared-vs-GitHub drift, run:
 

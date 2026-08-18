@@ -24,13 +24,12 @@ Choose a repository used only for github-delivery acceptance/lifecycle testing. 
 The target must be able to produce the checks that the lifecycle verifies:
 
 - `CI / Node 22 / ubuntu-latest`
-- `CI / Node 22 / windows-latest`
-- `CI / Node 22 / macos-latest`
 - `CI / Node 24 / ubuntu-latest`
 - `CI / Node 24 / windows-latest`
-- `CI / Node 24 / macos-latest`
 - Dependency Review
 - CodeQL
+
+Node 26 compatibility is enforced inside the required Node 24 Ubuntu lane rather than as a separate required check.
 
 The lifecycle branch is built from the checked-out github-delivery source tree, but GitHub evaluates pull-request workflows according to the target repository's configuration. Keep the dedicated target's acceptance workflow/rules configuration aligned with the source repository.
 

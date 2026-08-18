@@ -27,16 +27,13 @@ function requiredChecks(overrides = {}) {
   ));
 }
 
-test("live fixture check contract matches the supported Node matrix", () => {
+test("live fixture check contract matches the lean required CI lanes", () => {
   assert.deepEqual(
     DEFAULT_EXPECTED_CHECKS.filter((item) => item.workflow === "CI").map((item) => item.name),
     [
       "Node 22 / ubuntu-latest",
-      "Node 22 / windows-latest",
-      "Node 22 / macos-latest",
       "Node 24 / ubuntu-latest",
       "Node 24 / windows-latest",
-      "Node 24 / macos-latest",
     ],
   );
   assert.equal(DEFAULT_EXPECTED_CHECKS.some((item) => /Node 20/.test(item.name || "")), false);
@@ -100,7 +97,7 @@ test("waits when a required workflow has not appeared", () => {
   assert.deepEqual(result.missingWorkflows, ["CodeQL"]);
 });
 
-test("waits when one CI matrix job has not appeared", () => {
+test("waits when one required CI lane has not appeared", () => {
   const checks = requiredChecks().filter((item) => item.name !== "Node 24 / windows-latest");
   const result = evaluateFixtureChecks({ checks });
   assert.equal(result.state, "waiting");
@@ -113,10 +110,10 @@ test("passes only after every required check succeeds and records extras", () =>
   const result = evaluateFixtureChecks({ checks });
   assert.equal(result.state, "ready");
   assert.equal(result.code, "fixture_checks_satisfied");
-  assert.equal(result.summary.count, 9);
+  assert.equal(result.summary.count, 6);
   assert.deepEqual(result.summary.observedWorkflows, ["CI", "CodeQL", "Dependency Review", "External Review"]);
   assert.deepEqual(result.summary.expectedWorkflows, DEFAULT_EXPECTED_WORKFLOWS);
-  assert.equal(result.summary.checks.length, 9);
+  assert.equal(result.summary.checks.length, 6);
 });
 
 test("times out fail-closed with the last incomplete evidence code", async () => {
@@ -153,7 +150,7 @@ test("runs the full lifecycle and proves stale-head rejection", async () => {
   const calls = [];
   const checks = {
     conclusion: "success",
-    count: 8,
+    count: 5,
     expectedWorkflows: DEFAULT_EXPECTED_WORKFLOWS,
     observedWorkflows: DEFAULT_EXPECTED_WORKFLOWS,
     checks: requiredChecks(),
@@ -182,7 +179,7 @@ test("fails when the stale-head guard accepts a mutation", async () => {
   const adapter = {
     async createIssue() { return { number: 1 }; }, async createBranch() {},
     async createDraftPr() { return { number: 2 }; }, async evaluateGate() { return { decision: "blocked" }; },
-    async markReady() {}, async waitForChecks() { return { conclusion: "success", count: 8, expectedWorkflows: DEFAULT_EXPECTED_WORKFLOWS, observedWorkflows: DEFAULT_EXPECTED_WORKFLOWS, checks: requiredChecks() }; },
+    async markReady() {}, async waitForChecks() { return { conclusion: "success", count: 5, expectedWorkflows: DEFAULT_EXPECTED_WORKFLOWS, observedWorkflows: DEFAULT_EXPECTED_WORKFLOWS, checks: requiredChecks() }; },
     async captureSnapshot() { return { head: "old" }; }, async changeHead() {},
     async attemptStaleHeadMutation() { return { rejected: false }; }, async bestEffortCleanup() {},
   };

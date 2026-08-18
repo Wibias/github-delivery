@@ -1,10 +1,7 @@
 export const DEFAULT_EXPECTED_CHECKS = Object.freeze([
   { workflow: "CI", name: "Node 22 / ubuntu-latest" },
-  { workflow: "CI", name: "Node 22 / windows-latest" },
-  { workflow: "CI", name: "Node 22 / macos-latest" },
   { workflow: "CI", name: "Node 24 / ubuntu-latest" },
   { workflow: "CI", name: "Node 24 / windows-latest" },
-  { workflow: "CI", name: "Node 24 / macos-latest" },
   { workflow: "Dependency Review" },
   { workflow: "CodeQL" },
 ]);
@@ -181,26 +178,19 @@ export async function waitForExpectedChecks({
   readRuns = async () => [],
   expectedChecks = DEFAULT_EXPECTED_CHECKS,
   timeoutMs = 15 * 60 * 1000,
-  intervalMs = 10 * 1000,
+  intervalMs = 15 * 1000,
   now = Date.now,
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-  onProgress = () => {},
 } = {}) {
-  if (typeof readChecks !== "function") throw new Error("readChecks must be a function");
-  const deadline = now() + timeoutMs;
-  let previousCode = null;
-  let last = evaluateFixtureChecks({ expectedChecks });
-
-  while (true) {
+  if (typeof readChecks !== "function") throw new Error("readChecks is required");
+  const startedAt = now();
+  let lastResult = evaluateFixtureChecks({ checks: [], runs: [], expectedChecks });
+  while (now() - startedAt < timeoutMs) {
     const [checks, runs] = await Promise.all([readChecks(), readRuns()]);
-    last = evaluateFixtureChecks({ checks, runs, expectedChecks });
-    if (last.code !== previousCode) {
-      onProgress(last);
-      previousCode = last.code;
-    }
-    if (last.state === "ready") return last.summary;
-    if (last.state === "blocked") throw fixtureCheckError(last, false);
-    if (now() >= deadline) throw fixtureCheckError(last, true);
-    await sleep(Math.min(intervalMs, Math.max(0, deadline - now())));
+    lastResult = evaluateFixtureChecks({ checks, runs, expectedChecks });
+    if (lastResult.state === "ready") return lastResult.summary;
+    if (lastResult.state === "blocked") throw fixtureCheckError(lastResult);
+    await sleep(intervalMs);
   }
+  throw fixtureCheckError(lastResult, true);
 }
