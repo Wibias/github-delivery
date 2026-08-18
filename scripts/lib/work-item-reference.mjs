@@ -1,4 +1,4 @@
-const WORK_ITEM_KEY_RE = /\b([A-Z][A-Z0-9]*-\d+)\b/g;
+const WORK_ITEM_KEY_RE = /\b([A-Z][A-Z0-9]*-\d+)\b/gi;
 const URL_RE = /https?:\/\/[^\s<>"')\]]+/gi;
 
 function repoEquals(left, right) {
