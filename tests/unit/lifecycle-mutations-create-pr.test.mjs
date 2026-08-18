@@ -19,6 +19,7 @@ function request(overrides = {}) {
 function prRow(overrides = {}) {
   return {
     number: 22,
+    url: "https://api.github.com/repos/Wibias/github-delivery/pulls/22",
     html_url: "https://github.com/Wibias/github-delivery/pull/22",
     state: "open",
     head: { ref: "feature/p0", repo: { full_name: "Wibias/github-delivery" } },
@@ -27,11 +28,14 @@ function prRow(overrides = {}) {
   };
 }
 
-function apiRunner(rows) {
+function apiRunner(rows, expectedHead = "Wibias:feature/p0") {
   return (command, args) => {
     assert.equal(command, "gh");
     assert.equal(args[0], "api");
-    assert.match(args[1], /^repos\/Wibias\/github-delivery\/pulls\?state=open&head=/);
+    assert.equal(
+      args[1],
+      `repos/Wibias/github-delivery/pulls?state=open&head=${encodeURIComponent(expectedHead)}&per_page=100`,
+    );
     assert.ok(args.includes("--paginate"));
     assert.ok(args.includes("--slurp"));
     return { status: 0, stdout: JSON.stringify([rows]), stderr: "" };
@@ -42,7 +46,11 @@ test("create_pr remains valid without a caller-supplied head repository override
   assert.equal(validateLifecycleMutation(request()), true);
 });
 
-test("blocks creation and identifies an existing exact-head/base PR", () => {
+test("create_pr accepts an exact caller-supplied head repository identity", () => {
+  assert.equal(validateLifecycleMutation(request({ head: "fork-owner:feature/p0", headRepo: "fork-owner/custom-fork" })), true);
+});
+
+test("blocks creation and reports the browser URL for an existing exact-head/base PR", () => {
   assert.throws(
     () => preflightLifecycleMutation({ request: request(), runner: apiRunner([prRow()]) }),
     /create_pr_existing:22:https:\/\/github\.com\/Wibias\/github-delivery\/pull\/22/,
@@ -78,4 +86,29 @@ test("does not match the same branch name from another head repository", () => {
     request: request(),
     runner: apiRunner([prRow({ head: { ref: "feature/p0", repo: { full_name: "Other/fork" } } })]),
   }));
+});
+
+test("explicit fork head repository is enforced exactly", () => {
+  const forkRequest = request({
+    head: "fork-owner:feature/p0",
+    headRepo: "fork-owner/custom-fork",
+  });
+  const wrongFork = prRow({
+    head: { ref: "feature/p0", repo: { full_name: "fork-owner/other-fork" } },
+  });
+  assert.doesNotThrow(() => preflightLifecycleMutation({
+    request: forkRequest,
+    runner: apiRunner([wrongFork], "fork-owner:feature/p0"),
+  }));
+
+  const rightFork = prRow({
+    head: { ref: "feature/p0", repo: { full_name: "fork-owner/custom-fork" } },
+  });
+  assert.throws(
+    () => preflightLifecycleMutation({
+      request: forkRequest,
+      runner: apiRunner([rightFork], "fork-owner:feature/p0"),
+    }),
+    /create_pr_existing:22:/,
+  );
 });
