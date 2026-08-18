@@ -35,19 +35,17 @@ test("full review accepts review and maintainer but never read-only", () => {
 });
 
 test("read-only workflows reject elevated modes", () => {
-  assert.equal(
-    validateWorkflowMutationMode({
-      workflow: "references/status.md",
-      mutationMode: "read-only",
-    }).valid,
-    true,
-  );
-  const denied = validateWorkflowMutationMode({
-    workflow: "references/status.md",
-    mutationMode: "maintainer",
-  });
-  assert.equal(denied.valid, false);
-  assert.equal(denied.reason, "mode_denied_by_workflow");
+  for (const workflow of ["references/status.md", "references/open-work-status.md"]) {
+    assert.deepEqual(allowedMutationModes(workflow), ["read-only"]);
+    assert.equal(
+      validateWorkflowMutationMode({ workflow, mutationMode: "read-only" }).valid,
+      true,
+      workflow,
+    );
+    const denied = validateWorkflowMutationMode({ workflow, mutationMode: "maintainer" });
+    assert.equal(denied.valid, false, workflow);
+    assert.equal(denied.reason, "mode_denied_by_workflow", workflow);
+  }
 });
 
 test("watch accepts only its declared read-only and autonomous modes", () => {
