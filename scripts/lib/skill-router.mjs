@@ -41,6 +41,7 @@ const ISSUE_TRIAGE_REQUEST = /\btriage\b[\s\S]{0,80}\b(?:issue|issues|ticket|tic
 const QA_INTAKE_REQUEST = /\bqa intake\b|\bfile\b[\s\S]{0,80}\breproducible\b[\s\S]{0,80}\bbug report/;
 const CONFLICT_REQUEST = /\b(?:merge conflicts?|git conflicts?|resolve(?:\s+the)?(?:\s+merge)?\s+conflicts?)\b/;
 const OUT_OF_SCOPE_REQUEST = /\b(?:out of scope|rejected enhancement|not now)\b/;
+const SKILL_AUTHORING_REQUEST = /\b(?:create|author|write|edit|update|modify|change|fix|harden|extend|refactor|test|validate|debug|repair|audit)\b[\s\S]{0,160}\b(?:agent\s+)?skill\b|\b(?:agent\s+)?skill\b[\s\S]{0,160}\b(?:create|author|write|edit|update|modify|change|fix|harden|extend|refactor|test|validate|debug|repair|audit)\b/;
 
 export const PUBLIC_ROUTE_HANDOFFS = Object.freeze([
   "split-to-prs",
@@ -146,7 +147,7 @@ export function routeShippingGithubPrompt(prompt) {
   if (!text) return null;
 
   if (/(local|before .*pull request|before .*\bpr\b)/.test(text) && /(unit test|vitest|merge conflict|debug)/.test(text)) return null;
-  if (/create .*agent skill|skill-ratchet|pdf table extraction/.test(text)) return null;
+  if (SKILL_AUTHORING_REQUEST.test(text) || /skill-ratchet|pdf table extraction/.test(text)) return null;
 
   if (DELIVERY_NAME.test(text) && DELIVERY_UPDATE.test(text)) {
     return result("references/update.md", "read-only", []);
