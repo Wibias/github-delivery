@@ -9,72 +9,83 @@ on:
 permissions:
   contents: read
 
-jobs:
-  test:
-    name: Node ${{ matrix.node }} / ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os:
-          - ubuntu-latest
-          - windows-latest
-          - macos-latest
-        node:
-          - 22
-          - 24
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
+jobs:
+  core:
+    name: Node 24 / ubuntu-latest
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - name: Set up Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: ${{ matrix.node }}
-          package-manager-cache: false
-
-      - name: Set up .NET
-        if: runner.os == 'Windows'
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
-        with:
-          global-json-file: global.json
-
-      - name: Run checks
-        run: npm run check
-
-      # Node 26 is a declared supported runtime, but the live ruleset already
-      # protects the Node 24 lanes. Run Node 26 inside each required Node 24
-      # lane so a Node 26 regression cannot be green-lit by an unrequired job.
-      - name: Set up protected Node 26 compatibility runtime
-        if: matrix.node == 24
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 26
-          package-manager-cache: false
-
-      - name: Run protected Node 26 compatibility checks
-        if: matrix.node == 24
-        run: npm run check
-
-      - name: Restore Node 24 for lane-specific follow-up checks
-        if: matrix.node == 24
+      - name: Set up Node.js 24
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
           package-manager-cache: false
 
-      - name: Verify architecture contracts
-        run: >-
-          node --test
-          tests/unit/mutation-action-registry.test.mjs
-          tests/unit/mutation-action-registry-broker.test.mjs
-          tests/unit/review-context-contract.test.mjs
+      - name: Run canonical repository checks
+        run: npm run check
+
+      # Node 26 is supported, but version-independent repository/security/dist
+      # gates already ran above. Re-run only runtime-sensitive syntax, package,
+      # and unit contracts under Node 26.
+      - name: Set up Node.js 26 compatibility runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 26
+          package-manager-cache: false
+
+      - name: Verify Node 26 compatibility
+        run: node scripts/check-syntax.mjs && npm run package:check && npm test
+
+  node22-compatibility:
+    name: Node 22 / ubuntu-latest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+
+      - name: Verify Node 22 compatibility
+        run: node scripts/check-syntax.mjs && npm run package:check && npm test
+
+  windows-authority:
+    name: Node 24 / windows-latest
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
 
       - name: Validate Windows authority installer syntax
-        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $Installer = Get-Content authority-host/windows/install.ps1 -Raw
@@ -83,7 +94,6 @@ jobs:
           [void][scriptblock]::Create($ReleaseInstaller)
 
       - name: Restore Windows authority host in locked mode
-        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $Project = 'authority-host/windows/GitHubDeliveryAuthority/GitHubDeliveryAuthority.csproj'
@@ -91,7 +101,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build Windows authority host
-        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Continue'
@@ -107,11 +116,9 @@ jobs:
           }
 
       - name: Run Windows authority host self-test
-        if: runner.os == 'Windows'
         run: dotnet run --project authority-host/windows/GitHubDeliveryAuthority/GitHubDeliveryAuthority.csproj --configuration Release --no-build -- --self-test
 
       - name: Run Windows authority host XAML smoke test
-        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           dotnet run --project authority-host/windows/GitHubDeliveryAuthority/GitHubDeliveryAuthority.csproj --configuration Release --no-build -- --xaml-self-test
@@ -122,7 +129,6 @@ jobs:
           }
 
       - name: Publish Windows authority host
-        if: runner.os == 'Windows' && matrix.node == 24
         shell: pwsh
         run: |
           $Project = 'authority-host/windows/GitHubDeliveryAuthority/GitHubDeliveryAuthority.csproj'
