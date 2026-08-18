@@ -225,6 +225,15 @@ test("does not trigger for local pre-PR debugging", () => {
   );
 });
 
+test("does not steal skill-authoring work that ends with PR publication", () => {
+  for (const prompt of [
+    "Harden our GitHub Delivery skill so malformed PR bodies cannot happen, test it, then open a PR",
+    "Update this agent skill with a regression test and create a pull request after it works",
+  ]) {
+    assert.equal(routeShippingGithubPrompt(prompt), null, prompt);
+  }
+});
+
 test("routes stacked PR work to the stacked workflow", () => {
   assert.equal(
     routeShippingGithubPrompt("restack my GitHub PR stack after the bottom PR got review commits").workflow,
