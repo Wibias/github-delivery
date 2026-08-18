@@ -5,6 +5,17 @@ function repoEquals(left, right) {
   return String(left || "").toLowerCase() === String(right || "").toLowerCase();
 }
 
+function safeHttpUrl(value) {
+  const text = String(value || "").trim();
+  if (!text) return null;
+  try {
+    const url = new URL(text);
+    return url.protocol === "http:" || url.protocol === "https:" ? text : null;
+  } catch {
+    return null;
+  }
+}
+
 function normalizeKey(value) {
   const match = String(value || "").match(/\b([A-Z][A-Z0-9]*-\d+)\b/i);
   return match ? match[1].toUpperCase() : null;
@@ -52,7 +63,7 @@ function githubIssueCandidates(repository, issueLinks) {
     return [{
       kind: "github-issue",
       key: `#${number}`,
-      url: entry?.url ? String(entry.url) : null,
+      url: safeHttpUrl(entry?.url),
       source: "github-issue-link",
       tier: 1,
     }];
@@ -61,13 +72,13 @@ function githubIssueCandidates(repository, issueLinks) {
 
 function externalLinkCandidates(externalLinks) {
   return (externalLinks || []).flatMap((entry) => {
-    const url = entry?.url ? String(entry.url) : null;
-    const key = normalizeKey(entry?.key) || normalizeKey(url);
+    const rawUrl = entry?.url ? String(entry.url) : null;
+    const key = normalizeKey(entry?.key) || normalizeKey(rawUrl);
     if (!key) return [];
     return [{
       kind: "external",
       key,
-      url,
+      url: safeHttpUrl(rawUrl),
       source: "external-link",
       tier: 2,
     }];
@@ -79,9 +90,9 @@ function explicitUrlCandidates(...values) {
   for (const value of values) {
     const text = String(value || "");
     for (const match of text.matchAll(URL_RE)) {
-      const url = match[0];
+      const url = safeHttpUrl(match[0]);
       const key = normalizeKey(url);
-      if (!key) continue;
+      if (!url || !key) continue;
       candidates.push({
         kind: "external",
         key,
