@@ -8,6 +8,7 @@ const WORKFLOW_MUTATION_MODES = Object.freeze({
   "references/fix-pr-bots.md": ["maintainer"],
   "references/full-review-pr.md": ["review", "maintainer"],
   "references/merge-pr.md": ["maintainer"],
+  "references/open-work-status.md": ["read-only"],
   "references/overtake-pr.md": ["maintainer"],
   "references/re-review-pr.md": ["review"],
   "references/research-issue.md": ["review"],
