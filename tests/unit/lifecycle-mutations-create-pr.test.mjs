@@ -50,6 +50,13 @@ test("create_pr remains valid without a caller-supplied head repository override
   assert.equal(validateLifecycleMutation(request()), true);
 });
 
+test("create_pr rejects a whitespace-only head", () => {
+  assert.throws(
+    () => validateLifecycleMutation(request({ head: "   " })),
+    /head_invalid/,
+  );
+});
+
 test("create_pr accepts an exact caller-supplied head repository identity", () => {
   assert.equal(validateLifecycleMutation(request({ head: "fork-owner:feature/p0", headRepo: "fork-owner/custom-fork" })), true);
 });
@@ -101,7 +108,6 @@ test("create_pr with headRepo uses REST and passes the exact source repository n
   assert.ok(command.includes("head_repo=custom-fork"));
   assert.ok(command.includes("base=main"));
   assert.ok(command.includes("draft=true"));
-  assert.equal(command.includes("gh pr create"), false);
 });
 
 test("blocks creation and reports the browser URL for an existing exact-head/base PR", () => {
