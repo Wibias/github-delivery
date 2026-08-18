@@ -33,6 +33,10 @@ function apiRow(overrides = {}) {
   };
 }
 
+function issueRepository(owner, name) {
+  return { name, owner: { login: owner } };
+}
+
 test("normalizes every page, browser URL, and repository identity", () => {
   const rows = normalizeOpenPullPages([
     [apiRow({ number: 11 })],
@@ -116,7 +120,7 @@ test("emits only bounded next-action annotations, never a merge-ready verdict", 
   assert.ok(result.pullRequests.every((row) => row.mergeReady === undefined));
 });
 
-test("collector enriches merge state and closing issue references from one per-PR read", () => {
+test("collector enriches merge state and same-repository closing issue references", () => {
   const runner = (command, args) => {
     assert.equal(command, "gh");
     if (args[0] === "repo") return "Wibias/github-delivery";
@@ -134,7 +138,11 @@ test("collector enriches merge state and closing issue references from one per-P
       assert.ok(args.includes("closingIssuesReferences,mergeStateStatus"));
       return JSON.stringify({
         mergeStateStatus: "DIRTY",
-        closingIssuesReferences: [{ number: 77, url: "https://github.com/Wibias/github-delivery/issues/77" }],
+        closingIssuesReferences: [{
+          number: 77,
+          url: "https://github.com/Wibias/github-delivery/issues/77",
+          repository: issueRepository("Wibias", "github-delivery"),
+        }],
       });
     }
     throw new Error(`unexpected command: ${command} ${args.join(" ")}`);
@@ -145,6 +153,65 @@ test("collector enriches merge state and closing issue references from one per-P
   assert.equal(result.pullRequests[0].nextActionEvidenceComplete, true);
   assert.equal(result.pullRequests[0].workItem.state, "resolved");
   assert.equal(result.pullRequests[0].workItem.reference.key, "#77");
+});
+
+test("cross-repository closing issues do not masquerade as same-repository work items", () => {
+  const runner = (command, args) => {
+    if (command !== "gh") throw new Error("unexpected command");
+    if (args[0] === "repo") return "Wibias/github-delivery";
+    if (args[0] === "api" && args[1] === "user") return "Wibias";
+    if (args[0] === "api" && String(args[1]).includes("/pulls?state=open")) {
+      return JSON.stringify([[apiRow({
+        issueLinks: undefined,
+        mergeable_state: undefined,
+        title: "No key in title",
+        body: "No key in body",
+        head: { ref: "feature/ENG-55-work", sha: "e".repeat(40), repo: { full_name: "Wibias/github-delivery" } },
+      })]]);
+    }
+    if (args[0] === "pr" && args[1] === "view") {
+      return JSON.stringify({
+        mergeStateStatus: "CLEAN",
+        closingIssuesReferences: [{
+          number: 77,
+          url: "https://github.com/Other/repo/issues/77",
+          repository: issueRepository("Other", "repo"),
+        }],
+      });
+    }
+    throw new Error(`unexpected command: ${command} ${args.join(" ")}`);
+  };
+
+  const result = collectOpenWorkStatus(runner);
+  assert.equal(result.pullRequests[0].workItem.state, "resolved");
+  assert.equal(result.pullRequests[0].workItem.reference.key, "ENG-55");
+  assert.equal(result.pullRequests[0].workItem.reference.source, "head-ref");
+});
+
+test("malformed closing issue repository evidence marks work-item evidence unknown", () => {
+  const runner = (command, args) => {
+    if (command !== "gh") throw new Error("unexpected command");
+    if (args[0] === "repo") return "Wibias/github-delivery";
+    if (args[0] === "api" && args[1] === "user") return "Wibias";
+    if (args[0] === "api" && String(args[1]).includes("/pulls?state=open")) {
+      return JSON.stringify([[apiRow({
+        issueLinks: undefined,
+        mergeable_state: undefined,
+        head: { ref: "feature/ENG-98", sha: "f".repeat(40), repo: { full_name: "Wibias/github-delivery" } },
+      })]]);
+    }
+    if (args[0] === "pr" && args[1] === "view") {
+      return JSON.stringify({
+        mergeStateStatus: "CLEAN",
+        closingIssuesReferences: [{ number: 77, url: "https://github.com/Wibias/github-delivery/issues/77" }],
+      });
+    }
+    throw new Error(`unexpected command: ${command} ${args.join(" ")}`);
+  };
+
+  const result = collectOpenWorkStatus(runner);
+  assert.equal(result.pullRequests[0].workItem.state, "unknown");
+  assert.equal(result.pullRequests[0].workItem.reason, "github-issue-link-evidence-unavailable");
 });
 
 test("optional enrichment failure keeps the PR but marks affected evidence unknown", () => {
