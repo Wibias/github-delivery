@@ -48,6 +48,18 @@ function exactString(value, name) {
   return String(required(value, name));
 }
 
+function normalizedStringSet(value, name, { optional = false } = {}) {
+  if (value === undefined && optional) return [];
+  if (!Array.isArray(value)) throw new Error(`authority_scope_${name}_invalid`);
+  const items = value.map((entry) => {
+    if (typeof entry !== "string" || !entry.trim()) {
+      throw new Error(`authority_scope_${name}_entry_invalid`);
+    }
+    return entry.trim();
+  });
+  return [...new Set(items)].sort();
+}
+
 function base(request) {
   if (!plainObject(request)) throw new Error("authority_scope_request_invalid");
   const scope = {
@@ -152,6 +164,11 @@ export function authorityScopeForRequest(request = {}) {
         ...scope,
         ...prScope(request),
         bodySha256: bodyHash(request.body),
+        approvedMediaRemovals: normalizedStringSet(
+          request.approvedMediaRemovals,
+          "approved_media_removals",
+          { optional: true },
+        ),
       };
 
     case "create_issue":
