@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Text.Json;
 using Microsoft.UI.Windowing;
@@ -23,6 +24,9 @@ internal sealed partial class ControlCenterWindow : Window
 
     private readonly StateStore _store;
     private readonly AppWindow _appWindow;
+    private readonly ObservableCollection<ActivityListItem> _activityItems = new();
+    private string? _activitySnapshot;
+    private string? _diagnosticsUpdatedText;
     private bool _allowClose;
     private bool _refreshingAutostart;
 
@@ -34,6 +38,7 @@ internal sealed partial class ControlCenterWindow : Window
         TrySetWindowIcon();
         _appWindow.Closing += OnAppWindowClosing;
         _store = store;
+        ActivityList.ItemsSource = _activityItems;
         RootLayout.Loaded += (_, _) => QueueEdgeSpacingUpdate(RootLayout.ActualWidth);
         RootLayout.SizeChanged += (_, args) => QueueEdgeSpacingUpdate(args.NewSize.Width);
         Activated += (_, _) => Refresh();
@@ -72,9 +77,7 @@ internal sealed partial class ControlCenterWindow : Window
         RemoveRepositoryButton.IsEnabled = false;
 
         var events = _store.ListRecentAuditEvents(50);
-        ActivityList.ItemsSource = events.Count == 0
-            ? new[] { "No audit events recorded yet." }
-            : events.Select(FormatAuditEvent).ToArray();
+        UpdateActivityList(events);
 
         var leases = _store.ListActiveBranchLeases(now);
         GrantList.ItemsSource = leases.Count == 0
@@ -94,6 +97,12 @@ internal sealed partial class ControlCenterWindow : Window
         RefreshInstallationStatus();
         RefreshAutostart();
         DiagnosticsUpdated.Text = $"Updated {DateTimeOffset.Now:t}";
+        var diagnosticsText = $"Updated {DateTimeOffset.Now:t}";
+        if (!string.Equals(diagnosticsText, _diagnosticsUpdatedText, StringComparison.Ordinal))
+        {
+            _diagnosticsUpdatedText = diagnosticsText;
+            DiagnosticsUpdated.Text = diagnosticsText;
+        }
     }
 
     private void RefreshConfiguration()
@@ -182,13 +191,21 @@ internal sealed partial class ControlCenterWindow : Window
         return new HostVersionInfo(version, sourceCommit);
     }
 
-    private static string FormatAuditEvent(AuditEventRecord entry)
+    private void UpdateActivityList(IReadOnlyList<AuditEventRecord> events)
     {
-        var local = DateTimeOffset.FromUnixTimeSeconds(entry.CreatedAt).ToLocalTime();
-        var repo = entry.Repo ?? "Authority";
-        var branch = string.IsNullOrEmpty(entry.Branch) ? string.Empty : $" [{entry.Branch}]";
-        var action = entry.EventType.Replace('_', ' ');
-        return $"{local:HH:mm}    {repo}{branch}    {action}    {entry.Outcome}    Local user";
+        var nextItems = ActivityListBuilder.Build(events, DateTimeOffset.Now);
+        var snapshot = ActivityListBuilder.BuildSnapshot(nextItems);
+        if (string.Equals(snapshot, _activitySnapshot, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _activitySnapshot = snapshot;
+        _activityItems.Clear();
+        foreach (var item in nextItems)
+        {
+            _activityItems.Add(item);
+        }
     }
 
     private static string FormatBranchLease(BranchLeaseRecord lease, long now)

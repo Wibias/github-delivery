@@ -10,6 +10,10 @@ const controlCenterCodePath = new URL(
   "../../authority-host/windows/GitHubDeliveryAuthority/ControlCenterWindow.xaml.cs",
   import.meta.url,
 );
+const activityListItemPath = new URL(
+  "../../authority-host/windows/GitHubDeliveryAuthority/ActivityListItem.cs",
+  import.meta.url,
+);
 const approvalWindowPath = new URL(
   "../../authority-host/windows/GitHubDeliveryAuthority/ApprovalWindow.xaml",
   import.meta.url,
@@ -31,6 +35,15 @@ test("control center caps recent activity and applies proportional side gutters"
     xaml,
     /x:Name="ActivityList"[^>]*MinHeight="280"[^>]*MaxHeight="420"[^>]*HorizontalContentAlignment="Stretch"[^>]*ScrollViewer\.VerticalScrollBarVisibility="Auto"[^>]*ScrollViewer\.HorizontalScrollBarVisibility="Disabled"/,
   );
+  assert.match(xaml, /xmlns:local="using:GitHubDeliveryAuthority"/);
+  assert.match(xaml, /ListView\.ItemTemplateSelector/);
+  assert.match(xaml, /ActivityDaySeparatorItem/);
+  assert.match(xaml, /ActivityEventItem/);
+  assert.match(code, /ObservableCollection<ActivityListItem>/);
+  assert.match(code, /ActivityList\.ItemsSource = _activityItems/);
+  assert.match(code, /ActivityListBuilder\.Build/);
+  assert.match(code, /ActivityListBuilder\.BuildSnapshot/);
+  assert.match(code, /_activitySnapshot/);
 
   assert.match(code, /RootLayout\.Loaded\s*\+=/);
   assert.match(code, /RootLayout\.SizeChanged\s*\+=/);
@@ -39,6 +52,16 @@ test("control center caps recent activity and applies proportional side gutters"
   assert.match(code, /SettingsContent\.Padding\s*=\s*padding/);
   assert.match(code, /width >= 1360[\s\S]*24d[\s\S]*28d/);
   assert.match(code, /width >= 900[\s\S]*20d[\s\S]*24d/);
+});
+
+test("recent activity inserts day separators and formats day labels", async () => {
+  const source = await read(activityListItemPath);
+
+  assert.match(source, /ActivityDaySeparatorItem/);
+  assert.match(source, /FormatDayLabel/);
+  assert.match(source, /if \(day == today\) return "Today"/);
+  assert.match(source, /if \(day == today\.AddDays\(-1\)\) return "Yesterday"/);
+  assert.match(source, /items\.Add\(new ActivityDaySeparatorItem/);
 });
 
 test("approval window applies proportional side gutters while preserving vertical padding", async () => {
