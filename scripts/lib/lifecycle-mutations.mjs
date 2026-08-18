@@ -159,14 +159,9 @@ function assertCreatePrNotDuplicate(request, runner) {
   const raw = run(runner, ["gh", "api", endpoint, "--paginate", "--slurp"]);
   const payload = parseJson(raw || "[]", "create_pr_preflight_invalid_json");
   const rows = normalizeCoveringPullPages(payload, repo);
-  const intendedHeadRepo = request.headRepo
-    ? String(request.headRepo)
-    : explicitOwner
-      ? null
-      : repo;
   const result = classifyCoveringPullRequests({
     intendedRepo: repo,
-    intendedHeadRepo,
+    intendedHeadRepo: explicitOwner ? null : repo,
     intendedHead: branch,
     intendedBase: base,
     rows,
@@ -193,7 +188,6 @@ export function validateLifecycleMutation(request = {}) {
     case "create_pr":
       required(request.base, "base");
       required(request.head, "head");
-      if (request.headRepo !== undefined) required(request.headRepo, "head_repo");
       required(request.title, "title");
       required(request.body, "body");
       required(request.idempotencyKey, "idempotency_key");
