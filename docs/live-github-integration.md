@@ -68,15 +68,12 @@ The target repository must be provisioned so pull requests emit the acceptance c
 The current live acceptance contract requires:
 
 - `CI / Node 22 / ubuntu-latest`
-- `CI / Node 22 / windows-latest`
-- `CI / Node 22 / macos-latest`
 - `CI / Node 24 / ubuntu-latest`
 - `CI / Node 24 / windows-latest`
-- `CI / Node 24 / macos-latest`
 - at least one check from `Dependency Review`
 - at least one check from `CodeQL`
 
-Additional checks are allowed and retained in the receipt. An empty or incomplete required-check set can never pass.
+Node 26 compatibility is enforced inside the required Node 24 Ubuntu lane. Additional checks are allowed and retained in the receipt. An empty or incomplete required-check set can never pass.
 
 The observer reports stable waiting/failure codes:
 
@@ -85,7 +82,7 @@ The observer reports stable waiting/failure codes:
 | `fixture_workflows_approval_required` | GitHub is waiting for manual workflow approval |
 | `fixture_checks_not_observed` | No PR checks appeared |
 | `fixture_checks_pending` | Required checks appeared but are still running |
-| `fixture_required_checks_missing` | One or more required workflows or matrix jobs never appeared |
+| `fixture_required_checks_missing` | One or more required workflows or CI lanes never appeared |
 | `fixture_checks_failed` | An observed check failed, was cancelled, skipped, stale, or timed out |
 
 Approval, missing, and pending states remain pollable until the deadline. A failed check stops immediately. Any unresolved state at timeout fails the lifecycle.
@@ -146,7 +143,7 @@ Example shape:
 {
   "checks": {
     "conclusion": "success",
-    "count": 8,
+    "count": 5,
     "expectedWorkflows": ["CI", "CodeQL", "Dependency Review"],
     "observedWorkflows": ["CI", "CodeQL", "Dependency Review"],
     "checks": []

@@ -11,10 +11,48 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: codeql-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  csharp_scope:
+    name: Detect C# analysis scope
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      required: ${{ steps.scope.outputs.required }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Detect C#-relevant pull request changes
+        id: scope
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "${EVENT_NAME}" != "pull_request" ]]; then
+            echo "required=true" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          git diff --name-only "${BASE_SHA}"...HEAD > "${RUNNER_TEMP}/changed-files.txt"
+          if grep -Eq '^(authority-host/windows/|global\.json$|\.github/workflows/codeql\.yml$)' "${RUNNER_TEMP}/changed-files.txt"; then
+            echo "required=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "required=false" >> "${GITHUB_OUTPUT}"
+          fi
+
   analyze:
     name: CodeQL / Analyze (javascript-typescript)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
       packages: read
@@ -40,7 +78,10 @@ jobs:
 
   analyze-csharp:
     name: CodeQL / Analyze (csharp)
+    needs: csharp_scope
+    if: github.event_name != 'pull_request' || needs.csharp_scope.outputs.required == 'true'
     runs-on: windows-latest
+    timeout-minutes: 30
     permissions:
       contents: read
       packages: read

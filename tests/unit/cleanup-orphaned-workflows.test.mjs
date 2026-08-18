@@ -54,7 +54,7 @@ test("cleanup workflow is default-branch-only, least-privilege, bounded, and pin
   const path = new URL("../../.github/workflows/cleanup-orphaned-workflows.yml", import.meta.url);
   const source = await readFile(path, "utf8");
 
-  assert.match(source, /schedule:\s*\n\s*- cron: "0 6 \* \* \*"/);
+  assert.match(source, /schedule:\s*\n\s*- cron: "0 6 \* \* 1"/);
   assert.match(source, /push:\s*\n\s*branches:\s*\n\s*- main/);
   assert.doesNotMatch(source, /workflow_dispatch/);
   assert.match(source, /permissions:\s*\n\s*actions: write\s*\n\s*contents: read/);
