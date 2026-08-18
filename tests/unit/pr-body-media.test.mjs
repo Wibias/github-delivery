@@ -11,6 +11,8 @@ test("extracts Markdown images, recognized media links, HTML media and GitHub up
     '<video controls src="https://example.com/c.webm"></video>',
     '<source src="https://example.com/d.mp4" type="video/mp4">',
     "https://github.com/user-attachments/assets/11111111-2222-3333-4444-555555555555",
+    "https://user-images.githubusercontent.com/12345/67890",
+    "https://private-user-images.githubusercontent.com/12345/67891?jwt=token",
   ].join("\n");
 
   assert.deepEqual(extractPrBodyMedia(body), [
@@ -20,6 +22,8 @@ test("extracts Markdown images, recognized media links, HTML media and GitHub up
     "https://example.com/c.webm",
     "https://example.com/d.mp4",
     "https://github.com/user-attachments/assets/11111111-2222-3333-4444-555555555555",
+    "https://user-images.githubusercontent.com/12345/67890",
+    "https://private-user-images.githubusercontent.com/12345/67891?jwt=token",
   ]);
 });
 
@@ -31,6 +35,18 @@ test("deduplicates media identities and ignores ordinary links", () => {
   ].join("\n");
 
   assert.deepEqual(extractPrBodyMedia(body), ["https://example.com/a.png"]);
+});
+
+test("recognizes legacy GitHub uploads even when linked without a file extension", () => {
+  const body = [
+    "[old screenshot](https://user-images.githubusercontent.com/12345/67890)",
+    "[private screenshot](https://private-user-images.githubusercontent.com/12345/67891?jwt=token)",
+  ].join("\n");
+
+  assert.deepEqual(extractPrBodyMedia(body), [
+    "https://user-images.githubusercontent.com/12345/67890",
+    "https://private-user-images.githubusercontent.com/12345/67891?jwt=token",
+  ]);
 });
 
 test("allows media to be reordered while text changes", () => {
