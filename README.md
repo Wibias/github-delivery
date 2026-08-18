@@ -205,6 +205,14 @@ A full review can combine:
 - proactive contract verification appropriate to the changed behavior;
 - conditional **visual evidence** for rendered/UI surfaces.
 
+### Safe simplification
+
+Simplification is **explicit-only**. Its goal is lower cognitive load and safer maintenance. **Line count is never the goal**; fewer lines are acceptable only when behavior and clarity improve.
+
+A simplification pass may validly conclude that there is **nothing worth simplifying**. Any proposed mutation still requires **explicit approval**. After approved candidates are applied and validated, GitHub Delivery automatically runs the **complete full review** again on the changed head with simplification disabled before publishing the final verdict. See [`references/simplify-pr.md`](references/simplify-pr.md).
+
+Security-sensitive findings follow [`SECURITY.md`](SECURITY.md). Undisclosed vulnerabilities belong in **private vulnerability reporting**, not a public issue or review thread.
+
 Visual evidence is required only when the diff actually carries a visual-surface signal. Accepted evidence is screenshot/video/deterministic render material bound to the exact current head SHA. Stale artifacts and text-only claims do not satisfy that axis; real preview/runtime blockers stay `blocked`.
 
 The final ship decision is one authoritative `ready`, `blocked`, or `unknown` result from live evidence. Positive readiness/merge claims require a fresh final gate.
