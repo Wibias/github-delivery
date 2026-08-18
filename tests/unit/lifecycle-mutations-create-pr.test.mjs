@@ -50,6 +50,27 @@ test("create_pr accepts an exact caller-supplied head repository identity", () =
   assert.equal(validateLifecycleMutation(request({ head: "fork-owner:feature/p0", headRepo: "fork-owner/custom-fork" })), true);
 });
 
+test("create_pr accepts a same-repository headRepo with an unqualified head", () => {
+  assert.equal(validateLifecycleMutation(request({ headRepo: "wibias/GITHUB-delivery" })), true);
+});
+
+test("create_pr rejects a fork headRepo when head omits the required owner qualifier", () => {
+  assert.throws(
+    () => validateLifecycleMutation(request({ headRepo: "fork-owner/custom-fork" })),
+    /head_repo_requires_qualified_head/,
+  );
+});
+
+test("create_pr rejects an explicit head owner that disagrees with headRepo", () => {
+  assert.throws(
+    () => validateLifecycleMutation(request({
+      head: "fork-owner:feature/p0",
+      headRepo: "other-owner/custom-fork",
+    })),
+    /head_owner_repo_mismatch/,
+  );
+});
+
 test("blocks creation and reports the browser URL for an existing exact-head/base PR", () => {
   assert.throws(
     () => preflightLifecycleMutation({ request: request(), runner: apiRunner([prRow()]) }),
