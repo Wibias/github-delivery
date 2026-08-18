@@ -4,6 +4,30 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [0.8.5] - 2026-08-18
+
+### Added
+
+- Added a repository-scoped, read-only open-work workflow for the authenticated GitHub user, including complete PR pagination, deterministic ordering, bounded next-action signals, and ranked work-item references that never invent tracker hosts or authority from PR text (PR #283).
+- Added tracker-aware external work-item delivery orchestration with Linear as the first normalized tracker shape. Delivery phases are derived from verified GitHub evidence, tracker status selection fails closed on missing/ambiguous mappings, and planned tracker transitions bind the observed current status so stale writes must re-plan (PR #284).
+- Added read-only competing-PR consolidation analysis. Candidate clusters use durable work-item identity plus non-noise implementation overlap, never auto-select a canonical PR, and require direct supersede-grade evidence between the chosen canonical PR and every PR proposed for replacement (PR #285).
+- Added conditional visual-review evidence for rendered/UI changes. Screenshot, video, or deterministic render artifacts must be bound to the exact current head SHA; stale artifacts and text-only claims are rejected, while genuine preview/runtime blockers remain explicitly `blocked` (PR #286).
+- Added head-bound multi-base delivery for backports/ports. Each target base gets an independent `parallel-port` identity and deterministic provenance marker bound to repository, source PR, exact source head SHA, and target base; wrong-base, duplicate, ambiguous-marker, and incomplete-required-target states fail closed (PR #287).
+
+### Changed
+
+- Reworked pull-request CI from a 3-OS × 2-Node matrix plus three full Node 26 reruns into one canonical Node 24/Ubuntu full `npm run check`, bounded Node 26 compatibility on that workspace, a scoped Node 22/Ubuntu compatibility lane, and a scoped Node 24/Windows Authority lane. Superseded CI/CodeQL/Dependency Review runs are cancelled, C# CodeQL is scoped on PRs, the duplicate Architecture Contracts workflow is removed, repository-policy polling is daily, and orphan-workflow cleanup is weekly (PR #288).
+- Reduced ordinary runtime-relevant PR execution from 9 full repository checks to 1, from 9 full unit-suite runtime executions to 3, from 2 Windows Authority lanes to 1 when relevant, and from 2 macOS PR jobs to 0 while retaining Node 22/24/26 compatibility coverage and live-fixture overrides (PR #288).
+- Reorganized the README around a clearer start-here path, grouped capability map, concise safety model, consolidated installation/maintenance guidance, dedicated stack/competing-PR/backport explanation, updated workflow reference, and the current lean CI topology. Release-specific implementation detail is no longer embedded in the hero text.
+- Bumped the package version from `0.8.2` to `0.8.5` for the complete post-0.8.2 rollup.
+
+### Fixed
+
+- Moved the remaining workflow-level `actions: write` permission down to the cleanup job, kept top-level workflow permissions read-only, and added validation that rejects future top-level write scopes while still permitting explicitly allowlisted job-level writes (PR #282).
+- Hardened PR publication identity and retries: exact duplicate detection now binds target repository, head repository/ref, and base; qualified REST head filters prevent same-repository misses; explicit cross-repository `head_repo` identity is supported; and exact owned idempotent retries converge before the broader duplicate preflight (PR #283).
+- Protected existing PR-body screenshots, videos, GitHub uploads, reference-style Markdown images, and other recognized media from accidental body rewrites. Intentional removal requires an exact approved identity list that is included in trusted `update_pr_body` authority scope (PR #283).
+- Prevented cross-repository closing issues and unsafe display URLs from masquerading as trustworthy same-repository work-item evidence, and tightened open-work fixtures so PR-number normalization and repository boundaries are actually exercised (PR #283).
+
 ## [0.8.2] - 2026-08-17
 
 ### Changed
