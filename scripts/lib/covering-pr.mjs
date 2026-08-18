@@ -14,7 +14,7 @@ export function normalizeCoveringPullPages(payload, targetRepo) {
     if (!Array.isArray(page)) throw new Error("covering_pr_page_invalid");
     for (const raw of page) {
       const number = Number(raw?.number);
-      const url = raw?.url ?? raw?.html_url;
+      const url = raw?.html_url ?? raw?.url;
       const headRefName = raw?.headRefName ?? raw?.head?.ref;
       const baseRefName = raw?.baseRefName ?? raw?.base?.ref;
       const headRepoFullName = repoName(raw, "head");
