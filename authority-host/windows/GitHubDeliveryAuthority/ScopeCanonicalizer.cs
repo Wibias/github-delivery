@@ -75,6 +75,7 @@ internal static partial class ScopeCanonicalizer
             case "update_pr_body":
                 AddPrScope(scope, request);
                 scope["bodySha256"] = BodySha256(request);
+                scope["approvedMediaRemovals"] = CanonicalStringSet(request, "approvedMediaRemovals", optional: true);
                 break;
 
             case "create_issue":
@@ -203,6 +204,41 @@ internal static partial class ScopeCanonicalizer
     {
         scope["pr"] = PositiveInt(request, "pr");
         scope["expectedHead"] = RequiredString(request, "expectedHead");
+    }
+
+    private static JsonArray CanonicalStringSet(JsonElement request, string name, bool optional = false)
+    {
+        if (!request.TryGetProperty(name, out var values))
+        {
+            if (optional) return new JsonArray();
+            throw new AuthorityException($"authority_scope_{ToSnake(name)}_invalid");
+        }
+        if (values.ValueKind != JsonValueKind.Array)
+        {
+            throw new AuthorityException($"authority_scope_{ToSnake(name)}_invalid");
+        }
+
+        var normalized = new List<string>();
+        foreach (var value in values.EnumerateArray())
+        {
+            if (value.ValueKind != JsonValueKind.String)
+            {
+                throw new AuthorityException($"authority_scope_{ToSnake(name)}_entry_invalid");
+            }
+            var text = value.GetString()?.Trim() ?? string.Empty;
+            if (text.Length == 0)
+            {
+                throw new AuthorityException($"authority_scope_{ToSnake(name)}_entry_invalid");
+            }
+            normalized.Add(text);
+        }
+
+        var array = new JsonArray();
+        foreach (var item in normalized.Distinct(StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal))
+        {
+            array.Add(item);
+        }
+        return array;
     }
 
     private static JsonArray CanonicalReviewers(JsonElement request)
