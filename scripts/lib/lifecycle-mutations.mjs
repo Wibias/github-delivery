@@ -1,5 +1,6 @@
 import { classifyCoveringPullRequests, normalizeCoveringPullPages } from "./covering-pr.mjs";
 import { diffPrBodyMedia } from "./pr-body-media.mjs";
+import { assertPublishedMarkdown } from "./published-body-integrity.mjs";
 
 const LIFECYCLE_ACTIONS = new Set([
   "push_code",
@@ -273,17 +274,20 @@ export function validateLifecycleMutation(request = {}) {
       createPrHeadIdentity(request);
       required(request.title, "title");
       required(request.body, "body");
+      assertPublishedMarkdown(request.body);
       required(request.idempotencyKey, "idempotency_key");
       break;
     case "update_pr_body":
       positiveInteger(request.pr, "pr");
       exactSha(request.expectedHead, "expected_head");
       required(request.body, "body");
+      assertPublishedMarkdown(request.body);
       validateApprovedMediaRemovals(request.approvedMediaRemovals);
       break;
     case "create_issue":
       required(request.title, "title");
       required(request.body, "body");
+      assertPublishedMarkdown(request.body);
       required(request.idempotencyKey, "idempotency_key");
       break;
     case "assign_issue":
@@ -387,7 +391,28 @@ export function verifyLifecycleMutation({ request, runner }) {
     if (observed !== String(required(request.body, "body"))) {
       throw new Error("update_pr_body_verification_failed");
     }
+    assertPublishedMarkdown(observed, { expected: String(request.body) });
     return observed;
+  }
+  if (request.action === "create_pr") {
+    const observed = run(runner, [
+      "gh",
+      "pr",
+      "view",
+      String(required(request.head, "head")),
+      "--repo",
+      String(required(request.repo, "repo")),
+      "--json",
+      "body",
+      "--jq",
+      ".body",
+    ]);
+    assertPublishedMarkdown(observed);
+    return observed;
+  }
+  if (request.action === "create_issue") {
+    assertPublishedMarkdown(String(required(request.body, "body")));
+    return true;
   }
   if (request.action === "assign_issue") {
     const output = run(runner, [

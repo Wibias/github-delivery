@@ -34,6 +34,7 @@ Anti-patterns (rewrite before posting):
 - “Fixed on development” without SHA/PR
 - Merge-ready checklist with only yes/no and no evidence lines
 - Backticked people: `` `@login` `` / `` `@{author}` `` (must be bare `@login`)
+- Literal escape sequences in the live GitHub body (`\\n`, `\\t`) that collapse headings, lists, or checklists into one line
 
 ## Research (issue)
 
