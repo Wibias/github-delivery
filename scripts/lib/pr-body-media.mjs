@@ -1,5 +1,6 @@
 const MEDIA_EXTENSION_RE = /\.(?:avif|gif|jpe?g|png|svg|webp|mp4|m4v|mov|webm)(?:[?#].*)?$/i;
-const GITHUB_UPLOAD_RE = /^https:\/\/github\.com\/user-attachments\/assets\/[A-Za-z0-9-]+(?:[?#].*)?$/i;
+const GITHUB_UPLOAD_RE = /^https:\/\/(?:github\.com\/user-attachments\/assets\/[A-Za-z0-9-]+|(?:private-)?user-images\.githubusercontent\.com\/[^\s]+)(?:[?#].*)?$/i;
+const GITHUB_UPLOAD_SCAN_RE = /https:\/\/(?:github\.com\/user-attachments\/assets\/[A-Za-z0-9-]+|(?:private-)?user-images\.githubusercontent\.com\/[^\s<>"')]+)(?:[?#][^\s<>"')]+)?/gi;
 
 function normalizeUrl(value) {
   const text = String(value || "").trim().replace(/^<|>$/g, "");
@@ -45,8 +46,7 @@ export function extractPrBodyMedia(body = "") {
     }
   }
 
-  const githubUpload = /https:\/\/github\.com\/user-attachments\/assets\/[A-Za-z0-9-]+(?:[?#][^\s<>"')]+)?/gi;
-  for (const match of text.matchAll(githubUpload)) {
+  for (const match of text.matchAll(GITHUB_UPLOAD_SCAN_RE)) {
     addMatch(entries, seen, match[0], match.index ?? 0, { requireRecognized: false });
   }
 
