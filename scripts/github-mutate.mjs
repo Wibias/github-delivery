@@ -4,6 +4,7 @@ import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import { runGitHubCommandWithRetry } from "./lib/github-retry.mjs";
 import { executeMutationDocument } from "./lib/mutation-document-execution.mjs";
 import { boundedSpawnSync } from "./lib/subprocess-policy.mjs";
+import { makeGitHubBodyTransportRunner } from "./lib/github-body-transport.mjs";
 
 const usage =
   "Usage: node scripts/github-mutate.mjs --request FILE [--execute] [--audit FILE]";
@@ -32,10 +33,12 @@ function parseArgs(argv) {
 
 export function mutationRunner(command, argv, options) {
   if (command !== "gh") return boundedSpawnSync(command, argv, options);
-  return runGitHubCommandWithRetry(command, argv, {
-    options,
-    runner: boundedSpawnSync,
-  });
+  return makeGitHubBodyTransportRunner((cmd, args, opts) =>
+    runGitHubCommandWithRetry(cmd, args, {
+      options: opts,
+      runner: boundedSpawnSync,
+    }),
+  )(command, argv, options);
 }
 
 function completedKeysFromAudit(auditPath) {
