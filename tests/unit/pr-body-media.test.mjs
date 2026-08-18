@@ -27,6 +27,41 @@ test("extracts Markdown images, recognized media links, HTML media and GitHub up
   ]);
 });
 
+test("extracts full, collapsed, and shortcut reference-style Markdown images", () => {
+  const body = [
+    "![first][Screenshot One]",
+    "![Second Shot][]",
+    "![third-shot]",
+    "",
+    "[screenshot one]: https://example.com/ref-one.png \"first\"",
+    "[second shot]: <https://example.com/ref-two.webp>",
+    "[third-shot]: https://example.com/ref-three.svg",
+  ].join("\n");
+
+  assert.deepEqual(extractPrBodyMedia(body), [
+    "https://example.com/ref-one.png",
+    "https://example.com/ref-two.webp",
+    "https://example.com/ref-three.svg",
+  ]);
+});
+
+test("reference-style image removal is protected even when its definition remains", () => {
+  const oldBody = [
+    "![shot][asset]",
+    "",
+    "[asset]: https://example.com/reference.png",
+  ].join("\n");
+  const newBody = [
+    "Image removed but definition accidentally left behind.",
+    "",
+    "[asset]: https://example.com/reference.png",
+  ].join("\n");
+
+  assert.deepEqual(diffPrBodyMedia(oldBody, newBody).unapprovedMissing, [
+    "https://example.com/reference.png",
+  ]);
+});
+
 test("deduplicates media identities and ignores ordinary links", () => {
   const body = [
     "![shot](https://example.com/a.png)",
