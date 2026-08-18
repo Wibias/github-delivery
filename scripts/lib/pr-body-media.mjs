@@ -7,6 +7,21 @@ function normalizeUrl(value) {
   return text || null;
 }
 
+function normalizeReferenceLabel(value) {
+  return String(value || "").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function referenceDefinitions(text) {
+  const definitions = new Map();
+  const definition = /^[ \t]{0,3}\[([^\]\n]+)\]:[ \t]*(?:<([^>\n]+)>|(\S+))(?:[ \t]+(?:"[^"\n]*"|'[^'\n]*'|\([^\)\n]*\)))?[ \t]*$/gm;
+  for (const match of text.matchAll(definition)) {
+    const label = normalizeReferenceLabel(match[1]);
+    const url = normalizeUrl(match[2] || match[3]);
+    if (label && url && !definitions.has(label)) definitions.set(label, url);
+  }
+  return definitions;
+}
+
 function isMediaUrl(value) {
   const url = normalizeUrl(value);
   return Boolean(url && (MEDIA_EXTENSION_RE.test(url) || GITHUB_UPLOAD_RE.test(url)));
@@ -23,10 +38,24 @@ export function extractPrBodyMedia(body = "") {
   const text = String(body || "");
   const entries = [];
   const seen = new Set();
+  const definitions = referenceDefinitions(text);
 
   const markdownImage = /!\[[^\]]*\]\(\s*(?:<([^>]+)>|([^\s)]+))(?:\s+["'][^"']*["'])?\s*\)/g;
   for (const match of text.matchAll(markdownImage)) {
     addMatch(entries, seen, match[1] || match[2], match.index ?? 0, { requireRecognized: false });
+  }
+
+  const referenceImage = /!\[([^\]\n]*)\][ \t]*\[([^\]\n]*)\]/g;
+  for (const match of text.matchAll(referenceImage)) {
+    const label = normalizeReferenceLabel(match[2] || match[1]);
+    const url = definitions.get(label);
+    if (url) addMatch(entries, seen, url, match.index ?? 0, { requireRecognized: false });
+  }
+
+  const shortcutReferenceImage = /!\[([^\]\n]+)\](?![ \t]*[\[(])/g;
+  for (const match of text.matchAll(shortcutReferenceImage)) {
+    const url = definitions.get(normalizeReferenceLabel(match[1]));
+    if (url) addMatch(entries, seen, url, match.index ?? 0, { requireRecognized: false });
   }
 
   const markdownLink = /(?<!!)\[[^\]]*\]\(\s*(?:<([^>]+)>|([^\s)]+))(?:\s+["'][^"']*["'])?\s*\)/g;
