@@ -36,13 +36,15 @@ export function normalizeOpenPullPages(payload, repoFullName) {
     for (const raw of page) {
       const number = Number(raw?.number);
       const title = raw?.title;
-      const url = raw?.url ?? raw?.html_url;
+      const url = raw?.html_url ?? raw?.url;
       const authorLogin = raw?.authorLogin ?? raw?.user?.login;
       const headRefName = raw?.headRefName ?? raw?.head?.ref;
       const headRefOid = raw?.headRefOid ?? raw?.head?.sha;
       const headRepoFullName = repoName(raw, "head");
       const baseRefName = raw?.baseRefName ?? raw?.base?.ref;
       const targetRepoFullName = raw?.targetRepoFullName ?? repoName(raw, "base");
+      const rawMergeableState = raw?.mergeableState ?? raw?.mergeable_state ?? null;
+      const issueLinksProvided = Array.isArray(raw?.issueLinks);
 
       if (
         !Number.isInteger(number) || number <= 0 || !title || !url || !authorLogin ||
@@ -62,13 +64,15 @@ export function normalizeOpenPullPages(payload, repoFullName) {
         body: String(raw?.body || ""),
         isDraft: raw?.isDraft === true || raw?.draft === true,
         updatedAt: raw?.updatedAt ?? raw?.updated_at ?? null,
-        mergeableState: String(raw?.mergeableState ?? raw?.mergeable_state ?? "unknown").toLowerCase(),
+        mergeableState: String(rawMergeableState ?? "unknown").toLowerCase(),
+        mergeStateComplete: raw?.mergeStateComplete === true || rawMergeableState !== null,
         headRefName: String(headRefName),
         headRefOid: String(headRefOid),
         headRepoFullName: String(headRepoFullName),
         baseRefName: String(baseRefName),
         targetRepoFullName: String(targetRepoFullName),
-        issueLinks: Array.isArray(raw?.issueLinks) ? raw.issueLinks : [],
+        issueLinks: issueLinksProvided ? raw.issueLinks : [],
+        issueLinksComplete: raw?.issueLinksComplete === true || issueLinksProvided,
         externalLinks: Array.isArray(raw?.externalLinks) ? raw.externalLinks : [],
       });
     }
@@ -81,6 +85,24 @@ function nextActionFor(row) {
   if (["dirty", "conflicting"].includes(row.mergeableState)) return "resolve-conflicts";
   if (row.mergeableState === "behind") return "update-base";
   return null;
+}
+
+function workItemFor(repository, row) {
+  if (row.issueLinksComplete === false) {
+    return {
+      state: "unknown",
+      candidates: [],
+      reason: "github-issue-link-evidence-unavailable",
+    };
+  }
+  return extractWorkItemReferences({
+    repository,
+    issueLinks: row.issueLinks,
+    externalLinks: row.externalLinks,
+    headRefName: row.headRefName,
+    title: row.title,
+    body: row.body,
+  });
 }
 
 export function buildOpenWorkStatus({ repository, authenticatedLogin, rows = [] } = {}) {
@@ -101,14 +123,8 @@ export function buildOpenWorkStatus({ repository, authenticatedLogin, rows = [] 
       isDraft: row.isDraft,
       updatedAt: row.updatedAt,
       nextAction: nextActionFor(row),
-      workItem: extractWorkItemReferences({
-        repository,
-        issueLinks: row.issueLinks,
-        externalLinks: row.externalLinks,
-        headRefName: row.headRefName,
-        title: row.title,
-        body: row.body,
-      }),
+      nextActionEvidenceComplete: row.isDraft || row.mergeStateComplete !== false,
+      workItem: workItemFor(repository, row),
     }));
 
   return {
@@ -135,9 +151,8 @@ export function listAllOpenPullRequests(repoFullName, runner = sh) {
   return normalizeOpenPullPages(payload, repoFullName);
 }
 
-function enrichClosingIssueLinks(repoFullName, rows, runner = sh) {
+function enrichPullRequestDetails(repoFullName, rows, runner = sh) {
   return rows.map((row) => {
-    if (!row.authorLogin) return row;
     let payload;
     try {
       const raw = runner("gh", [
@@ -147,11 +162,15 @@ function enrichClosingIssueLinks(repoFullName, rows, runner = sh) {
         "--repo",
         repoFullName,
         "--json",
-        "closingIssuesReferences",
+        "closingIssuesReferences,mergeStateStatus",
       ]);
       payload = JSON.parse(raw || "{}");
     } catch {
-      return row;
+      return {
+        ...row,
+        issueLinksComplete: false,
+        mergeStateComplete: false,
+      };
     }
     const issueLinks = Array.isArray(payload?.closingIssuesReferences)
       ? payload.closingIssuesReferences.flatMap((issue) => {
@@ -160,7 +179,16 @@ function enrichClosingIssueLinks(repoFullName, rows, runner = sh) {
           return [{ number, url: issue?.url ? String(issue.url) : null, repository: repoFullName }];
         })
       : [];
-    return { ...row, issueLinks };
+    const mergeStateStatus = typeof payload?.mergeStateStatus === "string"
+      ? payload.mergeStateStatus.trim()
+      : "";
+    return {
+      ...row,
+      issueLinks,
+      issueLinksComplete: true,
+      mergeableState: mergeStateStatus ? mergeStateStatus.toLowerCase() : "unknown",
+      mergeStateComplete: Boolean(mergeStateStatus),
+    };
   });
 }
 
@@ -174,7 +202,7 @@ export function collectOpenWorkStatus(runner = sh) {
   const authoredRows = allRows.filter(
     (row) => row.authorLogin.toLowerCase() === authenticatedLogin.toLowerCase(),
   );
-  const enriched = enrichClosingIssueLinks(repoFullName, authoredRows, runner);
+  const enriched = enrichPullRequestDetails(repoFullName, authoredRows, runner);
   return buildOpenWorkStatus({ repository: repoFullName, authenticatedLogin, rows: enriched });
 }
 
