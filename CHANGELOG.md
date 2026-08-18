@@ -7,6 +7,7 @@ All notable changes to `github-delivery` are documented here.
 ### Fixed
 
 - Fail closed when a published GitHub PR or comment body contains literal escape sequences instead of real markdown newlines, including stdin body transport, create/update verification, and live comment re-reads.
+- Bound GitHub, Git, PowerShell, and registry subprocess helpers now copy argv and force a direct spawn (shell: false), so library-provided arguments cannot be reconstructed as a shell command.
 
 ## [0.8.6] - 2026-08-18
 
