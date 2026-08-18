@@ -25,6 +25,27 @@ test("a stubborn child cannot outlive the bounded subprocess deadline", () => {
   assert.ok(elapsed < 5_000, `subprocess exceeded hard deadline budget: ${elapsed}ms`);
 });
 
+test("direct spawn rejects a reconstructed shell and copies argv off the caller array", () => {
+  const calls = [];
+  const args = ["--repo", "Wibias/github-delivery"];
+  boundedSpawnSync("gh", args, { shell: true, encoding: "utf8" }, {
+    spawn(command, argv, options) {
+      calls.push({ command, argv, options });
+      return { status: 0, stdout: "", stderr: "" };
+    },
+  });
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].command, "gh");
+  assert.deepEqual(calls[0].argv, ["--repo", "Wibias/github-delivery"]);
+  assert.notEqual(calls[0].argv, args);
+  assert.equal(calls[0].options.shell, false);
+  assert.throws(
+    () => boundedSpawnSync("gh", ["ok", 1], {}, { spawn() { throw new Error("must not spawn"); } }),
+    /subprocess_arg_invalid:1/,
+  );
+});
+
 test("canonical mutation and GitHub retry entrypoints do not fall back to raw spawnSync", () => {
   const mutate = readFileSync(
     new URL("../../scripts/github-mutate.mjs", import.meta.url),
