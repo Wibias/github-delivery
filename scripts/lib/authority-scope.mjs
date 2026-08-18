@@ -159,17 +159,19 @@ export function authorityScopeForRequest(request = {}) {
         bodySha256: bodyHash(request.body),
       };
 
-    case "update_pr_body":
+    case "update_pr_body": {
+      const approvedMediaRemovals = normalizedStringSet(
+        request.approvedMediaRemovals,
+        "approved_media_removals",
+        { optional: true },
+      );
       return {
         ...scope,
         ...prScope(request),
         bodySha256: bodyHash(request.body),
-        approvedMediaRemovals: normalizedStringSet(
-          request.approvedMediaRemovals,
-          "approved_media_removals",
-          { optional: true },
-        ),
+        ...(approvedMediaRemovals.length ? { approvedMediaRemovals } : {}),
       };
+    }
 
     case "create_issue":
       return {
