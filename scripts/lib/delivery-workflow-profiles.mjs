@@ -84,6 +84,14 @@ const STATUS_GRAPH = Object.freeze({
   ...TERMINAL,
 });
 
+const OPEN_WORK_GRAPH = Object.freeze({
+  ROUTE: ["PREFLIGHT"],
+  PREFLIGHT: ["SNAPSHOT", "DONE"],
+  SNAPSHOT: ["REPORT"],
+  REPORT: ["DONE"],
+  ...TERMINAL,
+});
+
 const MERGE_GRAPH = Object.freeze({
   ROUTE: ["PREFLIGHT"],
   PREFLIGHT: ["PREPARE", "DONE"],
@@ -148,6 +156,7 @@ const PROFILE_DEFINITIONS = Object.freeze({
   "research-issue": { graph: RESEARCH_GRAPH, mutation: "read-mostly" },
   "create-pr-from-local-work": { graph: LOCAL_PR_GRAPH, mutation: "maintainer" },
   "create-pr-for-issue": { graph: CREATE_PR_GRAPH, mutation: "maintainer" },
+  "open-work-status": { graph: OPEN_WORK_GRAPH, mutation: "read-only" },
   "full-review-pr": { graph: REVIEW_GRAPH, mutation: "review" },
   "spec-standards-review": { graph: REVIEW_GRAPH, mutation: "review" },
   "simplify-pr": { graph: REVIEW_GRAPH, mutation: "maintainer" },
