@@ -119,15 +119,19 @@ test("create_pr idempotency lookup is bounded to the head branch", () => {
           ? [{
               id: 99,
               number: 99,
+              state: "open",
               user: { login: "agent" },
               title: "Add feature",
-              base: { ref: "main" },
-              head: { ref: "feature/x", label: "acme:feature/x" },
+              base: { ref: "main", repo: { full_name: "acme/widgets" } },
+              head: { ref: "feature/x", label: "acme:feature/x", repo: { full_name: "acme/widgets" } },
               body: createdBody,
               html_url: "https://github.test/acme/widgets/pull/99",
             }]
           : [];
         return { status: 0, stdout: JSON.stringify([exactPr]), stderr: "" };
+      }
+      if (command === "gh" && args[0] === "api" && String(args[1]).includes("/pulls?state=open")) {
+        return { status: 0, stdout: "[[]]", stderr: "" };
       }
       if (command === "gh" && args[0] === "api" && args[1] === "user") {
         return { status: 0, stdout: "agent\n", stderr: "" };
@@ -144,6 +148,67 @@ test("create_pr idempotency lookup is bounded to the head branch", () => {
   assert.ok(lookupCommand, "expected a head-filtered idempotency lookup");
   assert.match(lookupCommand, /head=feature%2Fx/);
   assert.equal(result.status, "succeeded");
+});
+
+test("create_pr exact idempotent retry converges before generic duplicate preflight", () => {
+  const key = "pr-retry";
+  const marker = idempotencyMarker(key);
+  let duplicatePreflightCalls = 0;
+  let createCalls = 0;
+
+  const result = executeLifecycleMutationRequest({
+    request: {
+      schemaVersion: 1,
+      action: "create_pr",
+      mutationMode: "maintainer",
+      explicitInstruction: true,
+      repo: "acme/widgets",
+      base: "main",
+      head: "feature/x",
+      title: "Add feature",
+      body: "Body",
+      idempotencyKey: key,
+    },
+    execute: true,
+    runner(command, args) {
+      if (command === "gh" && args[0] === "api" && String(args[1]).includes("/pulls?state=all")) {
+        return {
+          status: 0,
+          stdout: JSON.stringify([[
+            {
+              id: 99,
+              number: 99,
+              state: "open",
+              user: { login: "agent" },
+              title: "Add feature",
+              base: { ref: "main", repo: { full_name: "acme/widgets" } },
+              head: { ref: "feature/x", label: "acme:feature/x", repo: { full_name: "acme/widgets" } },
+              body: `Body\n\n${marker}`,
+              html_url: "https://github.test/acme/widgets/pull/99",
+            },
+          ]]),
+          stderr: "",
+        };
+      }
+      if (command === "gh" && args[0] === "api" && args[1] === "user") {
+        return { status: 0, stdout: "agent\n", stderr: "" };
+      }
+      if (command === "gh" && args[0] === "api" && String(args[1]).includes("/pulls?state=open")) {
+        duplicatePreflightCalls += 1;
+        return { status: 0, stdout: "[[]]", stderr: "" };
+      }
+      if (command === "gh" && args[0] === "pr" && args[1] === "create") {
+        createCalls += 1;
+        return { status: 0, stdout: "created\n", stderr: "" };
+      }
+      throw new Error(`unexpected command: ${command} ${args.join(" ")}`);
+    },
+  });
+
+  assert.equal(result.status, "already_applied");
+  assert.equal(result.existingMutation.number, 99);
+  assert.equal(duplicatePreflightCalls, 0);
+  assert.equal(createCalls, 0);
 });
 
 test("social mutation ignores a forged marker from another GitHub actor", () => {
