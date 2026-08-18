@@ -3,11 +3,14 @@
 // is a workflow violation, never a publication excuse.
 
 const WORKFLOW_MUTATION_MODES = Object.freeze({
+  "references/consolidate-prs.md": ["read-only"],
   "references/create-pr-for-issue.md": ["maintainer"],
   "references/create-pr-from-local-work.md": ["maintainer"],
   "references/fix-pr-bots.md": ["maintainer"],
   "references/full-review-pr.md": ["review", "maintainer"],
   "references/merge-pr.md": ["maintainer"],
+  "references/multi-base-delivery.md": ["maintainer"],
+  "references/open-work-status.md": ["read-only"],
   "references/overtake-pr.md": ["maintainer"],
   "references/re-review-pr.md": ["review"],
   "references/research-issue.md": ["review"],
@@ -16,6 +19,7 @@ const WORKFLOW_MUTATION_MODES = Object.freeze({
   "references/status.md": ["read-only"],
   "references/supersede-pr.md": ["maintainer"],
   "references/watch-pr.md": ["read-only", "autonomous"],
+  "references/work-item-delivery.md": ["read-only", "maintainer"],
 });
 
 export function allowedMutationModes(workflow) {

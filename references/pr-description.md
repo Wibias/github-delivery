@@ -6,7 +6,7 @@ Load this policy when opening a PR and again before declaring it merge-ready.
 
 The PR body is a durable, evidence-grounded explanation of the **final head**. A reviewer should understand what changed, why it matters, and how it was validated without reconstructing the story from commits.
 
-Be concise, but never vague. The body is not a changelog, implementation diary, or file-by-file narration. After the evidence and required sections are correct, apply `references/prose-quality.md`. That cleanup may improve wording, but it must preserve exact evidence states, GitHub syntax, required template fields, security redaction, and user-confirmed wording.
+Be concise, but never vague. The body is not a changelog, implementation diary, or file-by-file narration. After the evidence and required sections are correct, apply `references/prose-quality.md`. That cleanup may improve wording, but it must preserve exact evidence states, GitHub syntax, required template fields, security redaction, user-confirmed wording, and existing media unless exact removal was explicitly authorized.
 
 ## Sources of truth
 
@@ -82,6 +82,25 @@ Fixes #N
 
 Remove empty optional sections instead of leaving placeholder text.
 
+## Media preservation invariant
+
+Refreshing a PR body must not silently delete existing screenshots, videos, GitHub uploads, or other protected media.
+
+Before `update_pr_body` executes, the mutation preflight re-reads the current PR head and body, verifies the exact expected head, extracts protected media identities from the observed and proposed bodies, and rejects any missing identity that was not explicitly approved for removal.
+
+Protected identities include at minimum:
+
+- Markdown images;
+- Markdown links to recognized image/video or GitHub user-attachment URLs;
+- HTML `img`, `video`, and `source` media URLs;
+- GitHub `user-attachments` asset URLs.
+
+Reordering media or rewriting surrounding text is allowed. Intentional deletion is narrow: the request must carry the exact media identities in `approvedMediaRemovals`. A boolean or broad “remove media” waiver is not supported.
+
+The approved-removal set is part of the trusted `update_pr_body` authority scope. Changing that set after authority was issued changes the scope hash and requires new authority where configured.
+
+If a requested body refresh would drop unapproved media, keep the existing body and surface the exact blocked identities instead of publishing the rewrite.
+
 ## Initial PR creation
 
 Before opening the PR:
@@ -103,9 +122,10 @@ Before posting merge-ready evidence:
 3. update the Summary for scope or behavior changed by follow-up commits;
 4. update Validation to reflect what ran on the final head;
 5. add or remove Review notes and Limitations as the evidence changed;
-6. confirm the canonical closing reference still resolves to the intended issue.
+6. confirm the canonical closing reference still resolves to the intended issue;
+7. preserve every existing protected media identity unless its exact removal is explicitly authorized.
 
-If review fixes or later commits materially changed behavior, scope, validation, risk, or limitations, update the PR body. A materially stale or misleading description blocks a merge-ready claim.
+If review fixes or later commits materially changed behavior, scope, validation, risk, or limitations, update the PR body. A materially stale or misleading description blocks a merge-ready claim. A body rewrite that would silently discard existing media is also blocked.
 
 ## Rewrite these anti-patterns
 
@@ -115,4 +135,5 @@ If review fixes or later commits materially changed behavior, scope, validation,
 - Validation claims for commands or checks that did not run on the relevant head.
 - A copied issue description with no explanation of the implemented result.
 - Stale scope, test, or limitation claims after review-driven changes.
+- Body rewrites that accidentally remove screenshots, uploads, or videos.
 - Walls of implementation detail that hide the user or developer impact.

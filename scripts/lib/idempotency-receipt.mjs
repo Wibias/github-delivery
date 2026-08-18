@@ -4,6 +4,14 @@ function sameText(left, right) {
   return String(left ?? "").trimEnd() === String(right ?? "").trimEnd();
 }
 
+function sameRepo(left, right) {
+  return String(left || "").toLowerCase() === String(right || "").toLowerCase();
+}
+
+function repoName(record, side) {
+  return record?.[side]?.repo?.full_name ?? record?.[side]?.repo?.nameWithOwner ?? null;
+}
+
 export function visibleIdempotencyBody(value) {
   return String(value ?? "").replace(IDEMPOTENCY_MARKER_RE, "");
 }
@@ -41,10 +49,27 @@ export function exactIdempotencyRecordMatches({ record, request, actorLogin } = 
       if (record.pull_request === undefined && !record.head && !record.base) return false;
       if (!sameText(record.title, request.title)) return false;
       if (String(record?.base?.ref || "") !== String(request.base || "")) return false;
-      const requestedHead = String(request.head || "");
+
+      const requestRepo = String(request.repo || "");
+      const recordBaseRepo = repoName(record, "base");
+      if (recordBaseRepo && requestRepo && !sameRepo(recordBaseRepo, requestRepo)) return false;
+
+      const requestedHead = String(request.head || "").trim();
+      const separator = requestedHead.indexOf(":");
+      const requestedBranch = separator >= 0 ? requestedHead.slice(separator + 1) : requestedHead;
       const recordHead = String(record?.head?.ref || "");
       const recordLabel = String(record?.head?.label || "");
-      return recordHead === requestedHead || recordLabel === requestedHead;
+      if (!requestedBranch || recordHead !== requestedBranch) return false;
+      if (separator >= 0 && recordLabel !== requestedHead) return false;
+
+      const recordHeadRepo = repoName(record, "head");
+      const requestedHeadRepo = String(request.headRepo || "").trim();
+      if (requestedHeadRepo) {
+        if (!recordHeadRepo || !sameRepo(recordHeadRepo, requestedHeadRepo)) return false;
+      } else if (separator < 0 && requestRepo) {
+        if (!recordHeadRepo || !sameRepo(recordHeadRepo, requestRepo)) return false;
+      }
+      return true;
     }
     case "reply_bot_thread":
     case "reply_human_thread":

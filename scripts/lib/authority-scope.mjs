@@ -48,6 +48,25 @@ function exactString(value, name) {
   return String(required(value, name));
 }
 
+function optionalExactString(value, name) {
+  if (value === undefined || value === null) return null;
+  const text = String(value).trim();
+  if (!text) throw new Error(`authority_scope_${name}_required`);
+  return text;
+}
+
+function normalizedStringSet(value, name, { optional = false } = {}) {
+  if (value === undefined && optional) return [];
+  if (!Array.isArray(value)) throw new Error(`authority_scope_${name}_invalid`);
+  const items = value.map((entry) => {
+    if (typeof entry !== "string" || !entry.trim()) {
+      throw new Error(`authority_scope_${name}_entry_invalid`);
+    }
+    return entry.trim();
+  });
+  return [...new Set(items)].sort();
+}
+
 function base(request) {
   if (!plainObject(request)) throw new Error("authority_scope_request_invalid");
   const scope = {
@@ -136,23 +155,33 @@ export function authorityScopeForRequest(request = {}) {
         forceWithLease: request.forceWithLease === true,
       };
 
-    case "create_pr":
+    case "create_pr": {
+      const headRepo = optionalExactString(request.headRepo, "head_repo");
       return {
         ...scope,
         base: exactString(request.base, "base"),
         head: exactString(request.head, "head"),
+        ...(headRepo ? { headRepo } : {}),
         draft: request.draft === true,
         idempotencyKey: exactString(request.idempotencyKey, "idempotency_key"),
         titleSha256: sha256(exactString(request.title, "title")),
         bodySha256: bodyHash(request.body),
       };
+    }
 
-    case "update_pr_body":
+    case "update_pr_body": {
+      const approvedMediaRemovals = normalizedStringSet(
+        request.approvedMediaRemovals,
+        "approved_media_removals",
+        { optional: true },
+      );
       return {
         ...scope,
         ...prScope(request),
         bodySha256: bodyHash(request.body),
+        ...(approvedMediaRemovals.length ? { approvedMediaRemovals } : {}),
       };
+    }
 
     case "create_issue":
       return {

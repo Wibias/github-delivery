@@ -77,7 +77,7 @@ function publicAuthorityReceipt(authority) {
 
 function verifyHead({ request, runner }) {
   if (!PR_ACTIONS.has(request.action)) return null;
-  const expected = String(required(request.expectedHead, "expected_head"));
+  const expected = String(required(request.expectedHead, "expected_head")).trim().toLowerCase();
   const observed = runOrThrow(runner, [
     "gh",
     "pr",
@@ -89,7 +89,7 @@ function verifyHead({ request, runner }) {
     "headRefOid",
     "--jq",
     ".headRefOid",
-  ]);
+  ]).trim().toLowerCase();
   if (observed !== expected) {
     throw new Error(`expected_head_mismatch: expected ${expected}, observed ${observed || "missing"}`);
   }
@@ -109,12 +109,14 @@ function parsePages(output) {
 
 function lookupPath(request) {
   if (request.action === "create_pr") {
+    const repo = String(required(request.repo, "repo")).trim();
     const head = String(request.head || "").trim();
     if (!head) throw new Error("create_pr_head_required");
-    // Bound the idempotency scan to the head branch instead of enumerating
-    // every pull in the repository. High-volume repos can otherwise overflow
-    // the bounded subprocess stdout buffer (maxBuffer) before the create runs.
-    return `repos/${request.repo}/pulls?state=all&per_page=100&head=${encodeURIComponent(head)}`;
+    const owner = repo.split("/")[0];
+    const headFilter = head.includes(":") ? head : `${owner}:${head}`;
+    // REST requires a user/org-qualified `head` filter. Keep the idempotency
+    // scan bounded to the intended branch rather than enumerating every pull.
+    return `repos/${repo}/pulls?state=all&per_page=100&head=${encodeURIComponent(headFilter)}`;
   }
   if (request.action === "create_issue") {
     return `repos/${request.repo}/issues?state=all&per_page=100`;
@@ -222,7 +224,10 @@ export function executeLifecycleMutationRequest({
   if (!execute) return { ...plan, executed: false, status: "dry_run" };
 
   const observedHead = verifyHead({ request: plan.request, runner });
-  const preflight = preflightLifecycleMutation({ request: plan.request, runner });
+
+  // Recover an exact same-actor/idempotency create before broader publication
+  // preflights. Otherwise an already-created PR would be rejected as a generic
+  // exact-head duplicate before its durable receipt can converge the retry.
   const existingMutation = findExistingCreate({ request: plan.request, runner });
   if (existingMutation) {
     return {
@@ -230,13 +235,14 @@ export function executeLifecycleMutationRequest({
       executed: false,
       status: "already_applied",
       observedHead,
-      preflight,
+      preflight: null,
       existingMutation,
       stdout: "",
       verification: existingMutation,
     };
   }
 
+  const preflight = preflightLifecycleMutation({ request: plan.request, runner });
   const stdout = runOrThrow(runner, plan.command);
   let verification = verifyLifecycleMutation({ request: plan.request, runner });
   if (IDEMPOTENT_CREATES.has(plan.action)) {

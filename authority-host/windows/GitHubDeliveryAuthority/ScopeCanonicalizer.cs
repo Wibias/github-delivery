@@ -66,6 +66,13 @@ internal static partial class ScopeCanonicalizer
             case "create_pr":
                 scope["base"] = RequiredString(request, "base");
                 scope["head"] = RequiredString(request, "head");
+                var headRepo = OptionalString(request, "headRepo");
+                if (headRepo is not null)
+                {
+                    headRepo = headRepo.Trim();
+                    if (headRepo.Length == 0) throw new AuthorityException("authority_scope_head_repo_required");
+                    scope["headRepo"] = headRepo;
+                }
                 scope["draft"] = request.TryGetProperty("draft", out var draft) && draft.ValueKind == JsonValueKind.True;
                 scope["idempotencyKey"] = RequiredString(request, "idempotencyKey");
                 scope["titleSha256"] = Sha256(RequiredString(request, "title"));
@@ -75,6 +82,8 @@ internal static partial class ScopeCanonicalizer
             case "update_pr_body":
                 AddPrScope(scope, request);
                 scope["bodySha256"] = BodySha256(request);
+                var approvedMediaRemovals = CanonicalStringSet(request, "approvedMediaRemovals", optional: true);
+                if (approvedMediaRemovals.Count > 0) scope["approvedMediaRemovals"] = approvedMediaRemovals;
                 break;
 
             case "create_issue":
@@ -188,7 +197,7 @@ internal static partial class ScopeCanonicalizer
     public static JsonObject BuildResource(JsonElement request)
     {
         var resource = new JsonObject();
-        foreach (var field in new[] { "pr", "issue", "commentId", "threadId", "expectedHead", "authorityBranch", "headRefName", "targetRepo", "supersedingPr", "remote", "branch", "expectedRemoteTip", "newTip", "base", "head", "assignee" })
+        foreach (var field in new[] { "pr", "issue", "commentId", "threadId", "expectedHead", "authorityBranch", "headRefName", "targetRepo", "supersedingPr", "remote", "branch", "expectedRemoteTip", "newTip", "base", "head", "headRepo", "assignee" })
         {
             if (!request.TryGetProperty(field, out var value) || value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
             {
@@ -203,6 +212,41 @@ internal static partial class ScopeCanonicalizer
     {
         scope["pr"] = PositiveInt(request, "pr");
         scope["expectedHead"] = RequiredString(request, "expectedHead");
+    }
+
+    private static JsonArray CanonicalStringSet(JsonElement request, string name, bool optional = false)
+    {
+        if (!request.TryGetProperty(name, out var values))
+        {
+            if (optional) return new JsonArray();
+            throw new AuthorityException($"authority_scope_{ToSnake(name)}_invalid");
+        }
+        if (values.ValueKind != JsonValueKind.Array)
+        {
+            throw new AuthorityException($"authority_scope_{ToSnake(name)}_invalid");
+        }
+
+        var normalized = new List<string>();
+        foreach (var value in values.EnumerateArray())
+        {
+            if (value.ValueKind != JsonValueKind.String)
+            {
+                throw new AuthorityException($"authority_scope_{ToSnake(name)}_entry_invalid");
+            }
+            var text = value.GetString()?.Trim() ?? string.Empty;
+            if (text.Length == 0)
+            {
+                throw new AuthorityException($"authority_scope_{ToSnake(name)}_entry_invalid");
+            }
+            normalized.Add(text);
+        }
+
+        var array = new JsonArray();
+        foreach (var item in normalized.Distinct(StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal))
+        {
+            array.Add(item);
+        }
+        return array;
     }
 
     private static JsonArray CanonicalReviewers(JsonElement request)

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { basename, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 
 import {
   parsePolicyDependencies,
@@ -84,6 +84,47 @@ const STATUS_GRAPH = Object.freeze({
   ...TERMINAL,
 });
 
+const OPEN_WORK_GRAPH = Object.freeze({
+  ROUTE: ["PREFLIGHT"],
+  PREFLIGHT: ["SNAPSHOT", "DONE"],
+  SNAPSHOT: ["REPORT"],
+  REPORT: ["DONE"],
+  ...TERMINAL,
+});
+
+const WORK_ITEM_GRAPH = Object.freeze({
+  ROUTE: ["PREFLIGHT"],
+  PREFLIGHT: ["RESOLVE", "DONE"],
+  RESOLVE: ["SNAPSHOT", "DONE"],
+  SNAPSHOT: ["DELIVER", "REPORT"],
+  DELIVER: ["VERIFY"],
+  VERIFY: ["RECONCILE", "REPORT"],
+  RECONCILE: ["REPORT"],
+  REPORT: ["DONE"],
+  ...TERMINAL,
+});
+
+const CONSOLIDATE_GRAPH = Object.freeze({
+  ROUTE: ["PREFLIGHT"],
+  PREFLIGHT: ["COLLECT", "DONE"],
+  COLLECT: ["ANALYZE"],
+  ANALYZE: ["REPORT"],
+  REPORT: ["DONE"],
+  ...TERMINAL,
+});
+
+const MULTI_BASE_GRAPH = Object.freeze({
+  ROUTE: ["PREFLIGHT"],
+  PREFLIGHT: ["PLAN", "DONE"],
+  PLAN: ["APPLY"],
+  APPLY: ["LOCAL_VERIFY"],
+  LOCAL_VERIFY: ["PUBLISH", "DONE"],
+  PUBLISH: ["VERIFY_PORTS"],
+  VERIFY_PORTS: ["FINAL_GATE", "DONE"],
+  FINAL_GATE: ["DONE"],
+  ...TERMINAL,
+});
+
 const MERGE_GRAPH = Object.freeze({
   ROUTE: ["PREFLIGHT"],
   PREFLIGHT: ["PREPARE", "DONE"],
@@ -148,6 +189,10 @@ const PROFILE_DEFINITIONS = Object.freeze({
   "research-issue": { graph: RESEARCH_GRAPH, mutation: "read-mostly" },
   "create-pr-from-local-work": { graph: LOCAL_PR_GRAPH, mutation: "maintainer" },
   "create-pr-for-issue": { graph: CREATE_PR_GRAPH, mutation: "maintainer" },
+  "open-work-status": { graph: OPEN_WORK_GRAPH, mutation: "read-only" },
+  "work-item-delivery": { graph: WORK_ITEM_GRAPH, mutation: "profile-dependent" },
+  "consolidate-prs": { graph: CONSOLIDATE_GRAPH, mutation: "read-only" },
+  "multi-base-delivery": { graph: MULTI_BASE_GRAPH, mutation: "maintainer" },
   "full-review-pr": { graph: REVIEW_GRAPH, mutation: "review" },
   "spec-standards-review": { graph: REVIEW_GRAPH, mutation: "review" },
   "simplify-pr": { graph: REVIEW_GRAPH, mutation: "maintainer" },

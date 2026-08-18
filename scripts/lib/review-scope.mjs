@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 
 import { PROBE_REGISTRY, validateProbeRegistry } from "./probe-registry.mjs";
+import { planVisualEvidence } from "./visual-evidence.mjs";
 
 const CODE_RE = /\.(?:[cm]?[jt]sx?|mjs|cjs|py|go|rs|java|kt|rb|php|cs|swift|c|cc|cpp|h|hpp|vue|svelte)$/i;
 const DOC_RE = /\.(?:md|txt|rst|adoc)$/i;
@@ -185,6 +186,7 @@ export function assertCompletePrFileEnumeration(expectedCount, observedCount) {
 
 export function planReviewScope(input = {}) {
   const files = (input.files || []).map(normalizeFile).filter((file) => file.path);
+  const visualEvidence = planVisualEvidence(files);
   const evidence = new Map();
   const lensEvidence = new Map();
   const removedControlLeads = [];
@@ -303,6 +305,7 @@ export function planReviewScope(input = {}) {
     bugLenses,
     securityReview: { depth: securityDepth, requiredDomains: requiredSecurity.map((item) => item.id) },
     bugReview: { depth: bugDepth, requiredLenses: requiredBug.map((item) => item.id) },
+    visualEvidence,
     requiredProbes,
     probeEvidence,
     baselineScreens: logicFiles.length ? ["authn", "authz", "secrets_config", "injection", "error_propagation", "boundary_conditions"] : [],
@@ -314,6 +317,7 @@ export function planReviewScope(input = {}) {
       "Use renamed source and destination paths when interpreting ownership and security boundaries.",
       "Do not skip a domain solely because another review tool reported clean results.",
       "Every probe in `requiredProbes` names a Must-probe block in bug-review.md / security-review.md; walk each one against the diff.",
+      ...(visualEvidence.required ? ["Rendered visual evidence is required for this diff; load references/visual-evidence.md and bind artifacts to the current head SHA."] : []),
     ],
   };
 }

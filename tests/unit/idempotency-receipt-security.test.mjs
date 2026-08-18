@@ -33,6 +33,53 @@ test("exact receipt matcher rejects a PR masquerading as a created issue", () =>
   );
 });
 
+test("exact PR receipt matcher rejects the same branch from the wrong head repository", () => {
+  const key = "pr-head-repo";
+  const marker = idempotencyMarker(key);
+  const request = {
+    action: "create_pr",
+    repo: "acme/widgets",
+    base: "main",
+    head: "fork-owner:feature/x",
+    headRepo: "fork-owner/widgets-fork",
+    title: "Add feature",
+    body: `Body\n\n${marker}`,
+    idempotencyMarker: marker,
+  };
+  const record = {
+    user: { login: "agent" },
+    title: "Add feature",
+    body: `Body\n\n${marker}`,
+    base: { ref: "main", repo: { full_name: "acme/widgets" } },
+    head: { ref: "feature/x", label: "fork-owner:feature/x", repo: { full_name: "fork-owner/other-fork" } },
+  };
+
+  assert.equal(exactIdempotencyRecordMatches({ record, request, actorLogin: "agent" }), false);
+});
+
+test("exact PR receipt matcher binds an unqualified head to the target repository", () => {
+  const key = "pr-same-repo";
+  const marker = idempotencyMarker(key);
+  const request = {
+    action: "create_pr",
+    repo: "acme/widgets",
+    base: "main",
+    head: "feature/x",
+    title: "Add feature",
+    body: `Body\n\n${marker}`,
+    idempotencyMarker: marker,
+  };
+  const record = {
+    user: { login: "agent" },
+    title: "Add feature",
+    body: `Body\n\n${marker}`,
+    base: { ref: "main", repo: { full_name: "acme/widgets" } },
+    head: { ref: "feature/x", label: "fork-owner:feature/x", repo: { full_name: "fork-owner/widgets-fork" } },
+  };
+
+  assert.equal(exactIdempotencyRecordMatches({ record, request, actorLogin: "agent" }), false);
+});
+
 test("lifecycle create ignores forged marker records and verifies the exact created issue", () => {
   let created = false;
   let createdBody = null;
@@ -92,7 +139,7 @@ test("lifecycle create ignores forged marker records and verifies the exact crea
   assert.equal(result.verification.number, 88);
 });
 
-test("create_pr idempotency lookup is bounded to the head branch", () => {
+test("create_pr idempotency lookup is bounded to the qualified head branch", () => {
   const key = "pr-key";
   let lookupCommand = null;
   let createdBody = null;
@@ -119,15 +166,19 @@ test("create_pr idempotency lookup is bounded to the head branch", () => {
           ? [{
               id: 99,
               number: 99,
+              state: "open",
               user: { login: "agent" },
               title: "Add feature",
-              base: { ref: "main" },
-              head: { ref: "feature/x", label: "acme:feature/x" },
+              base: { ref: "main", repo: { full_name: "acme/widgets" } },
+              head: { ref: "feature/x", label: "acme:feature/x", repo: { full_name: "acme/widgets" } },
               body: createdBody,
               html_url: "https://github.test/acme/widgets/pull/99",
             }]
           : [];
         return { status: 0, stdout: JSON.stringify([exactPr]), stderr: "" };
+      }
+      if (command === "gh" && args[0] === "api" && String(args[1]).includes("/pulls?state=open")) {
+        return { status: 0, stdout: "[[]]", stderr: "" };
       }
       if (command === "gh" && args[0] === "api" && args[1] === "user") {
         return { status: 0, stdout: "agent\n", stderr: "" };
@@ -142,8 +193,70 @@ test("create_pr idempotency lookup is bounded to the head branch", () => {
   });
 
   assert.ok(lookupCommand, "expected a head-filtered idempotency lookup");
-  assert.match(lookupCommand, /head=feature%2Fx/);
+  assert.match(lookupCommand, /head=acme%3Afeature%2Fx/);
   assert.equal(result.status, "succeeded");
+});
+
+test("create_pr exact idempotent retry converges before generic duplicate preflight", () => {
+  const key = "pr-retry";
+  const marker = idempotencyMarker(key);
+  let duplicatePreflightCalls = 0;
+  let createCalls = 0;
+
+  const result = executeLifecycleMutationRequest({
+    request: {
+      schemaVersion: 1,
+      action: "create_pr",
+      mutationMode: "maintainer",
+      explicitInstruction: true,
+      repo: "acme/widgets",
+      base: "main",
+      head: "feature/x",
+      title: "Add feature",
+      body: "Body",
+      idempotencyKey: key,
+    },
+    execute: true,
+    runner(command, args) {
+      if (command === "gh" && args[0] === "api" && String(args[1]).includes("/pulls?state=all")) {
+        assert.match(String(args[1]), /head=acme%3Afeature%2Fx/);
+        return {
+          status: 0,
+          stdout: JSON.stringify([[
+            {
+              id: 99,
+              number: 99,
+              state: "open",
+              user: { login: "agent" },
+              title: "Add feature",
+              base: { ref: "main", repo: { full_name: "acme/widgets" } },
+              head: { ref: "feature/x", label: "acme:feature/x", repo: { full_name: "acme/widgets" } },
+              body: `Body\n\n${marker}`,
+              html_url: "https://github.test/acme/widgets/pull/99",
+            },
+          ]]),
+          stderr: "",
+        };
+      }
+      if (command === "gh" && args[0] === "api" && args[1] === "user") {
+        return { status: 0, stdout: "agent\n", stderr: "" };
+      }
+      if (command === "gh" && args[0] === "api" && String(args[1]).includes("/pulls?state=open")) {
+        duplicatePreflightCalls += 1;
+        return { status: 0, stdout: "[[]]", stderr: "" };
+      }
+      if (command === "gh" && args[0] === "pr" && args[1] === "create") {
+        createCalls += 1;
+        return { status: 0, stdout: "created\n", stderr: "" };
+      }
+      throw new Error(`unexpected command: ${command} ${args.join(" ")}`);
+    },
+  });
+
+  assert.equal(result.status, "already_applied");
+  assert.equal(result.existingMutation.number, 99);
+  assert.equal(duplicatePreflightCalls, 0);
+  assert.equal(createCalls, 0);
 });
 
 test("social mutation ignores a forged marker from another GitHub actor", () => {
