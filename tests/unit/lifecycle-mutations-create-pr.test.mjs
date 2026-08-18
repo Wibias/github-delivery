@@ -9,7 +9,6 @@ function request(overrides = {}) {
     repo: "Wibias/github-delivery",
     base: "main",
     head: "feature/p0",
-    headRepo: "Wibias/github-delivery",
     title: "Add P0 safety",
     body: "Body",
     idempotencyKey: "p0-safety",
@@ -39,7 +38,7 @@ function apiRunner(rows) {
   };
 }
 
-test("create_pr accepts optional explicit head repository identity", () => {
+test("create_pr remains valid without a caller-supplied head repository override", () => {
   assert.equal(validateLifecycleMutation(request()), true);
 });
 
