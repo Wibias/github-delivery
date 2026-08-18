@@ -227,13 +227,16 @@ test("existing GitHub release is reused only when asset digests match local file
   }
 });
 
-test("declared Node 26 support runs inside the already-required Node 24 lanes", () => {
+test("declared Node 26 support is bounded inside canonical Node 24 Ubuntu CI", () => {
   const workflow = readFileSync(".github/workflows/ci.yml", "utf8");
-  assert.match(workflow, /node:\s*\n\s*- 22\s*\n\s*- 24/);
-  assert.doesNotMatch(workflow, /node:\s*\n\s*- 22\s*\n\s*- 24\s*\n\s*- 26/);
-  assert.match(workflow, /Run protected Node 26 compatibility checks/);
-  assert.match(workflow, /node-version: 26/);
-  assert.match(workflow, /if: matrix\.node == 24/);
+  assert.match(workflow, /name: Node 24 \/ ubuntu-latest/);
+  assert.match(workflow, /name: Node 22 \/ ubuntu-latest/);
+  assert.doesNotMatch(workflow, /\bmatrix:/);
+  assert.match(workflow, /Set up Node\.js 26 compatibility runtime[\s\S]*node-version: 26/);
+  assert.match(
+    workflow,
+    /Verify Node 26 compatibility[\s\S]*node scripts\/check-syntax\.mjs && npm run package:check && npm test/,
+  );
 });
 
 test("nested npm publishing tool is covered by Dependabot", () => {
