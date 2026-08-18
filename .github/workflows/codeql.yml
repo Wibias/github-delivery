@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  csharp-scope:
+  csharp_scope:
     name: Detect C# analysis scope
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -78,8 +78,8 @@ jobs:
 
   analyze-csharp:
     name: CodeQL / Analyze (csharp)
-    needs: csharp-scope
-    if: github.event_name != 'pull_request' || needs.csharp-scope.outputs.required == 'true'
+    needs: csharp_scope
+    if: github.event_name != 'pull_request' || needs.csharp_scope.outputs.required == 'true'
     runs-on: windows-latest
     timeout-minutes: 30
     permissions:
