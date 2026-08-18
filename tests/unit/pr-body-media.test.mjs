@@ -1,0 +1,65 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import { diffPrBodyMedia, extractPrBodyMedia } from "../../scripts/lib/pr-body-media.mjs";
+
+test("extracts Markdown images, recognized media links, HTML media and GitHub uploads", () => {
+  const body = [
+    "![shot](https://example.com/a.png)",
+    "[demo](https://example.com/demo.mp4)",
+    '<img alt="other" src="https://example.com/b.webp">',
+    '<video controls src="https://example.com/c.webm"></video>',
+    '<source src="https://example.com/d.mp4" type="video/mp4">',
+    "https://github.com/user-attachments/assets/11111111-2222-3333-4444-555555555555",
+  ].join("\n");
+
+  assert.deepEqual(extractPrBodyMedia(body), [
+    "https://example.com/a.png",
+    "https://example.com/demo.mp4",
+    "https://example.com/b.webp",
+    "https://example.com/c.webm",
+    "https://example.com/d.mp4",
+    "https://github.com/user-attachments/assets/11111111-2222-3333-4444-555555555555",
+  ]);
+});
+
+test("deduplicates media identities and ignores ordinary links", () => {
+  const body = [
+    "![shot](https://example.com/a.png)",
+    '<img src="https://example.com/a.png">',
+    "[docs](https://example.com/docs)",
+  ].join("\n");
+
+  assert.deepEqual(extractPrBodyMedia(body), ["https://example.com/a.png"]);
+});
+
+test("allows media to be reordered while text changes", () => {
+  const oldBody = "before\n![a](https://example.com/a.png)\n![b](https://example.com/b.png)";
+  const newBody = "after\n![b](https://example.com/b.png)\n![a](https://example.com/a.png)";
+
+  assert.deepEqual(diffPrBodyMedia(oldBody, newBody), {
+    missing: [],
+    approvedMissing: [],
+    unapprovedMissing: [],
+  });
+});
+
+test("reports accidental media removal", () => {
+  const result = diffPrBodyMedia(
+    "![a](https://example.com/a.png)\n![b](https://example.com/b.png)",
+    "![a](https://example.com/a.png)",
+  );
+
+  assert.deepEqual(result.missing, ["https://example.com/b.png"]);
+  assert.deepEqual(result.approvedMissing, []);
+  assert.deepEqual(result.unapprovedMissing, ["https://example.com/b.png"]);
+});
+
+test("permits only exact approved removals", () => {
+  const oldBody = "![a](https://example.com/a.png)\n![b](https://example.com/b.png)";
+  const newBody = "text only";
+  const result = diffPrBodyMedia(oldBody, newBody, ["https://example.com/a.png"]);
+
+  assert.deepEqual(result.approvedMissing, ["https://example.com/a.png"]);
+  assert.deepEqual(result.unapprovedMissing, ["https://example.com/b.png"]);
+});
