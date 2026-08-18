@@ -99,6 +99,24 @@ test("uses branch before title before body for bare external keys", () => {
   assert.equal(body.reference.source, "body");
 });
 
+test("normalizes lowercase branch/title/body keys", () => {
+  for (const input of [
+    { headRefName: "feature/eng-19-timeout", source: "head-ref" },
+    { title: "eng-20 fix retry", source: "title" },
+    { body: "tracked by eng-21", source: "body" },
+  ]) {
+    const result = extractWorkItemReferences({
+      ...base,
+      headRefName: input.headRefName ?? base.headRefName,
+      title: input.title ?? base.title,
+      body: input.body ?? base.body,
+    });
+    assert.equal(result.state, "resolved");
+    assert.match(result.reference.key, /^ENG-(?:19|20|21)$/);
+    assert.equal(result.reference.source, input.source);
+  }
+});
+
 test("returns ambiguous for conflicting candidates at the same strongest tier", () => {
   const result = extractWorkItemReferences({
     ...base,
