@@ -75,7 +75,8 @@ internal static partial class ScopeCanonicalizer
             case "update_pr_body":
                 AddPrScope(scope, request);
                 scope["bodySha256"] = BodySha256(request);
-                scope["approvedMediaRemovals"] = CanonicalStringSet(request, "approvedMediaRemovals", optional: true);
+                var approvedMediaRemovals = CanonicalStringSet(request, "approvedMediaRemovals", optional: true);
+                if (approvedMediaRemovals.Count > 0) scope["approvedMediaRemovals"] = approvedMediaRemovals;
                 break;
 
             case "create_issue":
