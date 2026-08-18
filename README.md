@@ -54,6 +54,7 @@ what do I have open in this repo?
 work on ENG-42 and open a PR
 triage the competing PRs in this repo
 full review PR #42
+full review PR #42 and simplify it safely
 fix the review comments on PR #18 and make it merge ready
 backport PR #42 to release/1.x and release/2.x
 merge PR #32
@@ -76,7 +77,7 @@ For installation edge cases, backup/restore, downgrade behavior, manual recovery
 | **Plan & triage** | `create a PRD for the onboarding flow` | PRDs, issue breakdown, QA intake, triage, agent briefs, refactor planning |
 | **Open work** | `what do I have open in this repo?` | Read-only repository-scoped view of your open PRs, work-item references, and bounded next actions |
 | **Issue research** | `research issue #90 on the latest development branch` | Evidence-backed research against the current development tip |
-| **Implement & publish** | `create a PR for issue #90` | Bounded research, minimal complete implementation, pre-open review, exact publication identity, linked PR |
+| **Implement & publish** | `create a PR for issue #90` | A bounded **research → implementation → pre-open review** sequence, minimal complete implementation, exact publication identity, linked PR |
 | **External work items** | `work on ENG-42 and open a PR` | Tracker-aware delivery orchestration, covering-PR reuse, evidence-driven milestone reconciliation |
 | **Review & fix** | `full review PR #42` | Bug + Security + Spec + Standards review, required probes, current-head verdict |
 | **Merge readiness** | `fix the review comments on PR #18 and make it merge ready` | Feedback triage, code fixes, validation, publication, refreshed readiness |
