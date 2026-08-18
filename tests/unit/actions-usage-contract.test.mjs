@@ -29,6 +29,17 @@ test("pull-request CI keeps one canonical full check and bounded compatibility l
   assert.match(ci, /cancel-in-progress: true/);
 });
 
+test("compatibility and Windows lanes skip irrelevant pull-request diffs", () => {
+  assert.match(ci, /scope:/);
+  assert.match(ci, /node_compat:/);
+  assert.match(ci, /windows_authority:/);
+  assert.match(ci, /needs: scope/);
+  assert.match(ci, /needs\.scope\.outputs\.node_compat == 'true'/);
+  assert.match(ci, /needs\.scope\.outputs\.windows_authority == 'true'/);
+  assert.match(ci, /authority-host\/windows\//);
+  assert.match(ci, /scripts\/prepare-authority-host-runtime-smoke\.mjs/);
+});
+
 test("repository policy requires only the lean CI lanes", () => {
   const ciChecks = repositoryPolicy.requiredChecks.filter((name) => name.startsWith("Node "));
   assert.deepEqual(ciChecks, [
