@@ -17,6 +17,7 @@ const ROUTED_WORKFLOWS = [
   "research-issue",
   "create-pr-from-local-work",
   "create-pr-for-issue",
+  "open-work-status",
   "full-review-pr",
   "spec-standards-review",
   "simplify-pr",
@@ -46,11 +47,14 @@ test("create PR profile preserves bounded preflight through final gate lifecycle
   assert.deepEqual(profile.graph.FINAL_GATE, ["DONE"]);
 });
 
-test("status profile cannot drift into mutation phases", () => {
-  const profile = resolveDeliveryWorkflowProfile("status");
-  const phases = new Set(Object.keys(profile.graph));
-  for (const forbidden of ["IMPLEMENT", "PUBLISH_CHANGE", "MERGE"]) {
-    assert.equal(phases.has(forbidden), false, forbidden);
+test("status profiles cannot drift into mutation phases", () => {
+  for (const workflow of ["status", "open-work-status"]) {
+    const profile = resolveDeliveryWorkflowProfile(workflow);
+    assert.equal(profile.mutation, "read-only", workflow);
+    const phases = new Set(Object.keys(profile.graph));
+    for (const forbidden of ["IMPLEMENT", "PUBLISH_CHANGE", "MERGE", "PUBLISH"]) {
+      assert.equal(phases.has(forbidden), false, `${workflow}:${forbidden}`);
+    }
   }
 });
 
@@ -73,6 +77,17 @@ test("one-shot workflow packet contains selected workflow and unconditional poli
     assert.equal(typeof document.content, "string");
     assert.ok(document.content.length > 0);
   }
+});
+
+test("open-work packet loads only its read-only evidence bundle", () => {
+  const packet = buildWorkflowPacket({ root: process.cwd(), workflow: "open-work-status" });
+  const paths = packet.documents.map((document) => document.path);
+  assert.equal(paths.includes("references/open-work-status.md"), true);
+  assert.equal(paths.includes("references/policy-kernel.md"), true);
+  assert.equal(paths.includes("references/policy/evidence.md"), true);
+  assert.equal(paths.includes("references/policy/mutation.md"), false);
+  assert.equal(paths.includes("references/policy/ci.md"), false);
+  assert.equal(paths.includes("references/policy/reviews.md"), false);
 });
 
 test("conditional modules are excluded by default and included only when explicitly activated", () => {
