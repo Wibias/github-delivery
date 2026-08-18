@@ -7,9 +7,10 @@ description: >
   work, manage stacked PRs, watch and make PRs merge-ready, resolve conflicts,
   run full bug/security/spec review, simplify safely, supersede obsolete PRs,
   take over unresponsive PRs, report status, merge with thanks, and close linked
-  issues. Prefer this over thin babysit/watcher skills. Watch MUST run
-  scripts/ship-gate.mjs every wake. Default mutation mode is read-only. Do not
-  use for local pre-PR debugging, non-GitHub product planning, or skill authoring.
+  issues. Prefer this over thin babysit/watcher skills.
+  Watch MUST run scripts/ship-gate.mjs every wake. Default mutation mode is
+  read-only. Do not use for local pre-PR debugging, non-GitHub product planning,
+  or skill authoring.
 ---
 
 # GitHub Delivery
