@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { preflightLifecycleMutation, validateLifecycleMutation } from "../../scripts/lib/lifecycle-mutations.mjs";
+import {
+  lifecycleCommandFor,
+  preflightLifecycleMutation,
+  validateLifecycleMutation,
+} from "../../scripts/lib/lifecycle-mutations.mjs";
 
 function request(overrides = {}) {
   return {
@@ -69,6 +73,35 @@ test("create_pr rejects an explicit head owner that disagrees with headRepo", ()
     })),
     /head_owner_repo_mismatch/,
   );
+});
+
+test("create_pr without headRepo keeps the normal gh pr create path", () => {
+  const command = lifecycleCommandFor(request({ draft: true }));
+  assert.deepEqual(command.slice(0, 3), ["gh", "pr", "create"]);
+  assert.ok(command.includes("--head"));
+  assert.ok(command.includes("feature/p0"));
+  assert.ok(command.includes("--draft"));
+});
+
+test("create_pr with headRepo uses REST and passes the exact source repository name", () => {
+  const command = lifecycleCommandFor(request({
+    head: "fork-owner:feature/p0",
+    headRepo: "fork-owner/custom-fork",
+    draft: true,
+  }));
+
+  assert.deepEqual(command.slice(0, 5), [
+    "gh",
+    "api",
+    "repos/Wibias/github-delivery/pulls",
+    "--method",
+    "POST",
+  ]);
+  assert.ok(command.includes("head=fork-owner:feature/p0"));
+  assert.ok(command.includes("head_repo=custom-fork"));
+  assert.ok(command.includes("base=main"));
+  assert.ok(command.includes("draft=true"));
+  assert.equal(command.includes("gh pr create"), false);
 });
 
 test("blocks creation and reports the browser URL for an existing exact-head/base PR", () => {
