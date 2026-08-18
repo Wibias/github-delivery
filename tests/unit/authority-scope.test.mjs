@@ -103,6 +103,44 @@ test("PR creation scope binds exact content, topology, and idempotency key", () 
   assert.equal("body" in scope, false);
 });
 
+test("PR body update scope binds exact approved media removals as a canonical set", () => {
+  const request = {
+    schemaVersion: 1,
+    action: "update_pr_body",
+    mutationMode: "maintainer",
+    repo: "Wibias/github-delivery",
+    pr: 105,
+    expectedHead: merge.expectedHead,
+    body: "New body",
+    approvedMediaRemovals: [
+      "https://example.com/z.png",
+      "https://example.com/a.png",
+      "https://example.com/a.png",
+    ],
+  };
+
+  const scope = authorityScopeForRequest(request);
+  assert.deepEqual(scope.approvedMediaRemovals, [
+    "https://example.com/a.png",
+    "https://example.com/z.png",
+  ]);
+  assert.equal(
+    authorityScopeSha256(request),
+    authorityScopeSha256({
+      ...request,
+      approvedMediaRemovals: ["https://example.com/a.png", "https://example.com/z.png"],
+    }),
+  );
+  assert.notEqual(
+    authorityScopeSha256(request),
+    authorityScopeSha256({ ...request, approvedMediaRemovals: [] }),
+  );
+  assert.notEqual(
+    authorityScopeSha256(request),
+    authorityScopeSha256({ ...request, approvedMediaRemovals: ["https://example.com/a.png"] }),
+  );
+});
+
 test("social writes bind exact visible content and idempotency key", () => {
   const request = {
     schemaVersion: 1,
