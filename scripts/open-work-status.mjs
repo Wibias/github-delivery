@@ -26,6 +26,34 @@ function repoName(row, side) {
   return row?.[`${side}RepoFullName`] ?? row?.[side]?.repo?.full_name ?? row?.[side]?.repo?.nameWithOwner ?? null;
 }
 
+function issueRepositoryName(issue) {
+  const explicit = issue?.repository?.nameWithOwner ?? issue?.repository?.full_name;
+  if (explicit) return String(explicit);
+  const owner = issue?.repository?.owner?.login;
+  const name = issue?.repository?.name;
+  return owner && name ? `${owner}/${name}` : null;
+}
+
+function normalizeClosingIssueLinks(value) {
+  if (!Array.isArray(value)) return { links: [], complete: false };
+  const links = [];
+  let complete = true;
+  for (const issue of value) {
+    const number = Number(issue?.number);
+    const repository = issueRepositoryName(issue);
+    if (!Number.isInteger(number) || number <= 0 || !repository) {
+      complete = false;
+      continue;
+    }
+    links.push({
+      number,
+      url: issue?.url ? String(issue.url) : null,
+      repository,
+    });
+  }
+  return { links, complete };
+}
+
 export function normalizeOpenPullPages(payload, repoFullName) {
   if (!Array.isArray(payload)) throw new Error("open_work_pr_pages_invalid");
   const pages = payload.length && payload.every(Array.isArray) ? payload : [payload];
@@ -172,20 +200,14 @@ function enrichPullRequestDetails(repoFullName, rows, runner = sh) {
         mergeStateComplete: false,
       };
     }
-    const issueLinks = Array.isArray(payload?.closingIssuesReferences)
-      ? payload.closingIssuesReferences.flatMap((issue) => {
-          const number = Number(issue?.number);
-          if (!Number.isInteger(number) || number <= 0) return [];
-          return [{ number, url: issue?.url ? String(issue.url) : null, repository: repoFullName }];
-        })
-      : [];
+    const issueEvidence = normalizeClosingIssueLinks(payload?.closingIssuesReferences);
     const mergeStateStatus = typeof payload?.mergeStateStatus === "string"
       ? payload.mergeStateStatus.trim()
       : "";
     return {
       ...row,
-      issueLinks,
-      issueLinksComplete: true,
+      issueLinks: issueEvidence.links,
+      issueLinksComplete: issueEvidence.complete,
       mergeableState: mergeStateStatus ? mergeStateStatus.toLowerCase() : "unknown",
       mergeStateComplete: Boolean(mergeStateStatus),
     };
