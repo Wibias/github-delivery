@@ -178,8 +178,58 @@ function createPrHeadIdentity(request) {
   }
   return {
     ...head,
+    headRepo,
     intendedHeadRepo: headRepo ?? (head.explicitOwner ? null : repo),
   };
+}
+
+function createPrCommand(request, repo) {
+  const identity = createPrHeadIdentity(request);
+  const base = String(required(request.base, "base"));
+  const head = String(required(request.head, "head"));
+  const title = String(required(request.title, "title"));
+  const body = String(required(request.body, "body"));
+
+  if (identity.headRepo) {
+    const headRepoName = identity.headRepo.split("/")[1];
+    const command = [
+      "gh",
+      "api",
+      `repos/${repo}/pulls`,
+      "--method",
+      "POST",
+      "--raw-field",
+      `title=${title}`,
+      "--raw-field",
+      `head=${head}`,
+      "--raw-field",
+      `head_repo=${headRepoName}`,
+      "--raw-field",
+      `base=${base}`,
+      "--raw-field",
+      `body=${body}`,
+    ];
+    if (request.draft === true) command.push("--field", "draft=true");
+    return command;
+  }
+
+  const command = [
+    "gh",
+    "pr",
+    "create",
+    "--repo",
+    repo,
+    "--base",
+    base,
+    "--head",
+    head,
+    "--title",
+    title,
+    "--body",
+    body,
+  ];
+  if (request.draft === true) command.push("--draft");
+  return command;
 }
 
 function assertCreatePrNotDuplicate(request, runner) {
@@ -260,26 +310,8 @@ export function lifecycleCommandFor(request = {}) {
         `${newTip}:refs/heads/${branch}`,
       ];
     }
-    case "create_pr": {
-      createPrHeadIdentity(request);
-      const command = [
-        "gh",
-        "pr",
-        "create",
-        "--repo",
-        repo,
-        "--base",
-        String(required(request.base, "base")),
-        "--head",
-        String(required(request.head, "head")),
-        "--title",
-        String(required(request.title, "title")),
-        "--body",
-        String(required(request.body, "body")),
-      ];
-      if (request.draft === true) command.push("--draft");
-      return command;
-    }
+    case "create_pr":
+      return createPrCommand(request, repo);
     case "update_pr_body":
       return [
         "gh",
