@@ -106,7 +106,7 @@ jobs:
           package-manager-cache: false
 
       - name: Verify Node 22 compatibility
-        run: node scripts/check-syntax.mjs && npm run package:check && npm test
+        run: npm run build:dist && node scripts/check-syntax.mjs && npm run package:check && npm test
 
   windows-authority:
     name: Node 24 / windows-latest
