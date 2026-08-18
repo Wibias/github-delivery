@@ -23,11 +23,13 @@ const FOLLOW_UP_ISSUE_REQUEST = /\bfollow[- ]?up\s+(?:issue|ticket)\b/;
 const CREATE_PR_FOR_ISSUE_REQUEST = /\b(?:create|open)\b[\s\S]*\b(?:pr|pull request)\b[\s\S]*\b(?:issue|#\d+)\b/;
 const IMPLEMENT_ISSUE_REQUEST = /\b(?:implement|fix|address|solve|resolve)\b[\s\S]{0,180}\b(?:issue|#\d+)\b|\b(?:issue|#\d+)\b[\s\S]{0,180}\b(?:implement|fix|address|solve|resolve)\b/;
 const CREATE_PR_REQUEST = /\b(?:create|open|make)\b[\s\S]{0,120}\b(?:pr|pull request)\b/;
+const RESEARCH_ISSUE_REQUEST = /\b(?:research|investigate)\b[\s\S]*\b(?:issue|issues|#\d+)\b/;
 const OPEN_WORK_REQUEST = /\b(?:what do i have open|what(?:'s| is) in review|show (?:me )?my open (?:prs|pull requests)|list (?:me )?my open (?:prs|pull requests)|open (?:pr|pull request) standup|open[- ]work standup|my open work)\b/;
 const WORK_ITEM_KEY = /\b[A-Z][A-Z0-9]*-\d+\b/i;
 const WORK_ITEM_STATUS_REQUEST = /\b(?:what(?:'s| is) left|status|where is|where's|inspect|check|show me)\b/;
 const WORK_ITEM_DELIVERY_REQUEST = /\b(?:ship|deliver|work on|implement|fix|finish|complete|take)\b|\b(?:create|open)\b[\s\S]{0,80}\b(?:pr|pull request)\b/;
 const WORK_ITEM_PUBLICATION_REQUEST = /\b(?:ship|deliver)\b|\b(?:create|open)\b[\s\S]{0,80}\b(?:pr|pull request)\b/;
+const CONSOLIDATE_PR_REQUEST = /\b(?:consolidate|cluster|triage|competing|overlapping|duplicate)\b[\s\S]{0,120}\b(?:prs|pull requests)\b|\b(?:prs|pull requests)\b[\s\S]{0,120}\b(?:competing|overlapping|duplicates?)\b/;
 const DELIVERY_NAME = /\bgithub[- ]?delivery\b/;
 const DELIVERY_UPDATE = /\b(update|upgrade)\b[\s\S]*\bgithub[- ]?delivery\b|\bgithub[- ]?delivery\b[\s\S]*\b(update|upgrade|latest stable release)\b/;
 const DELIVERY_CONFIG = /\b(set ?up|install|configure|configuration|settings?|protection mode|windows hello)\b[\s\S]*\bgithub[- ]?delivery\b|\bgithub[- ]?delivery\b[\s\S]*\b(set ?up|install|configure|configuration|settings?|protection mode|windows hello)\b/;
@@ -99,6 +101,9 @@ export function routeShippingGithubPrompt(prompt) {
   if (isOpenWorkRequest(text)) {
     return result("references/open-work-status.md", "read-only", []);
   }
+  if (CONSOLIDATE_PR_REQUEST.test(text) && !RESEARCH_ISSUE_REQUEST.test(text)) {
+    return result("references/consolidate-prs.md", "read-only", []);
+  }
   if (isWorkItemRequest(text)) {
     const readOnly = WORK_ITEM_STATUS_REQUEST.test(text) && !WORK_ITEM_DELIVERY_REQUEST.test(text);
     return result(
@@ -135,7 +140,7 @@ export function routeShippingGithubPrompt(prompt) {
     return result("references/create-pr-for-issue.md", "maintainer");
   }
   if (CREATE_PR_REQUEST.test(text) && !PR_REFERENCE.test(text)) return result("references/create-pr-from-local-work.md", "maintainer", ["push_code", "create_pr"]);
-  if (/\b(research|investigate)\b[\s\S]*\b(issue|issues|#\d+)\b/.test(text)) return result("references/research-issue.md", "review");
+  if (RESEARCH_ISSUE_REQUEST.test(text)) return result("references/research-issue.md", "review");
 
   const issueCreationAction = issueCreationActionForPrompt(text);
   if (issueCreationAction) return result("references/issue-workflows.md", "maintainer", [issueCreationAction]);

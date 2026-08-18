@@ -1,16 +1,11 @@
 ---
 name: github-delivery
 description: >
-  Primary skill for the complete GitHub issue and pull-request lifecycle:
-  create PRDs, break down and triage issues, run QA intake, prepare agent briefs
-  and refactor plans, research issues, create linked PRs, list repository open
-  work, deliver external tracker work items, manage stacked PRs, watch and make
-  PRs merge-ready, resolve conflicts, run full bug/security/spec review, simplify
-  safely, supersede obsolete PRs, take over unresponsive PRs, report status,
-  merge with thanks, and close linked issues. Prefer this over thin babysit/watcher
-  skills. Watch MUST run scripts/ship-gate.mjs every wake. Default mutation mode
-  is read-only. Do not use for local pre-PR debugging, non-GitHub product planning,
-  or skill authoring.
+  GitHub issue/PR lifecycle skill: PRDs, triage/QA, research, linked/open-work
+  PRs, external tracker delivery, competing PR analysis, stacks, review/fix/
+  simplify/security, conflicts, watch/status, supersede/overtake, merge/closure.
+  Watch MUST run scripts/ship-gate.mjs every wake. Default mode is read-only.
+  Not for local pre-PR debugging, non-GitHub planning, or skill authoring.
 ---
 
 # GitHub Delivery
@@ -50,6 +45,7 @@ simplify preparation first, then enter the merge workflow.
 | Create PR for issue #N (bounded preflight → implement → pre-open bug/security gate); link + merge-ready | `references/create-pr-for-issue.md`                |
 | List my open PRs / what’s in review / repository open-work standup (read-only overview)              | `references/open-work-status.md`                   |
 | Inspect or deliver external work item ENG-42 through the GitHub lifecycle                             | `references/work-item-delivery.md`                 |
+| Find competing / overlapping PR implementations (analysis only)                                      | `references/consolidate-prs.md`                    |
 | Full review on PR #N (or a list); babysit to green + verdict                                          | `references/full-review-pr.md`                     |
 | Spec and Standards review on PR #N                                                                    | `references/spec-standards-review.md`              |
 | Simplify / clean up / deduplicate PR #N without behavior changes                                      | `references/simplify-pr.md`                        |

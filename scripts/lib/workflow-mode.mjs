@@ -3,6 +3,7 @@
 // is a workflow violation, never a publication excuse.
 
 const WORKFLOW_MUTATION_MODES = Object.freeze({
+  "references/consolidate-prs.md": ["read-only"],
   "references/create-pr-for-issue.md": ["maintainer"],
   "references/create-pr-from-local-work.md": ["maintainer"],
   "references/fix-pr-bots.md": ["maintainer"],
