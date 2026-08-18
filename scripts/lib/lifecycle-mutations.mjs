@@ -150,10 +150,19 @@ function splitHead(repo, head) {
   return { owner, branch, explicitOwner: true };
 }
 
+function optionalHeadRepo(request) {
+  if (request.headRepo === undefined || request.headRepo === null) return null;
+  const value = String(request.headRepo).trim();
+  if (!value) throw new Error("head_repo_required");
+  if (!/^[^/\s]+\/[^/\s]+$/.test(value)) throw new Error("head_repo_invalid");
+  return value;
+}
+
 function assertCreatePrNotDuplicate(request, runner) {
   const repo = String(required(request.repo, "repo"));
   const base = String(required(request.base, "base"));
   const { owner, branch, explicitOwner } = splitHead(repo, required(request.head, "head"));
+  const intendedHeadRepo = optionalHeadRepo(request) ?? (explicitOwner ? null : repo);
   const headLabel = `${owner}:${branch}`;
   const endpoint = `repos/${repo}/pulls?state=open&head=${encodeURIComponent(headLabel)}&per_page=100`;
   const raw = run(runner, ["gh", "api", endpoint, "--paginate", "--slurp"]);
@@ -161,7 +170,7 @@ function assertCreatePrNotDuplicate(request, runner) {
   const rows = normalizeCoveringPullPages(payload, repo);
   const result = classifyCoveringPullRequests({
     intendedRepo: repo,
-    intendedHeadRepo: explicitOwner ? null : repo,
+    intendedHeadRepo,
     intendedHead: branch,
     intendedBase: base,
     rows,
@@ -188,6 +197,7 @@ export function validateLifecycleMutation(request = {}) {
     case "create_pr":
       required(request.base, "base");
       required(request.head, "head");
+      optionalHeadRepo(request);
       required(request.title, "title");
       required(request.body, "body");
       required(request.idempotencyKey, "idempotency_key");
