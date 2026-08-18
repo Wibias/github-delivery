@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { basename, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 
 import {
   parsePolicyDependencies,
@@ -113,6 +113,18 @@ const CONSOLIDATE_GRAPH = Object.freeze({
   ...TERMINAL,
 });
 
+const MULTI_BASE_GRAPH = Object.freeze({
+  ROUTE: ["PREFLIGHT"],
+  PREFLIGHT: ["PLAN", "DONE"],
+  PLAN: ["APPLY"],
+  APPLY: ["LOCAL_VERIFY"],
+  LOCAL_VERIFY: ["PUBLISH", "DONE"],
+  PUBLISH: ["VERIFY_PORTS"],
+  VERIFY_PORTS: ["FINAL_GATE", "DONE"],
+  FINAL_GATE: ["DONE"],
+  ...TERMINAL,
+});
+
 const MERGE_GRAPH = Object.freeze({
   ROUTE: ["PREFLIGHT"],
   PREFLIGHT: ["PREPARE", "DONE"],
@@ -180,6 +192,7 @@ const PROFILE_DEFINITIONS = Object.freeze({
   "open-work-status": { graph: OPEN_WORK_GRAPH, mutation: "read-only" },
   "work-item-delivery": { graph: WORK_ITEM_GRAPH, mutation: "profile-dependent" },
   "consolidate-prs": { graph: CONSOLIDATE_GRAPH, mutation: "read-only" },
+  "multi-base-delivery": { graph: MULTI_BASE_GRAPH, mutation: "maintainer" },
   "full-review-pr": { graph: REVIEW_GRAPH, mutation: "review" },
   "spec-standards-review": { graph: REVIEW_GRAPH, mutation: "review" },
   "simplify-pr": { graph: REVIEW_GRAPH, mutation: "maintainer" },

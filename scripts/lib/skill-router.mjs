@@ -30,6 +30,7 @@ const WORK_ITEM_STATUS_REQUEST = /\b(?:what(?:'s| is) left|status|where is|where
 const WORK_ITEM_DELIVERY_REQUEST = /\b(?:ship|deliver|work on|implement|fix|finish|complete|take)\b|\b(?:create|open)\b[\s\S]{0,80}\b(?:pr|pull request)\b/;
 const WORK_ITEM_PUBLICATION_REQUEST = /\b(?:ship|deliver)\b|\b(?:create|open)\b[\s\S]{0,80}\b(?:pr|pull request)\b/;
 const CONSOLIDATE_PR_REQUEST = /\b(?:consolidate|cluster|triage|competing|overlapping|duplicate)\b[\s\S]{0,120}\b(?:prs|pull requests)\b|\b(?:prs|pull requests)\b[\s\S]{0,120}\b(?:competing|overlapping|duplicates?)\b/;
+const MULTI_BASE_REQUEST = /\b(?:backport|back-port|port)\b[\s\S]{0,180}\b(?:pr|pull request)\s*#?\d+\b|\b(?:pr|pull request)\s*#?\d+\b[\s\S]{0,180}\b(?:backport|back-port|port)\b/;
 const DELIVERY_NAME = /\bgithub[- ]?delivery\b/;
 const DELIVERY_UPDATE = /\b(update|upgrade)\b[\s\S]*\bgithub[- ]?delivery\b|\bgithub[- ]?delivery\b[\s\S]*\b(update|upgrade|latest stable release)\b/;
 const DELIVERY_CONFIG = /\b(set ?up|install|configure|configuration|settings?|protection mode|windows hello)\b[\s\S]*\bgithub[- ]?delivery\b|\bgithub[- ]?delivery\b[\s\S]*\b(set ?up|install|configure|configuration|settings?|protection mode|windows hello)\b/;
@@ -47,6 +48,14 @@ function workItemDeliveryActions(text) {
     actions.push("merge_pr", "post_comment", "post_issue_comment", "close_linked_issue");
   }
   return [...new Set(actions)];
+}
+
+function multiBaseDeliveryActions(text) {
+  const actions = ["push_code", "create_pr"];
+  if (hasExplicitMergeIntent(text)) {
+    actions.push("merge_pr", "post_comment", "post_issue_comment", "close_linked_issue");
+  }
+  return actions;
 }
 
 function unquotedText(text) { return text.replace(/"[^"\n]*"|`[^`\n]*`|'[^'\n]*'/g, " "); }
@@ -103,6 +112,9 @@ export function routeShippingGithubPrompt(prompt) {
   }
   if (CONSOLIDATE_PR_REQUEST.test(text) && !RESEARCH_ISSUE_REQUEST.test(text)) {
     return result("references/consolidate-prs.md", "read-only", []);
+  }
+  if (MULTI_BASE_REQUEST.test(text)) {
+    return result("references/multi-base-delivery.md", "maintainer", multiBaseDeliveryActions(text));
   }
   if (isWorkItemRequest(text)) {
     const readOnly = WORK_ITEM_STATUS_REQUEST.test(text) && !WORK_ITEM_DELIVERY_REQUEST.test(text);

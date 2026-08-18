@@ -2,10 +2,10 @@
 name: github-delivery
 description: >
   GitHub issue/PR lifecycle skill: PRDs, triage/QA, research, linked/open-work
-  PRs, external tracker delivery, competing PR analysis, stacks, review/fix/
-  simplify/security, conflicts, watch/status, supersede/overtake, merge/closure.
-  Watch MUST run scripts/ship-gate.mjs every wake. Default mode is read-only.
-  Not for local pre-PR debugging, non-GitHub planning, or skill authoring.
+  PRs, external tracker delivery, competing PR analysis, backports/ports, stacks,
+  review/fix/simplify/security, conflicts, watch/status, supersede/overtake,
+  merge/closure. Watch MUST run scripts/ship-gate.mjs every wake. Default mode is
+  read-only. Not for local pre-PR debugging, non-GitHub planning, or skill authoring.
 ---
 
 # GitHub Delivery
@@ -46,6 +46,7 @@ simplify preparation first, then enter the merge workflow.
 | List my open PRs / what’s in review / repository open-work standup (read-only overview)              | `references/open-work-status.md`                   |
 | Inspect or deliver external work item ENG-42 through the GitHub lifecycle                             | `references/work-item-delivery.md`                 |
 | Find competing / overlapping PR implementations (analysis only)                                      | `references/consolidate-prs.md`                    |
+| Backport / port PR #N to one or more target base branches                                             | `references/multi-base-delivery.md`                |
 | Full review on PR #N (or a list); babysit to green + verdict                                          | `references/full-review-pr.md`                     |
 | Spec and Standards review on PR #N                                                                    | `references/spec-standards-review.md`              |
 | Simplify / clean up / deduplicate PR #N without behavior changes                                      | `references/simplify-pr.md`                        |
