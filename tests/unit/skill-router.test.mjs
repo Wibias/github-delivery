@@ -35,6 +35,29 @@ test("routes pull request synonyms the same as PR shorthand", () => {
   );
 });
 
+test("routes repository open-work requests to the read-only overview workflow", () => {
+  for (const prompt of [
+    "what do I have open in this repo?",
+    "what's in review in this repo?",
+    "show my open PRs here",
+    "give me my open PR standup",
+  ]) {
+    assert.deepEqual(routeShippingGithubPrompt(prompt), {
+      skill: "github-delivery",
+      workflow: "references/open-work-status.md",
+      mutationMode: "read-only",
+      explicitActions: [],
+    }, prompt);
+  }
+});
+
+test("named PR status stays on deep status instead of open-work overview", () => {
+  assert.equal(
+    routeShippingGithubPrompt("what is left on PR #41?").workflow,
+    "references/status.md",
+  );
+});
+
 test("routes security phrase order variants identically", () => {
   assert.equal(
     routeShippingGithubPrompt("security review pull request #32").workflow,
