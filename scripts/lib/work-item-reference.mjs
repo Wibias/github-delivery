@@ -1,4 +1,5 @@
 const WORK_ITEM_KEY_RE = /\b([A-Z][A-Z0-9]*-\d+)\b/g;
+const URL_RE = /https?:\/\/[^\s<>"')\]]+/gi;
 
 function repoEquals(left, right) {
   return String(left || "").toLowerCase() === String(right || "").toLowerCase();
@@ -73,6 +74,26 @@ function externalLinkCandidates(externalLinks) {
   });
 }
 
+function explicitUrlCandidates(...values) {
+  const candidates = [];
+  for (const value of values) {
+    const text = String(value || "");
+    for (const match of text.matchAll(URL_RE)) {
+      const url = match[0];
+      const key = normalizeKey(url);
+      if (!key) continue;
+      candidates.push({
+        kind: "external",
+        key,
+        url,
+        source: "external-url",
+        tier: 2,
+      });
+    }
+  }
+  return candidates;
+}
+
 function textCandidates(value, source, tier) {
   return keysFromText(value).map((key) => ({
     kind: "external",
@@ -93,7 +114,10 @@ export function extractWorkItemReferences({
 } = {}) {
   const tiers = [
     githubIssueCandidates(repository, issueLinks),
-    externalLinkCandidates(externalLinks),
+    [
+      ...externalLinkCandidates(externalLinks),
+      ...explicitUrlCandidates(title, body),
+    ],
     textCandidates(headRefName, "head-ref", 3),
     textCandidates(title, "title", 4),
     textCandidates(body, "body", 5),
