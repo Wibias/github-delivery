@@ -1,4 +1,3 @@
-import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 
 import { classifyAuthority } from "./authority-grant.mjs";
@@ -14,6 +13,7 @@ import {
   validateLifecycleMutation,
   verifyLifecycleMutation,
 } from "./lifecycle-mutations.mjs";
+import { boundedSpawnSync } from "./subprocess-policy.mjs";
 
 const ACTIONS = new Set([
   "push_code",
@@ -207,7 +207,7 @@ export function planLifecycleMutationRequest(
 export function executeLifecycleMutationRequest({
   request,
   execute = false,
-  runner = (command, args, options) => spawnSync(command, args, options),
+  runner = boundedSpawnSync,
   authorityPublicKey = null,
   requireTrustedAuthority = false,
   authorityNow,

@@ -5,7 +5,7 @@
  * Chains the existing gates, broker, review evidence, and cleanup evaluators so
  * the agent reviews one plan instead of hand-rolling each step.
  */
-import { spawnSync } from "node:child_process";
+import { boundedSpawnSync } from "./lib/subprocess-policy.mjs";
 import { appendFileSync, realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -206,7 +206,7 @@ export function detectMergeMethod(capabilities = null) {
 
 export function readRepositoryMergeCapabilities(
   repo,
-  runner = (command, args, options) => spawnSync(command, args, options),
+  runner = boundedSpawnSync,
 ) {
   const result = runner("gh", ["api", `repos/${repo}`], {
     encoding: "utf8",
@@ -480,6 +480,11 @@ async function main() {
   });
 
   const merged = receipts.find((item) => item.name === "merge")?.receipt;
+  if (!isFinalMergeOutcome(merged)) {
+    throw new Error(
+      `merge_not_final:${merged?.outcome || merged?.status || "unknown"}`,
+    );
+  }
   const cleanup = evaluateHeadBranchCleanup({
     actorLogin: process.env.GH_ACTOR_LOGIN || null,
     headOwnerLogin: null,

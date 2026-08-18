@@ -53,39 +53,33 @@ test("refreshExpectedHeads binds the live PR branch even when the head already m
 
 test("refreshExpectedHeads updates a stale head, binds branch, and reports the delta", () => {
   const runner = () => liveHead("b".repeat(40), "feature/review");
-  const result = refreshExpectedHeads({
-    requests: [request()],
-    runner,
-  });
-  assert.equal(result.refreshed.length, 1);
-  assert.deepEqual(result.refreshed[0], {
-    index: 0,
-    pr: 32,
-    repo: "acme/widgets",
-    from: "a".repeat(40),
-    to: "b".repeat(40),
-    branch: "feature/review",
-  });
-  assert.equal(result.requests[0].expectedHead, "b".repeat(40));
-  assert.equal(result.requests[0].authorityBranch, "feature/review");
-  assert.equal(result.requests[0].body, "Status update");
+  assert.throws(
+    () => refreshExpectedHeads({ requests: [request()], runner }),
+    /expected_head_mismatch: expected a{40}, observed b{40}/,
+  );
 });
 
-test("refreshExpectedHeads refreshes only stale operations while binding every PR branch", () => {
+test("refreshExpectedHeads binds matching heads and fails closed before authorizing a moved head", () => {
   const runner = (args) => liveHead("c".repeat(40), `feature/pr-${args[3]}`);
   const stale = request({ pr: 1, expectedHead: "a".repeat(40), idempotencyKey: "k1" });
   const fresh = request({ pr: 2, expectedHead: "c".repeat(40), idempotencyKey: "k2" });
+  assert.throws(
+    () =>
+      refreshExpectedHeads({
+        requests: [stale, fresh, request({ action: "post_issue_comment", pr: 3, expectedHead: undefined })],
+        runner,
+      }),
+    /expected_head_mismatch/,
+  );
   const result = refreshExpectedHeads({
-    requests: [stale, fresh, request({ action: "post_issue_comment", pr: 3, expectedHead: undefined })],
+    requests: [fresh, request({ action: "post_issue_comment", pr: 3, expectedHead: undefined })],
     runner,
   });
-  assert.deepEqual(result.refreshed.map((entry) => entry.pr), [1]);
+  assert.equal(result.refreshed.length, 0);
   assert.equal(result.requests[0].expectedHead, "c".repeat(40));
-  assert.equal(result.requests[0].authorityBranch, "feature/pr-1");
-  assert.equal(result.requests[1].expectedHead, "c".repeat(40));
-  assert.equal(result.requests[1].authorityBranch, "feature/pr-2");
-  assert.equal(result.requests[2].action, "post_issue_comment");
-  assert.equal(result.requests[2].authorityBranch, undefined);
+  assert.equal(result.requests[0].authorityBranch, "feature/pr-2");
+  assert.equal(result.requests[1].action, "post_issue_comment");
+  assert.equal(result.requests[1].authorityBranch, undefined);
 });
 
 test("refreshExpectedHeads fails closed when live head or branch evidence is invalid", () => {

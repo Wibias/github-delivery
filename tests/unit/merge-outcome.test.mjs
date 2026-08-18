@@ -78,13 +78,15 @@ test("successful gh merge exit reports queued when GitHub placed the PR in merge
     inQueue: true,
     queueEntry: { state: "AWAITING_CHECKS" },
   });
-  const result = executeMutationRequest({
-    request: mergeRequest(),
-    execute: true,
-    runner: harness.runner,
-  });
-  assert.equal(result.status, "succeeded");
-  assert.equal(result.outcome, "queued");
+  assert.throws(
+    () =>
+      executeMutationRequest({
+        request: mergeRequest(),
+        execute: true,
+        runner: harness.runner,
+      }),
+    /merge_outcome_unverified:queued/,
+  );
   assert.equal(harness.wasMergeCalled(), true);
 });
 
@@ -92,13 +94,16 @@ test("successful gh merge exit reports auto_merge_enabled when GitHub enabled au
   const harness = mergeRunner({
     autoMergeRequest: { enabledAt: "2026-08-09T09:00:00Z", mergeMethod: "MERGE" },
   });
-  const result = executeMutationRequest({
-    request: mergeRequest(),
-    execute: true,
-    runner: harness.runner,
-  });
-  assert.equal(result.status, "succeeded");
-  assert.equal(result.outcome, "auto_merge_enabled");
+  assert.throws(
+    () =>
+      executeMutationRequest({
+        request: mergeRequest(),
+        execute: true,
+        runner: harness.runner,
+      }),
+    /merge_outcome_unverified:auto_merge_enabled/,
+  );
+  assert.equal(harness.wasMergeCalled(), true);
 });
 
 test("merge broker reports merged only when GitHub exposes merged state", () => {
@@ -126,6 +131,36 @@ test("already merged PR is an idempotent outcome and does not invoke gh pr merge
   });
   assert.equal(result.status, "already_applied");
   assert.equal(result.outcome, "already_merged");
+  assert.equal(harness.wasMergeCalled(), false);
+});
+
+test("already queued PR is not merged and does not invoke gh pr merge", () => {
+  const harness = mergeRunner({}, {
+    inQueue: true,
+    queueEntry: { state: "AWAITING_CHECKS" },
+  });
+  const result = executeMutationRequest({
+    request: mergeRequest(),
+    execute: true,
+    runner: harness.runner,
+  });
+  assert.equal(result.status, "not_merged");
+  assert.equal(result.outcome, "queued");
+  assert.equal(result.executed, false);
+  assert.equal(harness.wasMergeCalled(), false);
+});
+
+test("already enabled auto-merge is not a final merge and does not invoke gh pr merge", () => {
+  const harness = mergeRunner({}, {
+    autoMergeRequest: { enabledAt: "2026-08-09T09:00:00Z", mergeMethod: "MERGE" },
+  });
+  const result = executeMutationRequest({
+    request: mergeRequest(),
+    execute: true,
+    runner: harness.runner,
+  });
+  assert.equal(result.status, "not_merged");
+  assert.equal(result.outcome, "auto_merge_enabled");
   assert.equal(harness.wasMergeCalled(), false);
 });
 

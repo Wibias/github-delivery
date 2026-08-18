@@ -56,6 +56,7 @@ try {
     : captureLiveSnapshot({
         repo: args.repo,
         pr: args.pr,
+        expectedHead: args.expectedHead,
         maxAgeSeconds: args.maxAgeSeconds,
       });
 

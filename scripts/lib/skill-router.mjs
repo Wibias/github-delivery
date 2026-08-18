@@ -34,6 +34,48 @@ const MULTI_BASE_REQUEST = /\b(?:backport|back-port|port)\b[\s\S]{0,180}\b(?:pr|
 const DELIVERY_NAME = /\bgithub[- ]?delivery\b/;
 const DELIVERY_UPDATE = /\b(update|upgrade)\b[\s\S]*\bgithub[- ]?delivery\b|\bgithub[- ]?delivery\b[\s\S]*\b(update|upgrade|latest stable release)\b/;
 const DELIVERY_CONFIG = /\b(set ?up|install|configure|configuration|settings?|protection mode|windows hello)\b[\s\S]*\bgithub[- ]?delivery\b|\bgithub[- ]?delivery\b[\s\S]*\b(set ?up|install|configure|configuration|settings?|protection mode|windows hello)\b/;
+const SPEC_STANDARDS_REQUEST = /\b(?:spec(?:ification)? and standards review|standards review|spec(?:ification)? review)\b/;
+const STACKED_PR_REQUEST = /\b(?:stacked prs?|pr stack|restack|open pr stack|bottom pr in (?:my|the) stack|retarget (?:and rebase )?the children|manage[- ]stacked[- ]prs)\b/;
+const AGENT_BRIEF_REQUEST = /\b(?:ready[- ]for[- ]agent|agent brief|issue contract)\b/;
+const ISSUE_TRIAGE_REQUEST = /\btriage\b[\s\S]{0,80}\b(?:issue|issues|ticket|tickets)\b|\b(?:issue|issues|ticket|tickets)\b[\s\S]{0,80}\btriage\b/;
+const QA_INTAKE_REQUEST = /\bqa intake\b|\bfile\b[\s\S]{0,80}\breproducible\b[\s\S]{0,80}\bbug report/;
+const CONFLICT_REQUEST = /\b(?:merge conflicts?|git conflicts?|resolve(?:\s+the)?(?:\s+merge)?\s+conflicts?)\b/;
+const OUT_OF_SCOPE_REQUEST = /\b(?:out of scope|rejected enhancement|not now)\b/;
+
+export const PUBLIC_ROUTE_HANDOFFS = Object.freeze([
+  "split-to-prs",
+  "finishing-a-development-branch",
+  "git-workflow-and-versioning",
+]);
+
+export const ROUTABLE_WORKFLOWS = Object.freeze([
+  "references/update.md",
+  "references/configuration.md",
+  "references/open-work-status.md",
+  "references/consolidate-prs.md",
+  "references/multi-base-delivery.md",
+  "references/work-item-delivery.md",
+  "references/stacked-prs.md",
+  "references/prepare-and-merge-pr.md",
+  "references/merge-pr.md",
+  "references/status.md",
+  "references/supersede-pr.md",
+  "references/overtake-pr.md",
+  "references/spec-standards-review.md",
+  "references/full-review-pr.md",
+  "references/simplify-pr.md",
+  "references/security-review.md",
+  "references/re-review-pr.md",
+  "references/watch-pr.md",
+  "references/create-pr-for-issue.md",
+  "references/create-pr-from-local-work.md",
+  "references/research-issue.md",
+  "references/issue-workflows.md",
+  "references/agent-brief.md",
+  "references/out-of-scope.md",
+  "references/resolve-conflicts.md",
+  "references/fix-pr-bots.md",
+]);
 
 function prepareAndMergeActions(text) {
   const actions = ["merge_pr", "post_comment", "post_issue_comment", "close_linked_issue"];
@@ -83,7 +125,12 @@ function isPrepareAndMergeRequest(text) {
 }
 
 function isMergeDiscussion(text) {
-  return PR_REFERENCE.test(text) && MERGE_INTENT.test(text.replace(MERGE_READY_PHRASE, "")) && !hasExplicitMergeIntent(text);
+  return (
+    PR_REFERENCE.test(text) &&
+    MERGE_INTENT.test(text.replace(MERGE_READY_PHRASE, "")) &&
+    !hasExplicitMergeIntent(text) &&
+    !CONFLICT_REQUEST.test(text)
+  );
 }
 
 function isOpenWorkRequest(text) {
@@ -124,6 +171,16 @@ export function routeShippingGithubPrompt(prompt) {
       readOnly ? [] : workItemDeliveryActions(text),
     );
   }
+  if (CONFLICT_REQUEST.test(text)) {
+    return result("references/resolve-conflicts.md", "maintainer", ["push_code"]);
+  }
+  if (STACKED_PR_REQUEST.test(text)) {
+    return result(
+      "references/stacked-prs.md",
+      hasExplicitMergeIntent(text) ? "maintainer" : "read-only",
+      hasExplicitMergeIntent(text) ? ["merge_pr", "post_comment"] : [],
+    );
+  }
 
   if (isPrepareAndMergeRequest(text)) return result("references/prepare-and-merge-pr.md", "maintainer", prepareAndMergeActions(text));
   if ((hasExplicitMergeIntent(text) && PR_REFERENCE.test(text)) || /^merge it\b/.test(text) || /^ship it\b/.test(text)) {
@@ -136,6 +193,9 @@ export function routeShippingGithubPrompt(prompt) {
   }
   if (/\b(overtake|take over|maintainer overtake|take it over)\b[\s\S]*\b(?:pr|pull request)\b/.test(text)) {
     return result("references/overtake-pr.md", "maintainer", ["push_code", "post_comment", "close_pr"]);
+  }
+  if (SPEC_STANDARDS_REQUEST.test(text) && PR_WORD.test(text)) {
+    return result("references/spec-standards-review.md", "review");
   }
   if (FULL_REVIEW_REQUEST.test(text)) {
     const simplifyRequested = SIMPLIFY_REQUEST.test(text);
@@ -156,6 +216,18 @@ export function routeShippingGithubPrompt(prompt) {
 
   const issueCreationAction = issueCreationActionForPrompt(text);
   if (issueCreationAction) return result("references/issue-workflows.md", "maintainer", [issueCreationAction]);
+  if (ISSUE_TRIAGE_REQUEST.test(text) && !CONSOLIDATE_PR_REQUEST.test(text)) {
+    return result("references/issue-workflows.md", "maintainer");
+  }
+  if (QA_INTAKE_REQUEST.test(text)) {
+    return result("references/issue-workflows.md", "maintainer");
+  }
+  if (AGENT_BRIEF_REQUEST.test(text)) {
+    return result("references/agent-brief.md", "maintainer");
+  }
+  if (OUT_OF_SCOPE_REQUEST.test(text)) {
+    return result("references/out-of-scope.md", "read-only");
+  }
 
   if (FIX_REVIEW_REQUEST.test(text) || /\bmake\b[\s\S]*\b(?:pr|pull request)\b[\s\S]*\bmerge[- ]?ready\b/.test(text)) {
     return result("references/fix-pr-bots.md", "maintainer", ["push_code"]);
