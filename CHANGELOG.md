@@ -4,6 +4,13 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- Stopped Control Center Recent activity from flashing on every refresh by binding a stable collection, rebuilding only when audit data changes, and inserting Today/Yesterday/date separators between day groups (PR #293).
+- Kept skill-authoring requests outside GitHub Delivery routing even when they end with PR publication (PR #295).
+- Fail closed when a published GitHub PR or comment body contains literal escape sequences instead of real markdown newlines, including stdin body transport, create/update verification, and live comment re-reads (PR #294).
+- Bound GitHub, Git, PowerShell, and registry subprocess helpers now copy argv and force a direct spawn (shell: false), so library-provided arguments cannot be reconstructed as a shell command (PR #294).
+
 ## [0.8.6] - 2026-08-18
 
 ### Changed

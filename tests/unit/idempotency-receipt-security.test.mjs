@@ -188,6 +188,9 @@ test("create_pr idempotency lookup is bounded to the qualified head branch", () 
         createdBody = args[args.indexOf("--body") + 1];
         return { status: 0, stdout: "https://github.test/acme/widgets/pull/99\n", stderr: "" };
       }
+      if (command === "gh" && args[0] === "pr" && args[1] === "view" && args.includes("body")) {
+        return { status: 0, stdout: createdBody || "Body", stderr: "" };
+      }
       throw new Error(`unexpected command: ${command} ${args.join(" ")}`);
     },
   });

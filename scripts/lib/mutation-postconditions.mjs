@@ -1,3 +1,5 @@
+import { assertPublishedMarkdown } from "./published-body-integrity.mjs";
+
 function runJson(runner, command, errorCode) {
   const [executable, ...args] = command;
   const result = runner(executable, args, {
@@ -17,12 +19,48 @@ function runJson(runner, command, errorCode) {
   }
 }
 
+function commentIdFromReceipt(request, receipt) {
+  const direct = receipt.existingMutation?.id || receipt.verification?.id || request.commentId;
+  if (direct) return String(direct);
+  const url = String(
+    receipt.existingMutation?.html_url ||
+      receipt.existingMutation?.url ||
+      receipt.verification?.html_url ||
+      receipt.verification?.url ||
+      receipt.stdout ||
+      "",
+  );
+  const match = url.match(/comments\/(\d+)/i);
+  return match ? match[1] : null;
+}
+
 export function verifyLegacyMutationPostcondition({ request = {}, receipt = {}, runner } = {}) {
   if (receipt?.executed !== true || receipt?.status !== "succeeded") return null;
   if (typeof runner !== "function") throw new Error("postcondition_runner_required");
 
   const repo = String(request.repo || "");
   if (!repo) throw new Error("postcondition_repo_required");
+
+  if (
+    request.action === "post_comment" ||
+    request.action === "post_issue_comment" ||
+    request.action === "edit_own_comment" ||
+    request.action === "reply_review_thread"
+  ) {
+    const expected = String(request.body || "");
+    const commentId = commentIdFromReceipt(request, receipt);
+    if (!commentId) {
+      assertPublishedMarkdown(expected);
+      return { body: expected, source: "request" };
+    }
+    const endpoint =
+      request.action === "reply_review_thread"
+        ? ["gh", "api", `repos/${repo}/pulls/comments/${commentId}`]
+        : ["gh", "api", `repos/${repo}/issues/comments/${commentId}`];
+    const comment = runJson(runner, endpoint, "comment_body_postcondition_failed");
+    assertPublishedMarkdown(comment.body, { expected });
+    return { body: comment.body, id: comment.id ?? commentId };
+  }
 
   if (request.action === "close_pr") {
     const state = runJson(
@@ -71,3 +109,4 @@ export function verifyLegacyMutationPostcondition({ request = {}, receipt = {}, 
 
   return null;
 }
+

@@ -33,6 +33,7 @@ This workflow is deliberately separate from `create-pr-for-issue.md`. **Do not i
 7. **Build exact publication requests.** The user’s direct “create pr” instruction authorizes only the `push_code` and `create_pr` effects needed for this workflow. Build exact broker requests for the scoped branch and PR. Default to a draft PR unless the user explicitly asks for ready-for-review publication.
 8. **Plan, authorize, execute.** Send every network-visible GitHub write through `scripts/github-mutate.mjs`. Obtain trusted authority where the action registry requires it, then execute the exact planned `push_code` and `create_pr` effects. If the `create_pr` preflight returns `create_pr_existing`, stop publication and reuse the named PR instead of bypassing the check.
 9. **Verify publication.** Re-read the created or reused PR and confirm repository, base, head, title/body, draft state, and final branch head match the intended publication. Do not rewrite an existing PR body merely because it was reused unless the user’s requested workflow separately authorizes that update.
+   Fail closed if the live body contains literal `\\n` / `\\t` escape sequences or collapsed markdown headings instead of real newlines. Repair through `update_pr_body` rather than treating escaped markdown as a successful publication.
 
 ## Hard boundaries
 
