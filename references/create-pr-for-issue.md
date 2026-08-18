@@ -87,13 +87,9 @@ Carry completed gate/review evidence into the PR validation notes.
 1. Resolve repository identity from the **issue**, not whichever remote is convenient, and resolve the correct base branch.
 2. Publish the exact commit using broker action `push_code`. Bind the observed remote generation; use force-with-lease only when the selected Git workflow permits rewriting that branch.
 3. Build the PR description from `references/pr-description.md`, the final candidate diff, issue acceptance criteria, thread clarifications, and completed validation. Do not narrate planned work as completed work.
-4. **Re-check exact-head publication identity after the push.** Determine whether an open PR already exists for the exact canonical repository + pushed head identity + intended base. This check is narrower than A’s semantic “covering PR” research and protects against races/retries/parallel publication:
-   - exactly one exact-head/base PR → reuse it and continue with linkage/readiness on that PR;
-   - multiple exact-head/base PRs → fail closed and report all matches;
-   - none → continue to create.
-   The lifecycle `create_pr` preflight independently repeats this live identity check immediately before execution.
-5. Create the PR with broker action `create_pr`, using a stable idempotency key and exact base/head/title/body. If execution returns `create_pr_existing`, treat the named PR as the publication result rather than bypassing or retrying creation under another title.
-6. Confirm the created or reused PR is on the canonical issue repository and intended base/head. Wrong topology is a hard stop.
+4. After push, re-check exact publication identity: canonical repository + pushed head identity + intended base. One exact open PR → reuse it; multiple → fail closed and report them; none → create. This is narrower than A's semantic covering-PR check, and `create_pr` preflight repeats it immediately before execution.
+5. Create with broker action `create_pr`, a stable idempotency key, and exact base/head/title/body. `create_pr_existing` names the publication result; do not bypass it or retry under another title.
+6. Confirm the created/reused PR has the canonical issue repository and intended base/head. Wrong topology is a hard stop.
 
 ## F. Link, assign, notify
 
@@ -105,7 +101,7 @@ GitHub's closing-keyword behavior depends on the PR base:
 Then:
 
 1. Assign yourself on the issue with broker action `assign_issue` when permissions permit. If denied, report once and continue.
-2. Post exactly one idempotent issue comment with broker action `post_issue_comment`: `[GD] Opened PR #<pr> to address this.` Reuse the canonical PR number whether it was newly created or discovered by the exact-head publication check.
+2. Post exactly one idempotent issue comment with broker action `post_issue_comment`: `[GD] Opened PR #<pr> to address this.` Reuse the canonical PR number whether newly created or found by the exact publication check.
 3. Spot-check that issue/PR references point at the canonical PR, not a fork-only or superseded PR.
 
 ## G. Make merge-ready
@@ -129,7 +125,7 @@ Before final reporting, apply `references/completion-claims.md` to current autho
 - Requested PR count only; canonical issue repository and intended base/head.
 - Full issue thread and screenshot gate completed; bounded preflight reached an evidence-backed outcome.
 - Non-empty implementation diff existed before the pre-open gate; pre-open bug/security requirements cleared before publication.
-- An existing exact-head/base PR was reused rather than duplicated when a publication race/retry already created it.
+- Existing exact-head/base publication was reused instead of duplicated after a race/retry.
 - Every network-visible write went through `github-mutate.mjs`; required trusted authority was obtained/redeemed by the mutation runtime.
 - PR description matches final head/issue contract; linkage follows the default/non-default rule without futile retries and protected media was preserved during rewrites.
 - Issue self-assigned when possible; one complete opened-PR comment; no duplicates.
