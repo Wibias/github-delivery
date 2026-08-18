@@ -53,6 +53,19 @@ test("repository policy requires only the lean CI lanes", () => {
   ]);
 });
 
+test("repository policy PRs can migrate live rulesets without self-blocking", () => {
+  assert.match(repositoryPolicyWorkflow, /fetch-depth: 0/);
+  assert.match(repositoryPolicyWorkflow, /BASE_SHA: \$\{\{ github\.event\.pull_request\.base\.sha \}\}/);
+  assert.match(
+    repositoryPolicyWorkflow,
+    /if node scripts\/verify-live-repository-policy\.mjs "\$\{GITHUB_REPOSITORY\}"; then/,
+  );
+  assert.match(
+    repositoryPolicyWorkflow,
+    /git show "\$\{BASE_SHA\}:\.github\/repository-policy\.json"/,
+  );
+});
+
 test("architecture contracts are not duplicated in a separate PR workflow", () => {
   assert.equal(
     existsSync(new URL("../../.github/workflows/architecture-contracts.yml", import.meta.url)),
