@@ -7,12 +7,13 @@ const canonicalizerPath = new URL(
   import.meta.url,
 );
 
-test("Windows authority scope binds approved PR media removals as a canonical set", async () => {
+test("Windows authority scope binds only non-empty approved PR media removals as a canonical set", async () => {
   const source = await readFile(canonicalizerPath, "utf8");
   const updateCase = source.match(/case "update_pr_body":[\s\S]*?break;/)?.[0] || "";
 
   assert.match(updateCase, /approvedMediaRemovals/);
   assert.match(updateCase, /CanonicalStringSet\(request, "approvedMediaRemovals", optional: true\)/);
+  assert.match(updateCase, /if \(approvedMediaRemovals\.Count > 0\) scope\["approvedMediaRemovals"\] = approvedMediaRemovals;/);
   assert.match(source, /Distinct\(StringComparer\.Ordinal\)/);
   assert.match(source, /OrderBy\(value => value, StringComparer\.Ordinal\)/);
 });
