@@ -28,11 +28,8 @@
   "requiredCheckIntegrationId": 15368,
   "requiredChecks": [
     "Node 22 / ubuntu-latest",
-    "Node 22 / windows-latest",
-    "Node 22 / macos-latest",
     "Node 24 / ubuntu-latest",
     "Node 24 / windows-latest",
-    "Node 24 / macos-latest",
     "Dependency Review",
     "CodeQL / Analyze (javascript-typescript)",
     "CodeQL / Analyze (csharp)"
