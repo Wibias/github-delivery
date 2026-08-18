@@ -222,7 +222,10 @@ export function executeLifecycleMutationRequest({
   if (!execute) return { ...plan, executed: false, status: "dry_run" };
 
   const observedHead = verifyHead({ request: plan.request, runner });
-  const preflight = preflightLifecycleMutation({ request: plan.request, runner });
+
+  // Recover an exact same-actor/idempotency create before broader publication
+  // preflights. Otherwise an already-created PR would be rejected as a generic
+  // exact-head duplicate before its durable receipt can converge the retry.
   const existingMutation = findExistingCreate({ request: plan.request, runner });
   if (existingMutation) {
     return {
@@ -230,13 +233,14 @@ export function executeLifecycleMutationRequest({
       executed: false,
       status: "already_applied",
       observedHead,
-      preflight,
+      preflight: null,
       existingMutation,
       stdout: "",
       verification: existingMutation,
     };
   }
 
+  const preflight = preflightLifecycleMutation({ request: plan.request, runner });
   const stdout = runOrThrow(runner, plan.command);
   let verification = verifyLifecycleMutation({ request: plan.request, runner });
   if (IDEMPOTENT_CREATES.has(plan.action)) {
