@@ -14,6 +14,48 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  scope:
+    name: Detect CI scope
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      node_compat: ${{ steps.scope.outputs.node_compat }}
+      windows_authority: ${{ steps.scope.outputs.windows_authority }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Detect compatibility and Windows Authority scope
+        id: scope
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "${EVENT_NAME}" != "pull_request" ]]; then
+            echo "node_compat=true" >> "${GITHUB_OUTPUT}"
+            echo "windows_authority=true" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          git diff --name-only "${BASE_SHA}"...HEAD > "${RUNNER_TEMP}/changed-files.txt"
+
+          if grep -Eq '^(scripts/|tests/|\.github/npm-publish/|package\.json$|\.github/workflows/ci\.yml$)' "${RUNNER_TEMP}/changed-files.txt"; then
+            echo "node_compat=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "node_compat=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+          if grep -Eq '^(authority-host/windows/|global\.json$|package\.json$|scripts/prepare-authority-host-runtime-smoke\.mjs$|scripts/lib/authority-host-(install|release)\.mjs$|\.github/workflows/ci\.yml$)' "${RUNNER_TEMP}/changed-files.txt"; then
+            echo "windows_authority=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "windows_authority=false" >> "${GITHUB_OUTPUT}"
+          fi
+
   core:
     name: Node 24 / ubuntu-latest
     runs-on: ubuntu-latest
@@ -47,6 +89,8 @@ jobs:
 
   node22-compatibility:
     name: Node 22 / ubuntu-latest
+    needs: scope
+    if: github.event_name != 'pull_request' || needs.scope.outputs.node_compat == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -66,6 +110,8 @@ jobs:
 
   windows-authority:
     name: Node 24 / windows-latest
+    needs: scope
+    if: github.event_name != 'pull_request' || needs.scope.outputs.windows_authority == 'true'
     runs-on: windows-latest
     timeout-minutes: 25
     steps:
