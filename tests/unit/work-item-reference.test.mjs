@@ -47,6 +47,34 @@ test("prefers explicit external metadata over branch/title/body heuristics", () 
   assert.equal(result.reference.tier, 2);
 });
 
+test("discovers an explicit work-item URL in PR text before branch heuristics", () => {
+  const result = extractWorkItemReferences({
+    ...base,
+    headRefName: "feature/ENG-10-fallback",
+    body: "Tracker: https://linear.app/acme/issue/ENG-9/example\nENG-12 body fallback",
+  });
+
+  assert.equal(result.state, "resolved");
+  assert.deepEqual(result.reference, {
+    kind: "external",
+    key: "ENG-9",
+    url: "https://linear.app/acme/issue/ENG-9/example",
+    source: "external-url",
+    tier: 2,
+  });
+});
+
+test("ignores ordinary external URLs that do not carry a work-item key", () => {
+  const result = extractWorkItemReferences({
+    ...base,
+    headRefName: "feature/ENG-10-fallback",
+    body: "Docs: https://example.com/reference",
+  });
+
+  assert.equal(result.reference.key, "ENG-10");
+  assert.equal(result.reference.source, "head-ref");
+});
+
 test("uses branch before title before body for bare external keys", () => {
   const branch = extractWorkItemReferences({
     ...base,
