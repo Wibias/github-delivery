@@ -80,11 +80,11 @@ function fetchLiveHead({ request, runner }) {
  * Refresh the `expectedHead` and bind `authorityBranch` for every PR-scoped
  * operation against live GitHub state before the authorization prompt.
  * Operations without a PR head binding are returned unchanged. A failed read
- * fails closed before any approval prompt.
+ * fails closed before any approval prompt. A supplied expected head is verified
+ * and never replaced; head movement requires regenerating the operation.
  *
- * Returns `{ requests, refreshed }` where `refreshed` contains only operations
- * whose expected head moved. Branch identity is nevertheless bound to every
- * PR-scoped output request.
+ * Returns `{ requests, refreshed }` where `refreshed` is empty on success.
+ * Branch identity is bound to every PR-scoped output request.
  */
 export function refreshExpectedHeads({
   requests = [],
@@ -98,21 +98,16 @@ export function refreshExpectedHeads({
     const request = requests[index];
     if (!headRefreshCandidate(request)) continue;
     const observed = fetchLiveHead({ request, runner });
+    if (String(observed.head).toLowerCase() !== String(request.expectedHead).toLowerCase()) {
+      throw new Error(
+        `expected_head_mismatch: expected ${request.expectedHead}, observed ${observed.head}`,
+      );
+    }
     output[index] = {
       ...output[index],
-      expectedHead: observed.head,
+      expectedHead: request.expectedHead,
       authorityBranch: observed.branch,
     };
-    if (String(observed.head).toLowerCase() !== String(request.expectedHead).toLowerCase()) {
-      refreshed.push({
-        index,
-        pr: request.pr,
-        repo: request.repo,
-        from: String(request.expectedHead),
-        to: observed.head,
-        branch: observed.branch,
-      });
-    }
   }
   return { requests: output, refreshed };
 }

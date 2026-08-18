@@ -1,9 +1,9 @@
-import { spawnSync } from "node:child_process";
+import { boundedSpawnSync } from "./subprocess-policy.mjs";
 import { collectPaginated } from "./github-pagination.mjs";
 import { snapshotIntegritySha256 } from "./snapshot-schema.mjs";
 
 function defaultRunGh(args) {
-  const result = spawnSync("gh", args, {
+  const result = boundedSpawnSync("gh", args, {
     encoding: "utf8",
     maxBuffer: 50 * 1024 * 1024,
   });

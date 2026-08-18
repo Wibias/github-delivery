@@ -56,7 +56,9 @@ test("dry-run never requests trusted authority", () => {
   });
 
   assert.equal(authorized, false);
-  assert.deepEqual(result, { action: "push_code", executed: false });
+  assert.equal(result.action, "push_code");
+  assert.equal(result.executed, false);
+  assert.equal(result.operationKey, "push_code:acme/widgets:");
 });
 
 test("execution batches only missing trusted grants and executes refreshed requests in order", () => {
@@ -137,33 +139,73 @@ test("execution batches only missing trusted grants and executes refreshed reque
   ]);
   assert.deepEqual(result, {
     batch: true,
+    partialFailure: false,
     results: [
-      { action: "post_comment", grant: "gd1.generated0.signature" },
-      { action: "assign_issue", grant: "gd1.existing.signature" },
-      { action: "create_pr", grant: "gd1.generated1.signature" },
+      {
+        action: "post_comment",
+        grant: "gd1.generated0.signature",
+        operationKey: "post_comment:acme/widgets:4",
+      },
+      {
+        action: "assign_issue",
+        grant: "gd1.existing.signature",
+        operationKey: "assign_issue:acme/widgets:7",
+      },
+      {
+        action: "create_pr",
+        grant: "gd1.generated1.signature",
+        operationKey: "create_pr:acme/widgets:",
+      },
     ],
   });
 });
 
 test("multi-request execution stops at the first failed operation", () => {
   const executed = [];
-  assert.throws(
-    () =>
-      executeMutationDocument({
-        document: [request("one"), request("two"), request("three")],
-        execute: false,
-        dependencies: {
-          mutationRequiresTrustedAuthority: () => false,
-          executeMutationWithAuthority({ request: current }) {
-            executed.push(current.action);
-            if (current.action === "two") throw new Error("second failed");
-            return { action: current.action };
-          },
-        },
-      }),
-    /second failed/,
-  );
+  const persisted = [];
+  const result = executeMutationDocument({
+    document: [request("one"), request("two"), request("three")],
+    execute: false,
+    dependencies: {
+      mutationRequiresTrustedAuthority: () => false,
+      onReceipt(receipt) {
+        persisted.push(receipt.action);
+      },
+      executeMutationWithAuthority({ request: current }) {
+        executed.push(current.action);
+        if (current.action === "two") throw new Error("second failed");
+        return { action: current.action, status: "succeeded" };
+      },
+    },
+  });
   assert.deepEqual(executed, ["one", "two"]);
+  assert.deepEqual(persisted, ["one", "two"]);
+  assert.equal(result.partialFailure, true);
+  assert.equal(result.results[0].status, "succeeded");
+  assert.equal(result.results[1].status, "failed");
+  assert.equal(result.results[1].error, "second failed");
+  assert.equal(result.results.length, 2);
+});
+
+test("retries skip operations that already completed", () => {
+  const executed = [];
+  const result = executeMutationDocument({
+    document: [request("one", { idempotencyKey: "k-one" }), request("two", { idempotencyKey: "k-two" })],
+    execute: false,
+    dependencies: {
+      completedOperationKeys: ["k-one"],
+      mutationRequiresTrustedAuthority: () => false,
+      executeMutationWithAuthority({ request: current }) {
+        executed.push(current.action);
+        return { action: current.action, status: "succeeded" };
+      },
+    },
+  });
+  assert.deepEqual(executed, ["two"]);
+  assert.equal(result.results[0].status, "already_applied");
+  assert.equal(result.results[0].skipped, true);
+  assert.equal(result.results[1].action, "two");
+  assert.equal(result.partialFailure, false);
 });
 
 test("execution validates every request before prompting for authority", () => {

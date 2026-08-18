@@ -224,3 +224,54 @@ test("does not trigger for local pre-PR debugging", () => {
     null,
   );
 });
+
+test("routes stacked PR work to the stacked workflow", () => {
+  assert.equal(
+    routeShippingGithubPrompt("restack my GitHub PR stack after the bottom PR got review commits").workflow,
+    "references/stacked-prs.md",
+  );
+  assert.equal(
+    routeShippingGithubPrompt("Show me the current open PR stack for this repo").mutationMode,
+    "read-only",
+  );
+  assert.equal(
+    routeShippingGithubPrompt("Merge the bottom PR in my stack first").workflow,
+    "references/stacked-prs.md",
+  );
+});
+
+test("routes spec and standards review separately from full review", () => {
+  const route = routeShippingGithubPrompt("spec and standards review on PR #32");
+  assert.equal(route.workflow, "references/spec-standards-review.md");
+  assert.equal(route.mutationMode, "review");
+});
+
+test("routes agent brief, out-of-scope, conflict, and issue-lifecycle requests", () => {
+  assert.equal(
+    routeShippingGithubPrompt("write a ready-for-agent issue contract").workflow,
+    "references/agent-brief.md",
+  );
+  assert.equal(
+    routeShippingGithubPrompt("record this as a rejected enhancement / out of scope").workflow,
+    "references/out-of-scope.md",
+  );
+  assert.equal(
+    routeShippingGithubPrompt("resolve merge conflicts on this branch").workflow,
+    "references/resolve-conflicts.md",
+  );
+  assert.equal(
+    routeShippingGithubPrompt("triage issues #12 and #15").workflow,
+    "references/issue-workflows.md",
+  );
+  assert.equal(
+    routeShippingGithubPrompt("run QA intake and file a reproducible bug report").workflow,
+    "references/issue-workflows.md",
+  );
+});
+
+test("stacked merge requests stay on stacked-prs with merge authority", () => {
+  const mergeStack = routeShippingGithubPrompt("merge the bottom PR in my stack first");
+  assert.equal(mergeStack.workflow, "references/stacked-prs.md");
+  assert.equal(mergeStack.mutationMode, "maintainer");
+  assert.ok(mergeStack.explicitActions.includes("merge_pr"));
+});

@@ -26,19 +26,17 @@ function commentRequest(overrides = {}) {
 
 test("refreshing a stale PR head changes the authority scope hash", () => {
   const request = commentRequest();
-  const before = authorityScopeSha256(request);
-
-  const refreshed = refreshExpectedHeads({
-    requests: [request],
-    runner() {
-      return JSON.stringify({ headRefOid: B, headRefName: "feature/new-head" });
-    },
-  }).requests[0];
-
-  const after = authorityScopeSha256(refreshed);
-  assert.notEqual(after, before);
-  assert.equal(refreshed.expectedHead, B);
-  assert.equal(refreshed.authorityBranch, "feature/new-head");
+  assert.throws(
+    () =>
+      refreshExpectedHeads({
+        requests: [request],
+        runner() {
+          return JSON.stringify({ headRefOid: B, headRefName: "feature/new-head" });
+        },
+      }),
+    /expected_head_mismatch/,
+  );
+  assert.equal(request.expectedHead, A);
 });
 
 test("binding a live branch also changes authority scope when the head is unchanged", () => {

@@ -11,4 +11,6 @@ test("github-mutate delegates routine orchestration to the mutation document exe
   assert.match(source, /executeMutationDocument/);
   assert.doesNotMatch(source, /executeMutationWithAuthority/);
   assert.match(source, /--request FILE \[--execute\] \[--audit FILE\]/);
+  assert.match(source, /completedKeysFromAudit/);
+  assert.match(source, /onReceipt/);
 });

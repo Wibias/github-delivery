@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, join, relative, sep } from "node:path";
 
-import { routeShippingGithubPrompt } from "./skill-router.mjs";
+import { ROUTABLE_WORKFLOWS, routeShippingGithubPrompt } from "./skill-router.mjs";
 import { KNOWN_LENS_IDS, KNOWN_SECURITY_SURFACE_IDS, planReviewScope } from "./review-scope.mjs";
 import {
   ASSERTION_TO_PROBE,
@@ -88,9 +88,7 @@ function inferredWorkflow(item) {
   if (item.expected_workflow !== undefined) return item.expected_workflow;
   if (!["must-trigger", "routing"].includes(item.category)) return undefined;
   const workflows = (item.expected_resources || []).filter((resource) =>
-    /^references\/(fix-pr-bots|watch-pr|re-review-pr|research-issue|create-pr-for-issue|full-review-pr|security-review|status|merge-pr|supersede-pr|overtake-pr)\.md$/.test(
-      resource,
-    ),
+    ROUTABLE_WORKFLOWS.includes(resource),
   );
   return workflows.length === 1 ? workflows[0] : undefined;
 }

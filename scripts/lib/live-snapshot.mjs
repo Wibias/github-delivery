@@ -152,6 +152,7 @@ export function captureLiveSnapshot({
   repo,
   pr,
   maxAgeSeconds = 300,
+  expectedHead = null,
   runner = boundedSpawnSync,
 } = {}) {
   const result = runner(
@@ -177,6 +178,7 @@ export function captureLiveSnapshot({
     snapshot,
     repo,
     pr,
+    expectedHead,
     maxAgeSeconds,
     requireComplete: false,
   });

@@ -5,7 +5,6 @@
  * Requires: gh auth
  */
 import { Buffer } from "node:buffer";
-import { spawnSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import {
   evaluateRequiredCheckWorkflowMapping,
@@ -26,6 +25,7 @@ import {
   attachRepositoryPermissions,
   feedbackPermissionLogins,
 } from "./lib/feedback-authority.mjs";
+import { boundedSpawnSync } from "./lib/subprocess-policy.mjs";
 
 function parseArgs(argv) {
   const positionals = [];
@@ -57,7 +57,7 @@ function parseArgs(argv) {
 }
 
 function ghOk(args) {
-  const result = spawnSync("gh", args, {
+  const result = boundedSpawnSync("gh", args, {
     encoding: "utf8",
     maxBuffer: 50 * 1024 * 1024,
   });

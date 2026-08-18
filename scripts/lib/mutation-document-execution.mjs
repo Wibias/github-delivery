@@ -145,18 +145,61 @@ export function executeMutationDocument({
     }
   }
 
+  const completedKeys = new Set(
+    Array.isArray(deps.completedOperationKeys) ? deps.completedOperationKeys : [],
+  );
   const results = [];
+  let partialFailure = false;
+
   for (const request of requests) {
-    results.push(
-      deps.executeMutationWithAuthority({
+    const operationKey =
+      request.idempotencyKey ||
+      [request.action, request.repo, request.pr ?? request.issue ?? ""].join(":");
+    if (completedKeys.has(operationKey)) {
+      const skipped = {
+        action: request.action,
+        status: "already_applied",
+        outcome: "already_completed",
+        skipped: true,
+        operationKey,
+      };
+      results.push(skipped);
+      deps.onReceipt?.(skipped);
+      continue;
+    }
+
+    try {
+      const result = deps.executeMutationWithAuthority({
         request,
         execute,
         runner,
         env: effectiveEnv,
         readFile,
-      }),
-    );
+      });
+      const receipt = { ...result, operationKey };
+      results.push(receipt);
+      deps.onReceipt?.(receipt);
+      if (receipt?.status === "succeeded" || receipt?.status === "already_applied") {
+        completedKeys.add(operationKey);
+      }
+    } catch (error) {
+      partialFailure = true;
+      const failed = {
+        action: request.action,
+        status: "failed",
+        error: String(error?.message || error),
+        operationKey,
+      };
+      results.push(failed);
+      deps.onReceipt?.(failed);
+      break;
+    }
   }
-  if (normalized.singular) return results[0];
-  return { batch: true, results };
+
+  if (normalized.singular) {
+    const only = results[0];
+    if (only?.status === "failed") throw new Error(only.error);
+    return only;
+  }
+  return { batch: true, results, partialFailure };
 }

@@ -1,4 +1,3 @@
-import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 
 import { classifyAuthority } from "./authority-grant.mjs";
@@ -9,6 +8,7 @@ import {
 import { authorizeMutation } from "./mutation-policy.mjs";
 import { evaluateHeadBranchCleanup } from "./merge-branch-cleanup.mjs";
 import { classifyMergeOutcome, readMergeState } from "./merge-outcome.mjs";
+import { boundedSpawnSync } from "./subprocess-policy.mjs";
 
 const PR_ACTIONS = new Set([
   "post_review",
@@ -732,7 +732,7 @@ export function planMutationRequest(
 export function executeMutationRequest({
   request,
   execute = false,
-  runner = (command, args, options) => spawnSync(command, args, options),
+  runner = boundedSpawnSync,
   authorityPublicKey = null,
   requireTrustedAuthority = false,
   authorityNow,
@@ -756,12 +756,28 @@ export function executeMutationRequest({
   const commentEditTarget = verifyOwnCommentTarget({ request: plan.request, runner });
   const mergeState = readMergeState({ request: plan.request, runner });
   const preMergeOutcome = classifyMergeOutcome(mergeState);
-  if (preMergeOutcome) {
+  if (preMergeOutcome === "merged") {
     return {
       ...plan,
       executed: false,
       status: "already_applied",
-      outcome: preMergeOutcome === "merged" ? "already_merged" : preMergeOutcome,
+      outcome: "already_merged",
+      observedHead,
+      observedBase: retargetState?.observedBase ?? null,
+      threadTarget,
+      commentEditTarget,
+      existingMutation: null,
+      idempotencyClaim: null,
+      stdout: "",
+      verification: mergeState,
+    };
+  }
+  if (preMergeOutcome === "queued" || preMergeOutcome === "auto_merge_enabled") {
+    return {
+      ...plan,
+      executed: false,
+      status: "not_merged",
+      outcome: preMergeOutcome,
       observedHead,
       observedBase: retargetState?.observedBase ?? null,
       threadTarget,
@@ -861,7 +877,9 @@ export function executeMutationRequest({
   if (plan.request.action === "merge_pr") {
     verification = readMergeState({ request: plan.request, runner });
     outcome = classifyMergeOutcome(verification);
-    if (!outcome) throw new Error("merge_outcome_unverified");
+    if (outcome !== "merged") {
+      throw new Error(`merge_outcome_unverified:${outcome || "unknown"}`);
+    }
   } else if (REVIEW_THREAD_ACTIONS.has(plan.request.action)) {
     verification = verifyReviewThreadTarget({ request: plan.request, runner });
     if (verification.isResolved !== true) {

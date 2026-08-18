@@ -133,7 +133,9 @@ test("mutation document does not prompt in off mode even when the action is intr
   });
   assert.equal(authorized, false);
   assert.equal(executed, true);
-  assert.deepEqual(result, { action: "post_comment", executed: true });
+  assert.equal(result.action, "post_comment");
+  assert.equal(result.executed, true);
+  assert.equal(result.operationKey, "test-key");
 });
 
 test("mutation document still batches authority in high-assurance mode", () => {

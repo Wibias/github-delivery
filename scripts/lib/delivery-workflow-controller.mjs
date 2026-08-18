@@ -279,8 +279,14 @@ export function createDeliveryWorkflowController(options = {}) {
       headSha = next.headSha || null;
       changed = true;
     }
-    if (Object.hasOwn(next, "issue")) issue = next.issue;
-    if (Object.hasOwn(next, "pr")) pr = next.pr;
+    if (Object.hasOwn(next, "issue") && next.issue !== issue) {
+      issue = next.issue;
+      changed = true;
+    }
+    if (Object.hasOwn(next, "pr") && next.pr !== pr) {
+      pr = next.pr;
+      changed = true;
+    }
     if (changed) {
       stateGeneration += 1;
       attempts.noProgressSteps = 0;
