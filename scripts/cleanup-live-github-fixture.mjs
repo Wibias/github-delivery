@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { spawnSync } from "node:child_process";
+import { boundedSpawnSync } from "./lib/subprocess-policy.mjs";
 import { existsSync, writeFileSync } from "node:fs";
 
 import { runGitHubCommandWithRetry } from "./lib/github-retry.mjs";
@@ -57,7 +57,7 @@ function parseArgs(argv) {
 
 function execute(command, args, options = {}) {
   if (command === "gh") return runGitHubCommandWithRetry(command, args, { options });
-  return spawnSync(command, args, options);
+  return boundedSpawnSync(command, args, options);
 }
 
 function run(command, args, { allowFailure = false } = {}) {

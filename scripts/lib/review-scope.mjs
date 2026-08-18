@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { boundedSpawnSync } from "./subprocess-policy.mjs";
 
 import { PROBE_REGISTRY, validateProbeRegistry } from "./probe-registry.mjs";
 import { planVisualEvidence } from "./visual-evidence.mjs";
@@ -323,7 +323,7 @@ export function planReviewScope(input = {}) {
 }
 
 function gh(args) {
-  const result = spawnSync("gh", args, { encoding: "utf8", maxBuffer: 50 * 1024 * 1024 });
+  const result = boundedSpawnSync("gh", args, { encoding: "utf8", maxBuffer: 50 * 1024 * 1024 });
   if (result.status !== 0) throw new Error(String(result.stderr || result.stdout || "gh failed").trim());
   return String(result.stdout || "").trim();
 }
@@ -337,13 +337,13 @@ export function collectPrReviewInput(repo, pr) {
 }
 
 function git(args) {
-  const result = spawnSync("git", args, { encoding: "utf8", maxBuffer: 50 * 1024 * 1024 });
+  const result = boundedSpawnSync("git", args, { encoding: "utf8", maxBuffer: 50 * 1024 * 1024 });
   if (result.status !== 0) throw new Error(String(result.stderr || result.stdout || "git failed").trim());
   return String(result.stdout || "").trim();
 }
 
 function gitMaybe(args) {
-  const result = spawnSync("git", args, { encoding: "utf8", maxBuffer: 50 * 1024 * 1024 });
+  const result = boundedSpawnSync("git", args, { encoding: "utf8", maxBuffer: 50 * 1024 * 1024 });
   if (result.status !== 0) return null;
   return String(result.stdout || "").trim();
 }

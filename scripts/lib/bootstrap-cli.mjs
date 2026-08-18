@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { boundedSpawnSync } from "./subprocess-policy.mjs";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
@@ -155,7 +155,7 @@ export function parseBootstrapArgs(argv = []) {
 
 export function checkBootstrapEnvironment({
   nodeVersion = process.version,
-  spawn = spawnSync,
+  spawn = boundedSpawnSync,
 } = {}) {
   const version = String(nodeVersion || "").replace(/^v/, "");
   const major = Number(version.split(".")[0]);

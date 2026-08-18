@@ -91,7 +91,7 @@ For installation edge cases, backup/restore, downgrade behavior, manual recovery
 
 ### What changed after 0.8.2
 
-The 0.8.5 line adds the major workflow and safety work developed after 0.8.2:
+The 0.8.6 line adds the major workflow and safety work developed after 0.8.2, plus delivery integrity and bounded GitHub/Git subprocesses:
 
 - least-privilege workflow-token enforcement;
 - repository-scoped open-work status;
@@ -100,7 +100,9 @@ The 0.8.5 line adds the major workflow and safety work developed after 0.8.2:
 - competing-PR consolidation analysis;
 - conditional head-bound visual review evidence;
 - multi-base backport/port delivery;
-- a substantially leaner GitHub Actions topology with stale-run cancellation and scoped platform lanes.
+- a substantially leaner GitHub Actions topology with stale-run cancellation and scoped platform lanes;
+- fail-closed delivery integrity for moved PR heads, queued/auto-merge outcomes, mutation receipts, and remaining public workflow routing;
+- bounded GitHub and Git subprocesses on review, verdict, CI forensics, ship-gate, runtime, live-fixture, release, and npm helper paths.
 
 See [`CHANGELOG.md`](CHANGELOG.md) for the full release-level details.
 

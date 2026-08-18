@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { spawnSync } from "node:child_process";
+import { boundedSpawnSync } from "./lib/subprocess-policy.mjs";
 import { fileURLToPath } from "node:url";
 
 import { parseNpmPackJson } from "./lib/npm-pack-json.mjs";
@@ -23,6 +23,7 @@ const RUNTIME_FILES = [
   "scripts/lib/bootstrap-maintenance.mjs",
   "scripts/lib/distribution.mjs",
   "scripts/lib/release-self-update.mjs",
+  "scripts/lib/subprocess-policy.mjs",
   "scripts/lib/release-zip.mjs",
   "scripts/lib/stable-release-update.mjs",
   "scripts/lib/user-config.mjs",
@@ -67,7 +68,7 @@ try {
     assert(existsSync(resolve(ROOT, path)), `missing runtime file: ${path}`);
   }
 
-  const packResult = spawnSync(NPM, ["pack", "--dry-run", "--json", "--ignore-scripts"], {
+  const packResult = boundedSpawnSync(NPM, ["pack", "--dry-run", "--json", "--ignore-scripts"], {
     cwd: ROOT,
     encoding: "utf8",
     shell: process.platform === "win32",

@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { boundedSpawnSync } from "./subprocess-policy.mjs";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -339,7 +339,7 @@ export function verifyReleaseAttestation({
   archivePath,
   tag,
   sourceCommit,
-  runner = (program, args, options) => spawnSync(program, args, options),
+  runner = (program, args, options) => boundedSpawnSync(program, args, options),
 } = {}) {
   if (typeof archivePath !== "string" || archivePath.length === 0 || !isSemverTag(tag) || !isCommitSha(sourceCommit)) {
     fail("stable_release_attestation_failed");

@@ -23,6 +23,7 @@ const REQUIRED_RUNTIME = new Set([
   "scripts/lib/bootstrap-maintenance.mjs",
   "scripts/lib/distribution.mjs",
   "scripts/lib/release-self-update.mjs",
+  "scripts/lib/subprocess-policy.mjs",
   "scripts/lib/release-zip.mjs",
   "scripts/lib/stable-release-update.mjs",
   "scripts/lib/user-config.mjs",

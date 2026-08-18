@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { spawnSync } from "node:child_process";
+import { boundedSpawnSync } from "./lib/subprocess-policy.mjs";
 
 import { collectCapabilityInventory } from "./lib/capability-inventory.mjs";
 
@@ -24,7 +24,7 @@ const REGISTRY = [
 ];
 
 function runner({ command, args }) {
-  const result = spawnSync(command, args, {
+  const result = boundedSpawnSync(command, args, {
     encoding: "utf8",
     shell: false,
     windowsHide: true,

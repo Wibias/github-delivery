@@ -40,3 +40,38 @@ test("canonical mutation and GitHub retry entrypoints do not fall back to raw sp
   assert.doesNotMatch(retry, /from\s+["']node:child_process["']/);
   assert.match(retry, /runner\s*=\s*boundedSpawnSync/);
 });
+
+test("remaining GitHub and Git helper entrypoints do not fall back to raw spawnSync", () => {
+  const files = [
+    "scripts/actions-ship-gate-snapshot.mjs",
+    "scripts/capability-inventory.mjs",
+    "scripts/check-syntax.mjs",
+    "scripts/ci-forensics.mjs",
+    "scripts/cleanup-live-github-fixture.mjs",
+    "scripts/github-authorize.mjs",
+    "scripts/lib/authority-host-install.mjs",
+    "scripts/lib/bootstrap-cli.mjs",
+    "scripts/lib/release-self-update.mjs",
+    "scripts/lib/review-scope.mjs",
+    "scripts/lib/verdict-publication.mjs",
+    "scripts/live-github-fixture.mjs",
+    "scripts/publish-npm-idempotent.mjs",
+    "scripts/runtime-capabilities.mjs",
+    "scripts/validate-npm-package.mjs",
+    "scripts/verify-existing-release.mjs",
+    "scripts/verify-live-fixture-token.mjs",
+    "scripts/verify-live-repository-policy.mjs",
+    "scripts/verify-pr-head.mjs",
+    "scripts/verify-verdict-published.mjs",
+  ];
+
+  for (const relative of files) {
+    const source = readFileSync(new URL(`../../${relative}`, import.meta.url), "utf8");
+    assert.doesNotMatch(
+      source,
+      /import\s*\{[^}]*\bspawnSync\b[^}]*\}\s*from\s*["']node:child_process["']/,
+      relative,
+    );
+    assert.match(source, /boundedSpawnSync/, relative);
+  }
+});

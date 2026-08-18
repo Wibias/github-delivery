@@ -1,4 +1,5 @@
-import { spawn, spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
+import { boundedSpawnSync } from "./subprocess-policy.mjs";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve, win32 as win32Path } from "node:path";
@@ -221,7 +222,7 @@ function queryAuthorityHostStartup({ installed, runner }) {
 export function readAuthorityHostStartup({
   installed = readInstalledAuthorityHost(),
   platform = process.platform,
-  runner = spawnSync,
+  runner = boundedSpawnSync,
 } = {}) {
   if (platform !== "win32") return { configured: false, enabled: false, changed: false, reason: "unsupported_platform" };
   if (!installed?.installed || !installed.exePath) {
@@ -241,7 +242,7 @@ export function setAuthorityHostStartup({
   enabled,
   installed = readInstalledAuthorityHost(),
   platform = process.platform,
-  runner = spawnSync,
+  runner = boundedSpawnSync,
 } = {}) {
   if (platform !== "win32") return { configured: false, enabled: false, changed: false, reason: "unsupported_platform" };
   if (!installed?.installed || !installed.exePath) {
@@ -303,7 +304,7 @@ function defaultInstallScript() {
 export function installVerifiedAuthorityHost({
   payload,
   scriptPath = defaultInstallScript(),
-  runner = spawnSync,
+  runner = boundedSpawnSync,
 } = {}) {
   if (!payload?.verified || payload?.kind !== "github-delivery/verified-authority-host-payload") fail("authority_host_verified_payload_required");
   const result = runner(
@@ -355,7 +356,7 @@ export async function reconcileStableAuthorityHost({
   home = homedir(),
   client = createGitHubReleaseClient(),
   attestationRunner = undefined,
-  installRunner = spawnSync,
+  installRunner = boundedSpawnSync,
   scriptPath = defaultInstallScript(),
   installWhenDisabled = false,
   dependencies = {},

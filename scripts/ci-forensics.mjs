@@ -11,7 +11,7 @@
  */
 import { realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";
-import { spawnSync } from "node:child_process";
+import { boundedSpawnSync } from "./lib/subprocess-policy.mjs";
 
 import { captureLiveSnapshot } from "./lib/live-snapshot.mjs";
 import { ownedHelperEffect } from "./lib/watchdog-evidence-registry.mjs";
@@ -43,7 +43,7 @@ function parseArgs(argv) {
 }
 
 function gh(args) {
-  const result = spawnSync("gh", args, { encoding: "utf8", maxBuffer: 50 * 1024 * 1024 });
+  const result = boundedSpawnSync("gh", args, { encoding: "utf8", maxBuffer: 50 * 1024 * 1024 });
   if (result.status !== 0) {
     return { ok: false, error: String(result.stderr || result.stdout || "").trim().slice(0, 300), data: null };
   }
@@ -105,7 +105,7 @@ function annotationsFor(checkRunId, repo, limit) {
 }
 
 function logTailFor(checkRunId, repo, lines) {
-  const result = spawnSync(
+  const result = boundedSpawnSync(
     "gh",
     ["api", `repos/${repo}/actions/jobs/${checkRunId}/logs`],
     { encoding: "utf8", maxBuffer: 50 * 1024 * 1024 },
