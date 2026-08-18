@@ -24,6 +24,10 @@ const CREATE_PR_FOR_ISSUE_REQUEST = /\b(?:create|open)\b[\s\S]*\b(?:pr|pull requ
 const IMPLEMENT_ISSUE_REQUEST = /\b(?:implement|fix|address|solve|resolve)\b[\s\S]{0,180}\b(?:issue|#\d+)\b|\b(?:issue|#\d+)\b[\s\S]{0,180}\b(?:implement|fix|address|solve|resolve)\b/;
 const CREATE_PR_REQUEST = /\b(?:create|open|make)\b[\s\S]{0,120}\b(?:pr|pull request)\b/;
 const OPEN_WORK_REQUEST = /\b(?:what do i have open|what(?:'s| is) in review|show (?:me )?my open (?:prs|pull requests)|list (?:me )?my open (?:prs|pull requests)|open (?:pr|pull request) standup|open[- ]work standup|my open work)\b/;
+const WORK_ITEM_KEY = /\b[A-Z][A-Z0-9]*-\d+\b/i;
+const WORK_ITEM_STATUS_REQUEST = /\b(?:what(?:'s| is) left|status|where is|where's|inspect|check|show me)\b/;
+const WORK_ITEM_DELIVERY_REQUEST = /\b(?:ship|deliver|work on|implement|fix|finish|complete|take)\b|\b(?:create|open)\b[\s\S]{0,80}\b(?:pr|pull request)\b/;
+const WORK_ITEM_PUBLICATION_REQUEST = /\b(?:ship|deliver)\b|\b(?:create|open)\b[\s\S]{0,80}\b(?:pr|pull request)\b/;
 const DELIVERY_NAME = /\bgithub[- ]?delivery\b/;
 const DELIVERY_UPDATE = /\b(update|upgrade)\b[\s\S]*\bgithub[- ]?delivery\b|\bgithub[- ]?delivery\b[\s\S]*\b(update|upgrade|latest stable release)\b/;
 const DELIVERY_CONFIG = /\b(set ?up|install|configure|configuration|settings?|protection mode|windows hello)\b[\s\S]*\bgithub[- ]?delivery\b|\bgithub[- ]?delivery\b[\s\S]*\b(set ?up|install|configure|configuration|settings?|protection mode|windows hello)\b/;
@@ -32,6 +36,15 @@ function prepareAndMergeActions(text) {
   const actions = ["merge_pr", "post_comment", "post_issue_comment", "close_linked_issue"];
   if (FIX_REVIEW_REQUEST.test(text) || SIMPLIFY_REQUEST.test(text)) actions.unshift("push_code");
   return actions;
+}
+
+function workItemDeliveryActions(text) {
+  const actions = [];
+  if (WORK_ITEM_PUBLICATION_REQUEST.test(text)) actions.push("push_code", "create_pr");
+  if (hasExplicitMergeIntent(text)) {
+    actions.push("merge_pr", "post_comment", "post_issue_comment", "close_linked_issue");
+  }
+  return [...new Set(actions)];
 }
 
 function unquotedText(text) { return text.replace(/"[^"\n]*"|`[^`\n]*`|'[^'\n]*'/g, " "); }
@@ -66,6 +79,10 @@ function isOpenWorkRequest(text) {
   return !PR_REFERENCE.test(text) && OPEN_WORK_REQUEST.test(text);
 }
 
+function isWorkItemRequest(text) {
+  return WORK_ITEM_KEY.test(text) && !PR_REFERENCE.test(text) && (WORK_ITEM_STATUS_REQUEST.test(text) || WORK_ITEM_DELIVERY_REQUEST.test(text));
+}
+
 export function routeShippingGithubPrompt(prompt) {
   const text = normalized(prompt);
   if (!text) return null;
@@ -81,6 +98,14 @@ export function routeShippingGithubPrompt(prompt) {
   }
   if (isOpenWorkRequest(text)) {
     return result("references/open-work-status.md", "read-only", []);
+  }
+  if (isWorkItemRequest(text)) {
+    const readOnly = WORK_ITEM_STATUS_REQUEST.test(text) && !WORK_ITEM_DELIVERY_REQUEST.test(text);
+    return result(
+      "references/work-item-delivery.md",
+      readOnly ? "read-only" : "maintainer",
+      readOnly ? [] : workItemDeliveryActions(text),
+    );
   }
 
   if (isPrepareAndMergeRequest(text)) return result("references/prepare-and-merge-pr.md", "maintainer", prepareAndMergeActions(text));

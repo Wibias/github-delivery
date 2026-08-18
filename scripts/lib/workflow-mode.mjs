@@ -17,6 +17,7 @@ const WORKFLOW_MUTATION_MODES = Object.freeze({
   "references/status.md": ["read-only"],
   "references/supersede-pr.md": ["maintainer"],
   "references/watch-pr.md": ["read-only", "autonomous"],
+  "references/work-item-delivery.md": ["read-only", "maintainer"],
 });
 
 export function allowedMutationModes(workflow) {
