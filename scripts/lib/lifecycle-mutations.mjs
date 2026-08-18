@@ -146,6 +146,7 @@ function sameRepo(left, right) {
 function splitHead(repo, head) {
   const targetOwner = String(repo).split("/")[0];
   const value = String(head).trim();
+  if (!value) throw new Error("head_invalid");
   const separator = value.indexOf(":");
   if (separator < 0) return { owner: targetOwner, branch: value, explicitOwner: false };
   if (value.indexOf(":", separator + 1) >= 0) throw new Error("head_invalid");
