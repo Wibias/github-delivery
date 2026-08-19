@@ -204,7 +204,9 @@ export function planReviewScope(input = {}) {
     const { added, removed } = patchLines(file.patch);
     const changedText = [...added, ...removed].join("\n");
     const symbols = extractSymbols(file.path, changedText);
-    const isLogic = CODE_RE.test(file.path) || OPERATIONAL_POLICY_RE.test(file.path) || /^\.github\//.test(file.path);
+    const isLogic = paths.some(
+      (path) => CODE_RE.test(path) || OPERATIONAL_POLICY_RE.test(path) || /^\.github\//.test(path),
+    );
     if (isLogic) logicFiles.push(file.path);
     if (isLogic && !file.patch && file.status !== "removed") missingPatches.push(file.path);
 
@@ -228,8 +230,10 @@ export function planReviewScope(input = {}) {
 
     workflowPermissionChanges.push(...workflowSignals(file.path, added, removed, evidence));
 
-    if (LOCK_RE.test(file.path) || MANIFEST_RE.test(file.path)) {
-      const kind = LOCK_RE.test(file.path) ? "lockfile" : "manifest";
+    const lockChanged = paths.some((path) => LOCK_RE.test(path));
+    const manifestChanged = paths.some((path) => MANIFEST_RE.test(path));
+    if (lockChanged || manifestChanged) {
+      const kind = lockChanged ? "lockfile" : "manifest";
       dependencyChanges.push({ file: file.path, kind, additions: file.additions, deletions: file.deletions });
       addEvidence(evidence, "supply_chain", "security", 3, `${kind} changed`, file.path);
     }
