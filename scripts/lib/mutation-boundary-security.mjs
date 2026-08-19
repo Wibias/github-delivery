@@ -24,7 +24,9 @@ const WRITE_GROUP_VERBS = {
 };
 
 const GH_COMMAND_RE = /["']gh["']\s*,\s*(?:\[\s*)?["']([a-z-]+)["']\s*,\s*["']([a-z-]+)["']/g;
+const GH_DYNAMIC_GROUP_VERB_RE = /["']gh["']\s*,\s*(?:\[\s*)?["'](pr|issue|release|workflow|run|label|secret|variable)["']\s*,\s*(?!["'])/g;
 const GH_API_RE = /["']gh["']\s*,\s*(?:\[\s*)?["']api["'][\s\S]{0,1800}/g;
+const GH_API_DYNAMIC_METHOD_RE = /["']gh["']\s*,\s*(?:\[\s*)?["']api["'][\s\S]{0,1800}?["'](?:--method|-X)["']\s*,\s*(?!["'])/g;
 const GH_GRAPHQL_INVOCATION_RE = /["']gh["']\s*,\s*(?:\[\s*)?["']api["']\s*,\s*["']graphql["']/i;
 const MUTATING_METHOD_RE = /(?:["']--method["']\s*,\s*["'](?:POST|PATCH|PUT|DELETE)["']|["']-X["']\s*,\s*["'](?:POST|PATCH|PUT|DELETE)["']|["']--method=(?:POST|PATCH|PUT|DELETE)["'])/i;
 const GRAPHQL_MUTATION_RE = /\bmutation\s*(?:\([^)]*\))?\s*\{/i;
@@ -81,6 +83,17 @@ export function validateMutationBoundarySource(path, source) {
     }
   }
 
+  GH_DYNAMIC_GROUP_VERB_RE.lastIndex = 0;
+  for (const match of source.matchAll(GH_DYNAMIC_GROUP_VERB_RE)) {
+    errors.push(
+      error(
+        path,
+        "dynamic_gh_verb",
+        `Dynamic gh ${match[1]} verbs are forbidden outside the mutation boundary because their write/read effect cannot be proven statically.`,
+      ),
+    );
+  }
+
   GH_API_RE.lastIndex = 0;
   for (const match of source.matchAll(GH_API_RE)) {
     const window = match[0];
@@ -102,6 +115,17 @@ export function validateMutationBoundarySource(path, source) {
         ),
       );
     }
+  }
+
+  GH_API_DYNAMIC_METHOD_RE.lastIndex = 0;
+  if (GH_API_DYNAMIC_METHOD_RE.test(source)) {
+    errors.push(
+      error(
+        path,
+        "dynamic_gh_api_method",
+        "Dynamic gh api HTTP methods are forbidden outside the mutation boundary.",
+      ),
+    );
   }
 
   if (
