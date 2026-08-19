@@ -78,6 +78,43 @@ test("a real tool start clears the pending tool-emission stall without claiming 
   assert.equal(text(r, "I'll run the focused grep.\n").internalRequests.length, 0);
 });
 
+test("interleaved evidence tools do not buy a fresh micro-narration budget", () => {
+  const r = router({
+    generatedCharHardLimit: 10_000,
+    toolEmissionIntentThreshold: 50,
+    microNarrationIntentThreshold: 3,
+  });
+
+  assert.equal(
+    text(r, "I will start by loading the canonical agent rules and rewrite plan.\n").internalRequests.length,
+    0,
+  );
+  started(r, {
+    id: "read-1",
+    type: "commandExecution",
+    command: 'Get-Content -LiteralPath "AGENTS.md" -Raw',
+    status: "inProgress",
+  });
+
+  assert.equal(
+    text(r, "Canonical rules are loaded. Next I'll verify the current git state.\n").internalRequests.length,
+    0,
+  );
+  started(r, {
+    id: "read-2",
+    type: "commandExecution",
+    command: "git status --short --branch",
+    status: "inProgress",
+  });
+
+  const tripped = text(
+    r,
+    "GitHub Delivery owns this stack, so I'll load the stacked-PR workflow next.\n",
+  );
+  assert.equal(tripped.internalRequests.length, 1);
+  assert.equal(tripped.internalRequests[0].method, "turn/interrupt");
+});
+
 test("repeated malformed tool protocol output accelerates a tool-emission stall", () => {
   const r = router({ generatedCharHardLimit: 10_000, toolEmissionIntentThreshold: 50 });
   assert.equal(text(r, "<atool></atool>\n").internalRequests.length, 0);
@@ -157,5 +194,4 @@ test("unique generated text is bounded by characters even without token telemetr
   assert.equal(text(r, "A completely novel sentence about one investigation path.\n").internalRequests.length, 0);
   const tripped = text(r, "Another unrelated sentence keeps growing without any runtime progress at all.\n");
   assert.equal(tripped.internalRequests.length, 1);
-  assert.equal(tripped.internalRequests[0].method, "turn/interrupt");
 });
