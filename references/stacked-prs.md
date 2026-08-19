@@ -52,7 +52,7 @@ Never mutate trunk or another protected/shared branch. Never use bare `--force`.
 
 ## 1. State preflight
 
-Use PowerShell only.
+PowerShell is **not** a runtime requirement for stacked PR support. The examples below use PowerShell variable syntax, but the same argv-safe `git`, `gh`, and Node operations may run from the host shell on Linux or macOS. Never interpolate attacker-controlled branch/ref text through `eval`, `sh -c`, `pwsh -Command`, or another reconstructed command string. If shell-specific glue is needed, detect that shell capability first and stop with an exact blocker when it is unavailable.
 
 ```powershell
 gh auth status

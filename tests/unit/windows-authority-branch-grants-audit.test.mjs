@@ -64,14 +64,17 @@ test("branch lease duration is bounded to one through ten minutes at host bounda
   assert.match(window, /minutes is >= 1 and <= 10/);
 });
 
-test("approval flow atomically reuses only an exact repo plus branch lease", () => {
+test("branch leases can authorize repeated code pushes but never another action class", () => {
   const service = read(`${host}/AuthorityService.cs`);
-  const coordinator = read(`${host}/ApprovalCoordinator.cs`);
+  const classifier = read(`${host}/MutationClassifier.cs`);
   const approval = read(`${host}/ApprovalWindow.xaml`);
-  assert.match(service, /branch_lease/);
-  assert.match(service, /TryUseActiveBranchLease/);
-  assert.match(service, /CreateBranchLease/);
-  assert.match(coordinator, /BranchLeaseMinutes/);
+
+  assert.match(classifier, /IsBranchLeaseEligible/);
+  assert.match(classifier, /"push_code"/);
+  assert.match(service, /operations\.All\(MutationClassifier\.IsBranchLeaseEligible\)/);
+  assert.match(service, /branchLeaseEligible\s*\?\s*_store\.TryUseActiveBranchLease/);
+  assert.match(service, /branchLeaseEligible \? branch : null/);
+  assert.match(service, /branch_lease_action_not_eligible/);
   assert.match(approval, /x:Name="BranchGrantToggle"/);
   assert.doesNotMatch(approval, /x:Name="BranchGrantToggle"[^>]*IsEnabled="False"/);
 });

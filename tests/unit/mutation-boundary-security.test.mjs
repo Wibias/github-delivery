@@ -28,6 +28,16 @@ test("rejects a direct gh pr mutation in a production helper", () => {
   assert.ok(codes(report).includes("direct_gh_mutation"));
 });
 
+test("rejects a dynamic gh mutation-capable verb slot", () => {
+  const root = fixture(
+    "scripts/helper.mjs",
+    'const verb = "comment";\nspawnSync("gh", ["pr", verb, "42", "--body", "oops"]);\n',
+  );
+  const report = validateMutationBoundaryTree(root);
+  assert.equal(report.valid, false);
+  assert.ok(codes(report).includes("dynamic_gh_verb"));
+});
+
 test("rejects a mutating gh api REST call outside the broker", () => {
   const root = fixture(
     "scripts/helper.mjs",
@@ -36,6 +46,16 @@ test("rejects a mutating gh api REST call outside the broker", () => {
   const report = validateMutationBoundaryTree(root);
   assert.equal(report.valid, false);
   assert.ok(codes(report).includes("direct_gh_api_mutation"));
+});
+
+test("rejects a dynamic gh api HTTP method outside the broker", () => {
+  const root = fixture(
+    "scripts/helper.mjs",
+    'const method = "PATCH";\nspawnSync("gh", ["api", "repos/acme/widgets/pulls/1", "--method", method]);\n',
+  );
+  const report = validateMutationBoundaryTree(root);
+  assert.equal(report.valid, false);
+  assert.ok(codes(report).includes("dynamic_gh_api_method"));
 });
 
 test("rejects a GraphQL mutation outside the broker", () => {
