@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 import { isDirectInvocation } from "./lib/direct-invocation.mjs";
-import { collectBranchReviewInput, planReviewScope } from "./lib/review-scope.mjs";
+import { collectBranchReviewInput } from "./lib/branch-review-input.mjs";
+import { planReviewScope } from "./lib/review-scope.mjs";
 import { projectBugScope, projectSecurityScope } from "./lib/review-scope-compat.mjs";
 import { evidenceClears, validatePreOpenEvidence } from "./lib/pre-open-evidence.mjs";
 
@@ -16,14 +17,17 @@ export function evaluate(plan, evidence = null) {
   const scopeBlockers = [
     ...bugScope.requiredLenses.map((id) => `bug:requiredLenses:${id}`),
     ...securityScope.requiredSurfaces.map((id) => `security:requiredSurfaces:${id}`),
+    ...(plan.requiredProbes || []).map((id) => `probe:requiredProbes:${id}`),
   ];
   const complete = implementationDiffPresent && plan.complete && bugScope.complete && securityScope.complete;
   const lensMap = evidence?.lenses ?? {};
   const surfaceMap = evidence?.surfaces ?? {};
+  const probeMap = evidence?.probes ?? {};
   const clearedByEvidence = [];
   const remainingScopeBlockers = scopeBlockers.filter((blocker) => {
     const [axis, , id] = blocker.split(":");
-    const cleared = axis === "bug" ? evidenceClears(lensMap, id) : evidenceClears(surfaceMap, id);
+    const map = axis === "bug" ? lensMap : axis === "security" ? surfaceMap : probeMap;
+    const cleared = evidenceClears(map, id);
     if (cleared) clearedByEvidence.push(blocker);
     return !cleared;
   });
@@ -40,6 +44,7 @@ export function evaluate(plan, evidence = null) {
   return {
     bugScope,
     securityScope,
+    requiredProbes: plan.requiredProbes || [],
     blockers,
     clearedByEvidence,
     decision,
@@ -49,7 +54,7 @@ export function evaluate(plan, evidence = null) {
   };
 }
 
-function report({ repo, baseRef, headRef, headRefOid, bugScope, securityScope, blockers, clearedByEvidence, decision, complete, implementationDiffPresent, evidenceApplied }) {
+function report({ repo, baseRef, headRef, headRefOid, bugScope, securityScope, requiredProbes, blockers, clearedByEvidence, decision, complete, implementationDiffPresent, evidenceApplied }) {
   return {
     schemaVersion: 1,
     kind: "github-delivery/pre-open-gate",
@@ -63,13 +68,14 @@ function report({ repo, baseRef, headRef, headRefOid, bugScope, securityScope, b
     evidenceApplied,
     bugScope,
     securityScope,
+    requiredProbes,
     blockers,
     clearedByEvidence,
     instructions: [
       "workflow:implementation_missing: this pre-open gate requires a non-empty candidate implementation diff; implement first, then rerun the gate before publication.",
-      "decision=blocked: complete every remaining required bug lens and security surface on this branch diff (with --evidence-file), fix Confirmed High/Critical findings, then rerun before opening the PR.",
+      "decision=blocked: complete every remaining required bug lens, security surface, and deterministic probe on this branch diff (with --evidence-file), fix Confirmed High/Critical findings, then rerun before opening the PR.",
       "decision=unknown: restore complete branch evidence (fetch base, checkout head) and rerun; never open a PR from an incomplete diff.",
-      "decision=ready: the non-empty candidate branch diff has no required bug/security scope, or every required lens/surface carries valid done/n-a evidence; you may proceed to open the PR.",
+      "decision=ready: the non-empty candidate branch diff has no remaining review obligations, or every required lens/surface/probe carries valid done/n-a evidence; you may proceed to open the PR.",
     ],
   };
 }
