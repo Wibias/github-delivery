@@ -18,6 +18,8 @@ const PR_WORD = /\b(?:pr|pull request)\b/;
 const FULL_REVIEW_REQUEST = /\b(full review|review .* for real bugs|usefulness verdict)\b/;
 const REVIEW_PREPARATION_REQUEST = /\b(review|re-review|review again|look over|look through)\b/;
 const FIX_REVIEW_REQUEST = /\b(fix|address)\b[\s\S]*(review|coderabbit|codex|comment|feedback)/;
+const EXPLICIT_GREEN_REQUEST = /\b(?:make|get)\s+(?:pr|pull request)\s*#?\d+\s+green\b|\bfix\s+(?:the\s+)?(?:ci|failing checks?)\s+(?:on|for)\s+(?:pr|pull request)\s*#?\d+\b/;
+const CONTEXTUAL_GREEN_REQUEST = /^(?:please\s+)?(?:(?:make|get)\s+(?:this|it)\s+green|fix\s+(?:the\s+)?(?:ci|failing checks?))[.!?]*$/;
 const ISSUE_CREATE_REQUEST = /\b(?:create|file)\b[\s\S]{0,120}\b(?:issue|issues|ticket|tickets|bug report|bug reports)\b|\bopen\s+(?:a|an|new)\b[\s\S]{0,80}\b(?:issue|ticket|bug report)\b/;
 const FOLLOW_UP_ISSUE_REQUEST = /\bfollow[- ]?up\s+(?:issue|ticket)\b/;
 const CREATE_PR_FOR_ISSUE_REQUEST = /\b(?:create|open)\b[\s\S]*\b(?:pr|pull request)\b[\s\S]*\b(?:issue|#\d+)\b/;
@@ -104,6 +106,12 @@ function multiBaseDeliveryActions(text) {
 function unquotedText(text) { return text.replace(/"[^"\n]*"|`[^`\n]*`|'[^'\n]*'/g, " "); }
 function mergeText(text) { return unquotedText(text).replace(MERGE_READY_PHRASE, ""); }
 
+function hasActivePullRequestContext(context) {
+  return context?.activePullRequest === true ||
+    Number.isInteger(context?.activePrNumber) ||
+    Number.isInteger(context?.activePullRequest?.number);
+}
+
 export function hasExplicitMergeIntent(prompt) {
   const text = normalized(prompt);
   const candidate = mergeText(text);
@@ -142,7 +150,7 @@ function isWorkItemRequest(text) {
   return WORK_ITEM_KEY.test(text) && !PR_REFERENCE.test(text) && (WORK_ITEM_STATUS_REQUEST.test(text) || WORK_ITEM_DELIVERY_REQUEST.test(text));
 }
 
-export function routeShippingGithubPrompt(prompt) {
+export function routeShippingGithubPrompt(prompt, context = {}) {
   const text = normalized(prompt);
   if (!text) return null;
 
@@ -230,7 +238,12 @@ export function routeShippingGithubPrompt(prompt) {
     return result("references/out-of-scope.md", "read-only");
   }
 
-  if (FIX_REVIEW_REQUEST.test(text) || /\bmake\b[\s\S]*\b(?:pr|pull request)\b[\s\S]*\bmerge[- ]?ready\b/.test(text)) {
+  if (
+    FIX_REVIEW_REQUEST.test(text) ||
+    EXPLICIT_GREEN_REQUEST.test(text) ||
+    (hasActivePullRequestContext(context) && CONTEXTUAL_GREEN_REQUEST.test(text)) ||
+    /\bmake\b[\s\S]*\b(?:pr|pull request)\b[\s\S]*\bmerge[- ]?ready\b/.test(text)
+  ) {
     return result("references/fix-pr-bots.md", "maintainer", ["push_code"]);
   }
   if (/\b(what(?:'s| is) left|status|merge[- ]?ready\?|is .* ready)\b/.test(text) && PR_WORD.test(text)) return result("references/status.md", "read-only");
