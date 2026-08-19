@@ -236,4 +236,5 @@ test("unique generated text is bounded by characters even without token telemetr
   assert.equal(text(r, "A completely novel sentence about one investigation path.\n").internalRequests.length, 0);
   const tripped = text(r, "Another unrelated sentence keeps growing without any runtime progress at all.\n");
   assert.equal(tripped.internalRequests.length, 1);
+  assert.equal(tripped.internalRequests[0].method, "turn/interrupt");
 });
