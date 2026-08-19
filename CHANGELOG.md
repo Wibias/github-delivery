@@ -10,6 +10,9 @@ All notable changes to `github-delivery` are documented here.
 
 - Bumped the package version from `0.8.6` to `0.8.7`.
 - Restricted temporary Windows Authority branch leases to repeated `push_code` batches and tightened classic branch-protection, routing, mutation-boundary, security-policy, and stack portability contracts (PR #297).
+- Windows Authority CI and C# CodeQL now run on every pull request so candidate code cannot scope out its own security-critical lanes; the remaining Node 22 compatibility selector is executed from the pull request base version (PR #299).
+- Review briefs now apply a global model-facing diff-hunk budget while preserving complete structured review scope for deterministic tooling and on-demand inspection (PR #299).
+- Made quiet execution an entrypoint-visible contract: routine rule/skill/workflow loading, file reads, Git/GitHub snapshots, remote fetches, obvious retries, and shell-quoting corrections run without per-tool user-facing narration unless they materially change the plan or expose a blocker (PR #299).
 
 ### Fixed
 
@@ -19,6 +22,10 @@ All notable changes to `github-delivery` are documented here.
 - Bound GitHub, Git, PowerShell, and registry subprocess helpers now copy argv and force a direct spawn (`shell: false`), so library-provided arguments cannot be reconstructed as a shell command (PR #294).
 - Prevented unusual valid Git filenames from hiding sensitive path changes from scoped CI/CodeQL detection, and made required scoped lanes fail closed when their scope producer fails (PR #296).
 - Fail closed when classic branch protection may apply but cannot be proved absent, added GitHub-style classic branch-pattern coverage, restored contextual `make this green` routing, and strengthened dynamic mutation-command boundary checks (PR #297).
+- Redeem trusted authority before the first mutating GitHub command, including autonomous idempotency tag/ref coordination, so a rejected grant cannot leave coordination state behind before the requested mutation (PR #299).
+- Preserve rename/copy source and destination paths with NUL-delimited local branch diff parsing, keep both path generations in review classification, and make every deterministic required probe a first-class pre-open blocker until its canonical structured probe evidence validates against the deterministic trigger files (PR #299).
+- Enforce open stack-parent ordering at the mutation execution boundary before merge authority, and abort orphan-workflow cleanup before deletion when the default-branch generation changed during preflight (PR #299).
+- Protected Codex streaming now bounds repetitive interleaved tool micro-narration separately from tool-emission stalls: three future-action narration intents without execution/state/workflow progress trigger an interrupt, and evidence/read tool starts do not reset that budget (PR #299).
 
 ## [0.8.6] - 2026-08-18
 
@@ -52,7 +59,7 @@ All notable changes to `github-delivery` are documented here.
 
 - Moved the remaining workflow-level `actions: write` permission down to the cleanup job, kept top-level workflow permissions read-only, and added validation that rejects future top-level write scopes while still permitting explicitly allowlisted job-level writes (PR #282).
 - Hardened PR publication identity and retries: exact duplicate detection now binds target repository, head repository/ref, and base; qualified REST head filters prevent same-repository misses; explicit cross-repository `head_repo` identity is supported; and exact owned idempotent retries converge before the broader duplicate preflight (PR #283).
-- Protected existing PR-body screenshots, videos, GitHub uploads, reference-style Markdown images, and other recognized media from accidental body rewrites. Intentional removal requires an exact approved identity list that is included in trusted `update_pr_body` authority scope (PR #283).
+- Protected existing PR-body screenshots, videos, GitHub uploads, reference-style Markdown images, and other recognized media from accidental body rewrites. Intentional media removal requires an exact approved identity list that is included in trusted `update_pr_body` authority scope (PR #283).
 - Prevented cross-repository closing issues and unsafe display URLs from masquerading as trustworthy same-repository work-item evidence, and tightened open-work fixtures so PR-number normalization and repository boundaries are actually exercised (PR #283).
 
 ## [0.8.2] - 2026-08-17

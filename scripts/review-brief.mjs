@@ -4,7 +4,7 @@
  * so the review agent starts from facts instead of re-reading sources.
  *
  * Usage:
- *   node scripts/review-brief.mjs OWNER/REPO PR_NUMBER [--max-hunk-lines N] [--json]
+ *   node scripts/review-brief.mjs OWNER/REPO PR_NUMBER [--max-hunk-lines N] [--max-total-hunk-lines N] [--json]
  *
  * Default output is a compact text brief (fast to read). --json emits the full
  * structured plan for tooling.
@@ -18,19 +18,36 @@ import { planReviewDepthExecution } from "./lib/review-depth-execution.mjs";
 import { extractRequiredProbeBlocks } from "./lib/probe-blocks.mjs";
 import { ownedHelperEffect } from "./lib/watchdog-evidence-registry.mjs";
 
+const DEFAULT_MAX_HUNK_LINES = 24;
+const DEFAULT_MAX_TOTAL_HUNK_LINES = 1_200;
 const USAGE =
-  "Usage: node scripts/review-brief.mjs OWNER/REPO PR_NUMBER [--max-hunk-lines N] [--no-reference-map] [--json]";
+  "Usage: node scripts/review-brief.mjs OWNER/REPO PR_NUMBER [--max-hunk-lines N] [--max-total-hunk-lines N] [--no-reference-map] [--json]";
+
+function positiveInteger(value, option) {
+  const number = Number(value);
+  if (!Number.isInteger(number) || number < 1) {
+    throw new Error(`${option} requires a positive integer`);
+  }
+  return number;
+}
 
 function parseArgs(argv) {
   const positional = [];
-  const options = { maxHunkLines: 24, referenceMap: true, json: false };
+  const options = {
+    maxHunkLines: DEFAULT_MAX_HUNK_LINES,
+    maxTotalHunkLines: DEFAULT_MAX_TOTAL_HUNK_LINES,
+    referenceMap: true,
+    json: false,
+  };
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];
     if (value === "--max-hunk-lines") {
-      options.maxHunkLines = Number(argv[++index]);
-      if (!Number.isInteger(options.maxHunkLines) || options.maxHunkLines < 1) {
-        throw new Error("--max-hunk-lines requires a positive integer");
-      }
+      options.maxHunkLines = positiveInteger(argv[++index], "--max-hunk-lines");
+    } else if (value === "--max-total-hunk-lines") {
+      options.maxTotalHunkLines = positiveInteger(
+        argv[++index],
+        "--max-total-hunk-lines",
+      );
     } else if (value === "--no-reference-map") {
       options.referenceMap = false;
     } else if (value === "--json") {
@@ -50,7 +67,12 @@ export function hunkLines(patch = "", maxLines) {
   const lines = String(patch).split(/\r?\n/);
   const shown = lines.slice(0, maxLines);
   const truncated = lines.length > maxLines;
-  return { text: shown.join("\n"), truncated, totalLines: lines.length };
+  return {
+    text: shown.join("\n"),
+    truncated,
+    totalLines: lines.length,
+    shownLines: shown.length,
+  };
 }
 
 export function normalizeFile(file) {
@@ -64,7 +86,17 @@ export function normalizeFile(file) {
   };
 }
 
-export function briefText({ meta, plan, files, bugScope, securityScope, executionPlan = null, maxHunkLines, probeBlocks = [] }) {
+export function briefText({
+  meta,
+  plan,
+  files,
+  bugScope,
+  securityScope,
+  executionPlan = null,
+  maxHunkLines = DEFAULT_MAX_HUNK_LINES,
+  maxTotalHunkLines = DEFAULT_MAX_TOTAL_HUNK_LINES,
+  probeBlocks = [],
+}) {
   const out = [];
   out.push(`# Review brief: ${meta.repo}#${meta.pr}`);
   out.push(`Head: ${plan.headRefOid || "unknown"}`);
@@ -127,17 +159,38 @@ export function briefText({ meta, plan, files, bugScope, securityScope, executio
   }
 
   out.push("## Changed files (diff hunks)");
+  let remainingHunkLines = maxTotalHunkLines;
   for (const raw of files) {
     const file = normalizeFile(raw);
-    const { text, truncated, totalLines } = hunkLines(file.patch, maxHunkLines);
     out.push(`### ${file.path} (+${file.additions}/-${file.deletions})`);
-    if (text.trim()) {
-      out.push("```diff");
-      out.push(text);
-      out.push("```");
-      if (truncated) out.push(`_(${totalLines} hunk lines; ${maxHunkLines} shown — open the file only if a lens needs more)_`);
-    } else {
+
+    if (!file.patch.trim()) {
       out.push("_(no patch text available)_");
+      out.push("");
+      continue;
+    }
+
+    if (remainingHunkLines <= 0) {
+      out.push(
+        `_(diff hunk omitted: global hunk budget of ${maxTotalHunkLines} lines exhausted; open this file only if a lens needs more)_`,
+      );
+      out.push("");
+      continue;
+    }
+
+    const perFileLimit = Math.min(maxHunkLines, remainingHunkLines);
+    const { text, truncated, totalLines, shownLines } = hunkLines(file.patch, perFileLimit);
+    remainingHunkLines -= shownLines;
+    out.push("```diff");
+    out.push(text);
+    out.push("```");
+    if (truncated) {
+      const globalLimitReached = remainingHunkLines <= 0;
+      out.push(
+        globalLimitReached
+          ? `_(${totalLines} hunk lines; ${shownLines} shown before the global hunk budget of ${maxTotalHunkLines} lines was exhausted; open this file on demand)_`
+          : `_(${totalLines} hunk lines; ${shownLines} shown; open the file only if a lens needs more)_`,
+      );
     }
     out.push("");
   }
@@ -190,7 +243,17 @@ async function main() {
   }
 
   process.stdout.write(
-    `${briefText({ meta: { repo: args.repo, pr: args.pr }, plan, files: input.files, bugScope, securityScope, executionPlan, maxHunkLines: args.maxHunkLines, probeBlocks })}\n`,
+    `${briefText({
+      meta: { repo: args.repo, pr: args.pr },
+      plan,
+      files: input.files,
+      bugScope,
+      securityScope,
+      executionPlan,
+      maxHunkLines: args.maxHunkLines,
+      maxTotalHunkLines: args.maxTotalHunkLines,
+      probeBlocks,
+    })}\n`,
   );
 }
 

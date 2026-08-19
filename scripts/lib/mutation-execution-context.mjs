@@ -11,6 +11,7 @@ import {
   makeAuthorityRedeemer,
 } from "./authority-host-client.mjs";
 import { classifyMergeOutcome, readMergeState } from "./merge-outcome.mjs";
+import { verifyMergeStackEligibility } from "./merge-stack-policy.mjs";
 import { actionDefinition } from "./mutation-action-registry.mjs";
 import { boundedSpawnSync } from "./subprocess-policy.mjs";
 import { readUserConfig, resolveAuthorityMode } from "./user-config.mjs";
@@ -226,6 +227,13 @@ export function executeMutationWithAuthority({
     config,
   });
   const planned = planWithAuthorityOptions(request, options);
+
+  // Merge topology is an execution invariant, not only a workflow instruction.
+  // A child whose base is another open PR head cannot reach destructive authority.
+  const stackEligibility = execute === true
+    ? verifyMergeStackEligibility({ request: planned.request, runner })
+    : null;
+
   const pipeName = runtimeEnv.GITHUB_DELIVERY_AUTHORITY_PIPE || undefined;
   const resolvedRedeemer =
     redeemer === undefined
@@ -250,6 +258,7 @@ export function executeMutationWithAuthority({
     });
     return {
       ...receipt,
+      stackEligibility,
       redemption: execution.redemption(),
     };
   } catch (error) {
@@ -262,6 +271,7 @@ export function executeMutationWithAuthority({
         if (reconciled) {
           return {
             ...reconciled,
+            stackEligibility,
             redemption: execution.redemption(),
           };
         }

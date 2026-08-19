@@ -4,6 +4,7 @@ import { pathToFileURL } from "node:url";
 const API_ROOT = "https://api.github.com";
 const LOCAL_WORKFLOW_PREFIX = ".github/workflows/";
 const DEFAULT_MAX_DELETIONS = 500;
+const COMMIT_SHA_RE = /^[0-9a-f]{40}$/i;
 
 function encodePath(path) {
   return path.split("/").map(encodeURIComponent).join("/");
@@ -79,6 +80,17 @@ export function createGitHubClient({ token, fetchImpl = fetch, apiRoot = API_ROO
   return { request, exists, paginate };
 }
 
+async function readBranchGeneration({ client, owner, repo, branch }) {
+  const payload = await client.request(
+    `/repos/${owner}/${repo}/git/ref/heads/${encodePath(branch)}`,
+  );
+  const sha = String(payload?.object?.sha || "").toLowerCase();
+  if (!COMMIT_SHA_RE.test(sha)) {
+    throw new Error(`default_branch_generation_invalid:${branch}`);
+  }
+  return sha;
+}
+
 async function workflowStillExistsOnRunHead({ client, owner, repo, workflow, runs, log }) {
   const heads = new Map();
   for (const run of runs) {
@@ -133,6 +145,12 @@ export async function cleanupOrphanedWorkflowRuns({
   if (!defaultBranch) {
     throw new Error("Repository response did not include default_branch");
   }
+  const defaultBranchGeneration = await readBranchGeneration({
+    client,
+    owner,
+    repo,
+    branch: defaultBranch,
+  });
 
   const workflowEntries = await client.request(
     `/repos/${owner}/${repo}/contents/.github/workflows?ref=${encodeURIComponent(defaultBranch)}`,
@@ -196,6 +214,20 @@ export async function cleanupOrphanedWorkflowRuns({
     `Preflight approved ${cleanupPlans.length} orphan workflow(s) containing ${plannedRuns} run(s).`,
   );
 
+  // The active-path snapshot is valid only for the exact default-branch generation
+  // that produced it. Abort before the first DELETE if main moved during preflight.
+  const currentDefaultBranchGeneration = await readBranchGeneration({
+    client,
+    owner,
+    repo,
+    branch: defaultBranch,
+  });
+  if (currentDefaultBranchGeneration !== defaultBranchGeneration) {
+    throw new Error(
+      `default_branch_moved_during_cleanup:${defaultBranchGeneration}:${currentDefaultBranchGeneration}`,
+    );
+  }
+
   let deletedRuns = 0;
   let capped = false;
   const failures = [];
@@ -240,6 +272,7 @@ export async function cleanupOrphanedWorkflowRuns({
     plannedRuns,
     deletedRuns,
     capped,
+    defaultBranchGeneration,
   };
   log(`Cleanup complete: ${JSON.stringify(summary)}`);
   return summary;

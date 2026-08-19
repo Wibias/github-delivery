@@ -28,6 +28,9 @@ const FINALIZATION_WATCHDOG_OPTIONS = Object.freeze({
   noProgressTokenHardLimit: 16_000,
 });
 
+const MICRO_NARRATION_INTENT_THRESHOLD = 3;
+const MICRO_NARRATION_INTENT = /(?:^|\b(?:so|and|then|next)[,:]?\s+)(?:next\s+)?(?:let me|i(?:'|’)ll|i will|i need to|i(?:'|’)m going to|i am going to)\s+(?:(?:start(?:ing)?(?:\s+by)?|now|next|then|first|just)\s+)*(?:load(?:ing)?|read(?:ing)?|verif(?:y|ying)|check(?:ing)?|inspect(?:ing)?|fetch(?:ing)?|recaptur(?:e|ing)|lock(?:ing)?|run(?:ning)?|execut(?:e|ing)|invok(?:e|ing)|call(?:ing)?|search(?:ing)?|open(?:ing)?|us(?:e|ing)|apply(?:ing)?|patch(?:ing)?|edit(?:ing)?|writ(?:e|ing)|updat(?:e|ing)|fix(?:ing)?|chang(?:e|ing))\b/i;
+
 export function isCodexGeneratedTextMethod(method) {
   return GENERATED_TEXT_METHODS.has(String(method || ""));
 }
@@ -86,6 +89,46 @@ function activeTextWatchdog(watchdog, context) {
   return context.finalizing ? finalizationWatchdog(context) : watchdog;
 }
 
+function resetMicroNarration(context) {
+  context.microNarrationBuffer = "";
+  context.microNarrationIntentCount = 0;
+}
+
+function observeMicroNarration(delta, context) {
+  if (typeof delta !== "string" || delta.length === 0) return { action: "allow" };
+  const current = `${context.microNarrationBuffer || ""}${delta}`;
+  let lastBoundary = -1;
+  for (let index = 0; index < current.length; index += 1) {
+    if (/[\n.!?]/.test(current[index])) lastBoundary = index;
+  }
+  if (lastBoundary < 0) {
+    context.microNarrationBuffer = current.length > 2_000 ? current.slice(-2_000) : current;
+    return { action: "allow" };
+  }
+
+  const complete = current.slice(0, lastBoundary + 1);
+  context.microNarrationBuffer = current.slice(lastBoundary + 1);
+  for (const clause of complete
+    .split(/\n+/)
+    .flatMap((line) => line.split(/(?<=[.!?])\s+/))
+    .map((line) => line.trim())
+    .filter(Boolean)) {
+    if (clause.length > 320 || !MICRO_NARRATION_INTENT.test(clause)) continue;
+    context.microNarrationIntentCount = Number(context.microNarrationIntentCount || 0) + 1;
+    if (context.microNarrationIntentCount >= MICRO_NARRATION_INTENT_THRESHOLD) {
+      return {
+        action: "interrupt",
+        reason: "micro_narration_budget_exhausted",
+        details: {
+          microNarrationIntentCount: context.microNarrationIntentCount,
+          hardLimit: MICRO_NARRATION_INTENT_THRESHOLD,
+        },
+      };
+    }
+  }
+  return { action: "allow" };
+}
+
 export function observeCodexAppServerMessage(watchdog, message, context = {}) {
   if (!watchdog || typeof watchdog.observeAssistantDelta !== "function") {
     throw new Error("watchdog is required");
@@ -95,6 +138,12 @@ export function observeCodexAppServerMessage(watchdog, message, context = {}) {
 
   const { method, params = {} } = message;
   if (isCodexGeneratedTextMethod(method)) {
+    if (!context.finalizing) {
+      const narrationDecision = observeMicroNarration(params.delta || "", context);
+      if (narrationDecision.action === "interrupt") {
+        return maybeInterrupt(narrationDecision, params, context);
+      }
+    }
     const decision = activeTextWatchdog(watchdog, context).observeAssistantDelta(params.delta || "");
     return maybeInterrupt(decision, params, context);
   }
@@ -107,16 +156,19 @@ export function observeCodexAppServerMessage(watchdog, message, context = {}) {
   }
 
   if (method === "turn/diff/updated") {
-    watchdog.observeDiffProgress(params.diff || "");
+    const progress = watchdog.observeDiffProgress(params.diff || "");
+    if (progress?.progressed) resetMicroNarration(context);
     return { decision: { action: "allow" } };
   }
 
   if (method === "turn/plan/updated") {
-    watchdog.observePlanProgress(params.plan || []);
+    const progress = watchdog.observePlanProgress(params.plan || []);
+    if (progress?.progressed) resetMicroNarration(context);
     const complete = planIsComplete(params.plan);
     if (complete && !context.finalizing) {
       context.finalizing = true;
       context.finalizationWatchdog = createProgressWatchdog(FINALIZATION_WATCHDOG_OPTIONS);
+      resetMicroNarration(context);
     } else if (!complete && context.finalizing) {
       context.finalizing = false;
       context.finalizationWatchdog = null;
@@ -127,7 +179,11 @@ export function observeCodexAppServerMessage(watchdog, message, context = {}) {
   if (method === "item/started") {
     const item = params.item;
     if (RUNTIME_WORK_ITEM_TYPES.has(String(item?.type || ""))) {
+      const pendingToolEmissionSignal =
+        typeof watchdog.snapshot === "function" &&
+        Number(watchdog.snapshot().toolEmissionIntentCount || 0) > 0;
       watchdog.recordToolStart({ type: item.type, id: item.id || null });
+      if (pendingToolEmissionSignal) resetMicroNarration(context);
       context.finalizing = false;
       context.finalizationWatchdog = null;
     }
@@ -152,8 +208,10 @@ export function observeCodexAppServerMessage(watchdog, message, context = {}) {
     if (isSuccessfulAppServerItem(item)) {
       if (classification.kind === "state-change" && item?.type !== "fileChange") {
         watchdog.recordStateProgress("codex_state_change_completed");
+        resetMicroNarration(context);
       } else if (classification.kind === "execution") {
         watchdog.recordExecutionProgress({ kind: "codex_execution_completed" });
+        resetMicroNarration(context);
       }
     }
     return { decision: { action: "allow" } };
@@ -163,6 +221,7 @@ export function observeCodexAppServerMessage(watchdog, message, context = {}) {
     context.interruptedTurns.delete(params.turn.id);
     context.finalizing = false;
     context.finalizationWatchdog = null;
+    resetMicroNarration(context);
   }
 
   return { decision: { action: "allow" } };

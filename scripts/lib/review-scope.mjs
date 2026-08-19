@@ -3,6 +3,8 @@ import { boundedSpawnSync } from "./subprocess-policy.mjs";
 import { PROBE_REGISTRY, validateProbeRegistry } from "./probe-registry.mjs";
 import { planVisualEvidence } from "./visual-evidence.mjs";
 
+export { collectBranchReviewInput } from "./branch-review-input.mjs";
+
 const CODE_RE = /\.(?:[cm]?[jt]sx?|mjs|cjs|py|go|rs|java|kt|rb|php|cs|swift|c|cc|cpp|h|hpp|vue|svelte)$/i;
 const DOC_RE = /\.(?:md|txt|rst|adoc)$/i;
 const OPERATIONAL_POLICY_RE = /(^|\/)(?:SKILL\.md|references\/.*\.md|overrides\/)/i;
@@ -202,7 +204,9 @@ export function planReviewScope(input = {}) {
     const { added, removed } = patchLines(file.patch);
     const changedText = [...added, ...removed].join("\n");
     const symbols = extractSymbols(file.path, changedText);
-    const isLogic = CODE_RE.test(file.path) || OPERATIONAL_POLICY_RE.test(file.path) || /^\.github\//.test(file.path);
+    const isLogic = paths.some(
+      (path) => CODE_RE.test(path) || OPERATIONAL_POLICY_RE.test(path) || /^\.github\//.test(path),
+    );
     if (isLogic) logicFiles.push(file.path);
     if (isLogic && !file.patch && file.status !== "removed") missingPatches.push(file.path);
 
@@ -226,8 +230,10 @@ export function planReviewScope(input = {}) {
 
     workflowPermissionChanges.push(...workflowSignals(file.path, added, removed, evidence));
 
-    if (LOCK_RE.test(file.path) || MANIFEST_RE.test(file.path)) {
-      const kind = LOCK_RE.test(file.path) ? "lockfile" : "manifest";
+    const lockChanged = paths.some((path) => LOCK_RE.test(path));
+    const manifestChanged = paths.some((path) => MANIFEST_RE.test(path));
+    if (lockChanged || manifestChanged) {
+      const kind = lockChanged ? "lockfile" : "manifest";
       dependencyChanges.push({ file: file.path, kind, additions: file.additions, deletions: file.deletions });
       addEvidence(evidence, "supply_chain", "security", 3, `${kind} changed`, file.path);
     }
@@ -272,7 +278,12 @@ export function planReviewScope(input = {}) {
   const bugLenses = finalize(lensEvidence);
   const requiredSecurity = domains.filter((item) => item.category === "security" && item.required);
   const requiredBug = bugLenses.filter((item) => item.required);
-  const docsOnly = files.length > 0 && files.every((file) => DOC_RE.test(file.path) && !OPERATIONAL_POLICY_RE.test(file.path));
+  const docsOnly = files.length > 0 && files.every((file) => {
+    const paths = [file.path, file.previousPath].filter(Boolean);
+    return paths.every(
+      (path) => DOC_RE.test(path) && !OPERATIONAL_POLICY_RE.test(path),
+    );
+  });
   const criticalSecurity = requiredSecurity.some((item) => item.confidence === "high") || removedControlLeads.length > 0;
   const criticalBug = requiredBug.some((item) => item.confidence === "high");
   const securityDepth = docsOnly ? "skip" : criticalSecurity ? "full" : requiredSecurity.length ? "targeted" : logicFiles.length ? "baseline" : "skip";
@@ -334,45 +345,4 @@ export function collectPrReviewInput(repo, pr) {
   const files = pages.flat();
   assertCompletePrFileEnumeration(meta.changedFiles, files.length);
   return { repo, pr, ...meta, files };
-}
-
-function git(args) {
-  const result = boundedSpawnSync("git", args, { encoding: "utf8", maxBuffer: 50 * 1024 * 1024 });
-  if (result.status !== 0) throw new Error(String(result.stderr || result.stdout || "git failed").trim());
-  return String(result.stdout || "").trim();
-}
-
-function gitMaybe(args) {
-  const result = boundedSpawnSync("git", args, { encoding: "utf8", maxBuffer: 50 * 1024 * 1024 });
-  if (result.status !== 0) return null;
-  return String(result.stdout || "").trim();
-}
-
-function resolveRepoForBranch() {
-  try {
-    const name = JSON.parse(gh(["repo", "view", "--json", "nameWithOwner"])).nameWithOwner;
-    if (typeof name === "string" && name.includes("/")) return name;
-  } catch {
-    // fall through to git remote
-  }
-  const remote = gitMaybe(["remote", "get-url", "origin"]);
-  if (!remote) return null;
-  const match = String(remote).match(/(?:[:/])([^/:]+)\/([^/]+?)(?:\.git)?$/);
-  return match ? `${match[1]}/${match[2]}` : null;
-}
-
-export function collectBranchReviewInput(baseRef, headRef) {
-  const nameStatus = git(["diff", "--name-status", `${baseRef}...${headRef}`]);
-  const paths = nameStatus.split(/\r?\n/).filter(Boolean).map((line) => {
-    const [status, ...rest] = line.split(/\s+/);
-    return { status, path: rest.join(" ").replace(/^"|"$/g, "") };
-  });
-  const files = paths.map(({ status, path }) => {
-    const patch = git(["diff", "--no-ext-diff", "--unified=3", `${baseRef}...${headRef}`, "--", path]);
-    const added = patch.split(/\r?\n/).filter((line) => line.startsWith("+") && !line.startsWith("+++")).length;
-    const deleted = patch.split(/\r?\n/).filter((line) => line.startsWith("-") && !line.startsWith("---")).length;
-    return { path, status, patch, additions: added, deletions: deleted };
-  });
-  const headRefOid = gitMaybe(["rev-parse", "--verify", headRef]) || null;
-  return { repo: resolveRepoForBranch(), pr: null, headRefOid, files };
 }

@@ -25,8 +25,13 @@ function mockFetch(routes, calls) {
 }
 
 function baseRoutes(extra) {
+  const generation = "a".repeat(40);
   return [
     { path: "/repos/Wibias/github-delivery", body: { default_branch: "main" } },
+    {
+      path: "/repos/Wibias/github-delivery/git/ref/heads/main",
+      body: { object: { sha: generation } },
+    },
     {
       path: "/repos/Wibias/github-delivery/contents/.github/workflows?ref=main",
       body: [
@@ -35,6 +40,10 @@ function baseRoutes(extra) {
       ],
     },
     ...extra,
+    {
+      path: "/repos/Wibias/github-delivery/git/ref/heads/main",
+      body: { object: { sha: generation } },
+    },
   ];
 }
 

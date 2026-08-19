@@ -41,6 +41,10 @@ test("verification economy reuses passing evidence on unchanged code and state",
 test("deterministic tool calls are executed without micro-narration", () => {
   assert.match(kernel, /do not narrate.*tool calls|execute.*without.*narrat/i);
   assert.match(kernel, /phase change|material.*change|user input/i);
+  assert.match(kernel, /rule\/skill\/workflow loading|file reads|remote fetches/i);
+  assert.match(kernel, /retry quietly|correct.*quietly/i);
+  assert.match(skill, /routine deterministic tooling quietly/i);
+  assert.match(skill, /material progress or blockers/i);
 });
 
 test("context economy minimises evidence acquisition and model-facing output", () => {

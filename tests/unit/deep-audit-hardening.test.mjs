@@ -1,0 +1,317 @@
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import test from "node:test";
+
+import { classifyCiScope } from "../../scripts/ci-scope.mjs";
+import { cleanupOrphanedWorkflowRuns } from "../../scripts/cleanup-orphaned-workflows.mjs";
+import { makeRedemptionRunner } from "../../scripts/lib/authority-execution.mjs";
+import { collectBranchReviewInput } from "../../scripts/lib/branch-review-input.mjs";
+import { evaluateMergeStackEligibility } from "../../scripts/lib/merge-stack-policy.mjs";
+import { planReviewScope } from "../../scripts/lib/review-scope.mjs";
+import { evaluate as evaluatePreOpen } from "../../scripts/pre-open-gate.mjs";
+import { briefText } from "../../scripts/review-brief.mjs";
+
+function source(path) {
+  return readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
+}
+
+function git(cwd, args) {
+  return execFileSync("git", args, {
+    cwd,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  }).trim();
+}
+
+test("CI scope policy changes remain conservative when the classifier itself changes", () => {
+  const scope = classifyCiScope(["scripts/ci-scope.mjs"]);
+  assert.equal(scope.nodeCompat, true);
+  assert.equal(scope.windowsAuthority, true);
+  assert.equal(scope.csharp, true);
+});
+
+test("security-critical Windows and C# lanes cannot be scoped out by a pull request", () => {
+  const ci = source(".github/workflows/ci.yml");
+  const codeql = source(".github/workflows/codeql.yml");
+
+  assert.match(ci, /git show "\$\{BASE_SHA\}:scripts\/ci-scope\.mjs"/);
+  const windowsBlock = ci.slice(ci.indexOf("  windows-authority:"));
+  assert.doesNotMatch(windowsBlock, /needs: scope/);
+  assert.doesNotMatch(windowsBlock, /needs\.scope\.outputs\.windows_authority/);
+
+  assert.doesNotMatch(codeql, /csharp_scope:/);
+  const csharpBlock = codeql.slice(codeql.indexOf("  analyze-csharp:"));
+  assert.doesNotMatch(csharpBlock, /needs: csharp_scope/);
+  assert.doesNotMatch(csharpBlock, /needs\.csharp_scope/);
+});
+
+test("trusted authority is redeemed before an internal coordination write executes", () => {
+  const events = [];
+  const nonce = "audit-nonce";
+  const authority = {
+    verified: true,
+    claims: {
+      redemption: "required",
+      scopeSha256: "a".repeat(64),
+      nonce,
+    },
+  };
+  const execution = makeRedemptionRunner({
+    plannedCommand: ["gh", "pr", "comment", "42"],
+    authority,
+    authorityGrant: "gd1.audit-fixture",
+    redeemer() {
+      events.push("redeem");
+      return { status: "consumed", nonce, consumedAt: 1 };
+    },
+    runner() {
+      events.push("write");
+      return { status: 0, stdout: "", stderr: "" };
+    },
+  });
+
+  execution.runner("gh", [
+    "api",
+    "repos/acme/widget/git/refs",
+    "--method",
+    "POST",
+    "-f",
+    "ref=refs/github-delivery/idempotency/test",
+    "-f",
+    `sha=${"b".repeat(40)}`,
+  ], {});
+
+  assert.deepEqual(events, ["redeem", "write"]);
+  assert.equal(execution.redemption()?.status, "consumed");
+});
+
+test("branch review input preserves rename paths and keeps renamed code in scope", () => {
+  const root = mkdtempSync(join(tmpdir(), "github-delivery-rename-"));
+  const previousCwd = process.cwd();
+  try {
+    git(root, ["init", "-b", "main"]);
+    git(root, ["config", "user.email", "audit@example.invalid"]);
+    git(root, ["config", "user.name", "Audit Fixture"]);
+    mkdirSync(join(root, "src"), { recursive: true });
+    writeFileSync(join(root, "src", "auth.mjs"), "export const auth = true;\n", "utf8");
+    git(root, ["add", "src/auth.mjs"]);
+    git(root, ["commit", "-m", "base"]);
+    const base = git(root, ["rev-parse", "HEAD"]);
+
+    git(root, ["mv", "src/auth.mjs", "src/auth"]);
+    git(root, ["commit", "-m", "rename auth module"]);
+    const head = git(root, ["rev-parse", "HEAD"]);
+
+    process.chdir(root);
+    const input = collectBranchReviewInput(base, head);
+    assert.equal(input.files.length, 1);
+    assert.equal(input.files[0].status.startsWith("R"), true);
+    assert.equal(input.files[0].previousPath, "src/auth.mjs");
+    assert.equal(input.files[0].path, "src/auth");
+
+    const plan = planReviewScope(input);
+    assert.ok(plan.logicFiles.includes("src/auth"));
+    assert.notEqual(evaluatePreOpen(plan).decision, "ready");
+  } finally {
+    process.chdir(previousCwd);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("code renamed to a documentation path cannot take the docs-only shortcut", () => {
+  const plan = planReviewScope({
+    repo: "acme/widget",
+    pr: null,
+    headRefOid: "abc",
+    files: [
+      {
+        path: "docs/auth.md",
+        previousPath: "src/auth.mjs",
+        status: "R100",
+        patch: "diff --git a/src/auth.mjs b/docs/auth.md",
+        additions: 0,
+        deletions: 0,
+      },
+    ],
+  });
+
+  assert.ok(plan.logicFiles.includes("docs/auth.md"));
+  assert.notEqual(plan.bugReview.depth, "skip");
+  assert.notEqual(plan.securityReview.depth, "skip");
+});
+
+test("pre-open gate blocks until every deterministic required probe has canonical evidence", () => {
+  const plan = planReviewScope({
+    repo: "acme/widget",
+    pr: null,
+    headRefOid: "abc",
+    files: [
+      {
+        path: "tests/worker.test.mjs",
+        patch: "+setTimeout(() => {}, 100);\n",
+        additions: 1,
+        deletions: 0,
+        status: "modified",
+      },
+    ],
+  });
+  assert.ok(plan.requiredProbes.includes("test-honesty"));
+
+  const first = evaluatePreOpen(plan);
+  const evidence = {
+    schemaVersion: 1,
+    lenses: Object.fromEntries(first.bugScope.requiredLenses.map((id) => [id, "done"])),
+    surfaces: Object.fromEntries(
+      first.securityScope.requiredSurfaces.map((id) => [id, "n/a audit fixture boundary untouched"]),
+    ),
+    probes: {},
+  };
+  const blocked = evaluatePreOpen(plan, evidence);
+  assert.equal(blocked.decision, "blocked");
+  assert.ok(blocked.blockers.includes("probe:requiredProbes:test-honesty"));
+
+  evidence.probes["test-honesty"] = {
+    status: "clean",
+    files: ["tests/worker.test.mjs"],
+  };
+  const cleared = evaluatePreOpen(plan, evidence);
+  assert.equal(cleared.blockers.includes("probe:requiredProbes:test-honesty"), false);
+  assert.equal(cleared.probeEvidenceErrors.length, 0);
+  assert.equal(cleared.decision, "ready");
+});
+
+test("merge execution rejects a child while its stack parent is still open", () => {
+  const repo = "acme/widget";
+  const prs = [
+    {
+      number: 1,
+      title: "parent",
+      headRefName: "feature/parent",
+      baseRefName: "main",
+      headRepoFullName: repo,
+      baseRepoFullName: repo,
+      url: "https://example.invalid/1",
+      isDraft: false,
+      headRefOid: "a".repeat(40),
+    },
+    {
+      number: 2,
+      title: "child",
+      headRefName: "feature/child",
+      baseRefName: "feature/parent",
+      headRepoFullName: repo,
+      baseRepoFullName: repo,
+      url: "https://example.invalid/2",
+      isDraft: false,
+      headRefOid: "b".repeat(40),
+    },
+  ];
+  const result = evaluateMergeStackEligibility({ prs, targetPr: 2 });
+  assert.equal(result.eligible, false);
+  assert.equal(result.reason, "stack_parent_unlanded");
+  assert.equal(result.parentPr, 1);
+
+  const executionBoundary = source("scripts/lib/mutation-execution-context.mjs");
+  assert.match(executionBoundary, /verifyMergeStackEligibility/);
+});
+
+test("orphan cleanup aborts if the default branch generation moves before deletion", async () => {
+  const calls = [];
+  let refReads = 0;
+  const fetchImpl = async (input, init = {}) => {
+    const url = new URL(typeof input === "string" ? input : input.url);
+    const method = init.method ?? "GET";
+    const path = `${url.pathname}${url.search}`;
+    calls.push(`${method} ${path}`);
+
+    if (method === "GET" && path === "/repos/Wibias/github-delivery") {
+      return Response.json({ default_branch: "main" });
+    }
+    if (method === "GET" && path === "/repos/Wibias/github-delivery/git/ref/heads/main") {
+      refReads += 1;
+      return Response.json({ object: { sha: refReads === 1 ? "a".repeat(40) : "b".repeat(40) } });
+    }
+    if (
+      method === "GET" &&
+      path === "/repos/Wibias/github-delivery/contents/.github/workflows?ref=main"
+    ) {
+      return Response.json([
+        { type: "file", path: ".github/workflows/ci.yml" },
+        { type: "file", path: ".github/workflows/cleanup-orphaned-workflows.yml" },
+      ]);
+    }
+    if (
+      method === "GET" &&
+      path === "/repos/Wibias/github-delivery/actions/workflows?per_page=100&page=1"
+    ) {
+      return Response.json({
+        workflows: [
+          { id: 2, name: "Old helper", path: ".github/workflows/tmp.yml" },
+        ],
+      });
+    }
+    if (
+      method === "GET" &&
+      path === "/repos/Wibias/github-delivery/actions/workflows/2/runs?per_page=100&page=1"
+    ) {
+      return Response.json({ workflow_runs: [{ id: 200, status: "completed" }] });
+    }
+    if (method === "DELETE") {
+      return new Response("delete should not be attempted after generation drift", { status: 500 });
+    }
+    return new Response(`Unexpected request: ${method} ${path}`, { status: 500 });
+  };
+
+  await assert.rejects(
+    cleanupOrphanedWorkflowRuns({
+      token: "test-token",
+      repository: "Wibias/github-delivery",
+      fetchImpl,
+      log: () => {},
+    }),
+    /default_branch_moved_during_cleanup/,
+  );
+  assert.equal(calls.some((call) => call.startsWith("DELETE ")), false);
+  assert.equal(refReads, 2);
+});
+
+test("review brief applies a global hunk-line budget across huge diffs", () => {
+  const files = Array.from({ length: 20 }, (_, index) => ({
+    path: `src/file-${index}.mjs`,
+    additions: 30,
+    deletions: 0,
+    patch: Array.from({ length: 30 }, (__, line) => `+line ${index}-${line}`).join("\n"),
+  }));
+  const text = briefText({
+    meta: { repo: "acme/widget", pr: 1 },
+    plan: {
+      headRefOid: "abc",
+      fileCount: files.length,
+      logicFiles: files.map((file) => file.path),
+      requiredProbes: [],
+      dependencyChanges: [],
+      removedControlLeads: [],
+      uncertainty: [],
+    },
+    files,
+    bugScope: { requiredLenses: [] },
+    securityScope: { requiredSurfaces: [] },
+    executionPlan: null,
+    maxHunkLines: 24,
+    maxTotalHunkLines: 50,
+    probeBlocks: [],
+  });
+
+  const emittedDiffLines = text.split(/\r?\n/).filter((line) => line.startsWith("+line "));
+  assert.ok(emittedDiffLines.length <= 50, `expected <= 50 hunk lines, got ${emittedDiffLines.length}`);
+  assert.match(text, /global hunk budget/i);
+});

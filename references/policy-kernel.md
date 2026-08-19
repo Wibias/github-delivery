@@ -42,6 +42,8 @@ On unchanged relevant code and state, reuse valid passing evidence. Do not run a
 
 Execute deterministic tool calls without narrating each one. User-facing progress updates are for phase changes, material new evidence or plan changes, blockers, or needed user input; do not precede each test/read/write with micro-narration such as “let me run” or “I’ll run”.
 
+Rule/skill/workflow loading, file reads, Git/GitHub snapshots, remote fetches, obvious command retries, and shell-quoting corrections are not user-facing progress by themselves. Perform them directly. Do not emit status messages whose only new information is “loaded X”, “next I’ll verify Y”, “I’ll lock/fetch/recapture Z”, or that an obvious retry will now be attempted. If a failed tool call has a deterministic correction and does not change scope or create a blocker, correct it and retry quietly; surface the failure only when it materially changes the plan, evidence, authority, or user action required.
+
 ### GD-CORE-010 — Minimise evidence acquisition and context
 
 Prefer the highest-level authoritative helper or aggregate read that can decide the current step. Reuse one valid state snapshot while relevant state is unchanged. Do not delegate deterministic script or gate interpretation to a subagent. Escalate evidence progressively: decision/status, failing component, focused excerpt, then full raw output only when required.

@@ -104,7 +104,7 @@ persistent `delivery-controller.mjs` checkpoint. Route/phase graph stay locked;
 the controller owns transitions, evidence/retry/resource/no-progress accounting
 and resume. Only phase/state/blocker/required-evidence/execution change is
 progress. Conditional policy extends unchanged context. The controller grants
-no GitHub write authority.
+no GitHub write authority. Run routine deterministic tooling quietly; narrate only material progress or blockers (GD-CORE-009).
 
 ## Mandatory entrypoint behavior
 
