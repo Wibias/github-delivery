@@ -43,9 +43,8 @@ test("deterministic tool calls are executed without micro-narration", () => {
   assert.match(kernel, /phase change|material.*change|user input/i);
   assert.match(kernel, /rule\/skill\/workflow loading|file reads|remote fetches/i);
   assert.match(kernel, /retry quietly|correct.*quietly/i);
-  assert.match(skill, /quiet execution contract/i);
-  assert.match(skill, /loading canonical rules|checking Git\/GitHub state/i);
-  assert.match(skill, /retry quietly|correct it and retry quietly/i);
+  assert.match(skill, /routine deterministic tooling quietly/i);
+  assert.match(skill, /material progress or blockers/i);
 });
 
 test("context economy minimises evidence acquisition and model-facing output", () => {
