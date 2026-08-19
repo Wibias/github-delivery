@@ -25,3 +25,9 @@ Pending, missing, unrecognized, or unverifiable evidence is `unknown`, not pass.
 ### GD-EVID-006 — Finish with the authoritative gate
 
 Before claiming merge-ready or merging, the final `ship-gate.mjs` result must be `ready` on unchanged relevant heads/state. Component helpers diagnose; they do not overrule the authoritative gate.
+
+### GD-EVID-007 — Bind lightweight remote repository context to an immutable snapshot
+
+When a workflow needs GitHub repository context and no useful local checkout is already available, apply `references/repository-context.md`. Resolve the repository's actual default branch, or the workflow-selected branch when one is required, then capture its exact commit SHA and bind substantive remote file reads to that SHA. Do not guess `main`, `master`, or `HEAD`.
+
+Lightweight remote reads can establish targeted documentation or source evidence. They cannot by themselves prove history, runtime behavior, exhaustive repository coverage, or a modification result. Escalate to a local fetch/checkout when the selected workflow needs evidence that the remote path cannot prove complete.
