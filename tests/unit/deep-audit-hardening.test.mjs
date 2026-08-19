@@ -14,10 +14,9 @@ import test from "node:test";
 import { classifyCiScope } from "../../scripts/ci-scope.mjs";
 import { cleanupOrphanedWorkflowRuns } from "../../scripts/cleanup-orphaned-workflows.mjs";
 import { makeRedemptionRunner } from "../../scripts/lib/authority-execution.mjs";
-import {
-  collectBranchReviewInput,
-  planReviewScope,
-} from "../../scripts/lib/review-scope.mjs";
+import { collectBranchReviewInput } from "../../scripts/lib/branch-review-input.mjs";
+import { evaluateMergeStackEligibility } from "../../scripts/lib/merge-stack-policy.mjs";
+import { planReviewScope } from "../../scripts/lib/review-scope.mjs";
 import { evaluate as evaluatePreOpen } from "../../scripts/pre-open-gate.mjs";
 import { briefText } from "../../scripts/review-brief.mjs";
 
@@ -33,28 +32,26 @@ function git(cwd, args) {
   }).trim();
 }
 
-test("CI scope policy changes force the Windows and C# security lanes", () => {
+test("CI scope policy changes remain conservative when the classifier itself changes", () => {
   const scope = classifyCiScope(["scripts/ci-scope.mjs"]);
   assert.equal(scope.nodeCompat, true);
   assert.equal(scope.windowsAuthority, true);
   assert.equal(scope.csharp, true);
 });
 
-test("PR scope detection executes the trusted base selector, not candidate code", () => {
+test("security-critical Windows and C# lanes cannot be scoped out by a pull request", () => {
   const ci = source(".github/workflows/ci.yml");
   const codeql = source(".github/workflows/codeql.yml");
-  const trustedSelector = /git show \"\$\{BASE_SHA\}:scripts\/ci-scope\.mjs\"/;
 
-  assert.match(ci, trustedSelector);
-  assert.match(codeql, trustedSelector);
-  assert.doesNotMatch(
-    ci,
-    /git diff --name-only -z \"\$\{BASE_SHA\}\"\.\.\.HEAD \|\s*\n\s*node scripts\/ci-scope\.mjs/,
-  );
-  assert.doesNotMatch(
-    codeql,
-    /git diff --name-only -z \"\$\{BASE_SHA\}\"\.\.\.HEAD \|\s*\n\s*node scripts\/ci-scope\.mjs/,
-  );
+  assert.match(ci, /git show "\$\{BASE_SHA\}:scripts\/ci-scope\.mjs"/);
+  const windowsBlock = ci.slice(ci.indexOf("  windows-authority:"));
+  assert.doesNotMatch(windowsBlock, /needs: scope/);
+  assert.doesNotMatch(windowsBlock, /needs\.scope\.outputs\.windows_authority/);
+
+  assert.doesNotMatch(codeql, /csharp_scope:/);
+  const csharpBlock = codeql.slice(codeql.indexOf("  analyze-csharp:"));
+  assert.doesNotMatch(csharpBlock, /needs: csharp_scope/);
+  assert.doesNotMatch(csharpBlock, /needs\.csharp_scope/);
 });
 
 test("trusted authority is redeemed before an internal coordination write executes", () => {
@@ -158,10 +155,39 @@ test("pre-open gate blocks until every deterministic required probe has evidence
   assert.ok(result.blockers.includes("probe:requiredProbes:test-honesty"));
 });
 
-test("merge driver enforces stack-parent eligibility as an executable precondition", () => {
-  const mergeDriver = source("scripts/merge-pr-driver.mjs");
-  assert.match(mergeDriver, /verifyMergeStackEligibility/);
-  assert.match(mergeDriver, /stack_parent_unlanded/);
+test("merge execution rejects a child while its stack parent is still open", () => {
+  const repo = "acme/widget";
+  const prs = [
+    {
+      number: 1,
+      title: "parent",
+      headRefName: "feature/parent",
+      baseRefName: "main",
+      headRepoFullName: repo,
+      baseRepoFullName: repo,
+      url: "https://example.invalid/1",
+      isDraft: false,
+      headRefOid: "a".repeat(40),
+    },
+    {
+      number: 2,
+      title: "child",
+      headRefName: "feature/child",
+      baseRefName: "feature/parent",
+      headRepoFullName: repo,
+      baseRepoFullName: repo,
+      url: "https://example.invalid/2",
+      isDraft: false,
+      headRefOid: "b".repeat(40),
+    },
+  ];
+  const result = evaluateMergeStackEligibility({ prs, targetPr: 2 });
+  assert.equal(result.eligible, false);
+  assert.equal(result.reason, "stack_parent_unlanded");
+  assert.equal(result.parentPr, 1);
+
+  const executionBoundary = source("scripts/lib/mutation-execution-context.mjs");
+  assert.match(executionBoundary, /verifyMergeStackEligibility/);
 });
 
 test("orphan cleanup aborts if the default branch generation moves before deletion", async () => {
