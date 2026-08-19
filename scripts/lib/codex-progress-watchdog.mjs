@@ -29,7 +29,7 @@ const FINALIZATION_WATCHDOG_OPTIONS = Object.freeze({
 });
 
 const MICRO_NARRATION_INTENT_THRESHOLD = 3;
-const MICRO_NARRATION_INTENT = /(?:^|\b(?:so|and|then|next)[,:]?\s+)(?:next\s+)?(?:let me|i(?:'|’)ll|i will|i need to|i(?:'|’)m going to|i am going to)\s+(?:(?:start(?:ing)?(?:\s+by)?|now|next|then|first|just)\s+)*(?:load|read|verify|check|inspect|fetch|recapture|lock|run|execute|invoke|call|search|open|use|apply|patch|edit|write|update|fix|change)\b/i;
+const MICRO_NARRATION_INTENT = /(?:^|\b(?:so|and|then|next)[,:]?\s+)(?:next\s+)?(?:let me|i(?:'|’)ll|i will|i need to|i(?:'|’)m going to|i am going to)\s+(?:(?:start(?:ing)?(?:\s+by)?|now|next|then|first|just)\s+)*(?:load(?:ing)?|read(?:ing)?|verif(?:y|ying)|check(?:ing)?|inspect(?:ing)?|fetch(?:ing)?|recaptur(?:e|ing)|lock(?:ing)?|run(?:ning)?|execut(?:e|ing)|invok(?:e|ing)|call(?:ing)?|search(?:ing)?|open(?:ing)?|us(?:e|ing)|apply(?:ing)?|patch(?:ing)?|edit(?:ing)?|writ(?:e|ing)|updat(?:e|ing)|fix(?:ing)?|chang(?:e|ing))\b/i;
 
 export function isCodexGeneratedTextMethod(method) {
   return GENERATED_TEXT_METHODS.has(String(method || ""));
