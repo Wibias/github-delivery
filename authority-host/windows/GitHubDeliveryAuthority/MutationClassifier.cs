@@ -45,6 +45,9 @@ internal static class MutationClassifier
             || SocialActions.Contains(action);
     }
 
+    public static bool IsBranchLeaseEligible(JsonElement operation)
+        => string.Equals(operation.GetProperty("action").GetString(), "push_code", StringComparison.Ordinal);
+
     public static bool RequiresExactHumanApproval(JsonElement operation)
         => string.Equals(operation.GetProperty("action").GetString(), "reply_human_thread", StringComparison.Ordinal);
 }
