@@ -278,7 +278,12 @@ export function planReviewScope(input = {}) {
   const bugLenses = finalize(lensEvidence);
   const requiredSecurity = domains.filter((item) => item.category === "security" && item.required);
   const requiredBug = bugLenses.filter((item) => item.required);
-  const docsOnly = files.length > 0 && files.every((file) => DOC_RE.test(file.path) && !OPERATIONAL_POLICY_RE.test(file.path));
+  const docsOnly = files.length > 0 && files.every((file) => {
+    const paths = [file.path, file.previousPath].filter(Boolean);
+    return paths.every(
+      (path) => DOC_RE.test(path) && !OPERATIONAL_POLICY_RE.test(path),
+    );
+  });
   const criticalSecurity = requiredSecurity.some((item) => item.confidence === "high") || removedControlLeads.length > 0;
   const criticalBug = requiredBug.some((item) => item.confidence === "high");
   const securityDepth = docsOnly ? "skip" : criticalSecurity ? "full" : requiredSecurity.length ? "targeted" : logicFiles.length ? "baseline" : "skip";
