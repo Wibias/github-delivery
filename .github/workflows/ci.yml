@@ -48,8 +48,10 @@ jobs:
             exit 0
           fi
 
+          TRUSTED_SCOPE="${RUNNER_TEMP}/github-delivery-ci-scope-base.mjs"
+          git show "${BASE_SHA}:scripts/ci-scope.mjs" > "${TRUSTED_SCOPE}"
           git diff --name-only -z "${BASE_SHA}"...HEAD |
-            node scripts/ci-scope.mjs --mode ci >> "${GITHUB_OUTPUT}"
+            node "${TRUSTED_SCOPE}" --mode ci >> "${GITHUB_OUTPUT}"
 
   core:
     name: Node 24 / ubuntu-latest
