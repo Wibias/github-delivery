@@ -16,43 +16,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  csharp_scope:
-    name: Detect C# analysis scope
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    outputs:
-      required: ${{ steps.scope.outputs.required }}
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Set up Node.js 24
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 24
-          package-manager-cache: false
-
-      - name: Detect C#-relevant pull request changes
-        id: scope
-        shell: bash
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: |
-          set -euo pipefail
-          if [[ "${EVENT_NAME}" != "pull_request" ]]; then
-            echo "required=true" >> "${GITHUB_OUTPUT}"
-            exit 0
-          fi
-
-          TRUSTED_SCOPE="${RUNNER_TEMP}/github-delivery-ci-scope-base.mjs"
-          git show "${BASE_SHA}:scripts/ci-scope.mjs" > "${TRUSTED_SCOPE}"
-          git diff --name-only -z "${BASE_SHA}"...HEAD |
-            node "${TRUSTED_SCOPE}" --mode csharp >> "${GITHUB_OUTPUT}"
-
   analyze:
     name: CodeQL / Analyze (javascript-typescript)
     runs-on: ubuntu-latest
@@ -82,8 +45,6 @@ jobs:
 
   analyze-csharp:
     name: CodeQL / Analyze (csharp)
-    needs: csharp_scope
-    if: always() && (needs.csharp_scope.result != 'success' || github.event_name != 'pull_request' || needs.csharp_scope.outputs.required == 'true')
     runs-on: windows-latest
     timeout-minutes: 30
     permissions:
@@ -91,13 +52,6 @@ jobs:
       packages: read
       security-events: write
     steps:
-      - name: Fail closed when C# scope detection failed
-        if: needs.csharp_scope.result != 'success'
-        shell: pwsh
-        run: |
-          Write-Error 'Detect C# analysis scope did not complete successfully.'
-          exit 1
-
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
