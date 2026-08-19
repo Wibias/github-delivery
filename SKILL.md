@@ -106,6 +106,21 @@ and resume. Only phase/state/blocker/required-evidence/execution change is
 progress. Conditional policy extends unchanged context. The controller grants
 no GitHub write authority.
 
+## Quiet execution contract
+
+Routine deterministic tooling is quiet by default. Do not spend assistant output
+announcing that you are loading canonical rules, this skill, a selected workflow,
+or another reference; reading files; checking Git/GitHub state; locking a
+worktree; fetching remotes; correcting obvious shell quoting; or attempting the
+next deterministic read/test. Execute those steps directly.
+
+User-facing progress updates are reserved for a phase transition, material new
+evidence or plan change, a real blocker, a state-changing action worth reporting,
+or user input that is actually required. A successful evidence/read tool does
+not by itself justify “loaded X” / “next I’ll verify Y” narration. When a tool
+call fails but the correction is deterministic and does not change scope or the
+plan, correct it and retry quietly. See `GD-CORE-008` through `GD-CORE-010`.
+
 ## Mandatory entrypoint behavior
 
 - **Default mutation mode is read-only.** Available profiles are `read-only`,
