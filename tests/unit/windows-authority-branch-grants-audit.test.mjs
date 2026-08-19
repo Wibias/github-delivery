@@ -72,7 +72,7 @@ test("branch leases can authorize repeated code pushes but never another action 
   assert.match(classifier, /IsBranchLeaseEligible/);
   assert.match(classifier, /"push_code"/);
   assert.match(service, /operations\.All\(MutationClassifier\.IsBranchLeaseEligible\)/);
-  assert.match(service, /branchLeaseEligible \? _store\.TryUseActiveBranchLease/);
+  assert.match(service, /branchLeaseEligible\s*\?\s*_store\.TryUseActiveBranchLease/);
   assert.match(service, /branchLeaseEligible \? branch : null/);
   assert.match(service, /branch_lease_action_not_eligible/);
   assert.match(approval, /x:Name="BranchGrantToggle"/);
