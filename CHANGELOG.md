@@ -4,12 +4,21 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [0.8.7] - 2026-08-19
+
+### Changed
+
+- Bumped the package version from `0.8.6` to `0.8.7`.
+- Restricted temporary Windows Authority branch leases to repeated `push_code` batches and tightened classic branch-protection, routing, mutation-boundary, security-policy, and stack portability contracts (PR #297).
+
 ### Fixed
 
 - Stopped Control Center Recent activity from flashing on every refresh by binding a stable collection, rebuilding only when audit data changes, and inserting Today/Yesterday/date separators between day groups (PR #293).
 - Kept skill-authoring requests outside GitHub Delivery routing even when they end with PR publication (PR #295).
 - Fail closed when a published GitHub PR or comment body contains literal escape sequences instead of real markdown newlines, including stdin body transport, create/update verification, and live comment re-reads (PR #294).
-- Bound GitHub, Git, PowerShell, and registry subprocess helpers now copy argv and force a direct spawn (shell: false), so library-provided arguments cannot be reconstructed as a shell command (PR #294).
+- Bound GitHub, Git, PowerShell, and registry subprocess helpers now copy argv and force a direct spawn (`shell: false`), so library-provided arguments cannot be reconstructed as a shell command (PR #294).
+- Prevented unusual valid Git filenames from hiding sensitive path changes from scoped CI/CodeQL detection, and made required scoped lanes fail closed when their scope producer fails (PR #296).
+- Fail closed when classic branch protection may apply but cannot be proved absent, added GitHub-style classic branch-pattern coverage, restored contextual `make this green` routing, and strengthened dynamic mutation-command boundary checks (PR #297).
 
 ## [0.8.6] - 2026-08-18
 
