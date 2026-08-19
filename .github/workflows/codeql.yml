@@ -29,6 +29,12 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Set up Node.js 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
       - name: Detect C#-relevant pull request changes
         id: scope
         shell: bash
@@ -42,12 +48,8 @@ jobs:
             exit 0
           fi
 
-          git diff --name-only "${BASE_SHA}"...HEAD > "${RUNNER_TEMP}/changed-files.txt"
-          if grep -Eq '^(authority-host/windows/|global\.json$|\.github/workflows/codeql\.yml$)' "${RUNNER_TEMP}/changed-files.txt"; then
-            echo "required=true" >> "${GITHUB_OUTPUT}"
-          else
-            echo "required=false" >> "${GITHUB_OUTPUT}"
-          fi
+          git diff --name-only -z "${BASE_SHA}"...HEAD |
+            node scripts/ci-scope.mjs --mode csharp >> "${GITHUB_OUTPUT}"
 
   analyze:
     name: CodeQL / Analyze (javascript-typescript)
@@ -79,7 +81,7 @@ jobs:
   analyze-csharp:
     name: CodeQL / Analyze (csharp)
     needs: csharp_scope
-    if: github.event_name != 'pull_request' || needs.csharp_scope.outputs.required == 'true'
+    if: always() && (needs.csharp_scope.result != 'success' || github.event_name != 'pull_request' || needs.csharp_scope.outputs.required == 'true')
     runs-on: windows-latest
     timeout-minutes: 30
     permissions:
@@ -87,6 +89,13 @@ jobs:
       packages: read
       security-events: write
     steps:
+      - name: Fail closed when C# scope detection failed
+        if: needs.csharp_scope.result != 'success'
+        shell: pwsh
+        run: |
+          Write-Error 'Detect C# analysis scope did not complete successfully.'
+          exit 1
+
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

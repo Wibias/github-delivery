@@ -28,6 +28,12 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Set up Node.js 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
       - name: Detect compatibility and Windows Authority scope
         id: scope
         shell: bash
@@ -42,19 +48,8 @@ jobs:
             exit 0
           fi
 
-          git diff --name-only "${BASE_SHA}"...HEAD > "${RUNNER_TEMP}/changed-files.txt"
-
-          if grep -Eq '^(scripts/|tests/|\.github/npm-publish/|\.github-delivery-fixtures/|package\.json$|\.github/workflows/ci\.yml$)' "${RUNNER_TEMP}/changed-files.txt"; then
-            echo "node_compat=true" >> "${GITHUB_OUTPUT}"
-          else
-            echo "node_compat=false" >> "${GITHUB_OUTPUT}"
-          fi
-
-          if grep -Eq '^(authority-host/windows/|\.github-delivery-fixtures/|global\.json$|package\.json$|scripts/prepare-authority-host-runtime-smoke\.mjs$|scripts/lib/authority-host-(install|release)\.mjs$|\.github/workflows/ci\.yml$)' "${RUNNER_TEMP}/changed-files.txt"; then
-            echo "windows_authority=true" >> "${GITHUB_OUTPUT}"
-          else
-            echo "windows_authority=false" >> "${GITHUB_OUTPUT}"
-          fi
+          git diff --name-only -z "${BASE_SHA}"...HEAD |
+            node scripts/ci-scope.mjs --mode ci >> "${GITHUB_OUTPUT}"
 
   core:
     name: Node 24 / ubuntu-latest
@@ -90,10 +85,16 @@ jobs:
   node22-compatibility:
     name: Node 22 / ubuntu-latest
     needs: scope
-    if: github.event_name != 'pull_request' || needs.scope.outputs.node_compat == 'true'
+    if: always() && (needs.scope.result != 'success' || github.event_name != 'pull_request' || needs.scope.outputs.node_compat == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - name: Fail closed when scope detection failed
+        if: needs.scope.result != 'success'
+        run: |
+          echo "::error::Detect CI scope did not complete successfully."
+          exit 1
+
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -111,10 +112,17 @@ jobs:
   windows-authority:
     name: Node 24 / windows-latest
     needs: scope
-    if: github.event_name != 'pull_request' || needs.scope.outputs.windows_authority == 'true'
+    if: always() && (needs.scope.result != 'success' || github.event_name != 'pull_request' || needs.scope.outputs.windows_authority == 'true')
     runs-on: windows-latest
     timeout-minutes: 25
     steps:
+      - name: Fail closed when scope detection failed
+        if: needs.scope.result != 'success'
+        shell: pwsh
+        run: |
+          Write-Error 'Detect CI scope did not complete successfully.'
+          exit 1
+
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
