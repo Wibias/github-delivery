@@ -100,7 +100,7 @@ The 0.8.6 line adds the major workflow and safety work developed after 0.8.2, pl
 - competing-PR consolidation analysis;
 - conditional head-bound visual review evidence;
 - multi-base backport/port delivery;
-- a substantially leaner GitHub Actions topology with stale-run cancellation and scoped platform lanes;
+- a substantially leaner GitHub Actions topology with stale-run cancellation and unconditional security-critical Windows Authority/C# lanes;
 - fail-closed delivery integrity for moved PR heads, queued/auto-merge outcomes, mutation receipts, and remaining public workflow routing;
 - bounded GitHub and Git subprocesses on review, verdict, CI forensics, ship-gate, runtime, live-fixture, release, and npm helper paths.
 
@@ -162,7 +162,9 @@ Status, open-work, and competing-PR analysis remain read-only. Implementation-on
 
 Routine network-visible issue/PR writes pass through the typed GitHub mutation boundary. Stale-sensitive requests bind expected head state; branch pushes bind repository/remote/branch plus old/new tips; history rewrites use exact force-with-lease semantics rather than bare force.
 
-**Merge is deliberately stricter.** `scripts/merge-pr-driver.mjs` owns settle, final current-head/base/rules/feedback/review-evidence recapture, trusted destructive authority, head-pinned merge execution, and post-merge reconciliation. Generic hand-built merge mutation documents are rejected.
+For trusted high-assurance operations, authority redemption happens before the first mutating GitHub command, including autonomous idempotency coordination refs/tags. A rejected grant therefore cannot leave a coordination write behind before the requested mutation.
+
+**Merge is deliberately stricter.** `scripts/merge-pr-driver.mjs` owns settle, final current-head/base/rules/feedback/review-evidence recapture, trusted destructive authority, head-pinned merge execution, and post-merge reconciliation. The lower mutation execution boundary also rechecks open-PR stack topology and rejects a child merge while its parent PR is still open. Generic hand-built merge mutation documents are rejected.
 
 ### Exact-effect trusted authority
 
@@ -207,6 +209,8 @@ A full review can combine:
 - proactive contract verification appropriate to the changed behavior;
 - conditional **visual evidence** for rendered/UI surfaces.
 
+The pre-open gate treats those deterministic probes as first-class obligations alongside required bug lenses and security surfaces. A probe detected from the branch diff remains blocking until its `done` or justified `n/a` evidence is present. Local branch review uses NUL-delimited Git records so renames and unusual valid paths retain both source and destination identity.
+
 ### Safe simplification
 
 Simplification is **explicit-only**. Its goal is lower cognitive load and safer maintenance. **Line count is never the goal**; fewer lines are acceptable only when behavior and clarity improve.
@@ -226,6 +230,7 @@ The final ship decision is one authoritative `ready`, `blocked`, or `unknown` re
 - review decision, stale approvals, last-push requirements, unresolved threads;
 - conflicts, behind state, merge queue / auto-merge state;
 - unknown ruleset/state values failing closed;
+- open stack-parent topology before destructive merge execution;
 - exact-head merge execution and read-only reconciliation after ambiguous write results;
 - partial success when merge succeeded but non-destructive post-merge ceremony did not.
 
@@ -237,7 +242,7 @@ These are intentionally three different concepts.
 
 ### Stacked PRs
 
-A stack is a dependency chain where a child PR targets a parent PR branch. Stack operations discover repository-qualified topology, restack bottom-up, preserve layer ownership, and revalidate every surviving child after an upstream head changes.
+A stack is a dependency chain where a child PR targets a parent PR branch. Stack operations discover repository-qualified topology, restack bottom-up, preserve layer ownership, and revalidate every surviving child after an upstream head changes. The mutation execution boundary independently rejects a merge while the target PR still points at another open PR's head, so merge-order safety does not depend only on workflow prose.
 
 ### Competing PRs
 
@@ -473,24 +478,24 @@ npm run reliability:gate
 
 ### Lean required CI topology
 
-The pull-request CI topology is deliberately asymmetric to avoid repeating the full repository suite across every OS/runtime combination:
+The pull-request CI topology is deliberately asymmetric to avoid repeating the full repository suite across every OS/runtime combination while keeping the security-critical platform lanes unskippable by PR scope logic:
 
 | Required context | PR behavior |
 |---|---|
 | **Node 24 / ubuntu-latest** | Canonical full `npm run check`; then bounded Node 26 syntax/package/unit compatibility on the same workspace |
-| **Node 22 / ubuntu-latest** | Bounded compatibility lane only when runtime-relevant paths change; forced for `main`/live-fixture acceptance |
-| **Node 24 / windows-latest** | Windows Authority restore/build/self-test/publish/install smoke only when Authority/platform-relevant paths change; forced for `main`/live-fixture acceptance |
+| **Node 22 / ubuntu-latest** | Bounded compatibility lane only when runtime-relevant paths change; its path classifier is executed from the PR base version |
+| **Node 24 / windows-latest** | Always runs Windows Authority restore/build/self-test/publish/install smoke on pull requests |
 | **Dependency Review** | Runs on pull requests |
 | **CodeQL / Analyze (javascript-typescript)** | Runs on pull requests |
-| **CodeQL / Analyze (csharp)** | Scoped to Windows Authority/C#-relevant PRs; still runs on `main` and schedules |
+| **CodeQL / Analyze (csharp)** | Always runs on pull requests, plus `main` and schedules |
 
-There are no macOS PR compatibility lanes and no duplicate Architecture Contracts workflow. Superseded CI, CodeQL, and Dependency Review runs are cancelled when a newer commit arrives. Repository-policy verification is daily and orphan-workflow cleanup is weekly.
+There are no macOS PR compatibility lanes and no duplicate Architecture Contracts workflow. Superseded CI, CodeQL, and Dependency Review runs are cancelled when a newer commit arrives. Repository-policy verification is daily and orphan-workflow cleanup is weekly; cleanup pins the default-branch generation before deleting stale workflow histories.
 
-For ordinary runtime-relevant PRs this reduces full `npm run check` executions from **9 to 1**, full unit-suite runtime executions from **9 to 3**, Windows Authority lanes from **2 to 1 when relevant**, and macOS PR jobs from **2 to 0** while retaining Node 22/24/26 compatibility coverage.
+For ordinary runtime-relevant PRs this keeps full `npm run check` executions at **1**, full unit-suite runtime executions at **3**, one Windows Authority lane on every PR, and **0** macOS PR jobs while retaining Node 22/24/26 compatibility coverage and unconditional Windows/C# security coverage.
 
 ### Live lifecycle fixture
 
-The unit/eval suite proves deterministic contracts. An explicitly opted-in fixture repository exercises the real GitHub lifecycle with immutable repository-identity binding before the first mutation. Fixture runs force the scoped Node 22 and Windows compatibility lanes even when normal PR path filtering would skip them.
+The unit/eval suite proves deterministic contracts. An explicitly opted-in fixture repository exercises the real GitHub lifecycle with immutable repository-identity binding before the first mutation. Fixture diffs force the scoped Node 22 compatibility lane; the Windows Authority lane already runs unconditionally.
 
 See [`docs/live-integration.md`](docs/live-integration.md) and [`docs/live-github-integration.md`](docs/live-github-integration.md).
 
