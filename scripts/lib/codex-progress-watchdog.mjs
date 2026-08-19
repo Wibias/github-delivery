@@ -179,7 +179,11 @@ export function observeCodexAppServerMessage(watchdog, message, context = {}) {
   if (method === "item/started") {
     const item = params.item;
     if (RUNTIME_WORK_ITEM_TYPES.has(String(item?.type || ""))) {
+      const pendingToolEmissionSignal =
+        typeof watchdog.snapshot === "function" &&
+        Number(watchdog.snapshot().toolEmissionIntentCount || 0) > 0;
       watchdog.recordToolStart({ type: item.type, id: item.id || null });
+      if (pendingToolEmissionSignal) resetMicroNarration(context);
       context.finalizing = false;
       context.finalizationWatchdog = null;
     }
