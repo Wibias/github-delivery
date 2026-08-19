@@ -29,19 +29,20 @@ test("pull-request CI keeps one canonical full check and bounded compatibility l
   assert.match(ci, /cancel-in-progress: true/);
 });
 
-test("compatibility and Windows lanes use NUL-safe scope evidence and fail closed if detection fails", () => {
+test("only Node compatibility remains scoped; Windows Authority is unconditional", () => {
   assert.match(ci, /scope:/);
   assert.match(ci, /node_compat:/);
-  assert.match(ci, /windows_authority:/);
+  assert.match(ci, /git show "\$\{BASE_SHA\}:scripts\/ci-scope\.mjs"/);
   assert.match(ci, /git diff --name-only -z/);
-  assert.match(ci, /node scripts\/ci-scope\.mjs --mode ci/);
-  assert.match(ci, /needs: scope/);
-  assert.match(ci, /needs\.scope\.result != 'success'/);
+  assert.match(ci, /node "\$\{TRUSTED_SCOPE\}" --mode ci/);
   assert.match(ci, /needs\.scope\.outputs\.node_compat == 'true'/);
-  assert.match(ci, /needs\.scope\.outputs\.windows_authority == 'true'/);
-  assert.ok(occurrences(ci, "Fail closed when scope detection failed") >= 2);
-  assert.match(ci, /authority-host\/windows\//);
-  assert.match(ci, /scripts\/prepare-authority-host-runtime-smoke\.mjs/);
+
+  const windowsBlock = ci.slice(ci.indexOf("  windows-authority:"));
+  assert.doesNotMatch(windowsBlock, /needs: scope/);
+  assert.doesNotMatch(windowsBlock, /needs\.scope\.outputs\.windows_authority/);
+  assert.doesNotMatch(windowsBlock, /Fail closed when scope detection failed/);
+  assert.match(windowsBlock, /authority-host\/windows\//);
+  assert.match(windowsBlock, /scripts\/prepare-authority-host-runtime-smoke\.mjs/);
 });
 
 test("live fixture diffs force compatibility lanes for acceptance coverage", () => {
@@ -89,15 +90,15 @@ test("superseded expensive PR workflows cancel in progress", () => {
   }
 });
 
-test("C# CodeQL uses NUL-safe scope evidence and fails closed on scope errors", () => {
-  assert.match(codeql, /csharp_scope:/);
-  assert.match(codeql, /git diff --name-only -z/);
-  assert.match(codeql, /node scripts\/ci-scope\.mjs --mode csharp/);
-  assert.match(codeql, /authority-host\/windows\//);
-  assert.match(codeql, /needs: csharp_scope/);
-  assert.match(codeql, /needs\.csharp_scope\.result != 'success'/);
-  assert.match(codeql, /needs\.csharp_scope\.outputs\.required == 'true'/);
-  assert.match(codeql, /Fail closed when C# scope detection failed/);
+test("C# CodeQL always runs on pull requests", () => {
+  assert.doesNotMatch(codeql, /csharp_scope:/);
+  assert.match(codeql, /analyze-csharp:/);
+  assert.match(codeql, /name: CodeQL \/ Analyze \(csharp\)/);
+  const csharpBlock = codeql.slice(codeql.indexOf("  analyze-csharp:"));
+  assert.doesNotMatch(csharpBlock, /needs: csharp_scope/);
+  assert.doesNotMatch(csharpBlock, /needs\.csharp_scope/);
+  assert.doesNotMatch(csharpBlock, /Fail closed when C# scope detection failed/);
+  assert.match(csharpBlock, /authority-host\/windows\//);
 });
 
 test("maintenance schedules stay bounded", () => {
