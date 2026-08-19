@@ -57,22 +57,44 @@ test("PR scope detection executes the trusted base selector, not candidate code"
   );
 });
 
-test("trusted authority can be redeemed before internal coordination writes", () => {
+test("trusted authority is redeemed before an internal coordination write executes", () => {
+  const events = [];
+  const nonce = "audit-nonce";
+  const authority = {
+    verified: true,
+    claims: {
+      redemption: "required",
+      scopeSha256: "a".repeat(64),
+      nonce,
+    },
+  };
   const execution = makeRedemptionRunner({
     plannedCommand: ["gh", "pr", "comment", "42"],
-    authority: null,
-    authorityGrant: null,
-    redeemer: null,
-    runner: () => ({ status: 0, stdout: "", stderr: "" }),
+    authority,
+    authorityGrant: "gd1.audit-fixture",
+    redeemer() {
+      events.push("redeem");
+      return { status: "consumed", nonce, consumedAt: 1 };
+    },
+    runner() {
+      events.push("write");
+      return { status: 0, stdout: "", stderr: "" };
+    },
   });
 
-  assert.equal(typeof execution.redeem, "function");
+  execution.runner("gh", [
+    "api",
+    "repos/acme/widget/git/refs",
+    "--method",
+    "POST",
+    "-f",
+    "ref=refs/github-delivery/idempotency/test",
+    "-f",
+    `sha=${"b".repeat(40)}`,
+  ], {});
 
-  const broker = source("scripts/lib/github-mutation-broker.mjs");
-  const hookIndex = broker.indexOf("beforeExternalMutation?.()");
-  const claimIndex = broker.indexOf("acquireAutonomousIdempotencyClaim({", hookIndex);
-  assert.ok(hookIndex >= 0, "broker must expose a pre-write authority hook");
-  assert.ok(claimIndex > hookIndex, "authority hook must run before the autonomous claim write");
+  assert.deepEqual(events, ["redeem", "write"]);
+  assert.equal(execution.redemption()?.status, "consumed");
 });
 
 test("branch review input preserves rename source and destination paths", () => {
