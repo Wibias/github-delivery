@@ -82,7 +82,6 @@ test("interleaved evidence tools do not buy a fresh micro-narration budget", () 
   const r = router({
     generatedCharHardLimit: 10_000,
     toolEmissionIntentThreshold: 50,
-    microNarrationIntentThreshold: 3,
   });
 
   assert.equal(
