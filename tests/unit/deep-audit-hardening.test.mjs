@@ -127,6 +127,28 @@ test("branch review input preserves rename paths and keeps renamed code in scope
   }
 });
 
+test("code renamed to a documentation path cannot take the docs-only shortcut", () => {
+  const plan = planReviewScope({
+    repo: "acme/widget",
+    pr: null,
+    headRefOid: "abc",
+    files: [
+      {
+        path: "docs/auth.md",
+        previousPath: "src/auth.mjs",
+        status: "R100",
+        patch: "diff --git a/src/auth.mjs b/docs/auth.md",
+        additions: 0,
+        deletions: 0,
+      },
+    ],
+  });
+
+  assert.ok(plan.logicFiles.includes("docs/auth.md"));
+  assert.notEqual(plan.bugReview.depth, "skip");
+  assert.notEqual(plan.securityReview.depth, "skip");
+});
+
 test("pre-open gate blocks until every deterministic required probe has canonical evidence", () => {
   const plan = planReviewScope({
     repo: "acme/widget",
