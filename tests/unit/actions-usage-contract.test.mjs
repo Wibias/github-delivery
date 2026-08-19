@@ -29,19 +29,23 @@ test("pull-request CI keeps one canonical full check and bounded compatibility l
   assert.match(ci, /cancel-in-progress: true/);
 });
 
-test("compatibility and Windows lanes skip irrelevant pull-request diffs", () => {
+test("compatibility and Windows lanes use NUL-safe scope evidence and fail closed if detection fails", () => {
   assert.match(ci, /scope:/);
   assert.match(ci, /node_compat:/);
   assert.match(ci, /windows_authority:/);
+  assert.match(ci, /git diff --name-only -z/);
+  assert.match(ci, /node scripts\/ci-scope\.mjs --mode ci/);
   assert.match(ci, /needs: scope/);
+  assert.match(ci, /needs\.scope\.result != 'success'/);
   assert.match(ci, /needs\.scope\.outputs\.node_compat == 'true'/);
   assert.match(ci, /needs\.scope\.outputs\.windows_authority == 'true'/);
+  assert.ok(occurrences(ci, "Fail closed when scope detection failed") >= 2);
   assert.match(ci, /authority-host\/windows\//);
   assert.match(ci, /scripts\/prepare-authority-host-runtime-smoke\.mjs/);
 });
 
 test("live fixture diffs force compatibility lanes for acceptance coverage", () => {
-  assert.ok(occurrences(ci, "\\.github-delivery-fixtures/") >= 2);
+  assert.match(read("scripts/ci-scope.mjs"), /\.github-delivery-fixtures/);
 });
 
 test("repository policy requires only the lean CI lanes", () => {
@@ -85,11 +89,15 @@ test("superseded expensive PR workflows cancel in progress", () => {
   }
 });
 
-test("C# CodeQL is conditional for pull requests but remains required when relevant", () => {
+test("C# CodeQL uses NUL-safe scope evidence and fails closed on scope errors", () => {
   assert.match(codeql, /csharp_scope:/);
+  assert.match(codeql, /git diff --name-only -z/);
+  assert.match(codeql, /node scripts\/ci-scope\.mjs --mode csharp/);
   assert.match(codeql, /authority-host\/windows\//);
   assert.match(codeql, /needs: csharp_scope/);
-  assert.match(codeql, /github\.event_name != 'pull_request' \|\| needs\.csharp_scope\.outputs\.required == 'true'/);
+  assert.match(codeql, /needs\.csharp_scope\.result != 'success'/);
+  assert.match(codeql, /needs\.csharp_scope\.outputs\.required == 'true'/);
+  assert.match(codeql, /Fail closed when C# scope detection failed/);
 });
 
 test("maintenance schedules stay bounded", () => {
