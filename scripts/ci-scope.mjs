@@ -16,6 +16,7 @@ const WINDOWS_AUTHORITY_PATTERNS = [
   /^\.github-delivery-fixtures\//,
   /^global\.json$/,
   /^package\.json$/,
+  /^scripts\/ci-scope\.mjs$/,
   /^scripts\/prepare-authority-host-runtime-smoke\.mjs$/,
   /^scripts\/lib\/authority-host-(install|release)\.mjs$/,
   /^\.github\/workflows\/ci\.yml$/,
@@ -24,6 +25,7 @@ const WINDOWS_AUTHORITY_PATTERNS = [
 const CSHARP_PATTERNS = [
   /^authority-host\/windows\//,
   /^global\.json$/,
+  /^scripts\/ci-scope\.mjs$/,
   /^\.github\/workflows\/codeql\.yml$/,
 ];
 
