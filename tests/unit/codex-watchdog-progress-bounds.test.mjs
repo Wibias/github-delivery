@@ -55,6 +55,17 @@ function started(r, item) {
   });
 }
 
+function completed(r, item) {
+  return r.onServerMessage({
+    method: "item/completed",
+    params: {
+      threadId: "thr-progress",
+      turnId: "turn-progress",
+      item,
+    },
+  });
+}
+
 test("novel imminent-execution narration is bounded even when every sentence differs", () => {
   const r = router({ generatedCharHardLimit: 10_000 });
   assert.equal(text(r, "Let me grep the duplicate locale key.\n").internalRequests.length, 0);
@@ -112,6 +123,38 @@ test("interleaved evidence tools do not buy a fresh micro-narration budget", () 
   );
   assert.equal(tripped.internalRequests.length, 1);
   assert.equal(tripped.internalRequests[0].method, "turn/interrupt");
+});
+
+test("real execution progress resets the micro-narration budget", () => {
+  const r = router({
+    generatedCharHardLimit: 10_000,
+    toolEmissionIntentThreshold: 50,
+  });
+  assert.equal(text(r, "I'll load the first rule file.\n").internalRequests.length, 0);
+  started(r, {
+    id: "read-a",
+    type: "commandExecution",
+    command: 'Get-Content -LiteralPath "AGENTS.md" -Raw',
+    status: "inProgress",
+  });
+  assert.equal(text(r, "Next I'll verify the branch state.\n").internalRequests.length, 0);
+
+  completed(r, {
+    id: "test-1",
+    type: "commandExecution",
+    command: "npm test",
+    status: "completed",
+    exitCode: 0,
+  });
+
+  assert.equal(text(r, "I'll load the selected workflow.\n").internalRequests.length, 0);
+  started(r, {
+    id: "read-b",
+    type: "commandExecution",
+    command: 'Get-Content -LiteralPath "references/stacked-prs.md" -Raw',
+    status: "inProgress",
+  });
+  assert.equal(text(r, "Then I'll verify the live PR stack.\n").internalRequests.length, 0);
 });
 
 test("repeated malformed tool protocol output accelerates a tool-emission stall", () => {
