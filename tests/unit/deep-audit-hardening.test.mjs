@@ -123,7 +123,7 @@ test("branch review input preserves rename source and destination paths", () => 
   }
 });
 
-test("pre-open gate blocks until every deterministic required probe has evidence", () => {
+test("pre-open gate blocks until every deterministic required probe has canonical evidence", () => {
   const plan = planReviewScope({
     repo: "acme/widget",
     pr: null,
@@ -149,10 +149,18 @@ test("pre-open gate blocks until every deterministic required probe has evidence
     ),
     probes: {},
   };
-  const result = evaluatePreOpen(plan, evidence);
+  const blocked = evaluatePreOpen(plan, evidence);
+  assert.equal(blocked.decision, "blocked");
+  assert.ok(blocked.blockers.includes("probe:requiredProbes:test-honesty"));
 
-  assert.equal(result.decision, "blocked");
-  assert.ok(result.blockers.includes("probe:requiredProbes:test-honesty"));
+  evidence.probes["test-honesty"] = {
+    status: "clean",
+    files: ["tests/worker.test.mjs"],
+  };
+  const cleared = evaluatePreOpen(plan, evidence);
+  assert.equal(cleared.blockers.includes("probe:requiredProbes:test-honesty"), false);
+  assert.equal(cleared.probeEvidenceErrors.length, 0);
+  assert.equal(cleared.decision, "ready");
 });
 
 test("merge execution rejects a child while its stack parent is still open", () => {
