@@ -13,14 +13,28 @@ function positiveInteger(value, name) {
   return number;
 }
 
-function parseOpenPulls(output) {
-  let payload;
+function parseJson(output, code) {
   try {
-    payload = JSON.parse(String(output || "[]"));
+    return JSON.parse(String(output || "null"));
   } catch {
-    throw new Error("merge_stack_pr_pages_invalid_json");
+    throw new Error(code);
   }
-  return normalizePullPages(payload);
+}
+
+function runOrThrow(runner, args, code) {
+  const result = runner("gh", args, {
+    encoding: "utf8",
+    maxBuffer: 50 * 1024 * 1024,
+  });
+  if (result?.status !== 0) {
+    const detail = String(result?.stderr || result?.stdout || "").trim();
+    throw new Error(`${code}${detail ? `:${detail}` : ""}`);
+  }
+  return String(result?.stdout || "");
+}
+
+function parseOpenPulls(output) {
+  return normalizePullPages(parseJson(output || "[]", "merge_stack_pr_pages_invalid_json"));
 }
 
 export function evaluateMergeStackEligibility({ prs = [], targetPr } = {}) {
@@ -65,22 +79,32 @@ export function verifyMergeStackEligibility({ request, runner } = {}) {
   if (typeof runner !== "function") throw new Error("merge_stack_runner_required");
   const repo = required(request.repo, "repo");
   const pr = positiveInteger(request.pr, "pr");
-  const result = runner(
-    "gh",
-    ["api", `repos/${repo}/pulls?state=open&per_page=100`, "--paginate", "--slurp"],
-    { encoding: "utf8", maxBuffer: 50 * 1024 * 1024 },
+  const openPulls = parseOpenPulls(
+    runOrThrow(
+      runner,
+      ["api", `repos/${repo}/pulls?state=open&per_page=100`, "--paginate", "--slurp"],
+      "merge_stack_evidence_unreadable",
+    ),
   );
-  if (result?.status !== 0) {
-    const detail = String(result?.stderr || result?.stdout || "").trim();
-    throw new Error(`merge_stack_evidence_unreadable${detail ? `:${detail}` : ""}`);
+  const decision = evaluateMergeStackEligibility({ prs: openPulls, targetPr: pr });
+  if (decision.eligible) return decision;
+
+  if (decision.reason === "stack_target_pr_missing") {
+    const target = parseJson(
+      runOrThrow(runner, ["api", `repos/${repo}/pulls/${pr}`], "merge_stack_target_unreadable"),
+      "merge_stack_target_invalid_json",
+    );
+    if (target?.merged_at || target?.merged === true) {
+      return {
+        eligible: true,
+        reason: null,
+        pr,
+        parentPr: null,
+        alreadyMerged: true,
+      };
+    }
   }
-  const decision = evaluateMergeStackEligibility({
-    prs: parseOpenPulls(result?.stdout),
-    targetPr: pr,
-  });
-  if (!decision.eligible) {
-    const parent = decision.parentPr ? `:parent_pr=${decision.parentPr}` : "";
-    throw new Error(`${decision.reason}${parent}`);
-  }
-  return decision;
+
+  const parent = decision.parentPr ? `:parent_pr=${decision.parentPr}` : "";
+  throw new Error(`${decision.reason}${parent}`);
 }
