@@ -4,6 +4,17 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- Windows Authority CI and C# CodeQL now run on every pull request so candidate code cannot scope out its own security-critical lanes; the remaining Node 22 compatibility selector is executed from the pull request base version (PR #299).
+- Review briefs now apply a global model-facing diff-hunk budget while preserving complete structured review scope for deterministic tooling and on-demand inspection (PR #299).
+
+### Fixed
+
+- Redeem trusted authority before the first mutating GitHub command, including autonomous idempotency tag/ref coordination, so a rejected grant cannot leave coordination state behind before the requested mutation (PR #299).
+- Preserve rename/copy source and destination paths with NUL-delimited local branch diff parsing, and make every deterministic required probe a first-class pre-open blocker until `done` or justified `n/a` evidence exists (PR #299).
+- Enforce open stack-parent ordering at the mutation execution boundary before merge authority, and abort orphan-workflow cleanup before deletion when the default-branch generation changed during preflight (PR #299).
+
 ## [0.8.7] - 2026-08-19
 
 ### Changed
