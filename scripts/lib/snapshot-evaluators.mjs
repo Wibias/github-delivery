@@ -30,15 +30,71 @@ function sourceReadable(snapshot, name) {
   return source(snapshot, name).readable === true;
 }
 
-function patternMatchesBranch(pattern, branch) {
-  if (!pattern) return false;
-  if (pattern === branch) return true;
-  const expression = String(pattern)
-    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
-    .replace(/\*\*/g, "<<<STARSTAR>>>")
-    .replace(/\*/g, "[^/]*")
-    .replace(/<<<STARSTAR>>>/g, ".*");
-  return new RegExp(`^${expression}$`).test(branch);
+function escapeRegexCharacter(value) {
+  return /[\\^$.*+?()[\]{}|]/.test(value) ? `\\${value}` : value;
+}
+
+function characterClassExpression(source) {
+  if (!source) return null;
+  let value = source;
+  let prefix = "";
+  if (value[0] === "!" || value[0] === "^") {
+    prefix = "^";
+    value = value.slice(1);
+  }
+  if (!value) return null;
+  const escaped = value
+    .replaceAll("\\", "\\\\")
+    .replaceAll("]", "\\]");
+  return `[${prefix}${escaped}]`;
+}
+
+export function patternMatchesBranch(pattern, branch) {
+  const source = String(pattern || "");
+  const target = String(branch || "");
+  if (!source) return false;
+  if (source === target) return true;
+
+  let expression = "^";
+  for (let index = 0; index < source.length; index += 1) {
+    const character = source[index];
+    if (character === "\\" && index + 1 < source.length) {
+      expression += escapeRegexCharacter(source[++index]);
+      continue;
+    }
+    if (character === "*") {
+      if (source[index + 1] === "*") {
+        while (source[index + 1] === "*") index += 1;
+        expression += ".*";
+      } else {
+        expression += "[^/]*";
+      }
+      continue;
+    }
+    if (character === "?") {
+      expression += "[^/]";
+      continue;
+    }
+    if (character === "[") {
+      const close = source.indexOf("]", index + 1);
+      if (close > index + 1) {
+        const classExpression = characterClassExpression(source.slice(index + 1, close));
+        if (classExpression) {
+          expression += classExpression;
+          index = close;
+          continue;
+        }
+      }
+    }
+    expression += escapeRegexCharacter(character);
+  }
+  expression += "$";
+
+  try {
+    return new RegExp(expression).test(target);
+  } catch {
+    return false;
+  }
 }
 
 function policyEvidence(snapshot) {
@@ -54,6 +110,13 @@ function matchingClassicRules(snapshot) {
   return (
     policyEvidence(snapshot).branchProtectionRules?.nodes || []
   ).filter((rule) => patternMatchesBranch(rule?.pattern, base));
+}
+
+function classicProtectionReadable(snapshot, matchingRules) {
+  if (!sourceReadable(snapshot, "branchProtection")) return false;
+  if (!matchingRules.length) return true;
+  return snapshot?.evidence?.branchProtection !== null &&
+    snapshot?.evidence?.branchProtection !== undefined;
 }
 
 function activePullRequestRules(snapshot) {
@@ -115,7 +178,7 @@ export function evaluateRequiredChecksSnapshot(snapshot) {
       sourceComplete(snapshot, "policyGraphql") &&
       branchRules.pageInfo?.hasNextPage !== true,
     matchingClassicRuleCount: matchingRules.length,
-    classicProtectionReadable: sourceReadable(snapshot, "branchProtection"),
+    classicProtectionReadable: classicProtectionReadable(snapshot, matchingRules),
     activeRulesComplete: sourceComplete(snapshot, "activeRules"),
     checkRunsComplete: sourceComplete(snapshot, "checkRuns"),
     statusesComplete: sourceComplete(snapshot, "statuses"),
@@ -211,7 +274,7 @@ export function evaluateReviewPolicySnapshot(snapshot) {
       sourceComplete(snapshot, "policyGraphql") &&
       branchRules.pageInfo?.hasNextPage !== true,
     matchingClassicRuleCount: matchingRules.length,
-    classicProtectionReadable: sourceReadable(snapshot, "branchProtection"),
+    classicProtectionReadable: classicProtectionReadable(snapshot, matchingRules),
     activeRulesComplete: sourceComplete(snapshot, "activeRules"),
   });
 
