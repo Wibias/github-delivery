@@ -1,12 +1,9 @@
 /**
  * Validate review-completion evidence for the pre-open gate.
  *
- * The gate derives required scope from the diff shape. Evidence is the
- * machine-checkable record that each required lens, surface, and probe was
- * actually reviewed: `done` means the pass ran and found nothing needing a fix
- * (or the findings were fixed), `n/a (why)` means the boundary is untouched and
- * the reason is recorded. This module validates the evidence payload so the gate
- * can clear a `blocked` obligation only for entries that carry valid evidence.
+ * Lenses/surfaces use the compact `done` / `n/a <why>` contract. Deterministic
+ * probes retain their existing structured machine evidence and are validated
+ * against the actual diff scope by `probe-evidence.mjs` inside the gate.
  */
 
 export const PRE_OPEN_EVIDENCE_SCHEMA_VERSION = 1;
@@ -47,10 +44,8 @@ function normalizeEvidenceBlock(block, prefix, errors) {
  * Validate a pre-open evidence payload.
  *
  * `probes` is optional for schema-version compatibility with older evidence.
- * Missing probe evidence never clears a newly required probe.
- *
- * @param {unknown} input
- * @returns {{ ok: true, evidence: PreOpenEvidence } | { ok: false, errors: string[] }}
+ * When present it is passed through as a probe-id -> structured record map;
+ * scope-aware validation happens in the pre-open gate.
  */
 export function validatePreOpenEvidence(input) {
   const errors = [];
@@ -71,26 +66,21 @@ export function validatePreOpenEvidence(input) {
 
   const lenses = normalizeEvidenceBlock(lensBlock, "lens", errors);
   const surfaces = normalizeEvidenceBlock(surfaceBlock, "surface", errors);
-  const probes = normalizeEvidenceBlock(probeBlock, "probe", errors);
-
   if (errors.length) return { ok: false, errors };
+
   return {
     ok: true,
     evidence: {
       schemaVersion: PRE_OPEN_EVIDENCE_SCHEMA_VERSION,
       lenses,
       surfaces,
-      probes,
+      probes: structuredClone(probeBlock),
     },
   };
 }
 
 /**
- * Whether evidence clears a required id.
- *
- * @param {Record<string, string>} map
- * @param {string} id
- * @returns {boolean}
+ * Whether compact lens/surface evidence clears a required id.
  */
 export function evidenceClears(map, id) {
   const status = map[id];
