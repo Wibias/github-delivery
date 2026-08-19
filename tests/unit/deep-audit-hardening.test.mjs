@@ -94,7 +94,7 @@ test("trusted authority is redeemed before an internal coordination write execut
   assert.equal(execution.redemption()?.status, "consumed");
 });
 
-test("branch review input preserves rename source and destination paths", () => {
+test("branch review input preserves rename paths and keeps renamed code in scope", () => {
   const root = mkdtempSync(join(tmpdir(), "github-delivery-rename-"));
   const previousCwd = process.cwd();
   try {
@@ -117,6 +117,10 @@ test("branch review input preserves rename source and destination paths", () => 
     assert.equal(input.files[0].status.startsWith("R"), true);
     assert.equal(input.files[0].previousPath, "src/auth.mjs");
     assert.equal(input.files[0].path, "src/auth");
+
+    const plan = planReviewScope(input);
+    assert.ok(plan.logicFiles.includes("src/auth"));
+    assert.notEqual(evaluatePreOpen(plan).decision, "ready");
   } finally {
     process.chdir(previousCwd);
     rmSync(root, { recursive: true, force: true });
