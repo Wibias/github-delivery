@@ -277,56 +277,49 @@ Useful explicit commands:
 ```bash
 npx github-delivery install
 npx github-delivery setup
+npx github-delivery doctor
+npx github-delivery update
+npx github-delivery update --apply
 npx github-delivery start
-npx github-delivery autostart
-npx github-delivery autostart on
-npx github-delivery autostart off
 npx github-delivery autostart status
-npx github-delivery doctor
-npx github-delivery doctor --json
-npx github-delivery update
-npx github-delivery update --apply
 ```
 
-### Update
+The installer:
 
-Check/verify/plan only:
-
-```bash
-npx github-delivery update
-```
-
-Apply the verified plan:
-
-```bash
-npx github-delivery update --apply
-```
-
-Self-update accepts only the fixed upstream's latest stable `vX.Y.Z` GitHub Release and replaces nothing until release assets, checksums, distribution manifest, tag/source binding, constrained GitHub artifact attestation, and bounded ZIP extraction verify. Local tracked modifications block replacement even with `--force`; update does not silently downgrade an ahead install.
-
-### Setup and doctor
-
-```bash
-npx github-delivery setup
-npx github-delivery doctor
-```
-
-`setup` repairs/finishes activation against an existing managed installation. `doctor` is read-only and summarizes environment, installed version/integrity, persistent configuration, watchdog activation, stable-update relation, and Windows Authority state. Use `doctor --json` for machine-readable output.
+1. runs environment preflight;
+2. discovers the latest stable release when needed;
+3. verifies checksums, manifest, tag/source binding, and artifact attestation;
+4. plans installation;
+5. asks before mutation;
+6. backs up existing managed installs;
+7. installs the new payload;
+8. configures supported watchdog surfaces;
+9. verifies the installed manifest;
+10. reconciles the optional Windows Authority component.
 
 ### Windows Authority
 
-On supported Windows systems, the stable GitHub Release can include the separately verified self-contained Authority host. Guided setup/update can install or repair it without a local .NET SDK when required or already configured.
+On Windows, setup can install the self-contained `win-x64` Authority component without requiring a local .NET SDK. The host is versioned independently from the skill installation and is kept aligned through stable setup/update flows.
 
-`npx github-delivery start` ensures the host is running and brings the Control Center into view. Login auto-start is opt-in and shared between the CLI and Control Center setting. Normal window close leaves Authority in the tray; tray right-click -> `Exit` shuts it down completely.
-
-The host is not silently installed for a user whose protection mode is `off` and who has never installed Authority.
-
-### Manual / repository install
+Start or surface it with:
 
 ```bash
-git clone https://github.com/Wibias/github-delivery.git
-cd github-delivery
-npm run build:dist
+npx github-delivery start
+```
+
+Login auto-start is opt-in:
+
+```bash
+npx github-delivery autostart on
+npx github-delivery autostart off
+npx github-delivery autostart status
+```
+
+### Manual/source install
+
+For repository development or an explicit local source:
+
+```bash
 node scripts/install-skill.mjs
 node scripts/install-skill.mjs --apply
 ```
@@ -523,35 +516,33 @@ The public interface stays small even though the enforcement surface is not. Key
 | `scripts/lib/pr-consolidation.mjs` | Read-only competing-PR clustering/planning evidence |
 | `scripts/lib/multi-base-delivery.mjs` | Parallel port identities/provenance/completion |
 | `scripts/lib/agent-progress-watchdog.mjs` | Shared progress/evidence/tool-emission watchdog logic |
-| `scripts/build-dist.mjs` | Deterministic versioned skill bundle build |
-| `scripts/prepare-release.mjs` | Release identity/checksum/SBOM/provenance preparation |
+| `scripts/lib/delivery-workflow-controller.mjs` | Route-locked persistent workflow convergence state |
+| `scripts/lib/review-scope.mjs` | Evidence-ranked review scope and required probes |
+| `scripts/lib/probe-evidence.mjs` | Machine validation for applied probe evidence |
+| `scripts/lib/visual-evidence.mjs` | Conditional head-bound rendered-evidence planning/validation |
+| `scripts/lib/work-item-delivery.mjs` | Tracker milestone/reconciliation planning |
+| `scripts/lib/pr-consolidation.mjs` | Read-only competing-PR clustering/planning evidence |
+| `scripts/lib/multi-base-delivery.mjs` | Parallel port identities/provenance/completion |
 
-The architecture uses progressive disclosure: route once, load the selected workflow plus required policy modules, and escalate diagnostics only when needed rather than dumping the full rule set into every agent turn.
+Most workflows are readable Markdown. Deterministic scripts exist where correctness benefits from machine enforcement: routing, scope planning, probe coverage, policy validation, identity checks, evidence freshness, mutation authority, retries, postconditions, and release verification.
 
 ---
 
 ## Current state
 
-Implemented today:
-
-- natural-language routing for the issue/PR lifecycle;
-- read-only open-work and competing-PR analysis;
-- issue research, implementation, publication, external work-item delivery, and exact-head duplicate prevention;
-- deep current-head review with deterministic probe coverage and conditional visual evidence;
-- mutation authority, exact-effect receipts, stale-head protection, and head-pinned merge execution;
-- stack restacking/merge-order safety and independent multi-base delivery;
-- verified stable install/update and optional Windows Authority host;
-- progress watchdog/runtime convergence controls;
-- deterministic bundles, repository security checks, CodeQL, Dependency Review, live-fixture contracts, and release preparation.
-
-Still active-development territory:
-
-- host/runtime integrations remain constrained by what each agent host exposes;
-- the protected Codex App Server streaming boundary depends on an experimental upstream interface;
-- broader tracker adapters beyond the normalized work-item contract can be added without weakening GitHub authority boundaries;
-- more real-world fixture coverage and adversarial incident replays are still valuable as the system expands.
-
 The project intentionally fails closed rather than claiming unsupported coverage.
+
+Today:
+
+- issue/PR workflow routing is implemented;
+- evidence-based review and merge gates are implemented;
+- mutation authority and exact-effect broker boundaries are implemented;
+- release verification and update flows are implemented;
+- the Windows Authority component has build/self-test/XAML/publish/install coverage;
+- runtime watchdog enforcement is strongest under the protected Codex stream, partial under trusted hooks, and policy-only otherwise;
+- some host/tool surfaces still cannot be intercepted mid-generation, so policy/evidence budgets remain part of the design.
+
+If a host cannot prove a required safety boundary, GitHub Delivery reports that limitation instead of silently weakening the workflow.
 
 ---
 
