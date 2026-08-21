@@ -143,12 +143,23 @@ function isPrepareAndMergeRequest(text) {
   );
 }
 
+function isRequestedPreparation(text) {
+  return (
+    FULL_REVIEW_REQUEST.test(text)
+    || FIX_REVIEW_REQUEST.test(text)
+    || (SIMPLIFY_REQUEST.test(text) && PR_REFERENCE.test(text))
+    || EXPLICIT_GREEN_REQUEST.test(text)
+    || WATCH_PR_REQUEST.test(text)
+  );
+}
+
 function isMergeDiscussion(text) {
   return (
     PR_REFERENCE.test(text) &&
     MERGE_INTENT.test(text.replace(MERGE_READY_PHRASE, "")) &&
     !hasExplicitMergeIntent(text) &&
-    !CONFLICT_REQUEST.test(text)
+    !CONFLICT_REQUEST.test(text) &&
+    !(isRequestedPreparation(text) && NEGATED_MERGE_INTENT.test(mergeText(text)))
   );
 }
 
