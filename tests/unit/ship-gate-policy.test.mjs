@@ -23,6 +23,7 @@ function input(overrides = {}) {
       evidence: {
         pullRequest: {
           url: "https://github.com/Wibias/github-delivery/pull/42",
+          mergeStateStatus: "CLEAN",
         },
       },
     },

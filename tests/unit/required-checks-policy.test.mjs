@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   evaluateRequiredCheckCompleteness,
@@ -222,6 +224,61 @@ test("test merge evidence is authoritative when GitHub has emitted checks on it"
     incompleteReasons: selected.incompleteReasons,
   });
   assert.equal(result.decision, "blocked");
+});
+
+test("UNKNOWN mergeability ignores a present test-merge SHA", () => {
+  const headOid = "a".repeat(40);
+  const testMergeOid = "b".repeat(40);
+  const selected = selectAuthoritativeCheckEvidence({
+    headOid,
+    testMergeOid,
+    mergeStateStatus: "UNKNOWN",
+    headCheckRuns: [run("build", 11, "failure")],
+    headStatuses: [],
+    testMergeCheckRuns: [run("build", 11, "success")],
+    testMergeStatuses: [],
+    headEvidenceComplete: true,
+    testMergeEvidenceComplete: true,
+  });
+  assert.equal(selected.sha, headOid);
+  assert.equal(selected.reason, "test_merge_ignored_mergeability_unknown");
+  const result = evaluateRequiredChecks({
+    descriptors: [{ context: "build", appId: 11, sources: [] }],
+    checkRuns: selected.checkRuns,
+    statuses: selected.statuses,
+    evidenceComplete: selected.complete,
+    incompleteReasons: selected.incompleteReasons,
+  });
+  assert.equal(result.decision, "blocked");
+});
+
+test("CLEAN mergeability still prefers a present test-merge SHA", () => {
+  const headOid = "a".repeat(40);
+  const testMergeOid = "b".repeat(40);
+  const selected = selectAuthoritativeCheckEvidence({
+    headOid,
+    testMergeOid,
+    mergeStateStatus: "CLEAN",
+    headCheckRuns: [run("build", 11, "success")],
+    headStatuses: [],
+    testMergeCheckRuns: [run("build", 11, "failure")],
+    testMergeStatuses: [],
+    headEvidenceComplete: true,
+    testMergeEvidenceComplete: true,
+  });
+  assert.equal(selected.sha, testMergeOid);
+  assert.equal(selected.reason, "test_merge_has_status");
+});
+
+test("snapshot capture passes GraphQL mergeStateStatus into check selection", () => {
+  const source = readFileSync(
+    fileURLToPath(new URL("../../scripts/ship-gate-snapshot.mjs", import.meta.url)),
+    "utf8",
+  );
+  assert.match(
+    source,
+    /selectAuthoritativeCheckEvidence\(\{[\s\S]*mergeStateStatus:/,
+  );
 });
 
 test("head evidence is authoritative only when the test merge has no status evidence", () => {
