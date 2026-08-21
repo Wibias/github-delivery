@@ -130,6 +130,105 @@ test("an unexplained GitHub BLOCKED merge state never becomes ready", () => {
   assert.ok(gate.unknowns.includes("policy:github_merge_state_blocked"));
 });
 
+test("an unexplained GitHub UNKNOWN merge state never becomes ready", () => {
+  const snapshot = {
+    headOid: HEAD,
+    evidence: { pullRequest: { mergeStateStatus: "UNKNOWN" }, activeRules: [] },
+  };
+  const gate = combineShipGateResults(readyShipInput(snapshot));
+  assert.equal(gate.ready, false);
+  assert.equal(gate.decision, "unknown");
+  assert.ok(gate.unknowns.includes("policy:github_merge_state_unknown"));
+});
+
+test("a missing GitHub merge state never becomes ready", () => {
+  const snapshot = {
+    headOid: HEAD,
+    evidence: { pullRequest: {}, activeRules: [] },
+  };
+  const gate = combineShipGateResults(readyShipInput(snapshot));
+  assert.equal(gate.ready, false);
+  assert.ok(gate.unknowns.includes("policy:github_merge_state_unknown"));
+});
+
+test("an empty GitHub merge state never becomes ready", () => {
+  const snapshot = {
+    headOid: HEAD,
+    evidence: { pullRequest: { mergeStateStatus: "" }, activeRules: [] },
+  };
+  const gate = combineShipGateResults(readyShipInput(snapshot));
+  assert.equal(gate.ready, false);
+  assert.ok(gate.unknowns.includes("policy:github_merge_state_unknown"));
+});
+
+test("an unrecognised GitHub merge state never becomes ready", () => {
+  const snapshot = {
+    headOid: HEAD,
+    evidence: { pullRequest: { mergeStateStatus: "FUTURE_STATE" }, activeRules: [] },
+  };
+  const gate = combineShipGateResults(readyShipInput(snapshot));
+  assert.equal(gate.ready, false);
+  assert.ok(gate.unknowns.includes("policy:github_merge_state_unknown"));
+});
+
+test("a DRAFT GitHub merge state never becomes ready even when isDraft is false", () => {
+  const snapshot = {
+    headOid: HEAD,
+    evidence: {
+      pullRequest: { mergeStateStatus: "DRAFT", isDraft: false },
+      activeRules: [],
+    },
+  };
+  const gate = combineShipGateResults(readyShipInput(snapshot));
+  assert.equal(gate.ready, false);
+  assert.ok(gate.unknowns.includes("policy:github_merge_state_unknown"));
+});
+
+test("a CLEAN GitHub merge state can still be ready", () => {
+  const snapshot = {
+    headOid: HEAD,
+    evidence: { pullRequest: { mergeStateStatus: "CLEAN" }, activeRules: [] },
+  };
+  const gate = combineShipGateResults(readyShipInput(snapshot));
+  assert.equal(gate.ready, true);
+  assert.equal(gate.decision, "ready");
+});
+
+test("DIRTY merge state is left to wake and does not add a combiner unknown", () => {
+  const snapshot = {
+    headOid: HEAD,
+    evidence: { pullRequest: { mergeStateStatus: "DIRTY" }, activeRules: [] },
+  };
+  const gate = combineShipGateResults(readyShipInput(snapshot));
+  assert.equal(gate.decision, "ready");
+  assert.equal(
+    gate.unknowns.includes("policy:github_merge_state_unknown"),
+    false,
+  );
+  assert.equal(
+    gate.unknowns.includes("policy:github_merge_state_blocked"),
+    false,
+  );
+});
+
+test("failing required checks stay blocked when GitHub merge state is UNKNOWN", () => {
+  const snapshot = {
+    headOid: HEAD,
+    evidence: { pullRequest: { mergeStateStatus: "UNKNOWN" }, activeRules: [] },
+  };
+  const gate = combineShipGateResults({
+    ...readyShipInput(snapshot),
+    requiredChecks: {
+      decision: "blocked",
+      complete: true,
+      blockers: ["fail:build"],
+      unknowns: [],
+    },
+  });
+  assert.equal(gate.ready, false);
+  assert.equal(gate.decision, "blocked");
+});
+
 test("merge boundary invalidates when trusted feedback changes without a head change", () => {
   const approved = mergeBoundaryForSnapshot(mergeSnapshot());
   const changed = mergeSnapshot({

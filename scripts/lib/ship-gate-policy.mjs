@@ -6,6 +6,26 @@ const UNDERSTOOD_ACTIVE_RULE_TYPES = new Set([
   "merge_queue",
 ]);
 
+const MERGE_STATES_READY = new Set(["CLEAN", "UNSTABLE", "HAS_HOOKS"]);
+const MERGE_STATES_WAKE = new Set(["DIRTY", "BEHIND", "CONFLICTING"]);
+
+function applyMergeStateUnknowns(snapshot, unknowns) {
+  const mergeStateStatus = String(
+    snapshot?.evidence?.pullRequest?.mergeStateStatus || "",
+  ).toUpperCase();
+  if (mergeStateStatus === "BLOCKED") {
+    unknowns.push("policy:github_merge_state_blocked");
+    return;
+  }
+  if (
+    MERGE_STATES_READY.has(mergeStateStatus) ||
+    MERGE_STATES_WAKE.has(mergeStateStatus)
+  ) {
+    return;
+  }
+  unknowns.push("policy:github_merge_state_unknown");
+}
+
 function blockerValue(componentName, blocker) {
   if (typeof blocker === "string") return `${componentName}:${blocker}`;
   const reason = blocker?.reason || "blocked";
@@ -86,12 +106,7 @@ export function combineShipGateResults({
     unknowns.push(`policy:unsupported_active_ruleset_rule:${type}`);
   }
 
-  const mergeStateStatus = String(
-    snapshot?.evidence?.pullRequest?.mergeStateStatus || "",
-  ).toUpperCase();
-  if (mergeStateStatus === "BLOCKED") {
-    unknowns.push("policy:github_merge_state_blocked");
-  }
+  applyMergeStateUnknowns(snapshot, unknowns);
 
   const mergeQueueEnabled = reviewPolicy?.mergeQueue?.enabled === true;
   const mergeGroupCoverage = reviewPolicy?.mergeGroupWorkflowCoverage || null;

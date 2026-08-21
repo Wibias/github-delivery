@@ -100,6 +100,24 @@ function normalizedSha(value) {
   return sha || null;
 }
 
+const GRAPHQL_MERGE_STATE_STATUSES = new Set([
+  "BEHIND",
+  "BLOCKED",
+  "CLEAN",
+  "DIRTY",
+  "DRAFT",
+  "HAS_HOOKS",
+  "UNKNOWN",
+  "UNSTABLE",
+]);
+
+function ignoreTestMergeForUncomputedMergeability(mergeStateStatus) {
+  if (mergeStateStatus === undefined) return false;
+  const status = String(mergeStateStatus || "").toUpperCase();
+  if (!status || status === "UNKNOWN") return true;
+  return !GRAPHQL_MERGE_STATE_STATUSES.has(status);
+}
+
 export function selectAuthoritativeCheckEvidence({
   headOid,
   testMergeOid = null,
@@ -109,6 +127,7 @@ export function selectAuthoritativeCheckEvidence({
   testMergeStatuses = [],
   headEvidenceComplete = true,
   testMergeEvidenceComplete = true,
+  mergeStateStatus,
 } = {}) {
   const head = normalizedSha(headOid);
   if (!head) {
@@ -122,7 +141,8 @@ export function selectAuthoritativeCheckEvidence({
     };
   }
 
-  const testMerge = normalizedSha(testMergeOid);
+  const ignoreTestMerge = ignoreTestMergeForUncomputedMergeability(mergeStateStatus);
+  const testMerge = ignoreTestMerge ? null : normalizedSha(testMergeOid);
   if (testMerge) {
     if (testMergeEvidenceComplete !== true) {
       return {
@@ -152,7 +172,11 @@ export function selectAuthoritativeCheckEvidence({
     return {
       complete: false,
       sha: head,
-      reason: testMerge ? "test_merge_has_no_status" : "head_only",
+      reason: ignoreTestMerge
+        ? "test_merge_ignored_mergeability_unknown"
+        : testMerge
+          ? "test_merge_has_no_status"
+          : "head_only",
       checkRuns: headCheckRuns || [],
       statuses: headStatuses || [],
       incompleteReasons: ["head_check_evidence_incomplete"],
@@ -162,7 +186,11 @@ export function selectAuthoritativeCheckEvidence({
   return {
     complete: true,
     sha: head,
-    reason: testMerge ? "test_merge_has_no_status" : "head_only",
+    reason: ignoreTestMerge
+      ? "test_merge_ignored_mergeability_unknown"
+      : testMerge
+        ? "test_merge_has_no_status"
+        : "head_only",
     checkRuns: headCheckRuns || [],
     statuses: headStatuses || [],
     incompleteReasons: [],
