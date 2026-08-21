@@ -13,7 +13,7 @@
  *     [--lint-cmd "bun run lint:gui"] [--privacy-cmd "bun run privacy:scan"]
  *     [--keep-worktree] [--timeout-ms N] [--json]
  */
-import { realpathSync } from "node:fs";
+import { existsSync, mkdirSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { boundedSpawnSync } from "./lib/subprocess-policy.mjs";
@@ -77,11 +77,80 @@ export function parseArgs(argv) {
   return { repo, pr, ...options };
 }
 
-function run(cmd, { cwd, timeoutMs }) {
+function tokenizeCommand(source) {
+  const tokens = [];
+  let current = "";
+  let quote = null;
+  for (const char of source) {
+    if (quote) {
+      if (char === quote) {
+        quote = null;
+        continue;
+      }
+      current += char;
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      continue;
+    }
+    if (/\s/.test(char)) {
+      if (current) {
+        tokens.push(current);
+        current = "";
+      }
+      continue;
+    }
+    if ("&|;`$<>()".includes(char)) throw new Error("verify_pr_head_command_shell_syntax");
+    current += char;
+  }
+  if (quote) throw new Error("verify_pr_head_command_unclosed_quote");
+  if (current) tokens.push(current);
+  if (tokens.length === 0) throw new Error("verify_pr_head_command_invalid");
+  return tokens;
+}
+
+export function commandToSpawn(command, { cwd } = {}) {
+  if (Array.isArray(command)) {
+    if (typeof command[0] !== "string" || command[0].length === 0) {
+      throw new Error("verify_pr_head_command_invalid");
+    }
+    return { command: command[0], args: command.slice(1).map(String), cwd };
+  }
+  if (typeof command !== "string" || !command.trim()) {
+    throw new Error("verify_pr_head_command_invalid");
+  }
+  let rest = command.trim();
+  let workingDirectory = cwd;
+  const cd = /^cd\s+(\S+)\s+&&\s+(.+)$/s.exec(rest);
+  if (cd) {
+    const directory = cd[1];
+    if (!directory || directory.includes("\0") || directory.split(/[\\/]/).includes("..")) {
+      throw new Error("verify_pr_head_command_cwd_invalid");
+    }
+    workingDirectory = cwd ? join(cwd, directory) : directory;
+    rest = cd[2].trim();
+  }
+  const tokens = tokenizeCommand(rest);
+  return { command: tokens[0], args: tokens.slice(1), cwd: workingDirectory };
+}
+
+export function run(command, { cwd, timeoutMs, spawn } = {}) {
+  const invocation = commandToSpawn(command, { cwd });
   const started = Date.now();
-  const result = boundedSpawnSync(cmd, [], { cwd, shell: true, encoding: "utf8", timeout: timeoutMs, maxBuffer: 200 * 1024 * 1024 });
+  const result = boundedSpawnSync(
+    invocation.command,
+    invocation.args,
+    {
+      cwd: invocation.cwd,
+      encoding: "utf8",
+      timeout: timeoutMs,
+      maxBuffer: 200 * 1024 * 1024,
+    },
+    spawn ? { spawn } : {},
+  );
   return {
-    cmd,
+    cmd: [invocation.command, ...invocation.args].join(" "),
     status: result.status,
     ok: result.status === 0,
     timedOut: result.error?.code === "ETIMEDOUT" || result.signal === "SIGTERM",
@@ -93,8 +162,7 @@ function run(cmd, { cwd, timeoutMs }) {
 function findGuiTsconfig(cwd) {
   const candidates = ["tsconfig.app.json", "tsconfig.json", "tsconfig.web.json"];
   for (const candidate of candidates) {
-    const probe = run(`test -f "gui/${candidate}" && echo found`, { cwd, timeoutMs: 10_000 });
-    if (probe.ok && probe.tail.includes("found")) return candidate;
+    if (existsSync(join(cwd, "gui", candidate))) return candidate;
   }
   return null;
 }
@@ -111,10 +179,13 @@ async function main() {
   const [owner, name] = args.repo.split("/");
 
   // Resolve PR head SHA.
-  const head = run(`gh pr view ${args.pr} --repo ${args.repo} --json headRefOid --jq .headRefOid`, {
-    cwd: process.cwd(),
-    timeoutMs: 60_000,
-  });
+  const head = run(
+    ["gh", "pr", "view", String(args.pr), "--repo", args.repo, "--json", "headRefOid", "--jq", ".headRefOid"],
+    {
+      cwd: process.cwd(),
+      timeoutMs: 60_000,
+    },
+  );
   if (!head.ok || !head.tail.trim()) {
     throw new Error(`could not resolve PR head: ${head.tail || head.cmd}`);
   }
@@ -125,28 +196,28 @@ async function main() {
   const candidateRoots = [join("C:", "Users", "ws", "Desktop", "Anderes", "GitHub", name)];
   let cloneRoot = null;
   for (const root of candidateRoots) {
-    const probe = run("git rev-parse --is-inside-work-tree", { cwd: root, timeoutMs: 10_000 });
+    const probe = run(["git", "rev-parse", "--is-inside-work-tree"], { cwd: root, timeoutMs: 10_000 });
     if (probe.ok) {
       cloneRoot = root;
       break;
     }
   }
   if (!cloneRoot) {
-    const probe = run("git rev-parse --is-inside-work-tree", { cwd: process.cwd(), timeoutMs: 10_000 });
+    const probe = run(["git", "rev-parse", "--is-inside-work-tree"], { cwd: process.cwd(), timeoutMs: 10_000 });
     if (probe.ok) cloneRoot = process.cwd();
   }
   if (!cloneRoot) throw new Error("no local git clone found to create the verification worktree from");
 
   // Ensure the PR head commit is present.
-  run(`git fetch ${args.repo} ${headSha}`, { cwd: cloneRoot, timeoutMs: 120_000 });
-  const base = run("git rev-parse --is-inside-work-tree", { cwd: cloneRoot, timeoutMs: 10_000 });
+  run(["git", "fetch", args.repo, headSha], { cwd: cloneRoot, timeoutMs: 120_000 });
+  const base = run(["git", "rev-parse", "--is-inside-work-tree"], { cwd: cloneRoot, timeoutMs: 10_000 });
   if (!base.ok) throw new Error(`clone root ${cloneRoot} is not a git work tree`);
 
   const worktreeRoot = args.worktreeRoot || join("D:", "codex-worktrees");
   const worktreeName = `verify-pr-${args.pr}-${Date.now().toString(36)}`;
   const worktreePath = join(worktreeRoot, worktreeName);
-  run(`mkdir -p "${worktreeRoot}"`, { cwd: cloneRoot, timeoutMs: 15_000 });
-  const add = run(`git worktree add --detach "${worktreePath}" ${headSha}`, {
+  mkdirSync(worktreeRoot, { recursive: true });
+  const add = run(["git", "worktree", "add", "--detach", worktreePath, headSha], {
     cwd: cloneRoot,
     timeoutMs: 120_000,
   });
@@ -176,7 +247,7 @@ async function main() {
     if (args.privacyCmd) results.privacy = run(args.privacyCmd, { cwd: worktreePath, timeoutMs: args.timeoutMs });
   } finally {
     if (!args.keepWorktree) {
-      run(`git worktree remove --force "${worktreePath}"`, { cwd: cloneRoot, timeoutMs: 60_000 });
+      run(["git", "worktree", "remove", "--force", worktreePath], { cwd: cloneRoot, timeoutMs: 60_000 });
     }
   }
 
