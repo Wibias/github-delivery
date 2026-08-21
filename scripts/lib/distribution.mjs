@@ -415,6 +415,19 @@ export function planInstallation({
   return { action: "same-version", allowed: false, unchanged: false, source, target, sourceVersion: sourcePackage.version, targetVersion: targetPackage.version, differences };
 }
 
+function siblingPath(target, prefix) {
+  const directory = dirname(resolve(target));
+  mkdirSync(directory, { recursive: true });
+  let candidate;
+  do {
+    candidate = join(
+      directory,
+      `${prefix}${process.pid}-${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`,
+    );
+  } while (existsSync(candidate));
+  return candidate;
+}
+
 export function applyInstallation({
   source,
   target,
@@ -422,6 +435,9 @@ export function applyInstallation({
   allowDowngrade = false,
   force = false,
   legacyManifestlessMigration = false,
+  copySync = cpSync,
+  renameSync: rename = renameSync,
+  rmSync: remove = rmSync,
 } = {}) {
   const plan = planInstallation({
     source,
@@ -443,27 +459,54 @@ export function applyInstallation({
       unchanged: true,
     };
   }
-  let backupPath = null;
-  if (existsSync(plan.target)) {
-    const root = resolve(backupRoot || join(dirname(plan.target), ".github-delivery-backups"));
-    mkdirSync(root, { recursive: true });
-    backupPath = join(root, `github-delivery-${Date.now()}-${plan.targetVersion || "unknown"}`);
-    renameSync(plan.target, backupPath);
+  const stagingPath = siblingPath(plan.target, ".github-delivery-staging-");
+  try {
+    copySync(plan.source, stagingPath, { recursive: true, errorOnExist: true, force: false });
+  } catch (error) {
+    remove(stagingPath, { recursive: true, force: true });
+    throw error;
   }
-  try { cpSync(plan.source, plan.target, { recursive: true, errorOnExist: true, force: false }); }
-  catch (error) {
-    rmSync(plan.target, { recursive: true, force: true });
-    if (backupPath && existsSync(backupPath)) renameSync(backupPath, plan.target);
+
+  let backupPath = null;
+  try {
+    if (existsSync(plan.target)) {
+      const root = resolve(backupRoot || join(dirname(plan.target), ".github-delivery-backups"));
+      mkdirSync(root, { recursive: true });
+      backupPath = join(root, `github-delivery-${Date.now()}-${plan.targetVersion || "unknown"}`);
+      rename(plan.target, backupPath);
+    }
+    rename(stagingPath, plan.target);
+  } catch (error) {
+    if (backupPath && existsSync(backupPath) && !existsSync(plan.target)) {
+      rename(backupPath, plan.target);
+    }
+    remove(stagingPath, { recursive: true, force: true });
     throw error;
   }
   return { schemaVersion: 1, kind: "github-delivery/install-receipt", action: plan.action, sourceVersion: plan.sourceVersion, previousVersion: plan.targetVersion, target: plan.target, backupPath };
 }
 
-export function restoreBackup({ backup, target } = {}) {
+export function restoreBackup({
+  backup,
+  target,
+  renameSync: rename = renameSync,
+  rmSync: remove = rmSync,
+} = {}) {
   backup = resolve(backup);
   target = resolve(target);
   if (!existsSync(backup) || !statSync(backup).isDirectory()) throw new Error("backup directory does not exist");
-  rmSync(target, { recursive: true, force: true });
-  renameSync(backup, target);
+  if (!existsSync(target)) {
+    rename(backup, target);
+    return { schemaVersion: 1, kind: "github-delivery/restore-receipt", backup, target };
+  }
+  const asidePath = siblingPath(target, ".github-delivery-restore-aside-");
+  try {
+    rename(target, asidePath);
+    rename(backup, target);
+  } catch (error) {
+    if (!existsSync(target) && existsSync(asidePath)) rename(asidePath, target);
+    throw error;
+  }
+  remove(asidePath, { recursive: true, force: true });
   return { schemaVersion: 1, kind: "github-delivery/restore-receipt", backup, target };
 }

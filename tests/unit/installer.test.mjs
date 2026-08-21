@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
@@ -209,4 +209,84 @@ test("apply creates a backup before replacing and restore reverses it", () => {
 
   restoreBackup({ backup: receipt.backupPath, target });
   assert.equal(readFileSync(join(target, "marker.txt"), "utf8"), "old");
+});
+
+test("apply stages the new tree before displacing the live target", () => {
+  const root = mkdtempSync(join(tmpdir(), "github-delivery-install-test-"));
+  const source = join(root, "source");
+  const target = join(root, "target");
+  const backups = join(root, "backups");
+  skill(source, "0.2.0", "new");
+  skill(target, "0.1.0", "old");
+
+  let copyDestination;
+  const receipt = applyInstallation({
+    source,
+    target,
+    backupRoot: backups,
+    copySync(from, to, options) {
+      copyDestination = resolve(to);
+      assert.notEqual(copyDestination, resolve(target));
+      assert.equal(readFileSync(join(target, "marker.txt"), "utf8"), "old");
+      cpSync(from, to, options);
+    },
+  });
+
+  assert.equal(typeof copyDestination, "string");
+  assert.notEqual(copyDestination, resolve(target));
+  assert.equal(readFileSync(join(target, "marker.txt"), "utf8"), "new");
+  assert.equal(readFileSync(join(receipt.backupPath, "marker.txt"), "utf8"), "old");
+});
+
+test("failed staging copy does not displace the live target", () => {
+  const root = mkdtempSync(join(tmpdir(), "github-delivery-install-test-"));
+  const source = join(root, "source");
+  const target = join(root, "target");
+  const backups = join(root, "backups");
+  skill(source, "0.2.0", "new");
+  skill(target, "0.1.0", "old");
+
+  let displaced = false;
+  assert.throws(
+    () => applyInstallation({
+      source,
+      target,
+      backupRoot: backups,
+      copySync() {
+        throw new Error("injected staging failure");
+      },
+      renameSync(from, to) {
+        if (resolve(from) === resolve(target)) displaced = true;
+        renameSync(from, to);
+      },
+    }),
+    /injected staging failure/,
+  );
+  assert.equal(displaced, false);
+  assert.equal(readFileSync(join(target, "marker.txt"), "utf8"), "old");
+});
+
+test("restore keeps the live target if the backup cannot be swapped in", () => {
+  const root = mkdtempSync(join(tmpdir(), "github-delivery-install-test-"));
+  const source = join(root, "source");
+  const target = join(root, "target");
+  const backups = join(root, "backups");
+  skill(source, "0.2.0", "new");
+  skill(target, "0.1.0", "old");
+  const receipt = applyInstallation({ source, target, backupRoot: backups });
+
+  assert.throws(
+    () => restoreBackup({
+      backup: receipt.backupPath,
+      target,
+      renameSync(from, to) {
+        if (resolve(from) === resolve(receipt.backupPath) && resolve(to) === resolve(target)) {
+          throw new Error("injected backup swap failure");
+        }
+        renameSync(from, to);
+      },
+    }),
+    /injected backup swap failure/,
+  );
+  assert.equal(readFileSync(join(target, "marker.txt"), "utf8"), "new");
 });
