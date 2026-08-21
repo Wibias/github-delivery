@@ -1,4 +1,5 @@
 import { ownersForPath, parseCodeowners } from "./codeowners.mjs";
+import { protectionRefName } from "./native-stack-policy.mjs";
 import {
   evaluateRequiredCheckCompleteness,
   evaluateRequiredChecks,
@@ -106,7 +107,7 @@ function pullRequest(snapshot) {
 }
 
 function matchingClassicRules(snapshot) {
-  const base = pullRequest(snapshot).baseRefName;
+  const base = protectionRefName(snapshot) || pullRequest(snapshot).baseRefName;
   return (
     policyEvidence(snapshot).branchProtectionRules?.nodes || []
   ).filter((rule) => patternMatchesBranch(rule?.pattern, base));
