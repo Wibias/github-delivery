@@ -53,14 +53,17 @@ jobs:
       - name: Verify live GitHub policy matches current or proposed policy
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
+          # github.token cannot attest ruleset bypass actors. Prefer a repo-admin token.
+          GH_TOKEN: ${{ secrets.REPOSITORY_POLICY_TOKEN || github.token }}
           EVENT_NAME: ${{ github.event_name }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
 
           # Normal push/schedule runs are strict: live GitHub settings must match
-          # the policy checked into the commit being verified.
+          # the policy checked into the commit being verified, including bypass
+          # attestation. github.token cannot attest bypass, so those events stay
+          # red until REPOSITORY_POLICY_TOKEN is a repo-admin token.
           if [[ "${EVENT_NAME}" != "pull_request" ]]; then
             node scripts/verify-live-repository-policy.mjs "${GITHUB_REPOSITORY}"
             exit 0
@@ -69,6 +72,8 @@ jobs:
           # A policy-changing PR may be checked before or after its corresponding
           # live ruleset migration. Accept either fully consistent endpoint, but
           # never a partially migrated state that matches neither policy.
+          # EVENT_NAME=pull_request lets the verifier pass when the only live gap
+          # is that github.token cannot attest ruleset bypass.
           if node scripts/verify-live-repository-policy.mjs "${GITHUB_REPOSITORY}"; then
             exit 0
           fi

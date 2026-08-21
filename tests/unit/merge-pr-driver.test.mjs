@@ -133,7 +133,7 @@ test("merge boundary refuses direct merge while a native stack is present", () =
   const snapshot = boundarySnapshot();
   snapshot.evidence.pullRequest = {
     ...snapshot.evidence.pullRequest,
-    stack: { id: 427761, number: 289, position: 5, size: 5 },
+    stack: { id: 427761, number: 289, position: 5, size: 5, baseRefName: "main" },
   };
   assert.throws(
     () => mergeBoundaryForSnapshot(snapshot),

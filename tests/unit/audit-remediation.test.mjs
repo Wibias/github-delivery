@@ -131,6 +131,75 @@ test("an unexplained GitHub BLOCKED merge state never becomes ready", () => {
   assert.ok(gate.unknowns.includes("policy:github_merge_state_blocked"));
 });
 
+test("a native-stack member with empty PR-base rules never becomes ready", () => {
+  const snapshot = {
+    headOid: HEAD,
+    evidence: {
+      pullRequest: {
+        mergeStateStatus: "CLEAN",
+        reviewDecision: "APPROVED",
+        baseRefName: "feat/p1-visual-evidence",
+        stack: { size: 5, baseRefName: "main" },
+      },
+      activeRules: [],
+    },
+  };
+  const gate = combineShipGateResults({
+    ...readyShipInput(snapshot),
+    requiredChecks: readyComponent({ mode: "observed" }),
+  });
+  assert.equal(gate.ready, false);
+  assert.ok(gate.unknowns.includes("policy:native_stack_remaining_layers_unevaluated"));
+  assert.ok(gate.unknowns.includes("policy:native_stack_observed_checks"));
+});
+
+test("Protect main descriptors do not ready a multi-layer native stack", () => {
+  const snapshot = {
+    headOid: HEAD,
+    evidence: {
+      pullRequest: {
+        mergeStateStatus: "CLEAN",
+        baseRefName: "feat/p1-visual-evidence",
+        stack: { size: 5, baseRefName: "main" },
+      },
+      activeRules: [
+        {
+          type: "required_status_checks",
+          parameters: {
+            strict_required_status_checks_policy: true,
+            required_status_checks: [{ context: "Node 22 / ubuntu-latest", integration_id: 15368 }],
+          },
+        },
+      ],
+    },
+  };
+  const gate = combineShipGateResults({
+    ...readyShipInput(snapshot),
+    requiredChecks: readyComponent({ mode: "configured" }),
+  });
+  assert.equal(gate.ready, false);
+  assert.ok(gate.unknowns.includes("policy:native_stack_remaining_layers_unevaluated"));
+});
+
+test("an unstacked PR with empty descriptors is not forced unknown by native-stack policy", () => {
+  const snapshot = {
+    headOid: HEAD,
+    evidence: {
+      pullRequest: { mergeStateStatus: "CLEAN", baseRefName: "feat/unprotected", stack: null },
+      activeRules: [],
+    },
+  };
+  const gate = combineShipGateResults({
+    ...readyShipInput(snapshot),
+    requiredChecks: readyComponent({ mode: "observed" }),
+  });
+  assert.equal(gate.ready, true);
+  assert.equal(
+    gate.unknowns.includes("policy:native_stack_remaining_layers_unevaluated"),
+    false,
+  );
+});
+
 test("an unexplained GitHub UNKNOWN merge state never becomes ready", () => {
   const snapshot = {
     headOid: HEAD,

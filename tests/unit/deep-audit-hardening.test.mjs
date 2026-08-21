@@ -257,7 +257,7 @@ test("a trunk-targeting native-stack member is not independently merge-eligible"
   assert.equal(top.reason, "native_stack_unsupported");
 
   const snapshotSource = source("scripts/ship-gate-snapshot.mjs");
-  assert.match(snapshotSource, /stack \{ number size \}/);
+  assert.match(snapshotSource, /stack \{ number size baseRefName \}/);
   assert.match(snapshotSource, /stackEntry \{ position \}/);
 });
 

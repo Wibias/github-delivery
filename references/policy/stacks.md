@@ -20,7 +20,7 @@ A stack restack/recovery may use `--force-with-lease` only when explicitly autho
 
 ### GD-STACK-005 — Preserve trunk-vs-parent intent
 
-Do not treat a child PR's immediate parent as interchangeable with trunk. Review, diff, conflict resolution, readiness, and merge decisions use the actual parent relationship until retargeted.
+Do not treat a child PR's immediate parent as interchangeable with trunk. Review, diff, and conflict resolution use the actual parent relationship until retargeted. Native GitHub stack merge and ship-gate readiness use the stack base (the branch the whole stack ultimately targets), not the current PR base.
 
 ### GD-STACK-006 — Retarget children before removing a parent
 

@@ -26,6 +26,7 @@ import {
   feedbackPermissionLogins,
 } from "./lib/feedback-authority.mjs";
 import { boundedSpawnSync } from "./lib/subprocess-policy.mjs";
+import { normalizeNativeStack } from "./lib/native-stack-policy.mjs";
 
 function parseArgs(argv) {
   const positionals = [];
@@ -381,7 +382,7 @@ function fetchPolicy(owner, name, pr) {
         pullRequest(number: $number) {
           isInMergeQueue
           isMergeQueueEnabled
-          stack { number size }
+          stack { number size baseRefName }
           stackEntry { position }
           mergeQueueEntry {
             position
@@ -481,13 +482,19 @@ function fetchPolicy(owner, name, pr) {
     },
     nativeStack: {
       queried: true,
-      stack: Object.prototype.hasOwnProperty.call(pullRequest, "stack")
-        ? pullRequest.stack
-        : null,
-      stackEntry: Object.prototype.hasOwnProperty.call(pullRequest, "stackEntry")
-        ? pullRequest.stackEntry
-        : null,
+      ...(Object.prototype.hasOwnProperty.call(pullRequest, "stack")
+        ? { stack: pullRequest.stack }
+        : {}),
+      ...(Object.prototype.hasOwnProperty.call(pullRequest, "stackEntry")
+        ? { stackEntry: pullRequest.stackEntry }
+        : {}),
     },
+    stack: Object.prototype.hasOwnProperty.call(pullRequest, "stack")
+      ? pullRequest.stack
+      : undefined,
+    stackEntry: Object.prototype.hasOwnProperty.call(pullRequest, "stackEntry")
+      ? pullRequest.stackEntry
+      : undefined,
     error: complete ? null : "policy GraphQL pagination incomplete",
   };
 }
@@ -516,8 +523,12 @@ function fetchBranchOid(owner, name, base) {
   return oid;
 }
 
-function fetchTestMergeOid(owner, name, pr) {
-  const payload = ghJson(["api", `repos/${owner}/${name}/pulls/${pr}`]);
+function fetchRestPull(owner, name, pr) {
+  return ghJson(["api", `repos/${owner}/${name}/pulls/${pr}`]);
+}
+
+function fetchTestMergeOid(owner, name, pr, restPull = null) {
+  const payload = restPull || fetchRestPull(owner, name, pr);
   const oid = String(payload?.merge_commit_sha || "").trim().toLowerCase();
   return oid || null;
 }
@@ -779,16 +790,32 @@ try {
   );
   prEvidence.reviewRequests = reviewRequests.rows || [];
   const base = prEvidence.baseRefName;
+  const restPull = fetchRestPull(owner, name, pr);
+  const policy = fetchPolicy(owner, name, pr);
+  if (
+    policy.nativeStack?.queried === true &&
+    Object.prototype.hasOwnProperty.call(policy.nativeStack, "stack")
+  ) {
+    prEvidence.stack = policy.nativeStack.stack;
+  }
+  if (
+    policy.nativeStack?.queried === true &&
+    Object.prototype.hasOwnProperty.call(policy.nativeStack, "stackEntry")
+  ) {
+    prEvidence.stackEntry = policy.nativeStack.stackEntry;
+  }
+  const protectionBase =
+    normalizeNativeStack(prEvidence.stack).baseRefName || base;
   const headOid = prEvidence.headRefOid;
   const baseOid = fetchBranchOid(owner, name, base);
-  const testMergeOid = fetchTestMergeOid(owner, name, pr);
+  const testMergeOid = fetchTestMergeOid(owner, name, pr, restPull);
 
   const changedFiles = restCollection(
     `repos/${owner}/${name}/pulls/${pr}/files`,
     "changed files",
   );
   const activeRules = restCollection(
-    `repos/${owner}/${name}/rules/branches/${encodeURIComponent(base)}`,
+    `repos/${owner}/${name}/rules/branches/${encodeURIComponent(protectionBase)}`,
     "active rules",
   );
   const headCheckRuns = restCollection(
@@ -853,12 +880,8 @@ try {
     [issueComments, reviewComments, reviews],
   );
   const threads = reviewThreads(owner, name, pr);
-  const policy = fetchPolicy(owner, name, pr);
-  if (policy.nativeStack?.queried === true) {
-    prEvidence.stack = policy.nativeStack.stack;
-  }
-  const branchProtection = fetchBranchProtection(owner, name, base);
-  const codeowners = fetchCodeowners(owner, name, base);
+  const branchProtection = fetchBranchProtection(owner, name, protectionBase);
+  const codeowners = fetchCodeowners(owner, name, protectionBase);
   const requiredChecks = normalizeRequiredChecks({
     classicRequiredStatusChecks:
       branchProtection?.payload?.required_status_checks || null,
@@ -867,7 +890,7 @@ try {
   const workflowCoverage = scanTargetWorkflows(
     owner,
     name,
-    base,
+    protectionBase,
     policy.mergeQueue?.enabled === true,
     {
       requiredChecks,
@@ -877,7 +900,7 @@ try {
   const viewer = fetchViewer();
 
   const finalActiveRules = restCollection(
-    `repos/${owner}/${name}/rules/branches/${encodeURIComponent(base)}`,
+    `repos/${owner}/${name}/rules/branches/${encodeURIComponent(protectionBase)}`,
     "final active rules",
   );
   const finalBaseOid = fetchBranchOid(owner, name, base);

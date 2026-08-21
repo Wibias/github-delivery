@@ -3,7 +3,11 @@ import { boundedSpawnSync } from "./lib/subprocess-policy.mjs";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { evaluateLiveRepositoryPolicy } from "./lib/workflow-security.mjs";
+import {
+  evaluateLiveRepositoryPolicy,
+  liveRepositoryPolicyCiExitCode,
+  rulesetBypassFieldsComplete,
+} from "./lib/workflow-security.mjs";
 
 const USAGE = "Usage: node scripts/verify-live-repository-policy.mjs OWNER/REPO [ROOT]";
 
@@ -25,6 +29,14 @@ function runGhJson(args, context) {
 
 function ghJson(path) {
   return runGhJson(["api", path], path);
+}
+
+function ghJsonOptional(path) {
+  try {
+    return ghJson(path);
+  } catch {
+    return null;
+  }
 }
 
 function ghJsonPaginated(path) {
@@ -130,6 +142,7 @@ function main(argv) {
     `repos/${repo}/rules/branches/${encodeURIComponent(defaultBranch)}?per_page=100`,
   );
   const activeRulesets = fetchActiveRulesets(repo, activeRules);
+  const viewer = ghJsonOptional("user");
   const releaseEnvironment = ghJson(
     `repos/${repo}/environments/${encodeURIComponent(policy.release.environment)}`,
   );
@@ -138,15 +151,18 @@ function main(argv) {
     policy,
     live: {
       repository,
+      viewer,
       branch,
       activeRules,
       activeRulesets,
-      activeRulesetsComplete: true,
+      activeRulesetsComplete: rulesetBypassFieldsComplete(activeRulesets),
       releaseEnvironment,
     },
   });
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
-  if (!report.valid) process.exitCode = 1;
+  process.exitCode = liveRepositoryPolicyCiExitCode(report, {
+    eventName: process.env.EVENT_NAME,
+  });
 }
 
 try {
