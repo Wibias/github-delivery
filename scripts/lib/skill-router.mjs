@@ -213,7 +213,7 @@ export function routeShippingGithubPrompt(prompt, context = {}) {
   }
 
   if (isPrepareAndMergeRequest(text)) return result("references/prepare-and-merge-pr.md", "maintainer", prepareAndMergeActions(text));
-  if ((hasExplicitMergeIntent(text) && PR_REFERENCE.test(text)) || /^merge it\b/.test(text) || /^ship it\b/.test(text)) {
+  if (hasExplicitMergeIntent(text) && (PR_REFERENCE.test(text) || /^merge it\b/.test(text) || /^ship it\b/.test(text))) {
     return result("references/merge-pr.md", "maintainer", ["merge_pr", "post_comment", "post_issue_comment", "close_linked_issue"]);
   }
   if (isMergeDiscussion(text)) return result("references/status.md", "read-only", []);
