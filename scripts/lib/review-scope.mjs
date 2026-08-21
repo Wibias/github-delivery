@@ -1,7 +1,7 @@
 import { boundedSpawnSync } from "./subprocess-policy.mjs";
 
 import { PROBE_REGISTRY, validateProbeRegistry } from "./probe-registry.mjs";
-import { planVisualEvidence } from "./visual-evidence.mjs";
+import { normalizeReviewPath, planVisualEvidence } from "./visual-evidence.mjs";
 
 export { collectBranchReviewInput } from "./branch-review-input.mjs";
 
@@ -141,7 +141,7 @@ function addEvidence(map, id, category, score, reason, file, excerpt = null) {
 }
 
 function extractSymbols(path, text) {
-  const patterns = CODE_RE.test(path) ? [
+  const patterns = CODE_RE.test(normalizeReviewPath(path)) ? [
     /\b(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)/g,
     /\bclass\s+([A-Za-z_$][\w$]*)/g,
     /\b(?:def|func|fn)\s+([A-Za-z_][\w]*)/g,
@@ -220,23 +220,24 @@ export function planReviewScope(input = {}) {
 
   for (const file of files) {
     const paths = [file.path, file.previousPath].filter(Boolean);
+    const classifiedPaths = paths.map(normalizeReviewPath);
     if (file.previousPath) renamedFiles.push({ from: file.previousPath, to: file.path });
     const { added, removed } = patchLines(file.patch);
     const changedText = [...added, ...removed].join("\n");
     const symbols = extractSymbols(file.path, changedText);
-    const isLogic = paths.some(
+    const isLogic = classifiedPaths.some(
       (path) => CODE_RE.test(path) || OPERATIONAL_POLICY_RE.test(path) || /^\.github\//.test(path),
     );
     if (isLogic) logicFiles.push(file.path);
     if (isLogic && !file.patch && file.status !== "removed") missingPatches.push(file.path);
 
-    if (paths.some((path) => MCP_INSTALL_RE.test(path))) {
+    if (classifiedPaths.some((path) => MCP_INSTALL_RE.test(path))) {
       addEvidence(evidence, "agentic_skills_supply_chain", "security", 3, "mcp install path", file.path);
       addEvidence(evidence, "ai_agent_mcp", "security", 3, "mcp install path", file.path);
     }
 
     for (const [id, category, pathRe, textRe] of DOMAIN_SPECS) {
-      if (paths.some((path) => pathRe.test(path))) addEvidence(evidence, id, category, 1, "path signal", file.path);
+      if (classifiedPaths.some((path) => pathRe.test(path))) addEvidence(evidence, id, category, 1, "path signal", file.path);
       const addedHit = added.find((line) => textRe.test(line));
       const removedHit = removed.find((line) => textRe.test(line));
       if (addedHit) addEvidence(evidence, id, category, 2, "added-line signal", file.path, addedHit);
@@ -255,8 +256,8 @@ export function planReviewScope(input = {}) {
 
     workflowPermissionChanges.push(...workflowSignals(file.path, added, removed, evidence));
 
-    const lockChanged = paths.some((path) => LOCK_RE.test(path));
-    const manifestChanged = paths.some((path) => MANIFEST_RE.test(path));
+    const lockChanged = classifiedPaths.some((path) => LOCK_RE.test(path));
+    const manifestChanged = classifiedPaths.some((path) => MANIFEST_RE.test(path));
     if (lockChanged || manifestChanged) {
       const kind = lockChanged ? "lockfile" : "manifest";
       dependencyChanges.push({ file: file.path, kind, additions: file.additions, deletions: file.deletions });
@@ -305,9 +306,10 @@ export function planReviewScope(input = {}) {
   const requiredBug = bugLenses.filter((item) => item.required);
   const docsOnly = files.length > 0 && logicFiles.length === 0 && files.every((file) => {
     const paths = [file.path, file.previousPath].filter(Boolean);
-    return paths.every(
-      (path) => DOC_RE.test(path) && !OPERATIONAL_POLICY_RE.test(path),
-    );
+    return paths.every((path) => {
+      const classified = normalizeReviewPath(path);
+      return DOC_RE.test(classified) && !OPERATIONAL_POLICY_RE.test(classified);
+    });
   });
   const criticalSecurity = requiredSecurity.some((item) => item.confidence === "high") || removedControlLeads.length > 0;
   const criticalBug = requiredBug.some((item) => item.confidence === "high");

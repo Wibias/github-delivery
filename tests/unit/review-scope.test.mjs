@@ -122,6 +122,34 @@ test("keeps ordinary JSON as skip and Cursor mcpServers as required", () => {
   assert.notEqual(cursor.securityReview.depth, "skip");
 });
 
+test("trailing format characters after a code extension still count as logic", () => {
+  const patch = "+const x = 1;";
+  const suffixes = ["\u200B", " ", "\r", "\u202E", "\u00A0"];
+  for (const suffix of suffixes) {
+    const path = `src/worker.ts${suffix}`;
+    const result = plan([file(path, patch)]);
+    assert.ok(result.logicFiles.includes(path), JSON.stringify(suffix));
+    assert.notEqual(result.securityReview.depth, "skip", JSON.stringify(suffix));
+    assert.notEqual(result.bugReview.depth, "skip", JSON.stringify(suffix));
+  }
+
+  const mjs = plan([file("scripts/run.mjs ", patch)]);
+  assert.ok(mjs.logicFiles.includes("scripts/run.mjs "));
+  assert.notEqual(mjs.securityReview.depth, "skip");
+
+  const mid = plan([file("src/wo\u200Brker.ts", patch)]);
+  assert.ok(mid.logicFiles.includes("src/wo\u200Brker.ts"));
+  assert.notEqual(mid.securityReview.depth, "skip");
+
+  const bom = plan([file("\uFEFFsrc/worker.ts", patch)]);
+  assert.ok(bom.logicFiles.includes("\uFEFFsrc/worker.ts"));
+  assert.notEqual(bom.securityReview.depth, "skip");
+
+  const notCode = plan([file("src/pwn.ts\u200B.bak", patch)]);
+  assert.equal(notCode.securityReview.depth, "skip");
+  assert.deepEqual(notCode.logicFiles, []);
+});
+
 test("raises auth review when an authorization control is removed", () => {
   const result = plan([file("src/api/admin.ts", "-if (!requireAdmin(user)) throw forbidden();\n+return destroyAccount();")]);
   assert.equal(domain(result, "authz").confidence, "high");
