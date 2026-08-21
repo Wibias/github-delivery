@@ -58,6 +58,7 @@ function matchingLive(policy = desiredPolicy()) {
       allow_rebase_merge: false,
       allow_update_branch: true,
       allow_auto_merge: true,
+      permissions: { admin: true },
     },
     branch: { name: "main", protected: true },
     activeRules: [
@@ -310,6 +311,77 @@ test("live policy verifier fails closed when bypass evidence is incomplete", () 
       (error) => error.code === "ruleset_bypass_evidence_incomplete",
     ),
   );
+});
+
+test("live policy verifier fails closed when the reader cannot attest ruleset bypass", () => {
+  const live = matchingLive();
+  delete live.repository.permissions;
+  const report = evaluateLiveRepositoryPolicy({ policy: desiredPolicy(), live });
+  assert.equal(report.valid, false);
+  assert.ok(
+    report.errors.some((error) => error.code === "ruleset_bypass_evidence_incomplete"),
+  );
+});
+
+test("live policy verifier fails closed when github-actions bot reports never plus empty bypass actors", () => {
+  const live = matchingLive();
+  live.repository.permissions = { admin: true };
+  live.viewer = { login: "github-actions[bot]" };
+  const report = evaluateLiveRepositoryPolicy({ policy: desiredPolicy(), live });
+  assert.equal(report.valid, false);
+  assert.ok(
+    report.errors.some((error) => error.code === "ruleset_bypass_evidence_incomplete"),
+  );
+});
+
+test("live policy verifier fails closed when current_user_can_bypass is missing", () => {
+  const live = matchingLive();
+  live.repository.permissions = { admin: true };
+  delete live.activeRulesets[0].current_user_can_bypass;
+  const report = evaluateLiveRepositoryPolicy({ policy: desiredPolicy(), live });
+  assert.equal(report.valid, false);
+  assert.ok(
+    report.errors.some((error) => error.code === "ruleset_bypass_evidence_incomplete"),
+  );
+});
+
+test("live policy verifier fails closed when bypass_actors is omitted", () => {
+  const live = matchingLive();
+  live.repository.permissions = { admin: true };
+  delete live.activeRulesets[0].bypass_actors;
+  const report = evaluateLiveRepositoryPolicy({ policy: desiredPolicy(), live });
+  assert.equal(report.valid, false);
+  assert.ok(
+    report.errors.some((error) => error.code === "ruleset_bypass_evidence_incomplete"),
+  );
+});
+
+test("live policy verifier fails closed when no active rulesets were fetched", () => {
+  const live = matchingLive();
+  live.repository.permissions = { admin: true };
+  live.activeRulesets = [];
+  live.activeRulesetsComplete = true;
+  const report = evaluateLiveRepositoryPolicy({ policy: desiredPolicy(), live });
+  assert.equal(report.valid, false);
+  assert.ok(
+    report.errors.some((error) => error.code === "ruleset_bypass_evidence_incomplete"),
+  );
+});
+
+test("live policy verifier fails when current user bypass is pull_requests_only", () => {
+  const live = matchingLive();
+  live.repository.permissions = { admin: true };
+  live.activeRulesets[0].current_user_can_bypass = "pull_requests_only";
+  const report = evaluateLiveRepositoryPolicy({ policy: desiredPolicy(), live });
+  assert.equal(report.valid, false);
+  assert.ok(report.errors.some((error) => error.code === "current_user_can_bypass_ruleset"));
+});
+
+test("live policy verifier accepts empty bypass actors from an admin reader", () => {
+  const live = matchingLive();
+  live.repository.permissions = { admin: true };
+  const report = evaluateLiveRepositoryPolicy({ policy: desiredPolicy(), live });
+  assert.equal(report.valid, true, JSON.stringify(report.errors));
 });
 
 test("live policy verifier detects branch and repository merge control drift", () => {

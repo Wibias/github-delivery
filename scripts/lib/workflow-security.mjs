@@ -268,12 +268,30 @@ function sameStringSet(a = [], b = []) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
+const RULESET_BYPASS_MODES = new Set(["never", "always", "pull_requests_only"]);
+
 function normalizeBypassActor(actor = {}) {
   return {
     actorId: actor.actor_id ?? actor.actorId ?? null,
     actorType: actor.actor_type ?? actor.actorType ?? null,
     bypassMode: actor.bypass_mode ?? actor.bypassMode ?? null,
   };
+}
+
+export function rulesetBypassFieldsComplete(rulesets) {
+  if (!Array.isArray(rulesets) || rulesets.length === 0) return false;
+  return rulesets.every((ruleset) => {
+    if (!Array.isArray(ruleset?.bypass_actors)) return false;
+    const value = ruleset?.current_user_can_bypass;
+    if (typeof value !== "string") return false;
+    return RULESET_BYPASS_MODES.has(value.toLowerCase());
+  });
+}
+
+export function bypassReaderCanAttest(live = {}) {
+  const login = String(live.viewer?.login || "").toLowerCase();
+  if (login === "github-actions[bot]") return false;
+  return live.repository?.permissions?.admin === true;
 }
 
 function activeRulesetBypassState(live = {}) {
@@ -288,7 +306,10 @@ function activeRulesetBypassState(live = {}) {
     .filter((value) => value !== undefined && value !== null)
     .map(String);
   return {
-    complete: live.activeRulesetsComplete === true,
+    complete:
+      live.activeRulesetsComplete === true &&
+      rulesetBypassFieldsComplete(rulesets) &&
+      bypassReaderCanAttest(live),
     bypassActors,
     currentUserBypass,
   };

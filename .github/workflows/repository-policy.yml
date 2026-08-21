@@ -53,7 +53,8 @@ jobs:
       - name: Verify live GitHub policy matches current or proposed policy
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
+          # github.token cannot attest ruleset bypass actors. Prefer a repo-admin token.
+          GH_TOKEN: ${{ secrets.REPOSITORY_POLICY_TOKEN || github.token }}
           EVENT_NAME: ${{ github.event_name }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
