@@ -328,6 +328,33 @@ function activeRulesetBypassState(live = {}) {
   };
 }
 
+const REQUIRED_TAG_RULE_TYPES = ["deletion", "non_fast_forward", "update"];
+
+function tagIncludePatterns(ruleset) {
+  const include = ruleset?.conditions?.ref_name?.include;
+  if (!Array.isArray(include)) return [];
+  return include.map((value) => {
+    const text = String(value);
+    return text.startsWith("refs/tags/") ? text.slice("refs/tags/".length) : text;
+  });
+}
+
+function activeTagRulesetCoversPattern(ruleset, pattern) {
+  if (String(ruleset?.target) !== "tag") return false;
+  if (String(ruleset?.enforcement || "").toLowerCase() !== "active") return false;
+  const includes = tagIncludePatterns(ruleset);
+  return includes.includes(String(pattern)) || includes.includes("~ALL");
+}
+
+function tagRulesetHasRequiredProtection(ruleset) {
+  const types = new Set(
+    (Array.isArray(ruleset?.rules) ? ruleset.rules : [])
+      .map((rule) => rule?.type)
+      .filter(Boolean),
+  );
+  return REQUIRED_TAG_RULE_TYPES.every((type) => types.has(type));
+}
+
 export function evaluateLiveRepositoryPolicy({ policy, live } = {}) {
   const errors = [];
   const add = (code, detail) => errors.push({ code, detail });
@@ -511,6 +538,32 @@ export function evaluateLiveRepositoryPolicy({ policy, live } = {}) {
     );
   }
 
+  const expectedTagPattern = policy?.release?.protectedTagPattern;
+  const tagRulesets = Array.isArray(live?.tagRulesets) ? live.tagRulesets : [];
+  if (expectedTagPattern) {
+    if (live?.tagRulesetsComplete !== true) {
+      add(
+        "protected_tag_evidence_incomplete",
+        "Protected tag ruleset configuration could not be read completely.",
+      );
+    } else {
+      const covering = tagRulesets.filter((ruleset) =>
+        activeTagRulesetCoversPattern(ruleset, expectedTagPattern),
+      );
+      if (!covering.length) {
+        add(
+          "protected_tag_pattern_missing",
+          `No active tag ruleset covers protected pattern ${expectedTagPattern}.`,
+        );
+      } else if (!covering.some((ruleset) => tagRulesetHasRequiredProtection(ruleset))) {
+        add(
+          "protected_tag_rules_missing",
+          `Tag ruleset for ${expectedTagPattern} does not enforce deletion, non-fast-forward, and update protection.`,
+        );
+      }
+    }
+  }
+
   return {
     schemaVersion: 1,
     kind: "github-delivery/live-repository-policy-report",
@@ -531,6 +584,7 @@ export function evaluateLiveRepositoryPolicy({ policy, live } = {}) {
     repositoryMergeSettingsComplete: observedRepoMerge.complete,
     releaseEnvironment: observedEnvironment || null,
     observedRequiredReviewers: observedReviewers,
+    observedProtectedTagPattern: expectedTagPattern || null,
     errors,
   };
 }

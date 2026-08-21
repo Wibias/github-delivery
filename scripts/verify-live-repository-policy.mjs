@@ -123,6 +123,24 @@ function fetchActiveRulesets(repo, activeRules) {
   return [...paths.keys()].sort().map((path) => ghJson(path));
 }
 
+function fetchTagRulesets(repo) {
+  const summaries = ghJsonPaginated(`repos/${repo}/rulesets?per_page=100`);
+  const tagRulesets = [];
+  for (const summary of summaries) {
+    if (summary?.target !== "tag") continue;
+    const id = Number(summary?.id);
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      return { tagRulesets, tagRulesetsComplete: false };
+    }
+    try {
+      tagRulesets.push(ghJson(`repos/${repo}/rulesets/${id}`));
+    } catch {
+      return { tagRulesets, tagRulesetsComplete: false };
+    }
+  }
+  return { tagRulesets, tagRulesetsComplete: true };
+}
+
 function main(argv) {
   const [repo, rootArg] = argv;
   if (!repo?.includes("/") || argv.length > 2) throw new Error(USAGE);
@@ -142,6 +160,7 @@ function main(argv) {
     `repos/${repo}/rules/branches/${encodeURIComponent(defaultBranch)}?per_page=100`,
   );
   const activeRulesets = fetchActiveRulesets(repo, activeRules);
+  const { tagRulesets, tagRulesetsComplete } = fetchTagRulesets(repo);
   const viewer = ghJsonOptional("user");
   const releaseEnvironment = ghJson(
     `repos/${repo}/environments/${encodeURIComponent(policy.release.environment)}`,
@@ -156,6 +175,8 @@ function main(argv) {
       activeRules,
       activeRulesets,
       activeRulesetsComplete: rulesetBypassFieldsComplete(activeRulesets),
+      tagRulesets,
+      tagRulesetsComplete,
       releaseEnvironment,
     },
   });

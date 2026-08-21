@@ -86,6 +86,13 @@ test("repository policy pull-request CI receives EVENT_NAME for bypass-attestati
   );
 });
 
+test("repository policy live verify reads tag rulesets for the declared protected pattern", () => {
+  const source = read("scripts/verify-live-repository-policy.mjs");
+  assert.match(source, /repos\/\$\{repo\}\/rulesets\?per_page=100/);
+  assert.match(source, /target !== "tag"/);
+  assert.match(source, /tagRulesetsComplete/);
+});
+
 test("architecture contracts are not duplicated in a separate PR workflow", () => {
   assert.equal(
     existsSync(new URL("../../.github/workflows/architecture-contracts.yml", import.meta.url)),
