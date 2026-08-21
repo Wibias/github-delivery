@@ -101,6 +101,46 @@ test("merge discussion and status wording never grants merge authority", () => {
   }
 });
 
+test("negated merge does not steal simplify, fix, review, or watch", () => {
+  const simplify = routeShippingGithubPrompt("simplify PR #32, do not merge");
+  assert.equal(simplify.workflow, "references/simplify-pr.md");
+  assert.equal(simplify.mutationMode, "maintainer");
+  assert.ok(simplify.explicitActions.includes("push_code"));
+  assert.ok(!simplify.explicitActions.includes("merge_pr"));
+
+  const combined = routeShippingGithubPrompt("full review and simplify PR #32, do not merge");
+  assert.equal(combined.workflow, "references/full-review-pr.md");
+  assert.ok(!combined.explicitActions.includes("merge_pr"));
+
+  const green = routeShippingGithubPrompt("make PR #42 green but do not merge");
+  assert.equal(green.workflow, "references/fix-pr-bots.md");
+  assert.equal(green.mutationMode, "maintainer");
+  assert.ok(green.explicitActions.includes("push_code"));
+  assert.ok(!green.explicitActions.includes("merge_pr"));
+
+  const review = routeShippingGithubPrompt("full review PR #32, do not merge");
+  assert.equal(review.workflow, "references/full-review-pr.md");
+  assert.ok(!review.explicitActions.includes("merge_pr"));
+
+  const comments = routeShippingGithubPrompt("fix the review comments on PR #18, do not merge");
+  assert.equal(comments.workflow, "references/fix-pr-bots.md");
+  assert.ok(comments.explicitActions.includes("push_code"));
+  assert.ok(!comments.explicitActions.includes("merge_pr"));
+
+  const watch = routeShippingGithubPrompt("watch PR #77 but do not merge");
+  assert.equal(watch.workflow, "references/watch-pr.md");
+  assert.equal(watch.mutationMode, "read-only");
+  assert.ok(!watch.explicitActions.includes("merge_pr"));
+  assert.ok(!watch.explicitActions.includes("push_code"));
+});
+
+test("deliberative merge-or-simplify stays status, not simplify with push", () => {
+  const route = routeShippingGithubPrompt("Should I merge PR #32 or simplify it first?");
+  assert.equal(route.workflow, "references/status.md");
+  assert.equal(route.mutationMode, "read-only");
+  assert.deepEqual(route.explicitActions, []);
+});
+
 test("routes direct issue publication to the lifecycle create_issue action", () => {
   for (const prompt of [
     "create an issue for this bug",
