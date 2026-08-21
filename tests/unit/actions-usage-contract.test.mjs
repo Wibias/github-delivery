@@ -71,6 +71,21 @@ test("repository policy PRs can migrate live rulesets without self-blocking", ()
   );
 });
 
+test("repository policy live verify prefers an admin token over github.token", () => {
+  assert.match(
+    repositoryPolicyWorkflow,
+    /GH_TOKEN: \$\{\{ secrets\.REPOSITORY_POLICY_TOKEN \|\| github\.token \}\}/,
+  );
+});
+
+test("repository policy pull-request CI receives EVENT_NAME for bypass-attestation gating", () => {
+  assert.match(repositoryPolicyWorkflow, /EVENT_NAME: \$\{\{ github\.event_name \}\}/);
+  assert.match(
+    read("scripts/verify-live-repository-policy.mjs"),
+    /liveRepositoryPolicyCiExitCode\(report, \{\s*eventName: process\.env\.EVENT_NAME/,
+  );
+});
+
 test("architecture contracts are not duplicated in a separate PR workflow", () => {
   assert.equal(
     existsSync(new URL("../../.github/workflows/architecture-contracts.yml", import.meta.url)),
