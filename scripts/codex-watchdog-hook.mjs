@@ -207,7 +207,7 @@ export function statePathForProtocolQuarantine(stateRoot, sessionId) {
 }
 
 export function runCodexWatchdogHook(input, options = {}) {
-  if (!input || typeof input !== "object") throw new Error("hook input must be a JSON object");
+  if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("hook input must be a JSON object");
   const stateRoot = resolve(options.stateRoot || defaultStateRoot());
 
   if (input.hook_event_name === "SessionEnd") {
@@ -280,7 +280,7 @@ export function main({ stdin = process.stdin, stdout = process.stdout, stderr = 
       if (result.output) stdout.write(`${JSON.stringify(result.output)}\n`);
     } catch (error) {
       stderr.write(`github-delivery watchdog hook error: ${error?.message || error}\n`);
-      process.exitCode = 1;
+      process.exitCode = 2;
     }
   });
 }
