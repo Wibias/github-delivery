@@ -196,3 +196,67 @@ test("tight action budgets do not replace the larger finalization budget", () =>
   assert.equal(usage(100).internalRequests.length, 0);
   assert.equal(usage(3_000).internalRequests.length, 0);
 });
+
+test("bounded-recovery hard-stop quarantines the same model on the next turn", () => {
+  const stateRoot = mkdtempSync(join(tmpdir(), "gd-bounded-quarantine-"));
+  const options = { stateRoot, maxNarrationRecoveryAttempts: 2 };
+  const session = {
+    session_id: "session-bounded-recovery",
+    model: "broken/model",
+  };
+  const stalled = "Let me inspect the reference.\n".repeat(4);
+
+  try {
+    const first = runCodexWatchdogHook(
+      {
+        ...session,
+        hook_event_name: "Stop",
+        turn_id: "turn-a",
+        last_assistant_message: stalled,
+      },
+      options,
+    );
+    assert.equal(first.output.decision, "block");
+
+    const second = runCodexWatchdogHook(
+      {
+        ...session,
+        hook_event_name: "Stop",
+        turn_id: "turn-a",
+        stop_hook_active: true,
+        last_assistant_message: "Reading the reference now.",
+      },
+      options,
+    );
+    assert.equal(second.output.decision, "block");
+
+    const exhausted = runCodexWatchdogHook(
+      {
+        ...session,
+        hook_event_name: "Stop",
+        turn_id: "turn-a",
+        stop_hook_active: true,
+        last_assistant_message: "I'll inspect the reference files.",
+      },
+      options,
+    );
+    assert.equal(exhausted.output.continue, false);
+    assert.equal(exhausted.output.stopReason, "no_progress_stall_after_bounded_recovery");
+    assert.equal(exhausted.quarantinePersisted, true);
+
+    const nextTurn = runCodexWatchdogHook(
+      {
+        ...session,
+        hook_event_name: "UserPromptSubmit",
+        turn_id: "turn-b",
+        prompt: "Continue the same task.",
+      },
+      options,
+    );
+    assert.equal(nextTurn.output.decision, "block");
+    assert.match(nextTurn.output.reason, /no-progress narration/i);
+    assert.match(nextTurn.output.reason, /change model|new task/i);
+  } finally {
+    rmSync(stateRoot, { recursive: true, force: true });
+  }
+});
