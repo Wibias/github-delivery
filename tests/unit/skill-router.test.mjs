@@ -180,6 +180,27 @@ test("routes simplify plus merge through prepare-and-merge", () => {
   assert.ok(route.explicitActions.includes("merge_pr"));
 });
 
+test("routes fix-CI plus merge through prepare-and-merge", () => {
+  for (const prompt of [
+    "fix CI on PR #42 and ship it",
+    "make PR #42 green and merge it",
+  ]) {
+    const route = routeShippingGithubPrompt(prompt);
+    assert.equal(route.workflow, "references/prepare-and-merge-pr.md", prompt);
+    assert.equal(route.mutationMode, "maintainer", prompt);
+    assert.ok(route.explicitActions.includes("push_code"), prompt);
+    assert.ok(route.explicitActions.includes("merge_pr"), prompt);
+  }
+});
+
+test("routes watch plus merge through prepare-and-merge without push_code", () => {
+  const route = routeShippingGithubPrompt("watch PR #77 and merge it");
+  assert.equal(route.workflow, "references/prepare-and-merge-pr.md");
+  assert.equal(route.mutationMode, "maintainer");
+  assert.ok(route.explicitActions.includes("merge_pr"));
+  assert.ok(!route.explicitActions.includes("push_code"));
+});
+
 test("routes status and watch requests without granting mutation authority", () => {
   assert.equal(
     routeShippingGithubPrompt("what is left on PR #41?").workflow,

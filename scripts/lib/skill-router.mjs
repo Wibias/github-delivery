@@ -19,6 +19,7 @@ const FULL_REVIEW_REQUEST = /\b(full review|review .* for real bugs|usefulness v
 const REVIEW_PREPARATION_REQUEST = /\b(review|re-review|review again|look over|look through)\b/;
 const FIX_REVIEW_REQUEST = /\b(fix|address)\b[\s\S]*(review|coderabbit|codex|comment|feedback)/;
 const EXPLICIT_GREEN_REQUEST = /\b(?:make|get)\s+(?:pr|pull request)\s*#?\d+\s+green\b|\bfix\s+(?:the\s+)?(?:ci|failing checks?)\s+(?:on|for)\s+(?:pr|pull request)\s*#?\d+\b/;
+const WATCH_PR_REQUEST = /\b(watch|monitor|babysit|keep an eye on)\b[\s\S]*\b(?:pr|pull request)\b/;
 const CONTEXTUAL_GREEN_REQUEST = /^(?:please\s+)?(?:(?:make|get)\s+(?:this|it)\s+green|fix\s+(?:the\s+)?(?:ci|failing checks?))[.!?]*$/;
 const ISSUE_CREATE_REQUEST = /\b(?:create|file)\b[\s\S]{0,120}\b(?:issue|issues|ticket|tickets|bug report|bug reports)\b|\bopen\s+(?:a|an|new)\b[\s\S]{0,80}\b(?:issue|ticket|bug report)\b/;
 const FOLLOW_UP_ISSUE_REQUEST = /\bfollow[- ]?up\s+(?:issue|ticket)\b/;
@@ -82,7 +83,9 @@ export const ROUTABLE_WORKFLOWS = Object.freeze([
 
 function prepareAndMergeActions(text) {
   const actions = ["merge_pr", "post_comment", "post_issue_comment", "close_linked_issue"];
-  if (FIX_REVIEW_REQUEST.test(text) || SIMPLIFY_REQUEST.test(text)) actions.unshift("push_code");
+  if (FIX_REVIEW_REQUEST.test(text) || SIMPLIFY_REQUEST.test(text) || EXPLICIT_GREEN_REQUEST.test(text)) {
+    actions.unshift("push_code");
+  }
   return actions;
 }
 
@@ -130,7 +133,14 @@ export function issueCreationActionForPrompt(prompt) {
 
 function isPrepareAndMergeRequest(text) {
   if (!hasExplicitMergeIntent(text) || !PR_REFERENCE.test(text)) return false;
-  return FULL_REVIEW_REQUEST.test(text) || REVIEW_PREPARATION_REQUEST.test(text) || FIX_REVIEW_REQUEST.test(text) || SIMPLIFY_REQUEST.test(text);
+  return (
+    FULL_REVIEW_REQUEST.test(text)
+    || REVIEW_PREPARATION_REQUEST.test(text)
+    || FIX_REVIEW_REQUEST.test(text)
+    || SIMPLIFY_REQUEST.test(text)
+    || EXPLICIT_GREEN_REQUEST.test(text)
+    || WATCH_PR_REQUEST.test(text)
+  );
 }
 
 function isMergeDiscussion(text) {
@@ -213,7 +223,7 @@ export function routeShippingGithubPrompt(prompt, context = {}) {
   if (SIMPLIFY_REQUEST.test(text) && PR_REFERENCE.test(text)) return result("references/simplify-pr.md", "maintainer", ["push_code"]);
   if (/\b(?:security review|review security)\b/.test(text)) return result("references/security-review.md", "review");
   if (/\b(re-review|review again|recheck .*review)\b/.test(text)) return result("references/re-review-pr.md", "review");
-  if (/\b(watch|monitor|babysit|keep an eye on)\b[\s\S]*\b(?:pr|pull request)\b/.test(text)) {
+  if (WATCH_PR_REQUEST.test(text)) {
     const autonomous = /\bautonomous(ly)?\b|\bauto[- ]?fix\b|\bfix and merge without asking\b/.test(text);
     return result("references/watch-pr.md", autonomous ? "autonomous" : "read-only");
   }
