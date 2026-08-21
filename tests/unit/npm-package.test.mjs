@@ -90,6 +90,14 @@ test("package metadata exposes only the supported public npx bootstrap", () => {
   assert.match(pkg.scripts?.check || "", /package:check/);
 });
 
+test("package validator spawns npm through node, not a Windows shell", () => {
+  const source = readFileSync(join(ROOT, "scripts", "validate-npm-package.mjs"), "utf8");
+  assert.doesNotMatch(source, /npm\.cmd/);
+  assert.doesNotMatch(source, /shell:\s*true/);
+  assert.match(source, /resolveNpmCli/);
+  assert.match(source, /process\.execPath/);
+});
+
 test("npm pack contains only bootstrap runtime files plus npm's mandatory docs/metadata", () => {
   const pack = dryRunPack();
   const paths = new Set(pack.files.map((entry) => entry.path));

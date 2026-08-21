@@ -5,10 +5,10 @@ import { resolve } from "node:path";
 import { boundedSpawnSync } from "./lib/subprocess-policy.mjs";
 import { fileURLToPath } from "node:url";
 
+import { resolveNpmCli } from "./lib/npm-cli.mjs";
 import { parseNpmPackJson } from "./lib/npm-pack-json.mjs";
 
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
-const NPM = process.platform === "win32" ? "npm.cmd" : "npm";
 
 const RUNTIME_FILES = [
   "scripts/github-delivery-cli.mjs",
@@ -68,16 +68,19 @@ try {
     assert(existsSync(resolve(ROOT, path)), `missing runtime file: ${path}`);
   }
 
-  const packResult = boundedSpawnSync(NPM, ["pack", "--dry-run", "--json", "--ignore-scripts"], {
-    cwd: ROOT,
-    encoding: "utf8",
-    shell: process.platform === "win32",
-    env: {
-      ...process.env,
-      npm_config_audit: "false",
-      npm_config_fund: "false",
+  const packResult = boundedSpawnSync(
+    process.execPath,
+    [resolveNpmCli(), "pack", "--dry-run", "--json", "--ignore-scripts"],
+    {
+      cwd: ROOT,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        npm_config_audit: "false",
+        npm_config_fund: "false",
+      },
     },
-  });
+  );
   assert.equal(packResult.status, 0, packResult.stderr || packResult.stdout);
   const [pack] = parseNpmPackJson(packResult.stdout);
   assert(pack, "npm pack returned no package metadata");
