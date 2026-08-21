@@ -93,12 +93,26 @@ function matchingLive(policy = desiredPolicy()) {
         current_user_can_bypass: "never",
       },
     ],
+    tagRulesetsComplete: true,
+    tagRulesets: [coveringTagRuleset()],
     releaseEnvironment: {
       name: "release",
       protection_rules: [
         { type: "required_reviewers", reviewers: [{ reviewer: { login: "maintainer" } }] },
       ],
     },
+  };
+}
+
+function coveringTagRuleset(pattern = "v*") {
+  return {
+    id: 20972149,
+    target: "tag",
+    enforcement: "active",
+    conditions: {
+      ref_name: { include: [`refs/tags/${pattern}`], exclude: [] },
+    },
+    rules: [{ type: "deletion" }, { type: "non_fast_forward" }, { type: "update" }],
   };
 }
 
@@ -381,6 +395,41 @@ test("live policy verifier fails when current user bypass is pull_requests_only"
 test("live policy verifier accepts empty bypass actors from an admin reader", () => {
   const live = matchingLive();
   live.repository.permissions = { admin: true };
+  const report = evaluateLiveRepositoryPolicy({ policy: desiredPolicy(), live });
+  assert.equal(report.valid, true, JSON.stringify(report.errors));
+});
+
+test("live policy verifier fails closed when protected tag evidence is missing", () => {
+  const live = matchingLive();
+  delete live.tagRulesetsComplete;
+  delete live.tagRulesets;
+  const report = evaluateLiveRepositoryPolicy({ policy: desiredPolicy(), live });
+  assert.equal(report.valid, false);
+  assert.ok(report.errors.some((error) => error.code === "protected_tag_evidence_incomplete"));
+});
+
+test("live policy verifier fails when no tag ruleset covers the declared pattern", () => {
+  const live = matchingLive();
+  live.tagRulesetsComplete = true;
+  live.tagRulesets = [coveringTagRuleset("release-*")];
+  const report = evaluateLiveRepositoryPolicy({ policy: desiredPolicy(), live });
+  assert.equal(report.valid, false);
+  assert.ok(report.errors.some((error) => error.code === "protected_tag_pattern_missing"));
+});
+
+test("live policy verifier fails when a covering tag ruleset omits protection rules", () => {
+  const live = matchingLive();
+  live.tagRulesetsComplete = true;
+  live.tagRulesets = [{ ...coveringTagRuleset(), rules: [{ type: "creation" }] }];
+  const report = evaluateLiveRepositoryPolicy({ policy: desiredPolicy(), live });
+  assert.equal(report.valid, false);
+  assert.ok(report.errors.some((error) => error.code === "protected_tag_rules_missing"));
+});
+
+test("live policy verifier accepts refs/tags/v* as the declared v* pattern", () => {
+  const live = matchingLive();
+  live.tagRulesetsComplete = true;
+  live.tagRulesets = [coveringTagRuleset("v*")];
   const report = evaluateLiveRepositoryPolicy({ policy: desiredPolicy(), live });
   assert.equal(report.valid, true, JSON.stringify(report.errors));
 });

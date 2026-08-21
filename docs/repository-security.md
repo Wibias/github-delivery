@@ -20,7 +20,7 @@ Do not require Scorecard as a pull-request check because it runs on `main`, sche
 
 ## Release boundary
 
-Create an environment named `release` with at least one required reviewer. Restrict deployments to protected release tags matching `v*`. The release workflow must remain tag-only for publication; manual dispatch is validation-only.
+Create an environment named `release` with at least one required reviewer. Restrict deployments to protected release tags matching `v*`. Live Repository Policy CI must observe an active tag ruleset covering that pattern with deletion, non-fast-forward, and update rules. The release workflow must remain tag-only for publication; manual dispatch is validation-only.
 
 ## Repository features
 
