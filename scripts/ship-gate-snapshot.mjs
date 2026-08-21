@@ -381,6 +381,8 @@ function fetchPolicy(owner, name, pr) {
         pullRequest(number: $number) {
           isInMergeQueue
           isMergeQueueEnabled
+          stack { number size }
+          stackEntry { position }
           mergeQueueEntry {
             position
             state
@@ -476,6 +478,15 @@ function fetchPolicy(owner, name, pr) {
       enabled: pullRequest.isMergeQueueEnabled === true,
       inQueue: pullRequest.isInMergeQueue === true,
       entry: pullRequest.mergeQueueEntry || null,
+    },
+    nativeStack: {
+      queried: true,
+      stack: Object.prototype.hasOwnProperty.call(pullRequest, "stack")
+        ? pullRequest.stack
+        : null,
+      stackEntry: Object.prototype.hasOwnProperty.call(pullRequest, "stackEntry")
+        ? pullRequest.stackEntry
+        : null,
     },
     error: complete ? null : "policy GraphQL pagination incomplete",
   };
@@ -843,6 +854,9 @@ try {
   );
   const threads = reviewThreads(owner, name, pr);
   const policy = fetchPolicy(owner, name, pr);
+  if (policy.nativeStack?.queried === true) {
+    prEvidence.stack = policy.nativeStack.stack;
+  }
   const branchProtection = fetchBranchProtection(owner, name, base);
   const codeowners = fetchCodeowners(owner, name, base);
   const requiredChecks = normalizeRequiredChecks({

@@ -63,6 +63,7 @@ function mergeSnapshot(feedback = {}) {
         mergeStateStatus: "CLEAN",
         reviewDecision: "APPROVED",
         updatedAt: "2026-08-16T00:00:00Z",
+        stack: null,
       },
       activeRules: [
         {
@@ -187,17 +188,43 @@ test("a DRAFT GitHub merge state never becomes ready even when isDraft is false"
 test("a CLEAN GitHub merge state can still be ready", () => {
   const snapshot = {
     headOid: HEAD,
-    evidence: { pullRequest: { mergeStateStatus: "CLEAN" }, activeRules: [] },
+    evidence: { pullRequest: { mergeStateStatus: "CLEAN", stack: null }, activeRules: [] },
   };
   const gate = combineShipGateResults(readyShipInput(snapshot));
   assert.equal(gate.ready, true);
   assert.equal(gate.decision, "ready");
 });
 
+test("a missing native stack field never becomes ready", () => {
+  const snapshot = {
+    headOid: HEAD,
+    evidence: { pullRequest: { mergeStateStatus: "CLEAN" }, activeRules: [] },
+  };
+  const gate = combineShipGateResults(readyShipInput(snapshot));
+  assert.equal(gate.ready, false);
+  assert.ok(gate.unknowns.includes("policy:native_stack_unreadable"));
+});
+
+test("a native-stack member never becomes ready", () => {
+  const snapshot = {
+    headOid: HEAD,
+    evidence: {
+      pullRequest: {
+        mergeStateStatus: "CLEAN",
+        stack: { id: 427761, number: 289, position: 5, size: 5 },
+      },
+      activeRules: [],
+    },
+  };
+  const gate = combineShipGateResults(readyShipInput(snapshot));
+  assert.equal(gate.ready, false);
+  assert.ok(gate.unknowns.includes("policy:native_stack_unsupported"));
+});
+
 test("DIRTY merge state is left to wake and does not add a combiner unknown", () => {
   const snapshot = {
     headOid: HEAD,
-    evidence: { pullRequest: { mergeStateStatus: "DIRTY" }, activeRules: [] },
+    evidence: { pullRequest: { mergeStateStatus: "DIRTY", stack: null }, activeRules: [] },
   };
   const gate = combineShipGateResults(readyShipInput(snapshot));
   assert.equal(gate.decision, "ready");

@@ -54,6 +54,7 @@ function writeSnapshot() {
         isDraft: false,
         reviewRequests: [],
         commits: [],
+        stack: null,
       },
       changedFiles: [],
       branchProtection: null,

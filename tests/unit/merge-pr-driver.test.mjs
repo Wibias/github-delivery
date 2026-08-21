@@ -54,6 +54,7 @@ function readySnapshot({ state = "OPEN", isDraft = false, authorLogin = "alice" 
         title: "Test PR",
         isDraft,
         state,
+        stack: null,
       },
       changedFiles: [],
       branchProtection: {},
@@ -125,6 +126,27 @@ test("merge boundary refuses repositories without server-enforced base coherence
   assert.throws(
     () => mergeBoundaryForSnapshot(boundarySnapshot({ strict: false, mergeQueue: false })),
     /merge_boundary_not_server_enforced/,
+  );
+});
+
+test("merge boundary refuses direct merge while a native stack is present", () => {
+  const snapshot = boundarySnapshot();
+  snapshot.evidence.pullRequest = {
+    ...snapshot.evidence.pullRequest,
+    stack: { id: 427761, number: 289, position: 5, size: 5 },
+  };
+  assert.throws(
+    () => mergeBoundaryForSnapshot(snapshot),
+    /merge_boundary_native_stack_unsupported/,
+  );
+});
+
+test("merge boundary refuses merge when native stack identity was not captured", () => {
+  const snapshot = boundarySnapshot();
+  delete snapshot.evidence.pullRequest.stack;
+  assert.throws(
+    () => mergeBoundaryForSnapshot(snapshot),
+    /merge_boundary_native_stack_unreadable/,
   );
 });
 

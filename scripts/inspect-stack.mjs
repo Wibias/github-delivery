@@ -72,6 +72,60 @@ export function stackRefKey(repoFullName, refName) {
   return `${String(repoFullName).toLowerCase()}\u0000${String(refName)}`;
 }
 
+function normalizeNativeStackField(stack) {
+  if (stack === undefined) return undefined;
+  if (stack === null) return null;
+  if (typeof stack !== "object") return stack;
+  return {
+    id: stack.id ?? null,
+    number: stack.number ?? null,
+    position: stack.position ?? null,
+    size: stack.size ?? null,
+    baseRefName: stack.baseRefName ?? stack.base?.ref ?? null,
+  };
+}
+
+function nativeStackGroupKey(stack) {
+  if (!stack || typeof stack !== "object") return null;
+  if (stack.id != null && stack.id !== "") return `id:${stack.id}`;
+  if (stack.number != null && stack.number !== "") return `number:${stack.number}`;
+  return null;
+}
+
+function nativeParentOf(pr, prs) {
+  const key = nativeStackGroupKey(pr.stack);
+  if (!key || pr.stack?.position == null) return null;
+  const position = Number(pr.stack.position);
+  if (!Number.isFinite(position)) return null;
+  const lower = prs.filter((other) => {
+    if (other.number === pr.number) return false;
+    return (
+      nativeStackGroupKey(other.stack) === key &&
+      Number(other.stack?.position) < position
+    );
+  });
+  if (!lower.length) return null;
+  lower.sort((a, b) => Number(b.stack.position) - Number(a.stack.position));
+  return lower[0];
+}
+
+function hasOpenNativeParent(pr, prs) {
+  return Boolean(nativeParentOf(pr, prs));
+}
+
+function applyNativeStackMembership(prs, children) {
+  for (const pr of prs) {
+    const parent = nativeParentOf(pr, prs);
+    if (!parent) continue;
+    const parentHead = stackRefKey(parent.headRepoFullName, parent.headRefName);
+    const kids = children.get(parentHead) || [];
+    if (!kids.some((row) => row.number === pr.number)) {
+      kids.push(pr);
+      children.set(parentHead, kids);
+    }
+  }
+}
+
 export function normalizePullPages(payload) {
   if (!Array.isArray(payload)) throw new Error("stack_pr_pages_invalid");
   const pages = payload.length && payload.every(Array.isArray) ? payload : [payload];
@@ -94,7 +148,7 @@ export function normalizePullPages(payload) {
       ) {
         throw new Error("stack_pr_row_incomplete");
       }
-      prs.push({
+      const normalized = {
         number,
         title: String(row?.title || ""),
         headRefName: String(headRefName),
@@ -104,7 +158,10 @@ export function normalizePullPages(payload) {
         url: String(row?.url ?? row?.html_url ?? ""),
         isDraft: row?.isDraft === true || row?.draft === true,
         headRefOid: row?.headRefOid ?? row?.head?.sha ?? null,
-      });
+      };
+      const stack = normalizeNativeStackField(row?.stack);
+      if (stack !== undefined) normalized.stack = stack;
+      prs.push(normalized);
     }
   }
   const numbers = new Set();
@@ -144,6 +201,7 @@ export function buildGraph(prs) {
     if (!children.has(baseKey)) children.set(baseKey, []);
     children.get(baseKey).push(pr);
   }
+  applyNativeStackMembership(prs, children);
   return { byHead, children };
 }
 
@@ -152,6 +210,7 @@ export function stackRoots(prs, trunkNames, children) {
     prs.map((pr) => stackRefKey(pr.headRepoFullName, pr.headRefName)),
   );
   return prs.filter((pr) => {
+    if (hasOpenNativeParent(pr, prs)) return false;
     const baseIsTrunk = trunkNames.has(pr.baseRefName);
     const baseIsOpenHead = heads.has(stackRefKey(pr.baseRepoFullName, pr.baseRefName));
     return baseIsTrunk || !baseIsOpenHead;
@@ -188,7 +247,9 @@ export function connectedFromHead(head, byHead, children, repoFullName = null) {
   let cursor = start;
   const seen = new Set();
   while (true) {
-    const parent = byHead.get(stackRefKey(cursor.baseRepoFullName, cursor.baseRefName));
+    const inferred = byHead.get(stackRefKey(cursor.baseRepoFullName, cursor.baseRefName));
+    const nativeParent = nativeParentOf(cursor, [...byHead.values()]);
+    const parent = nativeParent || inferred;
     if (!parent) break;
     if (seen.has(cursor.number)) throw new Error(`stack_cycle:${cursor.number}`);
     seen.add(cursor.number);

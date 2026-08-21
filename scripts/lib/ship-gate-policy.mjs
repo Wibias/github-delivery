@@ -1,3 +1,5 @@
+import { nativeStackShipGateUnknowns } from "./merge-stack-policy.mjs";
+
 const UNDERSTOOD_ACTIVE_RULE_TYPES = new Set([
   "deletion",
   "non_fast_forward",
@@ -107,6 +109,7 @@ export function combineShipGateResults({
   }
 
   applyMergeStateUnknowns(snapshot, unknowns);
+  unknowns.push(...nativeStackShipGateUnknowns(snapshot));
 
   const mergeQueueEnabled = reviewPolicy?.mergeQueue?.enabled === true;
   const mergeGroupCoverage = reviewPolicy?.mergeGroupWorkflowCoverage || null;

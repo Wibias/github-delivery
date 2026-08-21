@@ -4,11 +4,11 @@ Canonical rules for discovering, updating, rewriting, recovering, and merging PR
 
 ### GD-STACK-001 — Discover topology before stack mutation
 
-A PR whose base is another open PR head, or which has open children, is part of a stack. Discover parent/child/base/head relationships before mutation, readiness, supersede, retarget, or merge decisions.
+A PR whose base is another open PR head, or which has open children, is part of a stack. GitHub native `stack` membership is also a stack. Discover parent/child/base/head relationships, and native stack identity, before mutation, readiness, supersede, retarget, or merge decisions. When inferred bases and native membership disagree, native membership wins.
 
 ### GD-STACK-002 — Merge bottom-up and revalidate survivors
 
-Never merge a middle/top PR as if it targeted trunk. Merge the bottom eligible PR first, then re-read and revalidate every surviving child because its base/topology and required evidence may have changed.
+Never merge a middle/top PR as if it targeted trunk. Never merge a GitHub-native stack member as an independent trunk PR. Merge the bottom eligible inferred PR first, then re-read and revalidate every surviving child because its base/topology and required evidence may have changed. Native stacks cannot use `gh pr merge`; github-delivery hard-stops until a native stack merge API exists.
 
 ### GD-STACK-003 — Update against the immediate parent
 

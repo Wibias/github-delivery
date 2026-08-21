@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 
+import { nativeStackFromSnapshot } from "./merge-stack-policy.mjs";
+
 function requiredString(value, code) {
   const text = String(value || "").trim();
   if (!text) throw new Error(code);
@@ -68,6 +70,17 @@ function feedbackFingerprint(snapshot = {}) {
 }
 
 export function mergeBoundaryForSnapshot(snapshot = {}) {
+  const identity = nativeStackFromSnapshot(snapshot);
+  if (!identity.queried || (identity.present && !identity.complete)) {
+    throw new Error(
+      "merge_boundary_native_stack_unreadable: native stack identity was not captured",
+    );
+  }
+  if (identity.present) {
+    throw new Error(
+      "merge_boundary_native_stack_unsupported: native stacks cannot use gh pr merge",
+    );
+  }
   const capture = snapshot?.evidence?.captureBoundary || {};
   const headOid = requiredString(snapshot?.headOid || capture.headOid, "merge_boundary_head_missing").toLowerCase();
   const baseRefName = requiredString(capture.baseRefName, "merge_boundary_base_ref_missing");

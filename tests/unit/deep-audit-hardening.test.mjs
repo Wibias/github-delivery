@@ -224,6 +224,43 @@ test("merge execution rejects a child while its stack parent is still open", () 
   assert.match(executionBoundary, /verifyMergeStackEligibility/);
 });
 
+test("a trunk-targeting native-stack member is not independently merge-eligible", () => {
+  const repo = "acme/widget";
+  const prs = [
+    {
+      number: 286,
+      title: "lower",
+      headRefName: "feat/lower",
+      baseRefName: "main",
+      headRepoFullName: repo,
+      baseRepoFullName: repo,
+      url: "https://example.invalid/286",
+      isDraft: false,
+      headRefOid: "a".repeat(40),
+      stack: { id: 427761, number: 289, position: 4, size: 5 },
+    },
+    {
+      number: 287,
+      title: "top",
+      headRefName: "feat/top",
+      baseRefName: "main",
+      headRepoFullName: repo,
+      baseRepoFullName: repo,
+      url: "https://example.invalid/287",
+      isDraft: false,
+      headRefOid: "b".repeat(40),
+      stack: { id: 427761, number: 289, position: 5, size: 5 },
+    },
+  ];
+  const top = evaluateMergeStackEligibility({ prs, targetPr: 287 });
+  assert.equal(top.eligible, false);
+  assert.equal(top.reason, "native_stack_unsupported");
+
+  const snapshotSource = source("scripts/ship-gate-snapshot.mjs");
+  assert.match(snapshotSource, /stack \{ number size \}/);
+  assert.match(snapshotSource, /stackEntry \{ position \}/);
+});
+
 test("orphan cleanup aborts if the default branch generation moves before deletion", async () => {
   const calls = [];
   let refReads = 0;

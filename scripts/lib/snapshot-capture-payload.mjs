@@ -268,6 +268,7 @@ export function assembleSnapshotCapture({
           inQueue: false,
           entry: null,
         },
+        nativeStack: policy?.nativeStack || { queried: false, stack: undefined, stackEntry: undefined },
       },
       workflowCoverage: workflowCoverage
         ? {
