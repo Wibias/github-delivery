@@ -17,6 +17,7 @@ function snapshot(activeRules) {
         baseOid: BASE,
         rulesFingerprint: RULES,
       },
+      pullRequest: { stack: null },
       activeRules,
       policy: { mergeQueue: { enabled: false } },
     },

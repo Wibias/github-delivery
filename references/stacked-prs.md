@@ -20,13 +20,15 @@ Do not use this workflow to split one oversized branch into a new stack; route t
 
 ## Core model
 
-Treat open GitHub PR base links as the authoritative graph:
+Treat GitHub native stack identity as authoritative when it is present. Open PR base links remain the inferred graph for unstacked PRs:
 
 ```text
 PR headRefName → PR baseRefName
 ```
 
-A stack is a connected component where at least one open PR targets another open PR's head branch. Prefer this graph over branch-name conventions or local ancestry.
+A native `stack` object on a pull request is a different membership oracle. Prefer it over inferred bases when they disagree. github-delivery will not merge a native-stack member with `gh pr merge`.
+
+A stack is a connected component where GitHub reports native stack membership, or where at least one open PR targets another open PR's head branch. Prefer this graph over branch-name conventions or local ancestry.
 
 - **bottom** — lowest open PR, normally targeting trunk;
 - **parent** — immediate PR base of a child;

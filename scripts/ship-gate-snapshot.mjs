@@ -382,14 +382,8 @@ function fetchPolicy(owner, name, pr) {
         pullRequest(number: $number) {
           isInMergeQueue
           isMergeQueueEnabled
-          stack {
-            number
-            size
-            baseRefName
-          }
-          stackEntry {
-            position
-          }
+          stack { number size baseRefName }
+          stackEntry { position }
           mergeQueueEntry {
             position
             state
@@ -486,8 +480,21 @@ function fetchPolicy(owner, name, pr) {
       inQueue: pullRequest.isInMergeQueue === true,
       entry: pullRequest.mergeQueueEntry || null,
     },
-    stack: pullRequest.stack ?? null,
-    stackEntry: pullRequest.stackEntry ?? null,
+    nativeStack: {
+      queried: true,
+      ...(Object.prototype.hasOwnProperty.call(pullRequest, "stack")
+        ? { stack: pullRequest.stack }
+        : {}),
+      ...(Object.prototype.hasOwnProperty.call(pullRequest, "stackEntry")
+        ? { stackEntry: pullRequest.stackEntry }
+        : {}),
+    },
+    stack: Object.prototype.hasOwnProperty.call(pullRequest, "stack")
+      ? pullRequest.stack
+      : undefined,
+    stackEntry: Object.prototype.hasOwnProperty.call(pullRequest, "stackEntry")
+      ? pullRequest.stackEntry
+      : undefined,
     error: complete ? null : "policy GraphQL pagination incomplete",
   };
 }
@@ -785,8 +792,18 @@ try {
   const base = prEvidence.baseRefName;
   const restPull = fetchRestPull(owner, name, pr);
   const policy = fetchPolicy(owner, name, pr);
-  prEvidence.stack = policy.stack ?? restPull.stack ?? null;
-  prEvidence.stackEntry = policy.stackEntry ?? null;
+  if (
+    policy.nativeStack?.queried === true &&
+    Object.prototype.hasOwnProperty.call(policy.nativeStack, "stack")
+  ) {
+    prEvidence.stack = policy.nativeStack.stack;
+  }
+  if (
+    policy.nativeStack?.queried === true &&
+    Object.prototype.hasOwnProperty.call(policy.nativeStack, "stackEntry")
+  ) {
+    prEvidence.stackEntry = policy.nativeStack.stackEntry;
+  }
   const protectionBase =
     normalizeNativeStack(prEvidence.stack).baseRefName || base;
   const headOid = prEvidence.headRefOid;

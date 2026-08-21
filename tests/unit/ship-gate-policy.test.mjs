@@ -21,10 +21,11 @@ function input(overrides = {}) {
       pr: 42,
       headOid: "abc123",
       evidence: {
-        pullRequest: {
-          url: "https://github.com/Wibias/github-delivery/pull/42",
-          mergeStateStatus: "CLEAN",
-        },
+      pullRequest: {
+        url: "https://github.com/Wibias/github-delivery/pull/42",
+        mergeStateStatus: "CLEAN",
+        stack: null,
+      },
       },
     },
     requiredChecks: component(),

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { nativeStackBlocksDirectMerge } from "./native-stack-policy.mjs";
+
+import { nativeStackFromSnapshot } from "./merge-stack-policy.mjs";
 
 function requiredString(value, code) {
   const text = String(value || "").trim();
@@ -69,9 +70,15 @@ function feedbackFingerprint(snapshot = {}) {
 }
 
 export function mergeBoundaryForSnapshot(snapshot = {}) {
-  if (nativeStackBlocksDirectMerge(snapshot)) {
+  const identity = nativeStackFromSnapshot(snapshot);
+  if (!identity.queried || (identity.present && !identity.complete)) {
     throw new Error(
-      "merge_boundary_native_stack_unsupported: native stacks cannot use gh pr merge; remaining layers are unevaluated",
+      "merge_boundary_native_stack_unreadable: native stack identity was not captured",
+    );
+  }
+  if (identity.present) {
+    throw new Error(
+      "merge_boundary_native_stack_unsupported: native stacks cannot use gh pr merge",
     );
   }
   const capture = snapshot?.evidence?.captureBoundary || {};

@@ -6,6 +6,7 @@ import {
   connectedFromHead,
   listAllOpenPullRequests,
   normalizePullPages,
+  stackRoots,
 } from "../../scripts/inspect-stack.mjs";
 
 function pull(
@@ -15,6 +16,7 @@ function pull(
     headRefName = `branch-${number}`,
     headRepo = "acme/widgets",
     baseRepo = "acme/widgets",
+    stack,
   } = {},
 ) {
   return {
@@ -31,6 +33,7 @@ function pull(
       ref: baseRefName,
       repo: { full_name: baseRepo },
     },
+    ...(stack !== undefined ? { stack } : {}),
   };
 }
 
@@ -173,4 +176,29 @@ test("branching stacks fail closed instead of inventing a linear merge order", (
     () => connectedFromHead("child-a", byHead, children, "acme/widgets"),
     /stack_branching:1:children=2,3/,
   );
+});
+
+test("native stack membership wins over inferred trunk bases", () => {
+  const stack = {
+    id: 427761,
+    number: 289,
+    size: 2,
+  };
+  const prs = normalizePullPages([
+    [
+      pull(286, "main", {
+        headRefName: "feat/lower",
+        stack: { ...stack, position: 1 },
+      }),
+      pull(287, "main", {
+        headRefName: "feat/top",
+        stack: { ...stack, position: 2 },
+      }),
+    ],
+  ]);
+  const { byHead, children } = buildGraph(prs);
+  const linked = connectedFromHead("feat/top", byHead, children, "acme/widgets");
+  assert.deepEqual(linked.map((pr) => pr.number), [286, 287]);
+  const roots = stackRoots(prs, new Set(["main"]), children);
+  assert.deepEqual(roots.map((pr) => pr.number), [286]);
 });
