@@ -25,17 +25,30 @@ function graphqlQuery(args) {
   return "";
 }
 
+function hasStdinBody(args) {
+  return args.some((value) => {
+    const flag = String(value || "");
+    return flag === "--input"
+      || flag === "--body-file"
+      || flag.startsWith("--input=")
+      || flag.startsWith("--body-file=");
+  });
+}
+
 export function isReadOnlyGitHubCommand(command, args = []) {
   if (command !== "gh" || !Array.isArray(args) || args.length === 0) return false;
   const [group, subcommand] = args;
   if (group === "api") {
     const method = methodFromArgs(args);
+    const stdinBody = hasStdinBody(args);
     if (String(subcommand || "") === "graphql") {
       if (method && method !== "GET" && method !== "POST") return false;
+      if (stdinBody && !graphqlQuery(args)) return false;
       return !/\bmutation\b/i.test(graphqlQuery(args));
     }
     if (method) return method === "GET";
-    // gh api switches to POST when fields are supplied without an explicit GET.
+    // gh api switches to POST when fields or an HTTP body are supplied without GET.
+    if (stdinBody) return false;
     if (args.some((value) => ["-f", "-F", "--raw-field", "--field"].includes(value))) {
       return false;
     }

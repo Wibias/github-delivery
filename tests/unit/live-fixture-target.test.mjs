@@ -201,6 +201,22 @@ test("only proven read-only gh commands are retryable", () => {
     false,
   );
   assert.equal(isReadOnlyGitHubCommand("gh", ["pr", "comment", "42"]), false);
+  assert.equal(
+    isReadOnlyGitHubCommand("gh", ["api", "repos/acme/widgets/issues/1", "--input", "-"]),
+    false,
+  );
+  assert.equal(
+    isReadOnlyGitHubCommand("gh", ["api", "graphql", "--input", "-"]),
+    false,
+  );
+  assert.equal(
+    isReadOnlyGitHubCommand("gh", ["api", "repos/acme/widgets/issues/1", "--input=-"]),
+    false,
+  );
+  assert.equal(
+    isReadOnlyGitHubCommand("gh", ["api", "-X", "GET", "repos/acme/widgets", "--input", "-"]),
+    true,
+  );
 });
 
 test("rate-limit classifier honours Retry-After and reset metadata", () => {
