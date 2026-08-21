@@ -104,3 +104,23 @@ test("mutating GitHub commands are never retried automatically", () => {
   assert.equal(calls, 1);
   assert.equal(result.githubDeliveryAttempts, 1);
 });
+
+test("gh api --input without GET is not retried on rate limit", () => {
+  let calls = 0;
+  const result = runGitHubCommandWithRetry(
+    "gh",
+    ["api", "repos/acme/widgets/issues/1", "--input", "-"],
+    {
+      runner() {
+        calls += 1;
+        return rateLimited("HTTP 429\nretry-after: 60");
+      },
+      sleep() {
+        assert.fail("stdin-body retry must not sleep");
+      },
+    },
+  );
+
+  assert.equal(calls, 1);
+  assert.equal(result.githubDeliveryAttempts, 1);
+});
