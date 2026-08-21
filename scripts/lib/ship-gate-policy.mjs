@@ -1,3 +1,5 @@
+import { nativeStackUnknowns } from "./native-stack-policy.mjs";
+
 const UNDERSTOOD_ACTIVE_RULE_TYPES = new Set([
   "deletion",
   "non_fast_forward",
@@ -84,6 +86,10 @@ export function combineShipGateResults({
 
   for (const type of unsupportedActiveRuleTypes(snapshot)) {
     unknowns.push(`policy:unsupported_active_ruleset_rule:${type}`);
+  }
+
+  for (const unknown of nativeStackUnknowns(snapshot, requiredChecks)) {
+    unknowns.push(unknown);
   }
 
   const mergeStateStatus = String(

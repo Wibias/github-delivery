@@ -128,6 +128,18 @@ test("merge boundary refuses repositories without server-enforced base coherence
   );
 });
 
+test("merge boundary refuses direct merge while a native stack is present", () => {
+  const snapshot = boundarySnapshot();
+  snapshot.evidence.pullRequest = {
+    ...snapshot.evidence.pullRequest,
+    stack: { size: 5, baseRefName: "main" },
+  };
+  assert.throws(
+    () => mergeBoundaryForSnapshot(snapshot),
+    /merge_boundary_native_stack_unsupported/,
+  );
+});
+
 test("merge boundary rejects a base move after approval", () => {
   const approved = mergeBoundaryForSnapshot(boundarySnapshot());
   const moved = boundarySnapshot({ baseOid: "d".repeat(40) });
