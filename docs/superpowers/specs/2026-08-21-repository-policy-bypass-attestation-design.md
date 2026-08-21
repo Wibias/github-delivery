@@ -78,6 +78,8 @@ Happy-path `matchingLive()` must include `repository.permissions.admin: true` so
 
 `tests/unit/actions-usage-contract.test.mjs`: workflow `GH_TOKEN` prefers `secrets.REPOSITORY_POLICY_TOKEN`.
 
+Pull-request CI may exit 0 when the **only** live error is `ruleset_bypass_evidence_incomplete`. Schedule, `workflow_dispatch`, and pushes to `main` still fail that error. Any other live drift, including a privileged reader seeing `pull_requests_only` / `always`, still fails pull-request CI.
+
 ## Docs
 
 `docs/repository-security.md`: live verify requires a token with repository admin so bypass actors are visible. Default Actions `GITHUB_TOKEN` cannot attest that policy.

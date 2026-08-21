@@ -294,6 +294,19 @@ export function bypassReaderCanAttest(live = {}) {
   return live.repository?.permissions?.admin === true;
 }
 
+export function liveRepositoryPolicyCiExitCode(report, { eventName } = {}) {
+  if (report?.valid === true) return 0;
+  const errors = Array.isArray(report?.errors) ? report.errors : [];
+  if (
+    eventName === "pull_request" &&
+    errors.length > 0 &&
+    errors.every((error) => error?.code === "ruleset_bypass_evidence_incomplete")
+  ) {
+    return 0;
+  }
+  return 1;
+}
+
 function activeRulesetBypassState(live = {}) {
   const rulesets = Array.isArray(live.activeRulesets) ? live.activeRulesets : [];
   const bypassActors = rulesets.flatMap((ruleset) =>

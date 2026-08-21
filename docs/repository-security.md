@@ -94,4 +94,4 @@ For live declared-vs-GitHub drift, run:
 node scripts/verify-live-repository-policy.mjs OWNER/REPO
 ```
 
-That command must use a token with repository admin. Default Actions `GITHUB_TOKEN` cannot see Admin ruleset bypass actors, so empty bypass lists from that identity are incomplete, not a pass. Scheduled Repository Policy CI should set `REPOSITORY_POLICY_TOKEN` to a repo-admin token.
+That command must use a token with repository admin. Default Actions `GITHUB_TOKEN` cannot see Admin ruleset bypass actors, so empty bypass lists from that identity are incomplete, not a pass. Scheduled Repository Policy CI and pushes to main stay fail-closed. Pull-request CI does not fail when that incomplete-attestation error is the only live gap, so a policy PR can land before `REPOSITORY_POLICY_TOKEN` is configured.

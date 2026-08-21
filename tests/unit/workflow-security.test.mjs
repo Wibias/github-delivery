@@ -6,6 +6,7 @@ import test from "node:test";
 
 import {
   evaluateLiveRepositoryPolicy,
+  liveRepositoryPolicyCiExitCode,
   validateRepositoryPolicy,
   validateWorkflowFile,
   validateWorkflowTree,
@@ -382,6 +383,32 @@ test("live policy verifier accepts empty bypass actors from an admin reader", ()
   live.repository.permissions = { admin: true };
   const report = evaluateLiveRepositoryPolicy({ policy: desiredPolicy(), live });
   assert.equal(report.valid, true, JSON.stringify(report.errors));
+});
+
+test("pull_request CI does not fail when the only live policy gap is unprivileged bypass attestation", () => {
+  const live = matchingLive();
+  delete live.repository.permissions;
+  const report = evaluateLiveRepositoryPolicy({ policy: desiredPolicy(), live });
+  assert.equal(report.valid, false);
+  assert.equal(liveRepositoryPolicyCiExitCode(report, { eventName: "pull_request" }), 0);
+  assert.equal(liveRepositoryPolicyCiExitCode(report, { eventName: "schedule" }), 1);
+  assert.equal(liveRepositoryPolicyCiExitCode(report, { eventName: "push" }), 1);
+});
+
+test("pull_request CI still fails when bypass attestation is incomplete plus other live drift", () => {
+  const live = matchingLive();
+  delete live.repository.permissions;
+  live.branch.protected = false;
+  const report = evaluateLiveRepositoryPolicy({ policy: desiredPolicy(), live });
+  assert.equal(liveRepositoryPolicyCiExitCode(report, { eventName: "pull_request" }), 1);
+});
+
+test("pull_request CI still fails when an admin reader can bypass pull requests", () => {
+  const live = matchingLive();
+  live.repository.permissions = { admin: true };
+  live.activeRulesets[0].current_user_can_bypass = "pull_requests_only";
+  const report = evaluateLiveRepositoryPolicy({ policy: desiredPolicy(), live });
+  assert.equal(liveRepositoryPolicyCiExitCode(report, { eventName: "pull_request" }), 1);
 });
 
 test("live policy verifier detects branch and repository merge control drift", () => {

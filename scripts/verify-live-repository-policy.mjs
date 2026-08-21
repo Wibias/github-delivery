@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 
 import {
   evaluateLiveRepositoryPolicy,
+  liveRepositoryPolicyCiExitCode,
   rulesetBypassFieldsComplete,
 } from "./lib/workflow-security.mjs";
 
@@ -159,7 +160,9 @@ function main(argv) {
     },
   });
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
-  if (!report.valid) process.exitCode = 1;
+  process.exitCode = liveRepositoryPolicyCiExitCode(report, {
+    eventName: process.env.EVENT_NAME,
+  });
 }
 
 try {
