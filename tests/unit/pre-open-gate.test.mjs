@@ -99,6 +99,27 @@ test("pre-open gate: Copilot MCP servers JSON is not ready", () => {
   }
 });
 
+test("pre-open gate: trailing format characters after a code extension are not ready", () => {
+  const patch = "+const x = 1;";
+  const paths = [
+    "src/worker.ts\u200B",
+    "scripts/run.mjs ",
+    "src/worker.ts\r",
+    "src/worker.ts\u202E",
+    "src/worker.ts\u00A0",
+  ];
+  for (const path of paths) {
+    const plan = planReviewScope({
+      repo: "acme/widget",
+      pr: null,
+      headRefOid: "abc",
+      files: [file(path, patch)],
+    });
+    const { decision } = gateDecision(plan);
+    assert.notEqual(decision, "ready", JSON.stringify(path));
+  }
+});
+
 test("pre-open gate: empty candidate diff is blocked until implementation exists", () => {
   const plan = planReviewScope({ repo: "acme/widget", pr: null, headRefOid: "base", files: [] });
   const result = evaluate(plan);

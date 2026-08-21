@@ -4,6 +4,11 @@ const DOC_PATH_RE = /(^|\/)docs?\//i;
 const UI_PATH_RE = /(^|\/)(?:app|pages?|views?|screens?|components?|ui|frontend|web|client)(\/|$)/i;
 const UI_CODE_RE = /\.(?:html?|jsx?|tsx?|vue|svelte)$/i;
 const VISUAL_LINE_RE = /(?:className=|class=|style=|<img\b|<svg\b|<video\b|<canvas\b|<button\b|<dialog\b|<input\b|<select\b|<textarea\b|display\s*:|grid|flex|padding|margin|font|color|background|border|width|height|position\s*:|aria-|role=)/i;
+const TRAILING_INVISIBLE_RE = /[\p{Cf}\p{Cc}\p{Zs}]+$/u;
+
+export function normalizeReviewPath(path) {
+  return String(path ?? "").replace(TRAILING_INVISIBLE_RE, "");
+}
 
 function patchChangedLines(patch = "") {
   return String(patch).split(/\r?\n/).filter((line) =>
@@ -24,7 +29,7 @@ function normalizeFile(raw = {}) {
 }
 
 function reasonFor(file) {
-  const paths = [file.path, file.previousPath].filter(Boolean);
+  const paths = [file.path, file.previousPath].filter(Boolean).map(normalizeReviewPath);
   if (paths.some((path) => STYLE_PATH_RE.test(path))) return { score: 6, reason: "stylesheet_changed" };
   if (paths.some((path) => VISUAL_ASSET_RE.test(path) && !DOC_PATH_RE.test(path))) {
     return { score: 5, reason: "visual_asset_changed" };
@@ -33,7 +38,7 @@ function reasonFor(file) {
     const lines = patchChangedLines(file.patch);
     if (!file.patch || lines.some((line) => VISUAL_LINE_RE.test(line))) return { score: 5, reason: "ui_surface_changed" };
   }
-  if (UI_CODE_RE.test(file.path) && patchChangedLines(file.patch).some((line) => VISUAL_LINE_RE.test(line))) {
+  if (UI_CODE_RE.test(normalizeReviewPath(file.path)) && patchChangedLines(file.patch).some((line) => VISUAL_LINE_RE.test(line))) {
     return { score: 4, reason: "visual_markup_or_style_changed" };
   }
   return null;
