@@ -12,7 +12,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
 
 import {
@@ -20,7 +20,79 @@ import {
   statePathForProtocolQuarantine,
   statePathForSession,
 } from "../../scripts/codex-watchdog-hook.mjs";
-import { sessionStateDirectory } from "../../scripts/lib/watchdog-state-store.mjs";
+import {
+  sessionStateDirectory,
+  watchdogStatePath,
+} from "../../scripts/lib/watchdog-state-store.mjs";
+
+const storeUrl = pathToFileURL(
+  fileURLToPath(new URL("../../scripts/lib/watchdog-state-store.mjs", import.meta.url)),
+).href;
+
+function waitChild(child) {
+  return new Promise((resolve, reject) => {
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => { stdout += chunk; });
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    child.once("error", reject);
+    child.once("exit", (code) => resolve({ code, stdout, stderr }));
+  });
+}
+
+async function waitForFile(path, timeoutMs = 8_000) {
+  const started = Date.now();
+  while (!existsSync(path)) {
+    if (Date.now() - started > timeoutMs) {
+      throw new Error(`timed out waiting for ${path}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
+function spawnLockWorker({
+  root,
+  scope,
+  readyFile,
+  releaseFile,
+  marker,
+  staleLockMs,
+  lockWaitMs,
+}) {
+  const scriptPath = join(root, `lock-worker-${marker}.mjs`);
+  writeFileSync(
+    scriptPath,
+    `import { existsSync, writeFileSync } from "node:fs";
+import { withWatchdogState } from ${JSON.stringify(storeUrl)};
+
+const releaseFile = ${JSON.stringify(releaseFile)};
+const started = Date.now();
+withWatchdogState(
+  ${JSON.stringify(scope)},
+  () => {
+    writeFileSync(${JSON.stringify(readyFile)}, ${JSON.stringify(marker)});
+    while (!existsSync(releaseFile)) {
+      if (Date.now() - started > 20_000) throw new Error("release wait timed out");
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+    }
+    return { state: { marker: ${JSON.stringify(marker)} } };
+  },
+  {
+    stateRoot: ${JSON.stringify(root)},
+    staleLockMs: ${Number(staleLockMs)},
+    lockWaitMs: ${Number(lockWaitMs)},
+  },
+);
+`,
+    "utf8",
+  );
+  return spawn(process.execPath, [scriptPath], {
+    stdio: ["ignore", "pipe", "pipe"],
+    windowsHide: true,
+  });
+}
 
 const hookEntrypoint = fileURLToPath(new URL("../../scripts/codex-watchdog-hook.mjs", import.meta.url));
 
@@ -135,6 +207,66 @@ test("fresh locks are respected and stale locks recover", () => {
   });
   assert.equal(recovered.output, null);
   assert.equal(existsSync(lockPath), false);
+});
+
+test("stale lock steal does not let the original holder unlink or overwrite the stealer", async () => {
+  const root = mkdtempSync(join(tmpdir(), "gd-lock-fence-"));
+  const scope = { sessionId: "session-fence", turnId: "turn-fence", agentId: "main" };
+  const statePath = watchdogStatePath(root, scope);
+  const lockPath = `${statePath}.lock`;
+  mkdirSync(dirname(statePath), { recursive: true });
+
+  const holderReady = join(root, "holder-ready");
+  const holderRelease = join(root, "holder-release");
+  const stealerReady = join(root, "stealer-ready");
+  const stealerRelease = join(root, "stealer-release");
+
+  const holder = spawnLockWorker({
+    root,
+    scope,
+    readyFile: holderReady,
+    releaseFile: holderRelease,
+    marker: "holder",
+    staleLockMs: 10_000,
+    lockWaitMs: 15_000,
+  });
+  const stealerHold = { child: null };
+  try {
+    const holderExit = waitChild(holder);
+    await waitForFile(holderReady);
+    assert.equal(existsSync(lockPath), true);
+
+    const old = new Date(Date.now() - 60_000);
+    utimesSync(lockPath, old, old);
+
+    stealerHold.child = spawnLockWorker({
+      root,
+      scope,
+      readyFile: stealerReady,
+      releaseFile: stealerRelease,
+      marker: "stealer",
+      staleLockMs: 1_000,
+      lockWaitMs: 15_000,
+    });
+    const stealerExit = waitChild(stealerHold.child);
+    await waitForFile(stealerReady);
+
+    writeFileSync(holderRelease, "go");
+    const holderResult = await holderExit;
+    assert.equal(existsSync(lockPath), true, "holder must not unlink the stealer lock");
+    assert.notEqual(holderResult.code, 0);
+    assert.match(`${holderResult.stderr}\n${holderResult.stdout}`, /lost watchdog state lock/i);
+
+    writeFileSync(stealerRelease, "go");
+    const stealerResult = await stealerExit;
+    assert.equal(stealerResult.code, 0, stealerResult.stderr);
+    assert.equal(existsSync(lockPath), false);
+    const stored = JSON.parse(readFileSync(statePath, "utf8"));
+    assert.equal(stored.marker, "stealer");
+  } finally {
+    holder.kill("SIGTERM");
+    stealerHold.child?.kill("SIGTERM");
+  }
 });
 
 test("malformed persisted state fails explicitly instead of silently disabling protection", () => {

@@ -87,14 +87,57 @@ function sleep(ms) {
   Atomics.wait(sleeper, 0, 0, ms);
 }
 
+function createLockToken() {
+  return `${process.pid}-${randomBytes(16).toString("hex")}`;
+}
+
+function readLockToken(lockPath) {
+  const stat = safeExistingFile(lockPath, "lock file");
+  if (!stat) return null;
+  return { stat, token: readFileSync(lockPath, "utf8").trim() };
+}
+
+function createExclusiveLock(lockPath, token) {
+  const fd = openSync(lockPath, "wx", 0o600);
+  try {
+    writeFileSync(fd, `${token}\n`);
+  } finally {
+    closeSync(fd);
+  }
+}
+
+function ownsLock(lockPath, token) {
+  try {
+    return readFileSync(lockPath, "utf8").trim() === token;
+  } catch (error) {
+    if (error?.code === "ENOENT") return false;
+    throw error;
+  }
+}
+
+function assertOwnsLock(lockPath, token) {
+  if (!ownsLock(lockPath, token)) {
+    throw new Error(`lost watchdog state lock: ${lockPath}`);
+  }
+}
+
+function releaseLock(lockPath, token) {
+  try {
+    if (!ownsLock(lockPath, token)) return;
+    rmSync(lockPath, { force: true });
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+  }
+}
+
 function acquireLock(lockPath, { lockWaitMs, staleLockMs }) {
+  const token = createLockToken();
   const started = Date.now();
   while (true) {
     let contentionError;
     try {
-      const fd = openSync(lockPath, "wx", 0o600);
-      closeSync(fd);
-      return;
+      createExclusiveLock(lockPath, token);
+      return token;
     } catch (error) {
       const retryable = error?.code === "EEXIST"
         || (process.platform === "win32" && error?.code === "EPERM");
@@ -103,11 +146,18 @@ function acquireLock(lockPath, { lockWaitMs, staleLockMs }) {
     }
 
     try {
-      const stat = safeExistingFile(lockPath, "lock file");
-      if (stat) {
-        const age = Date.now() - stat.mtimeMs;
+      const existing = readLockToken(lockPath);
+      if (existing) {
+        const age = Date.now() - existing.stat.mtimeMs;
         if (age >= staleLockMs) {
-          rmSync(lockPath, { force: true });
+          try {
+            const current = readFileSync(lockPath, "utf8").trim();
+            if (current === existing.token) {
+              rmSync(lockPath, { force: true });
+            }
+          } catch (error) {
+            if (error?.code !== "ENOENT") throw error;
+          }
           continue;
         }
       }
@@ -168,17 +218,18 @@ export function withWatchdogState(scope, reducer, options = {}) {
     staleLockMs: options.staleLockMs ?? DEFAULT_STALE_LOCK_MS,
   };
 
-  acquireLock(lockPath, lockOptions);
+  const token = acquireLock(lockPath, lockOptions);
   try {
     const prior = readState(statePath);
     const result = reducer(prior);
     if (!result || typeof result !== "object" || !Object.hasOwn(result, "state")) {
       throw new Error("watchdog state reducer must return an object with state");
     }
+    assertOwnsLock(lockPath, token);
     atomicWrite(statePath, result.state);
     return { ...result, statePath };
   } finally {
-    rmSync(lockPath, { force: true });
+    releaseLock(lockPath, token);
   }
 }
 
