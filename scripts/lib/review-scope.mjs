@@ -17,11 +17,16 @@ const OPERATIONAL_POLICY_RE = new RegExp(
     String.raw`(^|/)\.github/prompts/.*\.prompt\.md$`,
     String.raw`(^|/)\.cursor/rules/.*\.md$`,
     String.raw`(^|/)\.windsurf/rules/.*\.md$`,
+    String.raw`(^|/)\.vscode/mcp\.json$`,
+    String.raw`(^|/)mcp\.json$`,
+    String.raw`(^|/)\.mcp\.json$`,
+    String.raw`(^|/)claude_desktop_config\.json$`,
   ].join("|"),
   "i",
 );
 const LOCK_RE = /(^|\/)(?:package-lock\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb?|Cargo\.lock|go\.sum|Gemfile\.lock|composer\.lock)$/i;
 const MANIFEST_RE = /(^|\/)(?:package\.json|Cargo\.toml|go\.mod|pyproject\.toml|requirements[^/]*\.txt|Gemfile|composer\.json)$/i;
+const MCP_INSTALL_RE = /(^|\/)(?:\.vscode\/mcp\.json|mcp\.json|\.mcp\.json|claude_desktop_config\.json)$/i;
 
 // Exported so the eval validator can validate the probe registry against the
 // real lens/surface id universe without re-deriving it.
@@ -83,7 +88,7 @@ const DOMAIN_SPECS = [
   ["supply_chain", "security", /package|lock|Cargo|go\.mod|requirements|Gemfile|composer/i, /dependencies|devDependencies|scripts|postinstall|preinstall|git\+|https:\/\//i],
   ["logging_privacy", "security", /log|telemetry|analytics|sentry|privacy|pii|audit/i, /logger|console\.|telemetry|analytics|sentry|email|phone|address|redact|PII/i],
   ["ai_agent_mcp", "security", /prompt|llm|openai|anthropic|mcp|agent|rag|embedding|tool/i, /prompt|tool_call|toolUse|mcp|model|embedding|system message|assistant/i],
-  ["agentic_skills_supply_chain", "security", /(?:^|\/)(?:SKILL\.md|AGENTS(?:\.[A-Za-z0-9_-]+)?\.md|CLAUDE(?:\.[A-Za-z0-9_-]+)?\.md|GEMINI(?:\.[A-Za-z0-9_-]+)?\.md|skills\/|plugins\/|mcp\.json|\.mcp\.json|claude_desktop_config\.json|\.github\/copilot-instructions\.md|\.github\/instructions\/.*\.instructions\.md|\.github\/prompts\/.*\.prompt\.md|\.cursor\/rules\/.*\.md|\.windsurf\/rules\/.*\.md)(?:$|[/?#])/i, /allowed-tools|mcpServers|references\/|scripts\/|prompt injection/i],
+  ["agentic_skills_supply_chain", "security", /(?:^|\/)(?:SKILL\.md|AGENTS(?:\.[A-Za-z0-9_-]+)?\.md|CLAUDE(?:\.[A-Za-z0-9_-]+)?\.md|GEMINI(?:\.[A-Za-z0-9_-]+)?\.md|skills\/|plugins\/|mcp\.json|\.mcp\.json|claude_desktop_config\.json|\.github\/copilot-instructions\.md|\.github\/instructions\/.*\.instructions\.md|\.github\/prompts\/.*\.prompt\.md|\.cursor\/rules\/.*\.md|\.windsurf\/rules\/.*\.md)(?:$|[/?#])/i, /allowed-tools|mcpServers|"servers"\s*:|references\/|scripts\/|prompt injection/i],
   ["crypto_session", "security", /crypto|cipher|encrypt|decrypt|hash|jwt|cookie|tls|cert|hmac/i, /createHash|createHmac|encrypt|decrypt|jwt|cookie|SameSite|HttpOnly|TLS/i],
   ["business_logic", "security", /workflow|state|entitlement|checkout|subscription|transfer|refund|billing|quota/i, /state machine|entitlement|quota|transfer|refund|idempot|TOCTOU|compare-and-swap/i],
   ["iac_docker", "security", /Dockerfile|docker-compose|\.tf$|helm|charts|kubernetes|k8s|infra|deploy/i, /FROM\s|USER\s|privileged|cap_add|hostNetwork|iam|securityContext/i],
@@ -221,6 +226,11 @@ export function planReviewScope(input = {}) {
     );
     if (isLogic) logicFiles.push(file.path);
     if (isLogic && !file.patch && file.status !== "removed") missingPatches.push(file.path);
+
+    if (paths.some((path) => MCP_INSTALL_RE.test(path))) {
+      addEvidence(evidence, "agentic_skills_supply_chain", "security", 3, "mcp install path", file.path);
+      addEvidence(evidence, "ai_agent_mcp", "security", 3, "mcp install path", file.path);
+    }
 
     for (const [id, category, pathRe, textRe] of DOMAIN_SPECS) {
       if (paths.some((path) => pathRe.test(path))) addEvidence(evidence, id, category, 1, "path signal", file.path);

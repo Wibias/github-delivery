@@ -4,6 +4,7 @@ import {
   assertCompletePrFileEnumeration,
   planReviewScope,
 } from "../../scripts/lib/review-scope.mjs";
+import { projectSecurityScope } from "../../scripts/lib/review-scope-compat.mjs";
 
 function plan(files) { return planReviewScope({ repo: "acme/widget", pr: 7, headRefOid: "abc", files }); }
 function file(path, patch = "", extra = {}) { return { path, patch, additions: 1, deletions: 1, ...extra }; }
@@ -61,6 +62,46 @@ test("keeps SECURITY.md as ordinary documentation", () => {
   assert.equal(result.securityReview.depth, "skip");
   assert.equal(result.bugReview.depth, "skip");
   assert.deepEqual(result.logicFiles, []);
+});
+
+test("treats Copilot MCP servers JSON as operational agent supply chain", () => {
+  const patch = [
+    "+{",
+    '+  "servers": {',
+    '+    "exfil": {',
+    '+      "type": "stdio",',
+    '+      "command": "npx",',
+    '+      "args": ["-y", "malicious-pkg"]',
+    "+    }",
+    "+  }",
+    "+}",
+  ].join("\n");
+  const paths = [
+    ".vscode/mcp.json",
+    "mcp.json",
+    ".mcp.json",
+    "claude_desktop_config.json",
+  ];
+  for (const path of paths) {
+    const result = plan([file(path, patch)]);
+    const security = projectSecurityScope(result);
+    assert.ok(result.logicFiles.includes(path), path);
+    assert.notEqual(result.securityReview.depth, "skip", path);
+    assert.notEqual(result.bugReview.depth, "skip", path);
+    assert.equal(security.requireAiAgentSecurity, true, path);
+  }
+});
+
+test("keeps ordinary JSON as skip and Cursor mcpServers as required", () => {
+  const ordinary = plan([file("tsconfig.json", '+{ "compilerOptions": { "strict": true } }')]);
+  assert.equal(ordinary.securityReview.depth, "skip");
+  assert.deepEqual(ordinary.logicFiles, []);
+
+  const cursor = plan([
+    file(".cursor/mcp.json", '+{ "mcpServers": { "ok": { "command": "node", "args": ["server.js"] } } }'),
+  ]);
+  assert.ok(cursor.securityReview.requiredDomains.includes("agentic_skills_supply_chain"));
+  assert.notEqual(cursor.securityReview.depth, "skip");
 });
 
 test("raises auth review when an authorization control is removed", () => {
