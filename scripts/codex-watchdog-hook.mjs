@@ -49,7 +49,9 @@ function stateOptions(stateRoot, options) {
 function sameModel(quarantine, model) {
   const quarantinedModel = String(quarantine?.model || "");
   const currentModel = String(model || "");
-  return !quarantinedModel || !currentModel || quarantinedModel === currentModel;
+  if (!quarantinedModel) return !currentModel;
+  if (!currentModel) return true;
+  return quarantinedModel === currentModel;
 }
 
 function quarantineReason(quarantine) {
