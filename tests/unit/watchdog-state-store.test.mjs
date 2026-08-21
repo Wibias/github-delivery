@@ -408,6 +408,66 @@ test("protocol stalls quarantine the same model across turns and SessionEnd unti
   assert.equal(cleared.output, null);
 });
 
+test("empty-model quarantine does not block a later named model change", () => {
+  const root = mkdtempSync(join(tmpdir(), "gd-empty-model-quarantine-"));
+  const sessionId = "session-empty-model";
+  const stalled = runCodexWatchdogHook(
+    {
+      hook_event_name: "Stop",
+      session_id: sessionId,
+      turn_id: "turn-a",
+      model: "",
+      stop_hook_active: false,
+      last_assistant_message: ["grid", "<grid></grid>", "grid"].join("\n"),
+    },
+    { stateRoot: root },
+  );
+  assert.equal(stalled.output.continue, false);
+  assert.equal(stalled.quarantinePersisted, true);
+
+  const recovered = runCodexWatchdogHook(
+    {
+      hook_event_name: "UserPromptSubmit",
+      session_id: sessionId,
+      turn_id: "turn-b",
+      model: "working/model",
+      prompt: "Resume with a named model.",
+    },
+    { stateRoot: root },
+  );
+  assert.equal(recovered.output, null);
+});
+
+test("named-model quarantine still blocks a prompt that omits model", () => {
+  const root = mkdtempSync(join(tmpdir(), "gd-omit-model-quarantine-"));
+  const sessionId = "session-omit-model";
+  const stalled = runCodexWatchdogHook(
+    {
+      hook_event_name: "Stop",
+      session_id: sessionId,
+      turn_id: "turn-a",
+      model: "broken/model",
+      stop_hook_active: false,
+      last_assistant_message: ["grid", "<grid></grid>", "grid"].join("\n"),
+    },
+    { stateRoot: root },
+  );
+  assert.equal(stalled.output.continue, false);
+  assert.equal(stalled.quarantinePersisted, true);
+
+  const omitted = runCodexWatchdogHook(
+    {
+      hook_event_name: "UserPromptSubmit",
+      session_id: sessionId,
+      turn_id: "turn-b",
+      prompt: "Resume without declaring a model.",
+    },
+    { stateRoot: root },
+  );
+  assert.equal(omitted.output.decision, "block");
+  assert.match(omitted.output.reason, /change model|new task/i);
+});
+
 test("SubagentStop protocol stalls do not quarantine the parent task", () => {
   const root = mkdtempSync(join(tmpdir(), "gd-subagent-quarantine-"));
   const sessionId = "session-subagent-quarantine";
