@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import test from "node:test";
 
 import {
@@ -11,6 +12,21 @@ import {
 import {
   createAppServerWatchdogRouter,
 } from "../../scripts/lib/codex-app-server-watchdog-proxy.mjs";
+
+const ROOT = resolve(import.meta.dirname, "../..");
+const HOOK_CLI = join(ROOT, "scripts", "codex-watchdog-hook.mjs");
+
+function runHookCli(input) {
+  return spawnSync(process.execPath, [HOOK_CLI], {
+    input,
+    encoding: "utf8",
+    timeout: 15_000,
+    env: {
+      ...process.env,
+      GITHUB_DELIVERY_WATCHDOG_STATE_DIR: mkdtempSync(join(tmpdir(), "gd-hook-cli-")),
+    },
+  });
+}
 
 test("hook entrypoint persists only compact watchdog state between events", () => {
   const root = mkdtempSync(join(tmpdir(), "gd-watchdog-test-"));
@@ -105,4 +121,31 @@ test("proxy consumes responses to its private interrupt requests", () => {
     forward: null,
     internalRequests: [],
   });
+});
+
+test("invalid JSON stdin fail-closes with Codex block exit 2", () => {
+  const result = runHookCli("not-json{");
+  assert.equal(result.status, 2, result.stderr);
+  assert.match(result.stderr, /watchdog hook error/i);
+  assert.equal(result.stdout, "");
+});
+
+test("non-object JSON stdin fail-closes with Codex block exit 2", () => {
+  for (const raw of ["null", "[]"]) {
+    const result = runHookCli(raw);
+    assert.equal(result.status, 2, `${raw}: ${result.stderr}`);
+    assert.match(result.stderr, /hook input must be a JSON object/);
+    assert.equal(result.stdout, "");
+  }
+});
+
+test("valid PreToolUse stdin still exits 0", () => {
+  const result = runHookCli(JSON.stringify({
+    hook_event_name: "PreToolUse",
+    session_id: "s",
+    turn_id: "t",
+    tool_name: "Bash",
+    tool_input: { command: "echo ok" },
+  }));
+  assert.equal(result.status, 0, result.stderr);
 });
