@@ -12,11 +12,13 @@ import {
 } from "./lib/watchdog-state-store.mjs";
 
 const PROTOCOL_QUARANTINE_SESSION_PREFIX = "github-delivery-protocol-quarantine:";
+const BOUNDED_RECOVERY_STOP_REASON = "no_progress_stall_after_bounded_recovery";
 const REPEATED_STALL_STOP_REASON = "repeated_no_progress_stall_after_recovery";
 const SEVERE_RECOVERY_STOP_REASON = "severe_no_progress_recovery_completed";
 const HOOK_SEVERE_RECOVERY_CHAR_LIMIT = 8_000;
 const QUARANTINE_STOP_REASONS = new Set([
   "tool_protocol_emission_stall",
+  BOUNDED_RECOVERY_STOP_REASON,
   REPEATED_STALL_STOP_REASON,
   SEVERE_RECOVERY_STOP_REASON,
 ]);
@@ -54,7 +56,9 @@ function quarantineReason(quarantine) {
   const model = String(quarantine?.model || "");
   const subject = model ? `model ${model}` : "the current model";
   let failure = "repeated tool-protocol output";
-  if (quarantine?.reason === REPEATED_STALL_STOP_REASON) {
+  if (quarantine?.reason === BOUNDED_RECOVERY_STOP_REASON) {
+    failure = "no-progress narration after bounded recovery";
+  } else if (quarantine?.reason === REPEATED_STALL_STOP_REASON) {
     failure = "repeated no-progress narration";
   } else if (quarantine?.reason === SEVERE_RECOVERY_STOP_REASON) {
     failure = "excessive no-progress narration";
