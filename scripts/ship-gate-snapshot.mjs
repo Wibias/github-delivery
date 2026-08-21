@@ -833,6 +833,7 @@ try {
     headEvidenceComplete: headCheckRuns.complete && headStatuses.complete,
     testMergeEvidenceComplete:
       testMergeCheckRuns.complete && testMergeStatuses.complete,
+    mergeStateStatus: prEvidence.mergeStateStatus,
   });
   const checkRuns = selectedCollection(
     selectedChecks.checkRuns,
