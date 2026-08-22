@@ -17,6 +17,7 @@ import { gzipSync } from "node:zlib";
 
 import { inspectLegacyManifestlessInstallation } from "./bootstrap-cli.mjs";
 import { targetInstallLockPath, withExclusiveInstallLock } from "./install-lock.mjs";
+import { assertPortablePathIdentity } from "./release-path-identity.mjs";
 
 const ROOT_FILES = [
   "SKILL.md",
@@ -281,6 +282,7 @@ export function buildDistribution({ root = process.cwd(), out = join(root, "dist
     if (path === "SKILL.md") content = Buffer.from(injectSkillMetadata(content.toString("utf8"), { version }), "utf8");
     payloads.set(path, content);
   }
+  assertPortablePathIdentity([...payloads.keys()], { code: "release_path" });
   validateReferences(payloads);
   const manifest = {
     schemaVersion: 1,

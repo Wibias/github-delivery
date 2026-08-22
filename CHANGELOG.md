@@ -8,6 +8,7 @@ All notable changes to `github-delivery` are documented here.
 
 - Release SBOMs now describe the package, use the source-commit created time, emit SPDX package verification codes, and fail closed against the SPDX 2.3 JSON schema.
 - Installed manifest comparison now rejects symlink/directory substitutions and enforces declared POSIX modes instead of following links and hashing only.
+- Release ZIP construction and extraction now use a portable NFC/case-fold path identity and re-read the extracted tree before trusting it.
 
 ## [0.8.7] - 2026-08-19
 

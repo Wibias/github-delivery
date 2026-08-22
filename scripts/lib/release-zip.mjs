@@ -3,10 +3,14 @@ import {
   existsSync,
   lstatSync,
   mkdirSync,
+  readdirSync,
+  readFileSync,
   writeFileSync,
 } from "node:fs";
 import { join, resolve } from "node:path";
 import { TextDecoder } from "node:util";
+
+import { assertPortablePathIdentity } from "./release-path-identity.mjs";
 
 const DEFAULT_LIMITS = Object.freeze({
   maxArchiveBytes: 32 * 1024 * 1024,
@@ -103,6 +107,7 @@ function validateManifest(manifest) {
     if (!/^(0644|0755)$/.test(String(entry.mode || ""))) fail("release_zip_manifest_invalid", path);
     files.set(path, entry);
   }
+  assertPortablePathIdentity([...files.keys()], { code: "release_zip_path" });
   return files;
 }
 
@@ -210,6 +215,7 @@ export function inspectReleaseZip(archive, { limits = {} } = {}) {
     cursor = end;
   }
   if (cursor !== eocd) fail("release_zip_central_directory_invalid");
+  assertPortablePathIdentity(entries.map((entry) => entry.relativePath), { code: "release_zip_path" });
   return { entries, totalBytes };
 }
 
@@ -223,6 +229,48 @@ function ensurePrivateDestination(destination) {
   const root = join(destination, "github-delivery");
   if (existsSync(root)) fail("release_zip_destination_exists");
   return { destination, root };
+}
+
+function assertExactExtractedPath(root, relativePath) {
+  let current = root;
+  const rootStats = lstatSync(current);
+  if (!rootStats.isDirectory() || rootStats.isSymbolicLink()) fail("release_zip_extracted_path_identity", relativePath);
+  const segments = relativePath.split("/");
+  for (let index = 0; index < segments.length; index += 1) {
+    const segment = segments[index];
+    if (!readdirSync(current).includes(segment)) fail("release_zip_extracted_path_identity", relativePath);
+    current = join(current, segment);
+    const stats = lstatSync(current);
+    if (stats.isSymbolicLink()) fail("release_zip_extracted_not_regular", relativePath);
+    const last = index === segments.length - 1;
+    if (last) {
+      if (!stats.isFile()) fail("release_zip_extracted_not_regular", relativePath);
+    } else if (!stats.isDirectory()) {
+      fail("release_zip_extracted_path_identity", relativePath);
+    }
+  }
+}
+
+export function verifyExtractedReleaseTree({ root, manifest, files } = {}) {
+  const expectedFiles = validateManifest(manifest);
+  root = resolve(root);
+  const declared = [...expectedFiles.keys(), "manifest.json"];
+  if (Array.isArray(files)) {
+    for (const path of files) {
+      if (path !== "manifest.json" && !expectedFiles.has(path)) fail("release_zip_extracted_undeclared", path);
+    }
+  }
+  for (const path of declared) {
+    assertExactExtractedPath(root, path);
+    const absolute = join(root, ...path.split("/"));
+    const content = readFileSync(absolute);
+    if (path === "manifest.json") continue;
+    const expected = expectedFiles.get(path);
+    if (content.length !== expected.bytes || sha256(content) !== expected.sha256) {
+      fail("release_zip_extracted_mismatch", path);
+    }
+  }
+  return { valid: true, root, files: declared.sort() };
 }
 
 export function extractVerifiedReleaseZip({ archive, manifest, manifestBytes = undefined, destination, limits = {} } = {}) {
@@ -263,5 +311,6 @@ export function extractVerifiedReleaseZip({ archive, manifest, manifestBytes = u
     const mode = expected ? Number.parseInt(expected.mode, 8) : 0o644;
     writeFileSync(output, content, { mode });
   }
+  verifyExtractedReleaseTree({ root: paths.root, manifest, files: [...byPath.keys()] });
   return { root: paths.root, files: [...byPath.keys()].sort() };
 }
