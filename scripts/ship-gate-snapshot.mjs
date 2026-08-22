@@ -26,6 +26,7 @@ import {
   feedbackPermissionLogins,
 } from "./lib/feedback-authority.mjs";
 import { boundedSpawnSync } from "./lib/subprocess-policy.mjs";
+import { graphqlCliField } from "./lib/graphql-cli-fields.mjs";
 import { normalizeNativeStack } from "./lib/native-stack-policy.mjs";
 
 function parseArgs(argv) {
@@ -208,13 +209,13 @@ function reviewThreads(owner, name, pr) {
       "-f",
       `query=${query}`,
       "-F",
-      `owner=${owner}`,
+      `owner=${graphqlCliField(owner, "owner")}`,
       "-F",
-      `name=${name}`,
+      `name=${graphqlCliField(name, "name")}`,
       "-F",
       `number=${pr}`,
     ];
-    if (after) args.push("-F", `after=${after}`);
+    if (after) args.push("-F", `after=${graphqlCliField(after, "after")}`);
     const response = ghOk(args);
     if (!response.ok) {
       return {
@@ -408,9 +409,9 @@ function fetchPolicy(owner, name, pr) {
     "-f",
     `query=${query}`,
     "-F",
-    `owner=${owner}`,
+    `owner=${graphqlCliField(owner, "owner")}`,
     "-F",
-    `name=${name}`,
+    `name=${graphqlCliField(name, "name")}`,
     "-F",
     `number=${pr}`,
   ]);
