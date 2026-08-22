@@ -1,16 +1,21 @@
 import { createHash } from "node:crypto";
 import {
+  closeSync,
   copyFileSync,
   cpSync,
   existsSync,
+  fsyncSync,
   lstatSync,
   mkdirSync,
+  openSync,
   readFileSync,
   readdirSync,
   renameSync,
   rmSync,
   statSync,
+  unlinkSync,
   writeFileSync,
+  writeSync,
 } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { gzipSync } from "node:zlib";
@@ -419,16 +424,75 @@ export function planInstallation({
 }
 
 function siblingPath(target, prefix) {
-  const directory = dirname(resolve(target));
-  mkdirSync(directory, { recursive: true });
+  const directory = dirname(target);
+  const name = basename(target);
+  let attempt = 0;
   let candidate;
   do {
-    candidate = join(
-      directory,
-      `${prefix}${process.pid}-${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`,
-    );
+    candidate = join(directory, `${prefix}${name}-${process.pid}-${Date.now()}-${attempt}`);
+    attempt += 1;
   } while (existsSync(candidate));
   return candidate;
+}
+
+function installJournalPath(target) {
+  return join(dirname(target), `.github-delivery-install-journal-${basename(target)}`);
+}
+
+function writeInstallJournal(path, journal) {
+  const fd = openSync(path, "w");
+  try {
+    writeSync(fd, `${JSON.stringify(journal)}\n`);
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
+}
+
+function readInstallJournal(path) {
+  if (!existsSync(path)) return null;
+  try {
+    const parsed = JSON.parse(readFileSync(path, "utf8"));
+    if (!parsed || parsed.kind !== "github-delivery/install-journal") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export function recoverInterruptedInstallation(options = {}) {
+  const target = resolve(options.target);
+  return withExclusiveInstallLock(targetInstallLockPath(target), () => recoverInterruptedInstallationHeld(options));
+}
+
+function recoverInterruptedInstallationHeld({
+  target,
+  renameSync: rename = renameSync,
+  rmSync: remove = rmSync,
+} = {}) {
+  target = resolve(target);
+  const journalPath = installJournalPath(target);
+  const journal = readInstallJournal(journalPath);
+  if (!journal) return { recovered: false };
+  const stagingPath = journal.stagingPath ? resolve(journal.stagingPath) : null;
+  const backupPath = journal.backupPath ? resolve(journal.backupPath) : null;
+
+  if (!existsSync(target) && stagingPath && existsSync(stagingPath)) {
+    rename(stagingPath, target);
+    if (existsSync(journalPath)) unlinkSync(journalPath);
+    return { recovered: true, action: "completed", backupPath };
+  }
+  if (!existsSync(target) && backupPath && existsSync(backupPath)) {
+    rename(backupPath, target);
+    if (stagingPath && existsSync(stagingPath)) remove(stagingPath, { recursive: true, force: true });
+    if (existsSync(journalPath)) unlinkSync(journalPath);
+    return { recovered: true, action: "rolled-back", backupPath };
+  }
+  if (stagingPath && existsSync(stagingPath) && resolve(stagingPath) !== target) {
+    remove(stagingPath, { recursive: true, force: true });
+  }
+  if (existsSync(journalPath)) unlinkSync(journalPath);
+  return { recovered: false };
 }
 
 export function applyInstallation(options = {}) {
@@ -445,7 +509,10 @@ function applyInstallationHeld({
   copySync = cpSync,
   renameSync: rename = renameSync,
   rmSync: remove = rmSync,
+  restoreOnFailure = true,
+  afterDisplace,
 } = {}) {
+  recoverInterruptedInstallationHeld({ target, renameSync: rename, rmSync: remove });
   const plan = planInstallation({
     source,
     target,
@@ -467,6 +534,7 @@ function applyInstallationHeld({
     };
   }
   const stagingPath = siblingPath(plan.target, ".github-delivery-staging-");
+  const journalPath = installJournalPath(plan.target);
   try {
     copySync(plan.source, stagingPath, { recursive: true, errorOnExist: true, force: false });
   } catch (error) {
@@ -476,18 +544,38 @@ function applyInstallationHeld({
 
   let backupPath = null;
   try {
+    writeInstallJournal(journalPath, {
+      schemaVersion: 1,
+      kind: "github-delivery/install-journal",
+      phase: "staged",
+      target: plan.target,
+      stagingPath,
+      backupPath: null,
+    });
     if (existsSync(plan.target)) {
       const root = resolve(backupRoot || join(dirname(plan.target), ".github-delivery-backups"));
       mkdirSync(root, { recursive: true });
       backupPath = join(root, `github-delivery-${Date.now()}-${plan.targetVersion || "unknown"}`);
       rename(plan.target, backupPath);
+      writeInstallJournal(journalPath, {
+        schemaVersion: 1,
+        kind: "github-delivery/install-journal",
+        phase: "displaced",
+        target: plan.target,
+        stagingPath,
+        backupPath,
+      });
+      if (typeof afterDisplace === "function") afterDisplace({ target: plan.target, backupPath, stagingPath });
     }
     rename(stagingPath, plan.target);
+    if (existsSync(journalPath)) unlinkSync(journalPath);
   } catch (error) {
-    if (backupPath && existsSync(backupPath) && !existsSync(plan.target)) {
-      rename(backupPath, plan.target);
+    if (restoreOnFailure !== false) {
+      recoverInterruptedInstallationHeld({ target: plan.target, renameSync: rename, rmSync: remove });
     }
-    remove(stagingPath, { recursive: true, force: true });
+    if (existsSync(stagingPath) && existsSync(plan.target)) {
+      remove(stagingPath, { recursive: true, force: true });
+    }
     throw error;
   }
   return { schemaVersion: 1, kind: "github-delivery/install-receipt", action: plan.action, sourceVersion: plan.sourceVersion, previousVersion: plan.targetVersion, target: plan.target, backupPath };
