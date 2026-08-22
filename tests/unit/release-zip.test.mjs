@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { extractVerifiedReleaseZip } from "../../scripts/lib/release-zip.mjs";
+import { extractVerifiedReleaseZip, verifyExtractedReleaseTree } from "../../scripts/lib/release-zip.mjs";
 
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
@@ -219,5 +219,87 @@ test("enforces per-file and total extraction limits before writing", () => withT
       limits: { maxArchiveBytes: 1024 * 1024, maxFileBytes: 64, maxTotalBytes: 1024, maxFiles: 20 },
     }),
     /release_zip_file_limit_exceeded/,
+  );
+}));
+
+test("rejects case-aliased ZIP paths before writing", () => withTemp((root) => {
+  const value = fixture();
+  const extra = Buffer.from("other");
+  value.manifest.files.push({
+    path: "Package.json",
+    bytes: extra.length,
+    mode: "0644",
+    sha256: sha256(extra),
+  });
+  value.manifestBuffer = Buffer.from(JSON.stringify(value.manifest, null, 2) + "\n");
+  value.entries = [
+    { name: "github-delivery/package.json", data: value.packageBuffer },
+    { name: "github-delivery/Package.json", data: extra },
+    { name: "github-delivery/manifest.json", data: value.manifestBuffer },
+  ];
+  assert.throws(
+    () => extractVerifiedReleaseZip({
+      archive: makeStoredZip(value.entries),
+      manifest: value.manifest,
+      manifestBytes: value.manifestBuffer,
+      destination: root,
+    }),
+    /release_zip_path_alias/,
+  );
+}));
+
+test("rejects non-NFC ZIP paths even when they are unique strings", () => withTemp((root) => {
+  const value = fixture();
+  const nfd = Buffer.from("nfd");
+  const path = "cafe\u0301.json";
+  value.manifest.files.push({
+    path,
+    bytes: nfd.length,
+    mode: "0644",
+    sha256: sha256(nfd),
+  });
+  value.manifestBuffer = Buffer.from(JSON.stringify(value.manifest, null, 2) + "\n");
+  value.entries = [
+    { name: "github-delivery/package.json", data: value.packageBuffer },
+    { name: `github-delivery/${path}`, data: nfd },
+    { name: "github-delivery/manifest.json", data: value.manifestBuffer },
+  ];
+  assert.throws(
+    () => extractVerifiedReleaseZip({
+      archive: makeStoredZip(value.entries),
+      manifest: value.manifest,
+      manifestBytes: value.manifestBuffer,
+      destination: root,
+    }),
+    /release_zip_path_not_nfc/,
+  );
+}));
+
+test("post-extraction verification fails closed on content or type drift", () => withTemp((root) => {
+  const value = fixture();
+  const extracted = extractVerifiedReleaseZip({
+    archive: makeStoredZip(value.entries),
+    manifest: value.manifest,
+    manifestBytes: value.manifestBuffer,
+    destination: root,
+  });
+  writeFileSync(join(extracted.root, "package.json"), "tampered");
+  assert.throws(
+    () => verifyExtractedReleaseTree({
+      root: extracted.root,
+      manifest: value.manifest,
+      files: extracted.files,
+    }),
+    /release_zip_extracted_mismatch/,
+  );
+  rmSync(join(extracted.root, "package.json"));
+  mkdirSync(join(extracted.root, "package.json"));
+  assert.throws(
+    () => verifyExtractedReleaseTree({
+      root: extracted.root,
+      manifest: value.manifest,
+      files: extracted.files,
+    }),
+    /release_zip_extracted_not_regular/,
   );
 }));

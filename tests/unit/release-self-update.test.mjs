@@ -130,6 +130,16 @@ test("release manifest validation binds schema, identity, version, source and fi
   assert.deepEqual(manifest.files.map((entry) => entry.path), ["SKILL.md", "scripts/install-skill.mjs"]);
 });
 
+test("release manifest rejects case-aliased file paths", () => {
+  const base = validManifest().files[0];
+  assert.throws(
+    () => validateReleaseManifest(validManifest({
+      files: [base, { ...base, path: "skill.md", sha256: "e".repeat(64) }],
+    }), { version: "0.5.0" }),
+    /stable_release_manifest_path_alias/,
+  );
+});
+
 test("release manifest rejects invalid top-level identity and source commit", () => {
   for (const value of [
     validManifest({ schemaVersion: 2 }),

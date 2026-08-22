@@ -4,6 +4,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { extractVerifiedReleaseZip } from "./release-zip.mjs";
+import { assertPortablePathIdentity } from "./release-path-identity.mjs";
 import {
   planStableUpdate,
   releaseAssetPlan,
@@ -324,6 +325,7 @@ export function validateReleaseManifest(value, { version } = {}) {
       sha256: entry.sha256.toLowerCase(),
     };
   });
+  assertPortablePathIdentity(files.map((entry) => entry.path), { code: "stable_release_manifest_path" });
 
   return {
     schemaVersion: 1,
