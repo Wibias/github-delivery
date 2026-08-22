@@ -75,6 +75,21 @@ export function verifyLegacyMutationPostcondition({ request = {}, receipt = {}, 
   }
 
   if (request.action === "close_linked_issue") {
+    const pr = Number(request.pr);
+    if (!Number.isInteger(pr) || pr <= 0) {
+      throw new Error("close_issue_postcondition_failed:pr_required");
+    }
+    const link = runJson(
+      runner,
+      ["gh", "pr", "view", String(pr), "--repo", repo, "--json", "closingIssues"],
+      "close_issue_postcondition_failed",
+    );
+    const numbers = Array.isArray(link.closingIssues)
+      ? link.closingIssues.map((row) => Number(row?.number))
+      : [];
+    if (!numbers.includes(Number(request.issue))) {
+      throw new Error("close_issue_postcondition_failed:not_linked");
+    }
     const state = runJson(
       runner,
       ["gh", "issue", "view", String(request.issue), "--repo", repo, "--json", "state"],

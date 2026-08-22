@@ -350,6 +350,35 @@ function parseSlurpedCollection(output) {
   });
 }
 
+function verifyLinkedIssue({ request, runner }) {
+  if (request.action !== "close_linked_issue") return null;
+  const pr = positiveInteger(request.pr, "pr");
+  const issue = positiveInteger(request.issue, "issue");
+  const payload = parseJson(
+    runOrThrow(runner, [
+      "gh",
+      "pr",
+      "view",
+      String(pr),
+      "--repo",
+      required(request.repo, "repo"),
+      "--json",
+      "closingIssues",
+    ]),
+    "close_linked_issue_link_evidence_invalid",
+  );
+  if (!Array.isArray(payload.closingIssues)) {
+    throw new Error("close_linked_issue_link_evidence_invalid");
+  }
+  const numbers = payload.closingIssues.map((row) => Number(row?.number));
+  if (!numbers.includes(issue)) {
+    throw new Error(
+      `close_linked_issue_not_linked: issue ${issue} is not a closing issue of PR ${pr}`,
+    );
+  }
+  return { pr, issue, closingIssues: numbers };
+}
+
 function verifyHead({ request, runner }) {
   if (!PR_ACTIONS.has(request.action)) return null;
   const expectedHead = required(request.expectedHead, "expected_head");
@@ -674,6 +703,10 @@ export function planMutationRequest(
     positiveInteger(request.pr, "pr");
     required(request.expectedHead, "expected_head");
   }
+  if (request.action === "close_linked_issue") {
+    positiveInteger(required(request.pr, "pr"), "pr");
+    positiveInteger(request.issue, "issue");
+  }
   if (REVIEW_THREAD_ACTIONS.has(request.action)) {
     required(request.threadId, "thread_id");
   }
@@ -752,6 +785,7 @@ export function executeMutationRequest({
   }
 
   const observedHead = verifyHead({ request: plan.request, runner });
+  verifyLinkedIssue({ request: plan.request, runner });
   const threadTarget = verifyReviewThreadTarget({ request: plan.request, runner });
   const retargetState = verifyRetargetBase({ request: plan.request, runner });
   const commentEditTarget = verifyOwnCommentTarget({ request: plan.request, runner });

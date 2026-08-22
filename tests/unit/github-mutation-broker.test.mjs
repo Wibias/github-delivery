@@ -497,6 +497,83 @@ test("autonomous social create acquires and re-verifies a remote idempotency cla
   assert.equal(result.idempotencyClaim.status, "claimed");
 });
 
+function closeLinkedIssue(overrides = {}) {
+  return {
+    schemaVersion: 1,
+    action: "close_linked_issue",
+    mutationMode: "maintainer",
+    explicitInstruction: true,
+    repo: "acme/widgets",
+    pr: 32,
+    issue: 88,
+    ...overrides,
+  };
+}
+
+test("close_linked_issue requires a governing PR", () => {
+  assert.throws(
+    () => planMutationRequest(closeLinkedIssue({ pr: undefined })),
+    /pr_required/,
+  );
+});
+
+test("close_linked_issue rejects an issue that is not a closing issue of the governing PR", () => {
+  let closed = false;
+  assert.throws(
+    () =>
+      executeMutationRequest({
+        request: closeLinkedIssue(),
+        execute: true,
+        runner(command, args) {
+          if (args[0] === "pr" && args[1] === "view" && args.includes("closingIssues")) {
+            return {
+              status: 0,
+              stdout: JSON.stringify({ closingIssues: [{ number: 99 }] }),
+              stderr: "",
+            };
+          }
+          if (args[0] === "issue" && args[1] === "close") {
+            closed = true;
+            return { status: 0, stdout: "closed\n", stderr: "" };
+          }
+          throw new Error(`unexpected command: ${command} ${args.join(" ")}`);
+        },
+      }),
+    /close_linked_issue_not_linked/,
+  );
+  assert.equal(closed, false);
+});
+
+test("close_linked_issue closes only after the governing PR lists the issue", () => {
+  const calls = [];
+  const result = executeMutationRequest({
+    request: closeLinkedIssue(),
+    execute: true,
+    runner(command, args) {
+      calls.push([command, ...args]);
+      if (args[0] === "pr" && args[1] === "view" && args.includes("closingIssues")) {
+        return {
+          status: 0,
+          stdout: JSON.stringify({ closingIssues: [{ number: 88 }, { number: 90 }] }),
+          stderr: "",
+        };
+      }
+      if (args[0] === "issue" && args[1] === "close") {
+        return { status: 0, stdout: "closed\n", stderr: "" };
+      }
+      if (args[0] === "issue" && args[1] === "view") {
+        return { status: 0, stdout: JSON.stringify({ state: "CLOSED" }), stderr: "" };
+      }
+      throw new Error(`unexpected command: ${command} ${args.join(" ")}`);
+    },
+  });
+  assert.equal(result.executed, true);
+  assert.equal(result.status, "succeeded");
+  assert.equal(calls[0][1], "pr");
+  assert.ok(calls[0].includes("closingIssues"));
+  assert.deepEqual(calls[1].slice(0, 4), ["gh", "issue", "close", "88"]);
+});
+
 test("a fresh competing autonomous idempotency claim fails closed before any visible effect", () => {
   let visibleEffects = 0;
   let attemptedTagMessage = null;

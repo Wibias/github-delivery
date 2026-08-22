@@ -203,6 +203,37 @@ test("trusted branch deletion scope requires an explicit target repository", () 
   );
 });
 
+test("close_linked_issue authority binds the governing PR and issue", () => {
+  const request = {
+    schemaVersion: 1,
+    action: "close_linked_issue",
+    mutationMode: "maintainer",
+    explicitInstruction: true,
+    repo: "Wibias/github-delivery",
+    pr: 105,
+    issue: 88,
+  };
+  assert.deepEqual(authorityScopeForRequest(request), {
+    action: "close_linked_issue",
+    issue: 88,
+    mutationMode: "maintainer",
+    pr: 105,
+    repo: "Wibias/github-delivery",
+  });
+  assert.notEqual(
+    authorityScopeSha256(request),
+    authorityScopeSha256({ ...request, pr: 106 }),
+  );
+  assert.notEqual(
+    authorityScopeSha256(request),
+    authorityScopeSha256({ ...request, issue: 89 }),
+  );
+  assert.throws(
+    () => authorityScopeForRequest({ ...request, pr: undefined }),
+    /authority_scope_pr_required/,
+  );
+});
+
 test("batch hash is ordered and changes when operation order changes", () => {
   const comment = {
     schemaVersion: 1,
