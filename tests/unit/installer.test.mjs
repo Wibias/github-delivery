@@ -9,6 +9,7 @@ import { parseInstallArgs } from "../../scripts/install-skill.mjs";
 import {
   applyInstallation,
   planInstallation,
+  recoverInterruptedInstallation,
   restoreBackup,
 } from "../../scripts/lib/distribution.mjs";
 
@@ -293,6 +294,59 @@ test("apply stages the new tree before displacing the live target", () => {
   assert.notEqual(copyDestination, resolve(target));
   assert.equal(readFileSync(join(target, "marker.txt"), "utf8"), "new");
   assert.equal(readFileSync(join(receipt.backupPath, "marker.txt"), "utf8"), "old");
+});
+
+test("recover completes a crash between target displace and staging rename", () => {
+  const root = mkdtempSync(join(tmpdir(), "github-delivery-install-test-"));
+  const source = join(root, "source");
+  const target = join(root, "target");
+  const backups = join(root, "backups");
+  skill(source, "0.2.0", "new");
+  skill(target, "0.1.0", "old");
+
+  assert.throws(
+    () => applyInstallation({
+      source,
+      target,
+      backupRoot: backups,
+      restoreOnFailure: false,
+      afterDisplace() {
+        throw new Error("injected crash after displace");
+      },
+    }),
+    /injected crash after displace/,
+  );
+  assert.equal(existsSync(target), false);
+
+  const recovered = recoverInterruptedInstallation({ target });
+  assert.equal(recovered.recovered, true);
+  assert.equal(readFileSync(join(target, "marker.txt"), "utf8"), "new");
+});
+
+test("a later apply recovers an interrupted displace before copying again", () => {
+  const root = mkdtempSync(join(tmpdir(), "github-delivery-install-test-"));
+  const source = join(root, "source");
+  const target = join(root, "target");
+  const backups = join(root, "backups");
+  skill(source, "0.2.0", "new");
+  skill(target, "0.1.0", "old");
+
+  assert.throws(
+    () => applyInstallation({
+      source,
+      target,
+      backupRoot: backups,
+      restoreOnFailure: false,
+      afterDisplace() {
+        throw new Error("injected crash after displace");
+      },
+    }),
+    /injected crash after displace/,
+  );
+  assert.equal(existsSync(target), false);
+
+  applyInstallation({ source, target, backupRoot: backups });
+  assert.equal(readFileSync(join(target, "marker.txt"), "utf8"), "new");
 });
 
 test("failed staging copy does not displace the live target", () => {

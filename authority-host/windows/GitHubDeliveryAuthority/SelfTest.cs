@@ -6,7 +6,7 @@ namespace GitHubDeliveryAuthority;
 
 internal static class SelfTest
 {
-    private const string ExpectedMergeScope = "5792e06b57c2f0eece1cdc227d4ccb0b75012bb9ed65bbf183e3bd994aaeb8b8";
+    private const string ExpectedMergeScope = "4513a56e7639d6f8e83e8e43b8af2cb305b06674259527488595b8bef4040d60";
 
     public static int Run()
     {
@@ -35,16 +35,16 @@ internal static class SelfTest
     private static void ScopeFixture()
     {
         using var document = JsonDocument.Parse("""
-            {"schemaVersion":1,"action":"merge_pr","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","pr":105,"expectedHead":"71ac000000000000000000000000000000000001","mergeMethod":"merge"}
+            {"schemaVersion":1,"action":"merge_pr","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","pr":105,"expectedHead":"71ac000000000000000000000000000000000001","expectedBase":"main","expectedBaseOid":"72ac000000000000000000000000000000000001","mergeMethod":"merge"}
             """);
         var actual = ScopeCanonicalizer.ScopeSha256(document.RootElement);
         Assert(actual == ExpectedMergeScope, $"scope fixture mismatch: {actual}");
 
         using var branchA = JsonDocument.Parse("""
-            {"schemaVersion":1,"action":"merge_pr","mutationMode":"maintainer","repo":"Wibias/github-delivery","pr":105,"expectedHead":"71ac000000000000000000000000000000000001","authorityBranch":"feature/a","mergeMethod":"merge"}
+            {"schemaVersion":1,"action":"merge_pr","mutationMode":"maintainer","repo":"Wibias/github-delivery","pr":105,"expectedHead":"71ac000000000000000000000000000000000001","expectedBase":"main","expectedBaseOid":"72ac000000000000000000000000000000000001","authorityBranch":"feature/a","mergeMethod":"merge"}
             """);
         using var branchB = JsonDocument.Parse("""
-            {"schemaVersion":1,"action":"merge_pr","mutationMode":"maintainer","repo":"Wibias/github-delivery","pr":105,"expectedHead":"71ac000000000000000000000000000000000001","authorityBranch":"feature/b","mergeMethod":"merge"}
+            {"schemaVersion":1,"action":"merge_pr","mutationMode":"maintainer","repo":"Wibias/github-delivery","pr":105,"expectedHead":"71ac000000000000000000000000000000000001","expectedBase":"main","expectedBaseOid":"72ac000000000000000000000000000000000001","authorityBranch":"feature/b","mergeMethod":"merge"}
             """);
         Assert(
             ScopeCanonicalizer.ScopeSha256(branchA.RootElement) != ScopeCanonicalizer.ScopeSha256(branchB.RootElement),
