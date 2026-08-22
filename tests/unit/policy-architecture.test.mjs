@@ -11,6 +11,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import {
+  leftoverSharedRulesLoad,
   validatePolicyArchitecture,
 } from "../../scripts/lib/policy-bundle.mjs";
 
@@ -171,6 +172,53 @@ test("architecture validation rejects cycles and orphan policy modules", () => {
     assert.equal(report.valid, false);
     assert.ok(report.errors.some((value) => value.startsWith("policy_dependency_cycle:")));
     assert.ok(report.errors.some((value) => value.includes("orphan_policy_module:releases")));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("architecture validation rejects leftover shared-rules load prose", () => {
+  assert.equal(leftoverSharedRulesLoad("Read `references/shared-rules.md` first."), true);
+  assert.equal(
+    leftoverSharedRulesLoad(
+      "Do not load `references/shared-rules.md` as mandatory context. Load declared modules.",
+    ),
+    false,
+  );
+  const root = fixture({
+    workflowTail: "Read `references/shared-rules.md` before acting.",
+  });
+  try {
+    const report = validatePolicyArchitecture({
+      root,
+      baselineSkillBytes: 10_000,
+      baselineUniversalBytes: 20_000,
+    });
+    assert.equal(report.valid, false);
+    assert.ok(
+      report.errors.some((value) =>
+        value.includes("shared_rules_mandatory_load_forbidden:references/merge-pr.md"),
+      ),
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("architecture validation rejects per-workflow policy payloads above the 60% budget", () => {
+  const root = fixture();
+  try {
+    const report = validatePolicyArchitecture({
+      root,
+      baselineSkillBytes: 10_000,
+      baselineUniversalBytes: 100,
+      requiredReduction: 0.6,
+    });
+    assert.equal(report.valid, false);
+    assert.ok(
+      report.errors.some((value) => value.startsWith("workflow_policy_size_budget_exceeded:")),
+      report.errors.join("\n"),
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

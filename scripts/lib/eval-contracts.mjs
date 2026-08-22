@@ -74,6 +74,13 @@ function validateCase(row, root, seenIds, errors) {
     }
   }
   for (const resource of item.expected_resources || []) {
+    if (resource === "references/shared-rules.md") {
+      errors.push({
+        code: "shared_rules_expected_resource_forbidden",
+        id: item.id,
+        resource,
+      });
+    }
     if (
       typeof resource === "string" &&
       (resource.includes("/") || resource.endsWith(".md")) &&
@@ -224,6 +231,8 @@ function resolveExpectedResourcePaths(item, root) {
 }
 
 function markerMatchesExpectedResource(file, expected) {
+  // Compatibility-index markers stay bound without loading the monolith.
+  if (file === "references/shared-rules.md") return true;
   const allowed = [file, `references/${basename(file)}`];
   return expected.some((resource) => allowed.includes(resource));
 }
