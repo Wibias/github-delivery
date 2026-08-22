@@ -6,6 +6,7 @@ import { dirname, join, resolve, win32 as win32Path } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { callAuthorityHostSync } from "./authority-host-client.mjs";
+import { authorityInstallLockPath, withExclusiveInstallLock } from "./install-lock.mjs";
 import { acquireVerifiedAuthorityHostPayload } from "./authority-host-release.mjs";
 import { createGitHubReleaseClient } from "./release-self-update.mjs";
 import { compareStableVersions } from "./stable-release-update.mjs";
@@ -393,26 +394,31 @@ export async function reconcileStableAuthorityHost({
   const plan = planAuthorityHostUpdate({ mode: planningMode, targetVersion: expectedRelease.version, installed });
   if (!plan.required) return { ...plan, changed: false, installed, mode };
 
-  if (!releaseMetadata) releaseMetadata = await client.latestRelease();
-  if (releaseMetadata?.tag_name !== expectedRelease.tag) fail("authority_host_release_changed_during_update");
-  const workspace = (dependencies.makeWorkspace || makeWorkspace)();
-  try {
-    const acquire = dependencies.acquireVerifiedAuthorityHostPayload || acquireVerifiedAuthorityHostPayload;
-    const payload = await acquire({
-      release: releaseMetadata,
-      workspace,
-      client,
-      expectedVersion: expectedRelease.version,
-      expectedSourceCommit: expectedRelease.sourceCommit,
-      attestationRunner,
-    });
-    const result = install({ payload, runner: installRunner, scriptPath });
-    const after = readInstalled({ platform, env, home });
-    if (!after.installed || after.version !== expectedRelease.version || after.sourceCommit !== expectedRelease.sourceCommit.toLowerCase()) {
-      fail("authority_host_postinstall_verification_failed");
+  const root = installed.root || authorityHostInstallRoot({ platform, env, home });
+  if (!root) fail("authority_host_install_root_missing");
+
+  return withExclusiveInstallLock(authorityInstallLockPath(root), async () => {
+    if (!releaseMetadata) releaseMetadata = await client.latestRelease();
+    if (releaseMetadata?.tag_name !== expectedRelease.tag) fail("authority_host_release_changed_during_update");
+    const workspace = (dependencies.makeWorkspace || makeWorkspace)();
+    try {
+      const acquire = dependencies.acquireVerifiedAuthorityHostPayload || acquireVerifiedAuthorityHostPayload;
+      const payload = await acquire({
+        release: releaseMetadata,
+        workspace,
+        client,
+        expectedVersion: expectedRelease.version,
+        expectedSourceCommit: expectedRelease.sourceCommit,
+        attestationRunner,
+      });
+      const result = install({ payload, runner: installRunner, scriptPath });
+      const after = readInstalled({ platform, env, home });
+      if (!after.installed || after.version !== expectedRelease.version || after.sourceCommit !== expectedRelease.sourceCommit.toLowerCase()) {
+        fail("authority_host_postinstall_verification_failed");
+      }
+      return { ...plan, changed: true, installed: after, mode, result };
+    } finally {
+      (dependencies.removeWorkspace || ((path) => rmSync(path, { recursive: true, force: true })))(workspace);
     }
-    return { ...plan, changed: true, installed: after, mode, result };
-  } finally {
-    (dependencies.removeWorkspace || ((path) => rmSync(path, { recursive: true, force: true })))(workspace);
-  }
+  });
 }
