@@ -20,7 +20,7 @@ The same failure twice on one SHA stops blind reruns. For true infrastructure, r
 
 ### GD-CI-005 — Use adaptive settling before final readiness
 
-After the authoritative gate first becomes ready, settle for 60 seconds by default and 180 seconds after a push, rebase, restack, force-with-lease, approval/thread change, or newly discovered workflow. Poll the authoritative gate every 20 seconds; never hide one blocking sleep longer than 30 seconds. Reset on material change and finish with one final gate.
+After the authoritative gate first becomes ready, settle for 60 seconds by default and 180 seconds after a push, rebase, restack, force-with-lease, approval/thread change, or newly discovered workflow. A docs/markdown-only head may use a ~30–60s settle instead of the default window, because CI legs that would not exercise the docs change add no signal. Poll the authoritative gate every 20 seconds; never hide one blocking sleep longer than 30 seconds. Reset on material change and finish with one final gate.
 
 ### GD-CI-006 — Pending, missing, failing, or unknown blocks readiness
 

@@ -6,6 +6,7 @@ All notable changes to `github-delivery` are documented here.
 
 ### Fixed
 
+- Routed workflows, compact review contract, and Cursor overrides no longer instruct loading `shared-rules.md` as mandatory context; they load the declared policy modules instead.
 - `authorityMode=off` no longer treats caller-supplied `explicitInstruction` or `exactTextConfirmed` as independently authenticated consent; those actions still require a verified host grant at execution.
 - Mutation-document retry identity now hashes the mutation payload when no idempotency key is present, stale autonomous-claim recovery refuses to delete a ref whose SHA or freshness changed, and a timed-out `push_code` re-reads the remote tip instead of assuming failure.
 - Release SBOMs now describe the package, use the source-commit created time, emit SPDX package verification codes, and fail closed against the SPDX 2.3 JSON schema.

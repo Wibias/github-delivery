@@ -21,7 +21,7 @@ If both are installed, **prefer this redirect + github-delivery**.
 ## Do this instead
 
 1. Load skill **`github-delivery`** (`~/.agents/skills/github-delivery` or `~/.cursor/skills/github-delivery`).
-2. Read `references/shared-rules.md` + the matching workflow:
+2. Load `github-delivery` `SKILL.md` and the matching workflow (policy modules are declared in the workflow):
    - Default for babysit/watch/monitor → `references/watch-pr.md`
    - If they asked **merge-ready** → `references/fix-pr-bots.md`
 3. **First command every wake** (watch):

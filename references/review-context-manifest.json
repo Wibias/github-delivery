@@ -14,7 +14,9 @@
     "mutationModes": "references/mutation-modes.md",
     "publication": "references/comment-depth.md",
     "fullWorkflowDetail": "references/full-review-pr.md",
-    "sharedRulesDetail": "references/shared-rules.md"
+    "ciPolicy": "references/policy/ci.md",
+    "evidencePolicy": "references/policy/evidence.md",
+    "publicationPolicy": "references/policy/publication.md"
   },
   "neverSkipForTokenSavings": [
     "exact-head binding",

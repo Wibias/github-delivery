@@ -18,7 +18,7 @@ when this personal skill or `github-delivery` is available.
 ## Do this instead
 
 1. Load skill **`github-delivery`**.
-2. Read `references/shared-rules.md` + `references/security-review.md`.
+2. Load `github-delivery` `SKILL.md` and `references/security-review.md` (policy modules are declared in the workflow).
 3. Run that workflow (scope script, coverage matrix, HIGH confidence, AST10 when flagged).
 4. **Never** launch `subagent_type: "security-review"` or the built-in review-security launcher steps.
 
