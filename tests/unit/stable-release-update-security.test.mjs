@@ -11,6 +11,15 @@ import {
   releaseAssetPlan,
 } from "../../scripts/lib/stable-release-update.mjs";
 
+function regularStats(mode = 0o100644) {
+  return {
+    isFile: () => true,
+    isSymbolicLink: () => false,
+    isDirectory: () => false,
+    mode,
+  };
+}
+
 function requiredAssets(version) {
   return [
     { name: `github-delivery-v${version}.zip` },
@@ -32,7 +41,7 @@ function manifest(version, files = []) {
 
 function cleanInstalledDependencies() {
   return {
-    exists: () => true,
+    lstat: () => regularStats(0o100644),
     readFile: () => Buffer.from("tracked"),
     sha256: () => "b".repeat(64),
     listFiles: () => [],
@@ -41,7 +50,7 @@ function cleanInstalledDependencies() {
 
 function dirtyInstalledDependencies() {
   return {
-    exists: () => true,
+    lstat: () => regularStats(0o100644),
     readFile: () => Buffer.from("locally changed"),
     sha256: () => "c".repeat(64),
     listFiles: () => ["SKILL.md"],
@@ -89,6 +98,7 @@ test("current and ahead releases remain no-ops when local drift exists", () => {
       target: "/skill",
       installedManifest: manifest(installedVersion, [{
         path: "SKILL.md",
+        mode: "0644",
         sha256: "b".repeat(64),
       }]),
       dependencies: dirtyInstalledDependencies(),
@@ -157,11 +167,88 @@ test("required release assets must occur exactly once", () => {
   );
 });
 
+test("installed manifest comparison rejects symlink and directory substitutions", () => {
+  const tracked = { path: "SKILL.md", mode: "0644", sha256: "b".repeat(64) };
+  const matchingContent = {
+    exists: () => true,
+    readFile: () => Buffer.from("tracked"),
+    sha256: () => "b".repeat(64),
+    listFiles: () => [],
+  };
+
+  const symlink = compareInstalledManifest({
+    manifest: manifest("0.4.0", [tracked]),
+    target: "/skill",
+    dependencies: {
+      ...matchingContent,
+      lstat: () => ({
+        isFile: () => false,
+        isSymbolicLink: () => true,
+        isDirectory: () => false,
+        mode: 0o120777,
+      }),
+    },
+  });
+  assert.equal(symlink.clean, false);
+  assert.deepEqual(symlink.modifications, [{ path: "SKILL.md", reason: "not_regular" }]);
+
+  const directory = compareInstalledManifest({
+    manifest: manifest("0.4.0", [tracked]),
+    target: "/skill",
+    dependencies: {
+      ...matchingContent,
+      lstat: () => ({
+        isFile: () => false,
+        isSymbolicLink: () => false,
+        isDirectory: () => true,
+        mode: 0o40755,
+      }),
+    },
+  });
+  assert.equal(directory.clean, false);
+  assert.deepEqual(directory.modifications, [{ path: "SKILL.md", reason: "not_regular" }]);
+});
+
+test("installed manifest comparison enforces POSIX mode even when the hash matches", () => {
+  const result = compareInstalledManifest({
+    manifest: manifest("0.4.0", [{ path: "scripts/install-skill.mjs", mode: "0755", sha256: "b".repeat(64) }]),
+    target: "/skill",
+    dependencies: {
+      exists: () => true,
+      lstat: () => regularStats(0o100644),
+      readFile: () => Buffer.from("tracked"),
+      sha256: () => "b".repeat(64),
+      listFiles: () => [],
+      enforcePosixMode: true,
+    },
+  });
+  assert.equal(result.clean, false);
+  assert.deepEqual(result.modifications, [{ path: "scripts/install-skill.mjs", reason: "mode" }]);
+});
+
+test("installed manifest comparison accepts a regular file with matching hash and mode", () => {
+  const result = compareInstalledManifest({
+    manifest: manifest("0.4.0", [{ path: "SKILL.md", mode: "0644", sha256: "b".repeat(64) }]),
+    target: "/skill",
+    dependencies: {
+      exists: () => true,
+      lstat: () => regularStats(0o100644),
+      readFile: () => Buffer.from("tracked"),
+      sha256: () => "b".repeat(64),
+      listFiles: () => [],
+      enforcePosixMode: true,
+    },
+  });
+  assert.equal(result.clean, true);
+  assert.deepEqual(result.modifications, []);
+});
+
 test("installed manifest paths cannot escape the target", () => {
   assert.throws(
     () => compareInstalledManifest({
       manifest: manifest("0.4.0", [{
         path: "../outside",
+        mode: "0644",
         sha256: "b".repeat(64),
       }]),
       target: "/skill",

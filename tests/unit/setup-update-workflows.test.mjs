@@ -40,11 +40,23 @@ test("latest update source accepts stable releases only", () => {
 
 test("installed manifest comparison detects changed and missing tracked files", () => {
   const manifest = { schemaVersion: 1, kind: "github-delivery/distribution-manifest", files: [
-    { path: "SKILL.md", sha256: "a".repeat(64) },
-    { path: "references/status.md", sha256: "b".repeat(64) },
+    { path: "SKILL.md", mode: "0644", sha256: "a".repeat(64) },
+    { path: "references/status.md", mode: "0644", sha256: "b".repeat(64) },
   ]};
   const result = compareInstalledManifest({ manifest, target: "/skill", dependencies: {
-    exists: (path) => !path.endsWith("status.md"),
+    lstat: (path) => {
+      if (String(path).endsWith("status.md")) {
+        const error = new Error("ENOENT");
+        error.code = "ENOENT";
+        throw error;
+      }
+      return {
+        isFile: () => true,
+        isSymbolicLink: () => false,
+        isDirectory: () => false,
+        mode: 0o100644,
+      };
+    },
     readFile: () => Buffer.from("locally changed"),
     sha256: () => "c".repeat(64),
   }});

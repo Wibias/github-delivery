@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import {
   existsSync,
+  lstatSync,
   readFileSync,
   readdirSync,
 } from "node:fs";
@@ -75,24 +76,56 @@ export function validateManifestPath(path) {
   return path;
 }
 
+function parseManifestMode(mode) {
+  if (!/^(0644|0755)$/.test(String(mode || ""))) {
+    throw new Error("installed_manifest_invalid");
+  }
+  return Number.parseInt(mode, 8);
+}
+
+function lstatOrMissing(lstat, path) {
+  try {
+    return lstat(path);
+  } catch (error) {
+    if (error && error.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
+function isRegularFile(stats) {
+  return Boolean(stats) && typeof stats.isFile === "function" && stats.isFile() === true
+    && (typeof stats.isSymbolicLink !== "function" || stats.isSymbolicLink() !== true);
+}
+
 export function compareInstalledManifest({ manifest, target, dependencies = {} } = {}) {
   if (manifest?.schemaVersion !== 1 || manifest?.kind !== "github-delivery/distribution-manifest" || !Array.isArray(manifest.files)) {
     throw new Error("installed_manifest_invalid");
   }
   target = resolve(target);
-  const exists = dependencies.exists || existsSync;
+  const lstat = dependencies.lstat || lstatSync;
   const readFile = dependencies.readFile || readFileSync;
   const digest = dependencies.sha256 || sha256;
   const listFiles = dependencies.listFiles || defaultListFiles;
+  const enforcePosixMode = dependencies.enforcePosixMode ?? process.platform !== "win32";
   const modifications = [];
   const tracked = new Set();
 
   for (const entry of manifest.files) {
     const relativePath = validateManifestPath(entry?.path);
+    const expectedMode = parseManifestMode(entry.mode);
     tracked.add(relativePath);
     const path = join(target, ...relativePath.split("/"));
-    if (!exists(path)) {
+    const stats = lstatOrMissing(lstat, path);
+    if (!stats) {
       modifications.push({ path: relativePath, reason: "missing" });
+      continue;
+    }
+    if (!isRegularFile(stats)) {
+      modifications.push({ path: relativePath, reason: "not_regular" });
+      continue;
+    }
+    if (enforcePosixMode && (stats.mode & 0o777) !== expectedMode) {
+      modifications.push({ path: relativePath, reason: "mode" });
       continue;
     }
     if (digest(readFile(path)) !== entry.sha256) {
