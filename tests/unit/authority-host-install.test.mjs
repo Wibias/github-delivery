@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 
 import {
@@ -189,4 +192,46 @@ test("explicit install opt-in overrides disabled planning without changing autho
   assert.equal(installCalls, 1);
   assert.equal(result.action, "install");
   assert.equal(result.mode, "off");
+});
+
+test("reconcile refuses a concurrent Authority install on the same root", async () => {
+  const home = mkdtempSync(join(tmpdir(), "gd-authority-lock-"));
+  const local = join(home, "AppData", "Local");
+  const root = join(local, "GitHubDeliveryAuthority");
+  mkdirSync(root, { recursive: true });
+  writeFileSync(join(root, ".github-delivery-authority-install.lock"), "foreign-holder\n");
+  const expectedRelease = { tag: "v0.5.2", version: "0.5.2", sourceCommit: "b".repeat(40) };
+
+  await assert.rejects(
+    () => reconcileStableAuthorityHost({
+      expectedRelease,
+      platform: "win32",
+      env: { LOCALAPPDATA: local },
+      home,
+      client: {
+        async latestRelease() { return { tag_name: expectedRelease.tag }; },
+      },
+      dependencies: {
+        readUserConfig: () => ({ config: { schemaVersion: 1, authorityMode: "all" } }),
+        readInstalledAuthorityHost: () => ({
+          supported: true,
+          configured: false,
+          installed: false,
+          legacy: false,
+          version: null,
+          sourceCommit: null,
+          root,
+        }),
+        makeWorkspace: () => join(home, "workspace"),
+        removeWorkspace() {},
+        acquireVerifiedAuthorityHostPayload: async () => {
+          throw new Error("locked reconcile must not fetch a payload");
+        },
+        installVerifiedAuthorityHost() {
+          throw new Error("locked reconcile must not install");
+        },
+      },
+    }),
+    /install_lock_held/,
+  );
 });

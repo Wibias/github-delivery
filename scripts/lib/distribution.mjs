@@ -16,6 +16,7 @@ import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { gzipSync } from "node:zlib";
 
 import { inspectLegacyManifestlessInstallation } from "./bootstrap-cli.mjs";
+import { targetInstallLockPath, withExclusiveInstallLock } from "./install-lock.mjs";
 
 const ROOT_FILES = [
   "SKILL.md",
@@ -428,7 +429,11 @@ function siblingPath(target, prefix) {
   return candidate;
 }
 
-export function applyInstallation({
+export function applyInstallation(options = {}) {
+  return withExclusiveInstallLock(targetInstallLockPath(options.target), () => applyInstallationHeld(options));
+}
+
+function applyInstallationHeld({
   source,
   target,
   backupRoot,
@@ -486,7 +491,11 @@ export function applyInstallation({
   return { schemaVersion: 1, kind: "github-delivery/install-receipt", action: plan.action, sourceVersion: plan.sourceVersion, previousVersion: plan.targetVersion, target: plan.target, backupPath };
 }
 
-export function restoreBackup({
+export function restoreBackup(options = {}) {
+  return withExclusiveInstallLock(targetInstallLockPath(options.target), () => restoreBackupHeld(options));
+}
+
+function restoreBackupHeld({
   backup,
   target,
   renameSync: rename = renameSync,

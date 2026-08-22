@@ -313,3 +313,58 @@ test("restore keeps the live target if the backup cannot be swapped in", () => {
   );
   assert.equal(readFileSync(join(target, "marker.txt"), "utf8"), "new");
 });
+
+test("apply refuses a concurrent mutation of the same target", () => {
+  const root = mkdtempSync(join(tmpdir(), "github-delivery-install-test-"));
+  const source = join(root, "source");
+  const target = join(root, "target");
+  const backups = join(root, "backups");
+  skill(source, "0.2.0", "new");
+  skill(target, "0.1.0", "old");
+
+  let nestedError;
+  applyInstallation({
+    source,
+    target,
+    backupRoot: backups,
+    copySync(from, to, options) {
+      try {
+        applyInstallation({ source, target, backupRoot: backups });
+      } catch (error) {
+        nestedError = error;
+      }
+      cpSync(from, to, options);
+    },
+  });
+
+  assert.match(String(nestedError?.message || nestedError), /install_lock_held/);
+  assert.equal(readFileSync(join(target, "marker.txt"), "utf8"), "new");
+});
+
+test("restore refuses a concurrent mutation of the same target", () => {
+  const root = mkdtempSync(join(tmpdir(), "github-delivery-install-test-"));
+  const source = join(root, "source");
+  const target = join(root, "target");
+  const backups = join(root, "backups");
+  skill(source, "0.2.0", "new");
+  skill(target, "0.1.0", "old");
+  const receipt = applyInstallation({ source, target, backupRoot: backups });
+
+  let nestedError;
+  restoreBackup({
+    backup: receipt.backupPath,
+    target,
+    renameSync(from, to) {
+      if (nestedError === undefined) {
+        try {
+          applyInstallation({ source, target, backupRoot: backups });
+        } catch (error) {
+          nestedError = error;
+        }
+      }
+      renameSync(from, to);
+    },
+  });
+
+  assert.match(String(nestedError?.message || nestedError), /install_lock_held/);
+});
