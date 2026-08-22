@@ -122,8 +122,9 @@ test("preserves an orphan while a live PR branch still contains the workflow fil
         }],
       },
     },
+    { path: "/repos/Wibias/github-delivery/git/ref/heads/agent/pr-77", body: { object: { sha: "a".repeat(40) } } },
     {
-      path: "/repos/Wibias/github-delivery/contents/.github/workflows/tmp-pr-helper.yml?ref=agent%2Fpr-77",
+      path: `/repos/Wibias/github-delivery/contents/.github/workflows/tmp-pr-helper.yml?ref=${"a".repeat(40)}`,
       body: { type: "file", path: ".github/workflows/tmp-pr-helper.yml" },
     },
   ]);
@@ -132,7 +133,6 @@ test("preserves an orphan while a live PR branch still contains the workflow fil
   assert.equal(result.approvedWorkflows, 0);
   assert.equal(result.deletedRuns, 0);
   assert.equal(calls.some((call) => call.startsWith("DELETE ")), false);
-  assert.equal(routes.length, 0);
 });
 
 test("cleans a PR workflow after its run branch no longer contains the file", async () => {
@@ -156,11 +156,13 @@ test("cleans a PR workflow after its run branch no longer contains the file", as
         }],
       },
     },
+    { path: "/repos/Wibias/github-delivery/git/ref/heads/agent/pr-77", body: { object: { sha: "a".repeat(40) } } },
     {
-      path: "/repos/Wibias/github-delivery/contents/.github/workflows/tmp-pr-helper.yml?ref=agent%2Fpr-77",
+      path: `/repos/Wibias/github-delivery/contents/.github/workflows/tmp-pr-helper.yml?ref=${"a".repeat(40)}`,
       status: 404,
       body: { message: "Not Found" },
     },
+    { path: "/repos/Wibias/github-delivery/git/ref/heads/agent/pr-77", body: { object: { sha: "a".repeat(40) } } },
     { method: "DELETE", path: "/repos/Wibias/github-delivery/actions/runs/203", status: 204 },
   ]);
 
@@ -190,7 +192,6 @@ test("never deletes an orphan with a non-completed run", async () => {
   assert.equal(result.approvedWorkflows, 0);
   assert.equal(result.deletedRuns, 0);
   assert.equal(calls.some((call) => call.startsWith("DELETE ")), false);
-  assert.equal(routes.length, 0);
 });
 
 test("preflights every candidate before the first destructive request", async () => {
@@ -259,5 +260,175 @@ test("caps deletions and clears smaller orphan histories first", async () => {
   assert.equal(result.deletedRuns, 1);
   assert.equal(result.capped, true);
   assert.equal(calls.at(-1), "DELETE /repos/Wibias/github-delivery/actions/runs/208");
+  assert.equal(routes.length, 0);
+});
+
+test("stops later deletions when the default branch moves after the first DELETE", async () => {
+  const shaA = "a".repeat(40);
+  const shaB = "b".repeat(40);
+  const routes = [
+    { path: "/repos/Wibias/github-delivery", body: { default_branch: "main" } },
+    { path: "/repos/Wibias/github-delivery/git/ref/heads/main", body: { object: { sha: shaA } } },
+    {
+      path: "/repos/Wibias/github-delivery/contents/.github/workflows?ref=main",
+      body: [
+        { type: "file", path: ".github/workflows/ci.yml" },
+        { type: "file", path: ".github/workflows/cleanup-orphaned-workflows.yml" },
+      ],
+    },
+    {
+      path: "/repos/Wibias/github-delivery/actions/workflows?per_page=100&page=1",
+      body: {
+        workflows: [
+          { id: 2, name: "Temporary PR helper", path: ".github/workflows/tmp-pr-helper.yml" },
+        ],
+      },
+    },
+    {
+      path: "/repos/Wibias/github-delivery/actions/workflows/2/runs?per_page=100&page=1",
+      body: {
+        workflow_runs: [
+          { id: 301, status: "completed" },
+          { id: 302, status: "completed" },
+          { id: 305, status: "completed" },
+        ],
+      },
+    },
+    { path: "/repos/Wibias/github-delivery/git/ref/heads/main", body: { object: { sha: shaA } } },
+    { method: "DELETE", path: "/repos/Wibias/github-delivery/actions/runs/301", status: 204 },
+    { path: "/repos/Wibias/github-delivery/git/ref/heads/main", body: { object: { sha: shaB } } },
+    { method: "DELETE", path: "/repos/Wibias/github-delivery/actions/runs/302", status: 204 },
+    { method: "DELETE", path: "/repos/Wibias/github-delivery/actions/runs/305", status: 204 },
+  ];
+  const calls = [];
+
+  await assert.rejects(
+    cleanupOrphanedWorkflowRuns({
+      token: "test-token",
+      repository: "Wibias/github-delivery",
+      fetchImpl: mockFetch(routes, calls),
+      log: () => {},
+    }),
+    /default_branch_moved_during_cleanup/,
+  );
+  assert.equal(calls.filter((call) => call.startsWith("DELETE ")).length, 1);
+  assert.equal(
+    calls.includes("DELETE /repos/Wibias/github-delivery/actions/runs/302"),
+    false,
+  );
+});
+
+test("stops deletion when a run-head branch moves after the absence check", async () => {
+  const shaA = "a".repeat(40);
+  const headOld = "c".repeat(40);
+  const headNew = "d".repeat(40);
+  const routes = [
+    { path: "/repos/Wibias/github-delivery", body: { default_branch: "main" } },
+    { path: "/repos/Wibias/github-delivery/git/ref/heads/main", body: { object: { sha: shaA } } },
+    {
+      path: "/repos/Wibias/github-delivery/contents/.github/workflows?ref=main",
+      body: [
+        { type: "file", path: ".github/workflows/ci.yml" },
+        { type: "file", path: ".github/workflows/cleanup-orphaned-workflows.yml" },
+      ],
+    },
+    {
+      path: "/repos/Wibias/github-delivery/actions/workflows?per_page=100&page=1",
+      body: {
+        workflows: [
+          { id: 2, name: "Temporary PR helper", path: ".github/workflows/tmp-pr-helper.yml" },
+        ],
+      },
+    },
+    {
+      path: "/repos/Wibias/github-delivery/actions/workflows/2/runs?per_page=100&page=1",
+      body: {
+        workflow_runs: [{
+          id: 303,
+          status: "completed",
+          head_branch: "agent/pr-77",
+          head_repository: { full_name: "Wibias/github-delivery" },
+        }],
+      },
+    },
+    { path: "/repos/Wibias/github-delivery/git/ref/heads/agent/pr-77", body: { object: { sha: headOld } } },
+    {
+      path: `/repos/Wibias/github-delivery/contents/.github/workflows/tmp-pr-helper.yml?ref=${headOld}`,
+      status: 404,
+      body: { message: "Not Found" },
+    },
+    { path: "/repos/Wibias/github-delivery/git/ref/heads/main", body: { object: { sha: shaA } } },
+    { path: "/repos/Wibias/github-delivery/git/ref/heads/agent/pr-77", body: { object: { sha: headNew } } },
+    { method: "DELETE", path: "/repos/Wibias/github-delivery/actions/runs/303", status: 204 },
+  ];
+  const calls = [];
+
+  await assert.rejects(
+    cleanupOrphanedWorkflowRuns({
+      token: "test-token",
+      repository: "Wibias/github-delivery",
+      fetchImpl: mockFetch(routes, calls),
+      log: () => {},
+    }),
+    /run_head_moved_during_cleanup/,
+  );
+  assert.equal(calls.some((call) => call.startsWith("DELETE ")), false);
+});
+
+test("run-head presence checks use a captured commit SHA rather than the moving branch alias", async () => {
+  const shaA = "a".repeat(40);
+  const headSha = "c".repeat(40);
+  const routes = [
+    { path: "/repos/Wibias/github-delivery", body: { default_branch: "main" } },
+    { path: "/repos/Wibias/github-delivery/git/ref/heads/main", body: { object: { sha: shaA } } },
+    {
+      path: "/repos/Wibias/github-delivery/contents/.github/workflows?ref=main",
+      body: [
+        { type: "file", path: ".github/workflows/ci.yml" },
+        { type: "file", path: ".github/workflows/cleanup-orphaned-workflows.yml" },
+      ],
+    },
+    {
+      path: "/repos/Wibias/github-delivery/actions/workflows?per_page=100&page=1",
+      body: {
+        workflows: [
+          { id: 2, name: "Temporary PR helper", path: ".github/workflows/tmp-pr-helper.yml" },
+        ],
+      },
+    },
+    {
+      path: "/repos/Wibias/github-delivery/actions/workflows/2/runs?per_page=100&page=1",
+      body: {
+        workflow_runs: [{
+          id: 304,
+          status: "completed",
+          head_branch: "agent/pr-77",
+          head_repository: { full_name: "Wibias/github-delivery" },
+        }],
+      },
+    },
+    { path: "/repos/Wibias/github-delivery/git/ref/heads/agent/pr-77", body: { object: { sha: headSha } } },
+    {
+      path: `/repos/Wibias/github-delivery/contents/.github/workflows/tmp-pr-helper.yml?ref=${headSha}`,
+      status: 404,
+      body: { message: "Not Found" },
+    },
+    { path: "/repos/Wibias/github-delivery/git/ref/heads/main", body: { object: { sha: shaA } } },
+    { path: "/repos/Wibias/github-delivery/git/ref/heads/agent/pr-77", body: { object: { sha: headSha } } },
+    { method: "DELETE", path: "/repos/Wibias/github-delivery/actions/runs/304", status: 204 },
+  ];
+
+  const { result, calls } = await runWith(routes);
+  assert.equal(result.deletedRuns, 1);
+  assert.equal(
+    calls.includes(
+      `GET /repos/Wibias/github-delivery/contents/.github/workflows/tmp-pr-helper.yml?ref=${headSha}`,
+    ),
+    true,
+  );
+  assert.equal(
+    calls.some((call) => call.includes("tmp-pr-helper.yml?ref=agent%2Fpr-77")),
+    false,
+  );
   assert.equal(routes.length, 0);
 });

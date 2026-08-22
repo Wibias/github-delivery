@@ -91,37 +91,80 @@ async function readBranchGeneration({ client, owner, repo, branch }) {
   return sha;
 }
 
-async function workflowStillExistsOnRunHead({ client, owner, repo, workflow, runs, log }) {
+async function captureRunHeadRefs({ client, runs }) {
   const heads = new Map();
   for (const run of runs) {
     const fullName = run.head_repository?.full_name;
     const branch = run.head_branch;
     if (typeof fullName !== "string" || typeof branch !== "string" || !branch) continue;
-    heads.set(`${fullName}\0${branch}`, { fullName, branch });
-  }
-
-  for (const { fullName, branch } of heads.values()) {
+    const key = `${fullName}\0${branch}`;
+    if (heads.has(key)) continue;
     const [headOwner, headRepo, ...rest] = fullName.split("/");
     if (!headOwner || !headRepo || rest.length > 0) {
       throw new Error(
         `Workflow run returned invalid head_repository.full_name: ${JSON.stringify(fullName)}`,
       );
     }
+    const sha = await readBranchGeneration({
+      client,
+      owner: headOwner,
+      repo: headRepo,
+      branch,
+    });
+    heads.set(key, { fullName, branch, owner: headOwner, repo: headRepo, sha });
+  }
+  return [...heads.values()];
+}
 
+async function workflowStillExistsOnCapturedHeads({ client, workflow, heads, log }) {
+  for (const head of heads) {
     const exists = await client.exists(
-      `/repos/${encodeURIComponent(headOwner)}/${encodeURIComponent(headRepo)}`
-      + `/contents/${encodePath(workflow.path)}?ref=${encodeURIComponent(branch)}`,
+      `/repos/${encodeURIComponent(head.owner)}/${encodeURIComponent(head.repo)}`
+      + `/contents/${encodePath(workflow.path)}?ref=${encodeURIComponent(head.sha)}`,
     );
     if (exists) {
       log(
         `Preserving ${workflow.name} (${workflow.path}): `
-        + `branch ${fullName}:${branch} still contains it.`,
+        + `commit ${head.sha} on ${head.fullName}:${head.branch} still contains it.`,
       );
       return true;
     }
   }
-
   return false;
+}
+
+async function assertCleanupRefsUnchanged({
+  client,
+  owner,
+  repo,
+  defaultBranch,
+  defaultBranchGeneration,
+  heads,
+}) {
+  const currentDefaultBranchGeneration = await readBranchGeneration({
+    client,
+    owner,
+    repo,
+    branch: defaultBranch,
+  });
+  if (currentDefaultBranchGeneration !== defaultBranchGeneration) {
+    throw new Error(
+      `default_branch_moved_during_cleanup:${defaultBranchGeneration}:${currentDefaultBranchGeneration}`,
+    );
+  }
+  for (const head of heads) {
+    const current = await readBranchGeneration({
+      client,
+      owner: head.owner,
+      repo: head.repo,
+      branch: head.branch,
+    });
+    if (current !== head.sha) {
+      throw new Error(
+        `run_head_moved_during_cleanup:${head.fullName}:${head.branch}:${head.sha}:${current}`,
+      );
+    }
+  }
 }
 
 export async function cleanupOrphanedWorkflowRuns({
@@ -196,11 +239,12 @@ export async function cleanupOrphanedWorkflowRuns({
       continue;
     }
 
-    if (await workflowStillExistsOnRunHead({ client, owner, repo, workflow, runs, log })) {
+    const heads = await captureRunHeadRefs({ client, runs });
+    if (await workflowStillExistsOnCapturedHeads({ client, workflow, heads, log })) {
       continue;
     }
 
-    cleanupPlans.push({ workflow, runs });
+    cleanupPlans.push({ workflow, runs, heads });
   }
 
   // Clear smaller histories first so one bounded run removes as many stale sidebar
@@ -214,25 +258,11 @@ export async function cleanupOrphanedWorkflowRuns({
     `Preflight approved ${cleanupPlans.length} orphan workflow(s) containing ${plannedRuns} run(s).`,
   );
 
-  // The active-path snapshot is valid only for the exact default-branch generation
-  // that produced it. Abort before the first DELETE if main moved during preflight.
-  const currentDefaultBranchGeneration = await readBranchGeneration({
-    client,
-    owner,
-    repo,
-    branch: defaultBranch,
-  });
-  if (currentDefaultBranchGeneration !== defaultBranchGeneration) {
-    throw new Error(
-      `default_branch_moved_during_cleanup:${defaultBranchGeneration}:${currentDefaultBranchGeneration}`,
-    );
-  }
-
   let deletedRuns = 0;
   let capped = false;
   const failures = [];
 
-  outer: for (const { workflow, runs } of cleanupPlans) {
+  outer: for (const { workflow, runs, heads } of cleanupPlans) {
     for (const run of runs) {
       if (deletedRuns >= maxDeletions) {
         capped = true;
@@ -240,6 +270,15 @@ export async function cleanupOrphanedWorkflowRuns({
       }
 
       try {
+        // Each DELETE must still be justified by current immutable ref evidence.
+        await assertCleanupRefsUnchanged({
+          client,
+          owner,
+          repo,
+          defaultBranch,
+          defaultBranchGeneration,
+          heads,
+        });
         await client.request(`/repos/${owner}/${repo}/actions/runs/${run.id}`, { method: "DELETE" });
         deletedRuns += 1;
       } catch (error) {
@@ -247,6 +286,7 @@ export async function cleanupOrphanedWorkflowRuns({
           log(`Run ${run.id} for ${workflow.name} disappeared before deletion; continuing.`);
           continue;
         }
+        if (!(error instanceof GitHubHttpError)) throw error;
         failures.push(
           `${workflow.name} run ${run.id}: ${error instanceof Error ? error.message : String(error)}`,
         );
