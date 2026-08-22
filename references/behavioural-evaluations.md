@@ -66,6 +66,9 @@ Actions are the observed tool-call names plus authority-redemption and mutation-
 
 ## Compare
 
+Each run file must not embed `trace` objects. Observed evidence comes from a sibling
+`<run>.transcript.json` file, and `run.provenance.transcriptsSha256` must match that sidecar.
+
 ```bash
 node scripts/compare-behavioural-evals.mjs \
   cases.json baseline.json current.json candidate.json

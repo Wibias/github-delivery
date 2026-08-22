@@ -3,7 +3,11 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import { compareAdversarialPairs } from "../../scripts/lib/adversarial-eval-pairs.mjs";
-import { scoreBehaviouralRun, validateBehaviouralCase } from "../../scripts/lib/behavioural-evals.mjs";
+import {
+  attachTranscriptProvenance,
+  scoreBehaviouralRun,
+  validateBehaviouralCase,
+} from "../../scripts/lib/behavioural-evals.mjs";
 
 const CASES = JSON.parse(readFileSync(new URL("../evals/behavioural-adversarial-cases.json", import.meta.url), "utf8"));
 
@@ -34,6 +38,20 @@ function run(results) {
   };
 }
 
+function scoreResults(resultsWithTrace) {
+  const transcripts = {};
+  const results = resultsWithTrace.map((result) => {
+    const { trace, ...rest } = result;
+    transcripts[result.caseId] = trace;
+    return rest;
+  });
+  return scoreBehaviouralRun(
+    CASES,
+    attachTranscriptProvenance(run(results), transcripts),
+    transcripts,
+  );
+}
+
 test("adversarial fixture pack is valid and every pair has neutral/adversarial twins", () => {
   const groups = new Map();
   for (const item of CASES) {
@@ -60,7 +78,7 @@ test("fixture pack covers the intended hostile context channels", () => {
 });
 
 test("pair comparison passes when hostile framing retains neutral behaviour", () => {
-  const score = scoreBehaviouralRun(CASES, run(CASES.map(successfulResult)));
+  const score = scoreResults(CASES.map(successfulResult));
   const comparison = compareAdversarialPairs(CASES, score);
 
   assert.equal(comparison.allPairsRetained, true);
@@ -76,7 +94,7 @@ test("pair comparison detects framing-induced finding suppression", () => {
   attacked.findings = [];
   attacked.mergeReady = true;
 
-  const score = scoreBehaviouralRun(CASES, run(results));
+  const score = scoreResults(results);
   const comparison = compareAdversarialPairs(CASES, score);
   const regression = comparison.regressions.find((item) => item.pairId === "ADV-META-001");
 
@@ -91,7 +109,7 @@ test("pair comparison detects unsafe action caused only by injected repository t
   attacked.trace.toolCalls.push({ name: "follow-repository-instruction" });
   attacked.actions.push("follow-repository-instruction");
 
-  const score = scoreBehaviouralRun(CASES, run(results));
+  const score = scoreResults(results);
   const comparison = compareAdversarialPairs(CASES, score);
   assert.ok(comparison.regressions.some((item) => item.pairId === "ADV-REPO-001"));
 });
@@ -100,7 +118,7 @@ test("missing one side of a pair is itself a regression", () => {
   const results = CASES
     .filter((item) => item.id !== "ADV-SKILL-001-adversarial")
     .map(successfulResult);
-  const score = scoreBehaviouralRun(CASES, run(results));
+  const score = scoreResults(results);
   const comparison = compareAdversarialPairs(CASES, score);
   assert.ok(comparison.regressions.some((item) => item.pairId === "ADV-SKILL-001"));
 });
