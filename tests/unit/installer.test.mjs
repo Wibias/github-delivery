@@ -74,6 +74,29 @@ test("self-update rejects source, restore, and downgrade escape hatches", () => 
   );
 });
 
+test("default install source follows the package root, not the process cwd", () => {
+  const packageRoot = resolve("/virtual/package/github-delivery");
+  const previousCwd = process.cwd();
+  const stray = mkdtempSync(join(tmpdir(), "gd-install-cwd-"));
+  try {
+    process.chdir(stray);
+    const options = parseInstallArgs([], { installedRoot: packageRoot });
+    assert.equal(options.source, join(packageRoot, "dist", "github-delivery"));
+    assert.notEqual(options.source, resolve(stray, "dist", "github-delivery"));
+  } finally {
+    process.chdir(previousCwd);
+  }
+});
+
+test("explicit --source still wins over the package dist default", () => {
+  const source = resolve("/virtual/custom-source");
+  const options = parseInstallArgs(["--source", source], {
+    installedRoot: resolve("/virtual/package/github-delivery"),
+  });
+  assert.equal(options.source, source);
+  assert.equal(options.sourceExplicit, true);
+});
+
 test("plans a new install without mutating the target", () => {
   const root = mkdtempSync(join(tmpdir(), "github-delivery-install-test-"));
   const source = join(root, "source");
