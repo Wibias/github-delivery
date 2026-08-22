@@ -40,7 +40,7 @@ function inferHost(codexHome) {
 export function parseInstallArgs(argv, { installedRoot = resolve(import.meta.dirname, "..") } = {}) {
   const codexHome = defaultCodexHome();
   const options = {
-    source: join(process.cwd(), "dist", "github-delivery"),
+    source: join(installedRoot, "dist", "github-delivery"),
     target: join(homedir(), ".agents", "skills", "github-delivery"),
     backupRoot: undefined,
     apply: false,
