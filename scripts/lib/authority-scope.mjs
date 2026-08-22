@@ -134,6 +134,8 @@ export function authorityScopeForRequest(request = {}) {
       return {
         ...scope,
         ...prScope(request),
+        expectedBase: exactString(request.expectedBase, "expected_base"),
+        expectedBaseOid: exactString(request.expectedBaseOid, "expected_base_oid").toLowerCase(),
         mergeMethod: normalizeMergeMethod(request.mergeMethod),
       };
 

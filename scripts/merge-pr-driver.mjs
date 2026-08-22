@@ -119,7 +119,18 @@ export function buildThankRequest({ repo, pr, expectedHead, body }) {
   };
 }
 
-export function buildMergeRequest({ repo, pr, expectedHead, mergeMethod }) {
+export function buildMergeRequest({
+  repo,
+  pr,
+  expectedHead,
+  expectedBase,
+  expectedBaseOid,
+  mergeMethod,
+}) {
+  const base = String(expectedBase || "").trim();
+  const baseOid = String(expectedBaseOid || "").trim().toLowerCase();
+  if (!base) throw new Error("expected_base_required");
+  if (!baseOid) throw new Error("expected_base_oid_required");
   return {
     schemaVersion: 1,
     action: "merge_pr",
@@ -128,6 +139,8 @@ export function buildMergeRequest({ repo, pr, expectedHead, mergeMethod }) {
     repo,
     pr,
     expectedHead,
+    expectedBase: base,
+    expectedBaseOid: baseOid,
     mergeMethod,
   };
 }
@@ -391,6 +404,8 @@ async function main() {
     repo: args.repo,
     pr: args.pr,
     expectedHead,
+    expectedBase: approvedBoundary.baseRefName,
+    expectedBaseOid: approvedBoundary.baseOid,
     mergeMethod,
   });
   const thankRequest = thankBody

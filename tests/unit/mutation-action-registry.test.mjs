@@ -43,6 +43,7 @@ function fixtureFor(action) {
     head: "feature/safe",
     draft: true,
     expectedBase: "main",
+    expectedBaseOid: "d".repeat(40),
     newBase: "release",
     mergeMethod: "merge",
     ready: true,

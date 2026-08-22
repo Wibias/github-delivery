@@ -13,6 +13,8 @@ const request = {
   repo: "Wibias/github-delivery",
   pr: 105,
   expectedHead: "71ac000000000000000000000000000000000001",
+  expectedBase: "main",
+  expectedBaseOid: "72ac000000000000000000000000000000000001",
   mergeMethod: "merge",
 };
 

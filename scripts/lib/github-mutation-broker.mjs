@@ -402,6 +402,38 @@ function verifyHead({ request, runner }) {
   return output;
 }
 
+function verifyMergeBase({ request, runner }) {
+  if (request.action !== "merge_pr") return null;
+  const expectedBase = required(request.expectedBase, "expected_base");
+  const expectedBaseOid = String(required(request.expectedBaseOid, "expected_base_oid")).toLowerCase();
+  const payload = parseJson(
+    runOrThrow(runner, [
+      "gh",
+      "pr",
+      "view",
+      String(positiveInteger(request.pr, "pr")),
+      "--repo",
+      required(request.repo, "repo"),
+      "--json",
+      "baseRefName,baseRefOid",
+    ]),
+    "merge_base_evidence_invalid",
+  );
+  const observedBase = String(payload.baseRefName || "").trim();
+  const observedBaseOid = String(payload.baseRefOid || "").trim().toLowerCase();
+  if (observedBase !== expectedBase) {
+    throw new Error(
+      `expected_base_mismatch: expected ${expectedBase}, observed ${observedBase || "missing"}`,
+    );
+  }
+  if (observedBaseOid !== expectedBaseOid) {
+    throw new Error(
+      `expected_base_oid_mismatch: expected ${expectedBaseOid}, observed ${observedBaseOid || "missing"}`,
+    );
+  }
+  return { observedBase, observedBaseOid };
+}
+
 function verifyReviewThreadTarget({ request, runner }) {
   if (!REVIEW_THREAD_ACTIONS.has(request.action)) return null;
   const threadId = graphqlCliField(required(request.threadId, "thread_id"), "thread_id");
@@ -703,6 +735,10 @@ export function planMutationRequest(
     positiveInteger(request.pr, "pr");
     required(request.expectedHead, "expected_head");
   }
+  if (request.action === "merge_pr") {
+    required(request.expectedBase, "expected_base");
+    required(request.expectedBaseOid, "expected_base_oid");
+  }
   if (request.action === "close_linked_issue") {
     positiveInteger(required(request.pr, "pr"), "pr");
     positiveInteger(request.issue, "issue");
@@ -785,6 +821,7 @@ export function executeMutationRequest({
   }
 
   const observedHead = verifyHead({ request: plan.request, runner });
+  verifyMergeBase({ request: plan.request, runner });
   verifyLinkedIssue({ request: plan.request, runner });
   const threadTarget = verifyReviewThreadTarget({ request: plan.request, runner });
   const retargetState = verifyRetargetBase({ request: plan.request, runner });

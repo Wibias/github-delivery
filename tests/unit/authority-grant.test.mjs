@@ -34,6 +34,8 @@ function mergeRequest(overrides = {}) {
     repo: "acme/widgets",
     pr: 32,
     expectedHead: "abcdef1234567890",
+    expectedBase: "main",
+    expectedBaseOid: "b".repeat(40),
     mergeMethod: "merge",
     ...overrides,
   };

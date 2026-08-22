@@ -16,6 +16,8 @@ function mergeRequest(overrides = {}) {
     repo: "acme/widgets",
     pr: 32,
     expectedHead: "abcdef1234567890",
+    expectedBase: "main",
+    expectedBaseOid: "b".repeat(40),
     mergeMethod: "merge",
     ...overrides,
   };
@@ -63,6 +65,16 @@ test("checks the current PR head before a write", () => {
     runner(command, args) {
       calls.push([command, ...args]);
       if (args[0] === "pr" && args[1] === "view") {
+        if (args.includes("baseRefName,baseRefOid")) {
+          return {
+            status: 0,
+            stdout: JSON.stringify({
+              baseRefName: "main",
+              baseRefOid: "b".repeat(40),
+            }),
+            stderr: "",
+          };
+        }
         return { status: 0, stdout: "abcdef1234567890\n", stderr: "" };
       }
       if (args[0] === "pr" && args[1] === "merge") {
@@ -95,7 +107,7 @@ test("checks the current PR head before a write", () => {
   assert.equal(result.executed, true);
   assert.equal(result.status, "succeeded");
   assert.equal(result.outcome, "merged");
-  assert.equal(calls.length, 4);
+  assert.equal(calls.length, 5);
   assert.deepEqual(calls[0].slice(0, 4), ["gh", "pr", "view", "32"]);
 });
 
@@ -114,6 +126,50 @@ test("fails closed when the PR head moved", () => {
     /expected_head_mismatch/,
   );
   assert.equal(calls, 1);
+});
+
+test("merge_pr requires an exact base identity", () => {
+  assert.throws(
+    () => planMutationRequest(mergeRequest({ expectedBase: undefined })),
+    /expected_base_required/,
+  );
+  assert.throws(
+    () => planMutationRequest(mergeRequest({ expectedBaseOid: undefined })),
+    /expected_base_oid_required/,
+  );
+});
+
+test("fails closed when the PR base moved before merge", () => {
+  let mergeCalled = false;
+  assert.throws(
+    () =>
+      executeMutationRequest({
+        request: mergeRequest(),
+        execute: true,
+        runner(command, args) {
+          if (args[0] === "pr" && args[1] === "view" && args.includes(".headRefOid")) {
+            return { status: 0, stdout: "abcdef1234567890\n", stderr: "" };
+          }
+          if (args[0] === "pr" && args[1] === "view" && args.includes("baseRefName,baseRefOid")) {
+            return {
+              status: 0,
+              stdout: JSON.stringify({
+                baseRefName: "main",
+                baseRefOid: "c".repeat(40),
+              }),
+              stderr: "",
+            };
+          }
+          if (args[0] === "pr" && args[1] === "merge") {
+            mergeCalled = true;
+            return { status: 0, stdout: "merged\n", stderr: "" };
+          }
+          throw new Error(`unexpected command: ${command} ${args.join(" ")}`);
+        },
+      }),
+    /expected_base_oid_mismatch/,
+  );
+  assert.equal(mergeCalled, false);
 });
 
 test("requires the hash of the exact approved human reply", () => {

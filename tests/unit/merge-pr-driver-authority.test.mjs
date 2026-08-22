@@ -17,6 +17,8 @@ test("merge driver attaches one trusted grant to every exact transaction request
         repo: "acme/widget",
         pr: 42,
         expectedHead: HEAD,
+        expectedBase: "main",
+        expectedBaseOid: HEAD.replace(/a/g, "b"),
         mergeMethod: "merge",
       }),
     },
