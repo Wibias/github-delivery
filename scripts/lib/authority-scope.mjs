@@ -281,6 +281,7 @@ export function authorityScopeForRequest(request = {}) {
     case "close_linked_issue":
       return {
         ...scope,
+        pr: positiveInteger(required(request.pr, "pr"), "pr"),
         issue: positiveInteger(request.issue, "issue"),
       };
 

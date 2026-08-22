@@ -112,7 +112,7 @@ For every linked or fixed issue:
 
 1. Read the issue author and current state.
 2. Post one idempotent issue thank/fixed comment through the broker-supported social mutation path using the issue shape from `references/comment-depth.md`; keep the real `@login` bare and omit self-thanks.
-3. If the fix is complete and the issue remains open, execute `close_linked_issue` through the broker with explicit instruction.
+3. If the fix is complete and the issue remains open, execute `close_linked_issue` through the broker with explicit instruction, the governing PR number, and a live `closingIssues` link. Do not close an issue that GitHub does not list as a closing issue of that PR.
 4. Leave epics or partially fixed issues open and state why.
 
 Auto-close does not replace the required issue comment.
