@@ -440,12 +440,24 @@ function installJournalPath(target) {
 }
 
 function writeInstallJournal(path, journal) {
-  const fd = openSync(path, "w");
+  const tmp = `${path}.${process.pid}.tmp`;
+  const fd = openSync(tmp, "w");
   try {
     writeSync(fd, `${JSON.stringify(journal)}\n`);
     fsyncSync(fd);
   } finally {
     closeSync(fd);
+  }
+  try {
+    renameSync(tmp, path);
+  } catch {
+    if (existsSync(path)) unlinkSync(path);
+    try {
+      renameSync(tmp, path);
+    } catch (retryError) {
+      if (existsSync(tmp)) unlinkSync(tmp);
+      throw retryError;
+    }
   }
 }
 
@@ -458,6 +470,36 @@ function readInstallJournal(path) {
   } catch {
     return null;
   }
+}
+
+function findSiblingWithPrefix(target, prefix) {
+  const directory = dirname(target);
+  const marker = `${prefix}${basename(target)}-`;
+  let matches;
+  try {
+    matches = readdirSync(directory, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() && entry.name.startsWith(marker))
+      .map((entry) => join(directory, entry.name));
+  } catch {
+    return null;
+  }
+  if (matches.length !== 1) return null;
+  return matches[0];
+}
+
+function resolveRecoveryPaths(target, journal) {
+  const stagingFromJournal = journal?.stagingPath ? resolve(journal.stagingPath) : null;
+  const backupFromJournal = journal?.backupPath ? resolve(journal.backupPath) : null;
+  const asideFromJournal = journal?.asidePath ? resolve(journal.asidePath) : null;
+  return {
+    stagingPath: stagingFromJournal && existsSync(stagingFromJournal)
+      ? stagingFromJournal
+      : findSiblingWithPrefix(target, ".github-delivery-staging-"),
+    backupPath: backupFromJournal && existsSync(backupFromJournal) ? backupFromJournal : null,
+    asidePath: asideFromJournal && existsSync(asideFromJournal)
+      ? asideFromJournal
+      : findSiblingWithPrefix(target, ".github-delivery-restore-aside-"),
+  };
 }
 
 export function recoverInterruptedInstallation(options = {}) {
@@ -473,14 +515,26 @@ function recoverInterruptedInstallationHeld({
   target = resolve(target);
   const journalPath = installJournalPath(target);
   const journal = readInstallJournal(journalPath);
-  if (!journal) return { recovered: false };
-  const stagingPath = journal.stagingPath ? resolve(journal.stagingPath) : null;
-  const backupPath = journal.backupPath ? resolve(journal.backupPath) : null;
+  const { stagingPath, backupPath, asidePath } = resolveRecoveryPaths(target, journal);
+  if (!journal && !stagingPath && !asidePath && !backupPath) return { recovered: false };
 
   if (!existsSync(target) && stagingPath && existsSync(stagingPath)) {
     rename(stagingPath, target);
     if (existsSync(journalPath)) unlinkSync(journalPath);
     return { recovered: true, action: "completed", backupPath };
+  }
+  if (!existsSync(target) && journal?.phase === "restoring" && backupPath && existsSync(backupPath)) {
+    rename(backupPath, target);
+    if (asidePath && existsSync(asidePath) && resolve(asidePath) !== target) {
+      remove(asidePath, { recursive: true, force: true });
+    }
+    if (existsSync(journalPath)) unlinkSync(journalPath);
+    return { recovered: true, action: "completed", backupPath };
+  }
+  if (!existsSync(target) && asidePath && existsSync(asidePath)) {
+    rename(asidePath, target);
+    if (existsSync(journalPath)) unlinkSync(journalPath);
+    return { recovered: true, action: "rolled-back", backupPath };
   }
   if (!existsSync(target) && backupPath && existsSync(backupPath)) {
     rename(backupPath, target);
@@ -490,6 +544,9 @@ function recoverInterruptedInstallationHeld({
   }
   if (stagingPath && existsSync(stagingPath) && resolve(stagingPath) !== target) {
     remove(stagingPath, { recursive: true, force: true });
+  }
+  if (asidePath && existsSync(asidePath) && resolve(asidePath) !== target) {
+    remove(asidePath, { recursive: true, force: true });
   }
   if (existsSync(journalPath)) unlinkSync(journalPath);
   return { recovered: false };
@@ -544,18 +601,18 @@ function applyInstallationHeld({
 
   let backupPath = null;
   try {
-    writeInstallJournal(journalPath, {
-      schemaVersion: 1,
-      kind: "github-delivery/install-journal",
-      phase: "staged",
-      target: plan.target,
-      stagingPath,
-      backupPath: null,
-    });
     if (existsSync(plan.target)) {
       const root = resolve(backupRoot || join(dirname(plan.target), ".github-delivery-backups"));
       mkdirSync(root, { recursive: true });
       backupPath = join(root, `github-delivery-${Date.now()}-${plan.targetVersion || "unknown"}`);
+      writeInstallJournal(journalPath, {
+        schemaVersion: 1,
+        kind: "github-delivery/install-journal",
+        phase: "displacing",
+        target: plan.target,
+        stagingPath,
+        backupPath,
+      });
       rename(plan.target, backupPath);
       writeInstallJournal(journalPath, {
         schemaVersion: 1,
@@ -566,6 +623,15 @@ function applyInstallationHeld({
         backupPath,
       });
       if (typeof afterDisplace === "function") afterDisplace({ target: plan.target, backupPath, stagingPath });
+    } else {
+      writeInstallJournal(journalPath, {
+        schemaVersion: 1,
+        kind: "github-delivery/install-journal",
+        phase: "staged",
+        target: plan.target,
+        stagingPath,
+        backupPath: null,
+      });
     }
     rename(stagingPath, plan.target);
     if (existsSync(journalPath)) unlinkSync(journalPath);
@@ -590,22 +656,39 @@ function restoreBackupHeld({
   target,
   renameSync: rename = renameSync,
   rmSync: remove = rmSync,
+  restoreOnFailure = true,
 } = {}) {
   backup = resolve(backup);
   target = resolve(target);
+  recoverInterruptedInstallationHeld({ target, renameSync: rename, rmSync: remove });
   if (!existsSync(backup) || !statSync(backup).isDirectory()) throw new Error("backup directory does not exist");
   if (!existsSync(target)) {
     rename(backup, target);
     return { schemaVersion: 1, kind: "github-delivery/restore-receipt", backup, target };
   }
   const asidePath = siblingPath(target, ".github-delivery-restore-aside-");
+  const journalPath = installJournalPath(target);
   try {
+    writeInstallJournal(journalPath, {
+      schemaVersion: 1,
+      kind: "github-delivery/install-journal",
+      phase: "restoring",
+      target,
+      stagingPath: null,
+      backupPath: backup,
+      asidePath,
+    });
     rename(target, asidePath);
     rename(backup, target);
+    if (existsSync(journalPath)) unlinkSync(journalPath);
   } catch (error) {
-    if (!existsSync(target) && existsSync(asidePath)) rename(asidePath, target);
+    if (restoreOnFailure !== false) {
+      if (!existsSync(target) && existsSync(asidePath)) rename(asidePath, target);
+      else recoverInterruptedInstallationHeld({ target, renameSync: rename, rmSync: remove });
+      if (existsSync(journalPath) && existsSync(target)) unlinkSync(journalPath);
+    }
     throw error;
   }
-  remove(asidePath, { recursive: true, force: true });
+  if (existsSync(asidePath)) remove(asidePath, { recursive: true, force: true });
   return { schemaVersion: 1, kind: "github-delivery/restore-receipt", backup, target };
 }
