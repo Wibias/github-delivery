@@ -7,6 +7,7 @@ All notable changes to `github-delivery` are documented here.
 ### Fixed
 
 - `authorityMode=off` no longer treats caller-supplied `explicitInstruction` or `exactTextConfirmed` as independently authenticated consent; those actions still require a verified host grant at execution.
+- Mutation-document retry identity now hashes the mutation payload when no idempotency key is present, stale autonomous-claim recovery refuses to delete a ref whose SHA or freshness changed, and a timed-out `push_code` re-reads the remote tip instead of assuming failure.
 - Release SBOMs now describe the package, use the source-commit created time, emit SPDX package verification codes, and fail closed against the SPDX 2.3 JSON schema.
 - Installed manifest comparison now rejects symlink/directory substitutions and enforces declared POSIX modes instead of following links and hashing only.
 - Release ZIP construction and extraction now use a portable NFC/case-fold path identity and re-read the extracted tree before trusting it.

@@ -58,7 +58,46 @@ test("dry-run never requests trusted authority", () => {
   assert.equal(authorized, false);
   assert.equal(result.action, "push_code");
   assert.equal(result.executed, false);
-  assert.equal(result.operationKey, "push_code:acme/widgets:");
+  assert.match(result.operationKey, /^payload:[0-9a-f]{64}$/);
+});
+
+test("fallback operation keys bind the mutation payload instead of action and repo only", () => {
+  const first = [];
+  const secondDoc = {
+    operations: [
+      request("push_code", { branch: "feature", newTip: "a".repeat(40) }),
+      request("push_code", { branch: "feature", newTip: "b".repeat(40) }),
+    ],
+  };
+  const firstResult = executeMutationDocument({
+    document: secondDoc.operations[0],
+    execute: false,
+    dependencies: {
+      mutationRequiresTrustedAuthority: () => false,
+      executeMutationWithAuthority({ request: planned }) {
+        first.push(planned.newTip);
+        return { action: planned.action, status: "succeeded" };
+      },
+    },
+  });
+  const completed = [firstResult.operationKey];
+  const executed = [];
+  const retry = executeMutationDocument({
+    document: secondDoc,
+    execute: false,
+    dependencies: {
+      completedOperationKeys: completed,
+      mutationRequiresTrustedAuthority: () => false,
+      executeMutationWithAuthority({ request: planned }) {
+        executed.push(planned.newTip);
+        return { action: planned.action, status: "succeeded" };
+      },
+    },
+  });
+  assert.notEqual(retry.results[0].operationKey, retry.results[1].operationKey);
+  assert.equal(retry.results[0].skipped, true);
+  assert.equal(retry.results[1].skipped, undefined);
+  assert.deepEqual(executed, ["b".repeat(40)]);
 });
 
 test("execution batches only missing trusted grants and executes refreshed requests in order", () => {
@@ -137,27 +176,20 @@ test("execution batches only missing trusted grants and executes refreshed reque
     null,
     "gd1.existing.signature",
   ]);
-  assert.deepEqual(result, {
-    batch: true,
-    partialFailure: false,
-    results: [
-      {
-        action: "post_comment",
-        grant: "gd1.generated0.signature",
-        operationKey: "post_comment:acme/widgets:4",
-      },
-      {
-        action: "assign_issue",
-        grant: "gd1.existing.signature",
-        operationKey: "assign_issue:acme/widgets:7",
-      },
-      {
-        action: "create_pr",
-        grant: "gd1.generated1.signature",
-        operationKey: "create_pr:acme/widgets:",
-      },
+  assert.equal(result.batch, true);
+  assert.equal(result.partialFailure, false);
+  assert.deepEqual(
+    result.results.map((entry) => [entry.action, entry.grant]),
+    [
+      ["post_comment", "gd1.generated0.signature"],
+      ["assign_issue", "gd1.existing.signature"],
+      ["create_pr", "gd1.generated1.signature"],
     ],
-  });
+  );
+  for (const entry of result.results) {
+    assert.match(entry.operationKey, /^payload:[0-9a-f]{64}$/);
+  }
+  assert.equal(new Set(result.results.map((entry) => entry.operationKey)).size, 3);
 });
 
 test("multi-request execution stops at the first failed operation", () => {

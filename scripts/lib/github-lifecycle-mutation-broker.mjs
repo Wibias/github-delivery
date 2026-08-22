@@ -47,17 +47,63 @@ function bodyWithMarker(body, marker) {
   return `${visibleBody(required(body, "body")).trimEnd()}\n\n${marker}`;
 }
 
-function runOrThrow(runner, command) {
+function runCommand(runner, command) {
   const [executable, ...args] = command;
-  const result = runner(executable, args, {
+  return runner(executable, args, {
     encoding: "utf8",
     maxBuffer: 20 * 1024 * 1024,
   });
+}
+
+function runOrThrow(runner, command) {
+  const result = runCommand(runner, command);
   if (result.status !== 0) {
     const detail = String(result.stderr || result.stdout || "").trim();
     throw new Error(detail || `mutation_command_failed:${result.status}`);
   }
   return String(result.stdout || "").trim();
+}
+
+function uncertainSpawn(result) {
+  return result?.status == null || Boolean(result?.signal);
+}
+
+function spawnFailure(result) {
+  const detail = String(result?.stderr || result?.stdout || "").trim();
+  return new Error(detail || `mutation_command_failed:${result?.status ?? "unknown"}`);
+}
+
+function readPushedTip(request, runner) {
+  const result = runCommand(runner, [
+    "git",
+    "ls-remote",
+    "--heads",
+    String(request.remote),
+    `refs/heads/${request.branch}`,
+  ]);
+  if (result.status !== 0) {
+    throw new Error("push_outcome_unknown:remote_unreadable");
+  }
+  const row = String(result.stdout || "").trim();
+  return row ? String(row.split(/\s+/)[0] || "").toLowerCase() : "absent";
+}
+
+function reconcileUncertainPush({ plan, runner, writeResult }) {
+  const observed = readPushedTip(plan.request, runner);
+  const expected = String(plan.request.newTip || "").toLowerCase();
+  if (observed === expected) {
+    return {
+      executed: true,
+      status: "reconciled_after_error",
+      stdout: String(writeResult?.stdout || "").trim(),
+      verification: observed,
+    };
+  }
+  const previous = String(plan.request.expectedRemoteTip || "").toLowerCase();
+  if (observed === previous) throw spawnFailure(writeResult);
+  throw new Error(
+    `push_outcome_unknown: expected ${expected}, previous ${previous}, observed ${observed}`,
+  );
 }
 
 function publicAuthorityReceipt(authority) {
@@ -243,8 +289,26 @@ export function executeLifecycleMutationRequest({
   }
 
   const preflight = preflightLifecycleMutation({ request: plan.request, runner });
-  const stdout = runOrThrow(runner, plan.command);
-  let verification = verifyLifecycleMutation({ request: plan.request, runner });
+  let stdout;
+  let status = "succeeded";
+  let verification;
+  if (plan.action === "push_code") {
+    const writeResult = runCommand(runner, plan.command);
+    if (uncertainSpawn(writeResult)) {
+      const reconciled = reconcileUncertainPush({ plan, runner, writeResult });
+      stdout = reconciled.stdout;
+      status = reconciled.status;
+      verification = reconciled.verification;
+    } else if (writeResult.status !== 0) {
+      throw spawnFailure(writeResult);
+    } else {
+      stdout = String(writeResult.stdout || "").trim();
+      verification = verifyLifecycleMutation({ request: plan.request, runner });
+    }
+  } else {
+    stdout = runOrThrow(runner, plan.command);
+    verification = verifyLifecycleMutation({ request: plan.request, runner });
+  }
   if (IDEMPOTENT_CREATES.has(plan.action)) {
     verification = findExistingCreate({ request: plan.request, runner });
     if (!verification) throw new Error(`${plan.action}_verification_failed:idempotency_receipt_mismatch`);
@@ -252,7 +316,7 @@ export function executeLifecycleMutationRequest({
   return {
     ...plan,
     executed: true,
-    status: "succeeded",
+    status,
     observedHead,
     preflight,
     existingMutation: null,

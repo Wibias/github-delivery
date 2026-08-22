@@ -549,3 +549,69 @@ test("stale autonomous claim is recoverable but a fresh competing claim is not",
   assert.equal(recovered.status, "recovered_stale_claim");
   assert.ok(stale.state.calls.some((call) => call.includes("DELETE")));
 });
+
+test("stale claim recovery does not delete when the ref SHA changed after the age check", () => {
+  const oldTime = Date.parse("2026-08-16T00:00:00Z");
+  const seed = freshClaimRunner();
+  acquireAutonomousIdempotencyClaim({ request: claimRequest(), runner: seed.runner, now: oldTime });
+  const oldMessage = seed.state.tagMessages[0];
+  const state = {
+    reads: 0,
+    deleted: false,
+    oldMessage,
+    refObject: "old-tag-object",
+  };
+  function runner(command, args) {
+    const endpoint = String(args[1] || "");
+    if (args[0] === "api" && endpoint.endsWith("/git/tags") && args.includes("POST")) {
+      return { status: 0, stdout: JSON.stringify({ sha: "should-not-create" }), stderr: "" };
+    }
+    if (args[0] === "api" && endpoint.endsWith("/git/refs") && args.includes("POST")) {
+      return { status: 1, stdout: "", stderr: "HTTP 422: Reference already exists" };
+    }
+    if (args[0] === "api" && endpoint.includes("/git/ref/github-delivery/idempotency/")) {
+      state.reads += 1;
+      const sha = state.reads === 1 ? "old-tag-object" : "newer-tag-object";
+      return {
+        status: 0,
+        stdout: JSON.stringify({ object: { type: "tag", sha } }),
+        stderr: "",
+      };
+    }
+    if (args[0] === "api" && endpoint.includes("/git/tags/")) {
+      const createdAt = state.reads === 1
+        ? "2026-08-16T00:00:00.000Z"
+        : "2026-08-16T00:31:00.000Z";
+      return {
+        status: 0,
+        stdout: JSON.stringify({
+          message: JSON.stringify({
+            schemaVersion: 1,
+            kind: "github-delivery/autonomous-idempotency-claim",
+            createdAt,
+            repo: "acme/widgets",
+            action: "post_comment",
+            scopeSha256: JSON.parse(oldMessage).scopeSha256,
+            anchorSha: HEAD,
+          }),
+        }),
+        stderr: "",
+      };
+    }
+    if (args[0] === "api" && endpoint.includes("/git/refs/github-delivery/idempotency/") && args.includes("DELETE")) {
+      state.deleted = true;
+      return { status: 0, stdout: "", stderr: "" };
+    }
+    throw new Error(`unexpected claim command: ${command} ${args.join(" ")}`);
+  }
+
+  assert.throws(
+    () => acquireAutonomousIdempotencyClaim({
+      request: claimRequest(),
+      runner,
+      now: oldTime + AUTONOMOUS_CLAIM_RECOVERY_AGE_MS + 1,
+    }),
+    /autonomous_idempotency_claim_changed/,
+  );
+  assert.equal(state.deleted, false);
+});

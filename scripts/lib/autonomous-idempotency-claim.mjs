@@ -191,11 +191,14 @@ function readExistingClaim({ request, runner }) {
   return { ref, objectSha, createdAt: metadata.createdAt, createdAtMs };
 }
 
-function deleteStaleClaim({ request, claim, runner }) {
+function deleteStaleClaim({ request, claim, runner, now }) {
   const { owner, name } = repoParts(required(request.repo, "repo"));
   const current = readExistingClaim({ request, runner });
   if (current.objectSha !== claim.objectSha) {
     throw new Error(`autonomous_idempotency_claim_changed:${claim.ref}`);
+  }
+  if (now < current.createdAtMs + AUTONOMOUS_CLAIM_RECOVERY_AGE_MS) {
+    throw new Error(`autonomous_idempotency_claim_conflict:${claim.ref}:not_stale_on_delete`);
   }
   runOrThrow(
     runner,
@@ -275,7 +278,7 @@ export function acquireAutonomousIdempotencyClaim({
     );
   }
 
-  deleteStaleClaim({ request, claim: existing, runner });
+  deleteStaleClaim({ request, claim: existing, runner, now });
   const recovered = create();
   if (!recovered) {
     throw new Error(`autonomous_idempotency_claim_recovery_raced:${ref}`);
