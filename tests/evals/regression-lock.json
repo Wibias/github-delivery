@@ -1,239 +1,239 @@
 [
   {
     "id": "E1-2026-07-30",
-    "sha256": "46b0e330ee9a45525241ee8feb2b1c21326b34cf1256459526d94fd88ccd3676"
+    "sha256": "f4cfddad51ff08818ddbcfdeaafd119d833335d2217bdea4200911402c34e577"
   },
   {
     "id": "R-false-merge-ready-2026-07-31",
-    "sha256": "d6fe2ad7e47081a0b59d0a6e8c655d2f968608bb87143ad2f3ba3a9597210a9a"
+    "sha256": "20fb498ccaf9e1158496d82d9674ffe878282b43325d737adb1d9d5221116bd2"
   },
   {
     "id": "R-soft-gated-2026-07-31",
-    "sha256": "bc1be4ed461c8dfc8415a98dd18d4130a4987df74aee2dcd52b469d01b781a75"
+    "sha256": "065273068e06d1951ac36ad8bc5e0a95dd6f5b8e6ef34deba918aed653d71af0"
   },
   {
     "id": "R-issue-notify-2026-07-31",
-    "sha256": "e0feb7307cddbd6b2a43e9f1c28bdba8b24f5fc64f6dc8ebb4b9d11f515487fb"
+    "sha256": "0bd861e96f2da7be57fe575f0c87dabeaae67fef6e7dfb306a9de4c775b96d11"
   },
   {
     "id": "R-compile-tip-2026-07-31",
-    "sha256": "533a07a82f64fbd9c74c310dc5f031e3fe2bd3a8515357347ca8c78c7d3667a9"
+    "sha256": "baf6f234c3a8d1fdc49adefd9c5c4a88871f6f47940ab00e61c7f53be6c8e201"
   },
   {
     "id": "R-bare-number-2026-07-31",
-    "sha256": "0393e39ed9760f448463afaa8fdf6cf9949a98ef15c98b99ff017be99e37a0be"
-  },
-  {
-    "id": "R-watch-not-ready-2026-07-31",
-    "sha256": "f87e1914a34af6f91c9b08014428d503447f977ed5c373f15450e5dbd3ce29d1"
-  },
-  {
-    "id": "R-stack-handoff-2026-07-31",
-    "sha256": "7c5415eccca9b59a8f28fa86a9c93760865282395c911026be1d3d4c79e5df29"
-  },
-  {
-    "id": "R-encoding-2026-07-31",
-    "sha256": "3d82f8af8974f6d483a00b91537a87e987b8c5dd43c71e5c91b8da94aa833ec9"
-  },
-  {
-    "id": "R-fork-head-2026-07-31",
-    "sha256": "001db259dfe6e220ffa8f86fd6c65b193861eb618e3e81ddc2e67c2342cd39b3"
-  },
-  {
-    "id": "R-review-threads-2026-07-31",
-    "sha256": "83022da9c9f53f7bfddf3d8631ef3536b3723a6a93fc52b18c4fd043371ad9d7"
-  },
-  {
-    "id": "R-merge-queue-2026-07-31",
-    "sha256": "67bc0b141a7e8220d59a5eb32bbff850ecb8d7d077525b8884f767739d7cbe19"
-  },
-  {
-    "id": "R-codeowner-enforce-2026-07-31",
-    "sha256": "a48a13d8c1b9e3400a6bf2a5c24f9a9efdba354cc865d01f284fd1361d8928a8"
-  },
-  {
-    "id": "R-stale-approval-2026-07-31",
-    "sha256": "a1e23811835e73d4744915bccd6ccdc5a59e0a5c88f2c0bed1b4dc58219bb58c"
-  },
-  {
-    "id": "R-thin-settle-2026-07-31",
-    "sha256": "e73fec35a0d5feebe2a9550647cf999d414b2c0e99f036cecc6eaf8a0f443838"
-  },
-  {
-    "id": "R-multi-pr-fanout-2026-07-31",
-    "sha256": "48f23acec8cfbab8fc32f22336db7c848e4251d8380c326392ca201b834528da"
-  },
-  {
-    "id": "R-merge-issue-thanks-2026-07-31",
-    "sha256": "5b6865d36a8bc8a8266bc95a4798eb34fe76a2df0f3b0bc9c3e9fb65dba1b236"
-  },
-  {
-    "id": "R-watch-reviews-before-ci-2026-07-31",
-    "sha256": "9bfcc1efd1bf80ad11d0f8b5ade265019694b9e267ec98b089f265c129307981"
-  },
-  {
-    "id": "R-watch-no-wait-coderabbit-2026-07-31",
-    "sha256": "90bd806871e4e658372cca44ce797996021598761e3560165a5c96d033b28e7a"
-  },
-  {
-    "id": "R-watch-wake-gate-script-2026-07-31",
-    "sha256": "a151a7c23fa5387c6aa7fad8fd0f7ce5509afba4cf67bf2b35f4a2d2a70e281a"
-  },
-  {
-    "id": "R-wake-gate-ack-not-enough-2026-07-31",
-    "sha256": "a428132c67aba8b5ee7d611b6eaab4c8b5167eb27bde65a6c0419a30a963cacc"
-  },
-  {
-    "id": "R-ci-fix-not-rerun-timeout-2026-07-31",
-    "sha256": "6ba069d512a50b19cba8fd7966a12d309fc497a4fd0e4c8c20d0c0ff4eef8b63"
-  },
-  {
-    "id": "R-ci-rerun-failed-job-only-2026-07-31",
-    "sha256": "fbfed753cb2d469b3f49f75270b3d2fcccd37e370d8a03501dd0b0ba33726577"
-  },
-  {
-    "id": "R-security-coverage-matrix-2026-07-31",
-    "sha256": "b286715c4c1daf952db3ca3aee113af99a6c3c2d7b53b574042d4fb441b1c844"
-  },
-  {
-    "id": "R-security-scope-script-2026-07-31",
-    "sha256": "6a043483245070b91f20e763db3b181e95a052f6560c2bc81ed8d57b984822e9"
-  },
-  {
-    "id": "R-security-high-pass-gate-2026-07-31",
-    "sha256": "2071d060a9c3c3fe2be7b332817db632f920cabbb288b82a246ddb3aa718298d"
-  },
-  {
-    "id": "R-security-confidence-dof-2026-07-31",
-    "sha256": "43f9080fdbd92ac9302ab8d5d4092553f33ec77314efd62cebdae52899bcd9fb"
-  },
-  {
-    "id": "R-security-iac-removed-crypto-2026-07-31",
-    "sha256": "d4f5de58f37d565e5156112222db2f0c2953181e91fc03e3759cb3049c84f751"
-  },
-  {
-    "id": "R-security-ast10-skills-2026-07-31",
-    "sha256": "54ba7c95e447714462ae4557aa5449dfd4e8936ef924451d642759946026523d"
-  },
-  {
-    "id": "R-security-no-auto-adversarial-2026-07-31",
-    "sha256": "fbe12f11d37188bfca6a0a76e82468675a5a950fd4f580e22d818fdb4d124479"
-  },
-  {
-    "id": "R-no-harness-security-review-2026-07-31",
-    "sha256": "254c8221356123dc0826b826bfcfa379772b224e84de2c61f300f4ff0f31173e"
-  },
-  {
-    "id": "R-bug-scope-skip-docs-2026-07-31",
-    "sha256": "589bca68a1283e7188e94f448d212cc4e4d773b81bd49feaa2f341c08db12cb5"
-  },
-  {
-    "id": "R-bug-cursor-bugbot-plus-complementary-2026-07-31",
-    "sha256": "30868fd1aa39e0a17664f0bf2e6a02af97022c23bd97967e93330d2eadf71325"
-  },
-  {
-    "id": "R-bug-no-fake-bugbot-claude-2026-07-31",
-    "sha256": "22a3e206040fe3f92bfc6e0c6548ea6ad9f1d4a718dbc733456f379f305e6f64"
-  },
-  {
-    "id": "R-bug-no-auto-deep-multiagent-2026-07-31",
-    "sha256": "cc11c25ebc89dfb929f46222f108b05ca3d78607a1193679f2cddb70fdef9ec4"
-  },
-  {
-    "id": "R-bug-error-propagation-must-probe-2026-07-31",
-    "sha256": "83441a719283de0642b628de47979b55bc8ecb09213a0734fd1f5213e4a73b15"
-  },
-  {
-    "id": "R-ci-fix-unrelated-required-2026-07-31",
-    "sha256": "d3160f4bf30b89dca67884b460785c1479de0a982c536de644a1856682799e1b"
-  },
-  {
-    "id": "E1-2026-07-29",
-    "sha256": "0897d56f2f811fad1ba440cd6bd34dfcc7c9224ccae0121b3734971a7536f38a"
-  },
-  {
-    "id": "E1-2026-07-29b",
-    "sha256": "459ee2a9c305e5e7edc760f9ae11eb2888eed7a1eb9db00eaaa4811833be9b5c"
-  },
-  {
-    "id": "E1-matrix-2026-07-29",
-    "sha256": "192c324a995f005ec7d029cdd16663646544a1a05a0979ec8adfb7de4eadb86c"
-  },
-  {
-    "id": "R-adaptive-settle-visible-polling-2026-08-03",
-    "sha256": "12dfcc066704af7b483984cd757c03b4f7f5e4f989bf8b462955deb1a32fe7ca"
-  },
-  {
-    "id": "R-full-review-verdict-mode-2026-08-03",
-    "sha256": "6cc41d6b75b91c81cf700ac138f74b0c5f6c97abaadc075aee19a089967cc43b"
-  },
-  {
-    "id": "R-foreign-pr-owner-instructions-2026-08-03",
-    "sha256": "0799121c0126022d073c89b7f3368bc3a62775e16c694ed793a28243cb174321"
-  },
-  {
-    "id": "R-verdict-tldr-collapsible-2026-08-03",
-    "sha256": "0b8d372679be4d1766434156bdfd60fa81d640cfb2a82b24f2cdb2d731435bfd"
-  },
-  {
-    "id": "R-full-review-no-self-read-only-2026-08-04",
-    "sha256": "0d6ef3a749624e03a432bbff278686ee235c5667b58ab2bd09c98bd6cc0d9ec0"
+    "sha256": "e8f1d21b675a002037f01888115ab6ec5171c0ccff3a71267c8e121089b7b174"
   },
   {
     "id": "R-verdict-format-gate-2026-08-04",
-    "sha256": "b96eccaeb797e9786daea54e9243a41102cd778d6d75a741c11b3a75482885ae"
+    "sha256": "418bf22cd0e43f501f2c6b042a6289c5ccebe852c43fe9144736041da2ec1e56"
+  },
+  {
+    "id": "R-watch-not-ready-2026-07-31",
+    "sha256": "a46a4b55280748d72da881bac23a89b28f3940918dd3cc3e1d7b462d5b4ecf70"
+  },
+  {
+    "id": "R-stack-handoff-2026-07-31",
+    "sha256": "00e900cc675d296f103a941536af20bca69775121fb04c64cca433236f3d2c83"
+  },
+  {
+    "id": "R-encoding-2026-07-31",
+    "sha256": "30a2d4111862ab7d729eddf1b59a8b1022f70f0e3649dc3683d7d0b9938b96bf"
+  },
+  {
+    "id": "R-fork-head-2026-07-31",
+    "sha256": "195482342f749262df0d293415704e037e344b189a077f123945b57f1a23e30e"
+  },
+  {
+    "id": "R-review-threads-2026-07-31",
+    "sha256": "369890727141d99399ef4fbd2d2ed3d555428023b81473ec02e33ce30bb8f3da"
+  },
+  {
+    "id": "R-merge-queue-2026-07-31",
+    "sha256": "30bf75fb93dd903873b931a836e9df0a76d65b63fe111369732747a9300a90e4"
+  },
+  {
+    "id": "R-codeowner-enforce-2026-07-31",
+    "sha256": "69f095fbf3cb37a9af247b0ea3f0943003423c155548b8a87587657b0e59ce1c"
+  },
+  {
+    "id": "R-stale-approval-2026-07-31",
+    "sha256": "5dd45401e937269d1a572872ebba5f0c00f8cf16daac7779998a5e6fd1a33ead"
+  },
+  {
+    "id": "R-thin-settle-2026-07-31",
+    "sha256": "a3ff7494095fa4e65b9b4d73a0b2e29207c8ec9e8f52acf3c819b2d9129900bb"
+  },
+  {
+    "id": "R-multi-pr-fanout-2026-07-31",
+    "sha256": "d6a2a6232e1eb243e7983df5e91f108b5597d23c260b3419adfbc1735f902f94"
+  },
+  {
+    "id": "R-merge-issue-thanks-2026-07-31",
+    "sha256": "23f4727abda2a224cacf0f51522c7549ef4f0115600c19ff20b3518aefd46e9e"
+  },
+  {
+    "id": "R-watch-reviews-before-ci-2026-07-31",
+    "sha256": "04b0d9dbe300eccf2c8c4a692b899bc069e753d49a83a0c2f4b886f1d6889748"
+  },
+  {
+    "id": "R-watch-no-wait-coderabbit-2026-07-31",
+    "sha256": "f1f16aa42491cdfb9d340bfc7171b21160682d32fc6d7bceb108d465e90ce6cb"
+  },
+  {
+    "id": "R-watch-wake-gate-script-2026-07-31",
+    "sha256": "bc29584c64ef49ccb58213cdcf2f3649e70585a1f4f26681c745c20dfdc0b7ee"
+  },
+  {
+    "id": "R-wake-gate-ack-not-enough-2026-07-31",
+    "sha256": "5f897490935a75b42eebef9d74cf8f4d8dddcccfcc639c6bc41d08b76b533207"
+  },
+  {
+    "id": "R-ci-fix-not-rerun-timeout-2026-07-31",
+    "sha256": "6089ab89adfffc5668178b14ff96e7fa3a6193f5fac8e87a5bca796563552ad4"
+  },
+  {
+    "id": "R-ci-rerun-failed-job-only-2026-07-31",
+    "sha256": "82468f9e04707d8ede2713c5dced7f05b8a6a8a4d6a1997008d5259c802c188a"
+  },
+  {
+    "id": "R-security-coverage-matrix-2026-07-31",
+    "sha256": "860457b91ff9d28d89526bde99dee75aa81c6f3093d7bf6333e7cb7348201fd4"
+  },
+  {
+    "id": "R-security-scope-script-2026-07-31",
+    "sha256": "eb457cc35d762d5f9980b6e517924a85999a82463c1d3aea77b9d6f9edfb9831"
+  },
+  {
+    "id": "R-security-high-pass-gate-2026-07-31",
+    "sha256": "f6a35e068c9d77c5fbc16da21afca00dcac018fe80aa9ca949113386ed9a88ac"
+  },
+  {
+    "id": "R-security-confidence-dof-2026-07-31",
+    "sha256": "8ee919f87e91a75a569230a5e6111ec32b11aaa27207f3aa4550dea7acd6ec24"
+  },
+  {
+    "id": "R-security-iac-removed-crypto-2026-07-31",
+    "sha256": "230676b68b2df6b78d99dd8769ebe8f20839c8a4862d47c7564bf86d74c56ca9"
+  },
+  {
+    "id": "R-security-ast10-skills-2026-07-31",
+    "sha256": "39ebe864739c199b835eae729f6176f70e14454a0ac8efc4068d0a76d6780133"
+  },
+  {
+    "id": "R-security-no-auto-adversarial-2026-07-31",
+    "sha256": "ebb73af8828db0fec8bd51a72e86bd2bb72c3e8c5dc41e19f0d839f1954c1d31"
+  },
+  {
+    "id": "R-no-harness-security-review-2026-07-31",
+    "sha256": "3f080c07659e771046275e54360cfe7827bdbdffda1432b38dc93eb0f7fa5e32"
+  },
+  {
+    "id": "R-bug-scope-skip-docs-2026-07-31",
+    "sha256": "bbfec93cc5bd790938678bb199d93ad36c58cb2c37cc490bbe738536fcb7e6b7"
+  },
+  {
+    "id": "R-bug-cursor-bugbot-plus-complementary-2026-07-31",
+    "sha256": "af2f0733d2a6c063e8c6ec34d6c6e31a2421bc78536dde0f76665bd40e7fc297"
+  },
+  {
+    "id": "R-bug-no-fake-bugbot-claude-2026-07-31",
+    "sha256": "397e653ac3340c6e091061faeae10edca908c3662391142795b34f11496afbcd"
+  },
+  {
+    "id": "R-bug-no-auto-deep-multiagent-2026-07-31",
+    "sha256": "783dc5f29af63c6e5c8eeafa8d65c902336a6af28a6c9a1f2f0e90a233dd291e"
+  },
+  {
+    "id": "R-bug-error-propagation-must-probe-2026-07-31",
+    "sha256": "03a758065da8129d54baa66fbed71af22adcd41e3a474ca8f37c5fbb79ddd249"
+  },
+  {
+    "id": "R-ci-fix-unrelated-required-2026-07-31",
+    "sha256": "aaa17e9d981b4c8ecef4877279c9e9bab98d565779c16502e9b3de7bf5f60b81"
+  },
+  {
+    "id": "E1-2026-07-29",
+    "sha256": "02ab4e0b0f1d5de73e76452a3ea9a7ae4e5365605a281291d81fcb3c43094040"
+  },
+  {
+    "id": "E1-2026-07-29b",
+    "sha256": "77fc932dc46a8bc0598d91fe2f78b4c6b3907a9e91559bc220db9caeaa7c7c60"
+  },
+  {
+    "id": "E1-matrix-2026-07-29",
+    "sha256": "517f70eeec8dde662f1743e440dcbd559a88469f3cb846603b4eae082f16f6ac"
+  },
+  {
+    "id": "R-adaptive-settle-visible-polling-2026-08-03",
+    "sha256": "ea2548ad3ed5094723920e7e1ba77f405685f788337a1b0e2ff8c701ad02e266"
+  },
+  {
+    "id": "R-full-review-verdict-mode-2026-08-03",
+    "sha256": "9725e182218edfa8f52a10f41d47c72ee0ecfb45f83e2e0f27e6b0e04ac19a7e"
+  },
+  {
+    "id": "R-foreign-pr-owner-instructions-2026-08-03",
+    "sha256": "5c0171c46ac078e6dfb05afe461e09f7ae72d0c063c8cd88b45d6f3191626905"
+  },
+  {
+    "id": "R-verdict-tldr-collapsible-2026-08-03",
+    "sha256": "7934d190c6d7a790fe77c106dfdd691160e9bc39ba460d7a98d9cec68d65b692"
+  },
+  {
+    "id": "R-full-review-no-self-read-only-2026-08-04",
+    "sha256": "54c0cc67567fbca3328c216c62955ae65be1265ca9f20193c6decdcdcdfb3434"
   },
   {
     "id": "R-bot-defer-fabric-2026-08-05",
-    "sha256": "ca458185d42bf1f7c259b8fde9dfccc21e10ac1a60eba6cba513c49ad5666c1b"
+    "sha256": "a749023dd05d67e8c10724f40d612d5e64d402a644aaf59f91e057287f0556c6"
   },
   {
     "id": "R-cli-flag-noop-green-tests-2026-08-05",
-    "sha256": "9c3a557ed6110897962928154587ed66bc63dd8b00c1c3b2886745183f4529d1"
+    "sha256": "3c7cfe1feded8156ed8667e3dcf5577076a55c3a6d35900d54666d1e2746fa2f"
   },
   {
     "id": "R-pr1012-green-tests-nested-shape-2026-08-05",
-    "sha256": "d142dd589b34499b42daecf7a715e19b6e05889cc8d337622a64fba90c1c5043"
+    "sha256": "243e592d414b41d45579eae8617df9724e1c7a92bd8e47745b63e69b2c100121"
   },
   {
     "id": "R-pr1014-alias-recursion-2026-08-05",
-    "sha256": "4f044947e02d46a65c07fa54337fba649ff408e610a62653652af7f43a44e0bc"
+    "sha256": "3e972a0cbe5250468fb20c4d453283f50af8d0b70b86884aa68aa61d67d38e46"
   },
   {
     "id": "R-pr1013-clock-limit-budget-2026-08-05",
-    "sha256": "9afa827ed473c39a015085b3cc20855ab9a4e74a436f8d5263628d9e58058ec1"
+    "sha256": "92260b94aa158e624ae99a9c7f95c26f8fdc3f0436ac419c297bb6fd979c82d2"
   },
   {
     "id": "R-pr1014-normalized-requirement-2026-08-05",
-    "sha256": "6c95c43856b015ebf17c0d9f4a6ae9920f1b1f4bbf8d06759d638881e5e440f3"
+    "sha256": "57b08eed406b4ef2994ca6139259104d907674c38844f2847beef943a2c7f53e"
   },
   {
     "id": "R-pr1014-inactive-scoring-weight-docs-2026-08-05",
-    "sha256": "910cc712cbbf6bec5a19570b1f62e05e4ff1f629a4e796852ab906cf44f1214d"
+    "sha256": "609b03228aebe9c01e9532ad77912ecc0f3ffa3a732d92305b5f7b9fb3932ec5"
   },
   {
     "id": "R-pr1015-db-cast-null-score-2026-08-05",
-    "sha256": "9985683c174455c932715a3b58a4c5eac1d87d58b971adfa215b1d248c8a34b6"
+    "sha256": "ed2486351bce5cba70abab7ade2ca1a62ff4108617b911ff45dd7abb68aa2449"
   },
   {
     "id": "R-pr1015-policy-limit-source-2026-08-05",
-    "sha256": "315ae0d707446eb7671add60c3dd9db56ef9f35d17b20e89834fb52038f7ccd8"
+    "sha256": "f9a1d3e4c8841d17e32b5dffc9872aa63cddbff3b6f1fadbd7636e7879e5a626"
   },
   {
     "id": "R-pr1015-absent-provider-false-2026-08-05",
-    "sha256": "99bd50791679ae22f961b55cc49cd6c3fa422546e10b128514d95a810fbea617"
+    "sha256": "cd06170a6be660816d1655e8a7bf4dde7da4cbe6bccf67ca68090dbdb7092420"
   },
   {
     "id": "R-pr1015-misplaced-cli-flag-2026-08-05",
-    "sha256": "5d6a6c96d0c403d55bbff5c5fe96206ce19ebcf9dd0795e4f885abd0bfde7919"
+    "sha256": "df10311815b8eef3bbb8e1fd6c953a42168a2e58003cd884b0f834701bd2064f"
   },
   {
     "id": "R-ci-wait-no-long-sleep-2026-08-05",
-    "sha256": "87b4c5677c07b9f228692cf48a374aff241a254f73ac5b2c5d91ced84006f621"
+    "sha256": "48e35e91dc9d2bcdc023bc269f7042db6ccd89bb1724c3961027e99dfadca80e"
   },
   {
     "id": "R-full-review-same-head-reuse-2026-08-05",
-    "sha256": "23ffd257c7a3c7cc8421a260f889264e0a1f18ae0f99211d1962ae7e67a7057b"
+    "sha256": "d9d5f422d705604063d27744287736cfd662de64599e1918b5079888aebbe7ee"
   },
   {
     "id": "R-pr1066-oauth-baseurl-https-2026-08-05",
@@ -245,18 +245,18 @@
   },
   {
     "id": "R-probe-evidence-required-2026-08-05",
-    "sha256": "ca02ecdbc65f41a9cd8601dc22389eafd4eec8f7bfd5d79cef8bb76a062a4720"
+    "sha256": "3e15b12f6d70f5ae26af1efdaaaacf9e87b97c44cccfb0e584a3090eee3af12c"
   },
   {
     "id": "R-stack-restack-preflight-2026-08-05",
-    "sha256": "a09a0bc057d1e8b9eba86aed0b59794ec8ab0713fd322d02617eb4f280ad6f54"
+    "sha256": "f0a9d492e593c0aad458bee08bb780371a5d14afd35940ee4de0829a42c713c3"
   },
   {
     "id": "R-supersede-no-merge-2026-08-08",
-    "sha256": "01af91095d3fb966dab8b7ac0980d9ad8dee6cb2e5046007feff4108306a1f4c"
+    "sha256": "dfeadb86e4dcd0366e81922600960a2a66618da6bdbec03f9bc0e19763dd4244"
   },
   {
     "id": "R-overtake-unavailable-2026-08-08",
-    "sha256": "e81c22d5d6f5a768431acc50ddd54d97ab61f44d92edca62fa36f11f63e6f610"
+    "sha256": "954d2c11c429d35c6c87d1ee0ff9b5464e767384e73fe70c48802ed4acc15724"
   }
 ]

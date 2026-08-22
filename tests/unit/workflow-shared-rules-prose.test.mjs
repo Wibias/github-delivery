@@ -5,17 +5,12 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { listDeliveryWorkflowProfiles } from "../../scripts/lib/delivery-workflow-profiles.mjs";
+import { leftoverSharedRulesLoad } from "../../scripts/lib/policy-bundle.mjs";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
-const ALLOWED = /Do not load `references\/shared-rules\.md` as mandatory context[^\n]*/gi;
 
 function slash(path) {
   return path.replaceAll("\\", "/");
-}
-
-function leftoverSharedRules(text) {
-  const stripped = text.replace(ALLOWED, "");
-  return /shared-rules\.md|shared-rules \*\*~30–60s\*\*/i.test(stripped);
 }
 
 function workflowFiles() {
@@ -34,7 +29,7 @@ test("routed workflows do not instruct loading shared-rules as mandatory context
   const offenders = [];
   for (const relative of workflowFiles()) {
     const text = readFileSync(join(ROOT, relative), "utf8");
-    if (leftoverSharedRules(text)) offenders.push(relative);
+    if (leftoverSharedRulesLoad(text)) offenders.push(relative);
   }
   assert.deepEqual(offenders, []);
 });

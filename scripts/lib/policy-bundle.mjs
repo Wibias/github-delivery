@@ -15,6 +15,13 @@ const POLICY_MODULE_LINE_RE = /^\s*-\s+([a-z0-9-]+)(?:\s+\(when\s+(.+?)\))?\s*$/
 const BASELINE_SKILL_BYTES = 32_855;
 const BASELINE_UNIVERSAL_BYTES = 32_855 + 87_576;
 const REQUIRED_REDUCTION = 0.6;
+const SHARED_RULES_LOAD_ALLOWED_RE =
+  /Do not load `references\/shared-rules\.md` as mandatory context[^\n]*/gi;
+
+export function leftoverSharedRulesLoad(text) {
+  const stripped = String(text || "").replace(SHARED_RULES_LOAD_ALLOWED_RE, "");
+  return /shared-rules\.md|shared-rules \*\*~30–60s\*\*/i.test(stripped);
+}
 
 function bytes(value) {
   return Buffer.byteLength(String(value).replace(/\r\n?/g, "\n"), "utf8");
@@ -259,6 +266,9 @@ export function validatePolicyArchitecture({
     }
     const text = readText(full);
     runtimeTexts.set(path, text);
+    if (leftoverSharedRulesLoad(text)) {
+      errors.push(`shared_rules_mandatory_load_forbidden:${path}`);
+    }
     let declaration;
     try {
       declaration = parsePolicyModules(text);
@@ -332,12 +342,36 @@ export function validatePolicyArchitecture({
     );
   }
 
+  const workflowPolicyBytes = {};
+  for (const path of routedPaths) {
+    if (!runtimeTexts.has(path)) continue;
+    try {
+      const bundle = resolvePolicyBundle({ root: repositoryRoot, workflow: path });
+      const moduleByteSum = Object.values(bundle.bytes.modules).reduce(
+        (sum, value) => sum + value,
+        0,
+      );
+      const policyBytes = skillBytes + kernelBytes + moduleByteSum;
+      workflowPolicyBytes[path] = policyBytes;
+      const reduction =
+        baselineUniversalBytes > 0 ? 1 - policyBytes / baselineUniversalBytes : 0;
+      if (reduction < requiredReduction) {
+        errors.push(
+          `workflow_policy_size_budget_exceeded:${path}:${policyBytes}:${baselineUniversalBytes}:${requiredReduction}`,
+        );
+      }
+    } catch (error) {
+      errors.push(`${error.message}:${path}`);
+    }
+  }
+
   const metrics = {
     skillBytes,
     kernelBytes,
     universalBytes,
     skillReduction,
     universalReduction,
+    workflowPolicyBytes,
     routedWorkflows: routedPaths.length,
     moduleCount: modules.length,
     ruleCount: definitions.size,

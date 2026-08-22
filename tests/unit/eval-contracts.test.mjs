@@ -31,9 +31,13 @@ test("binds every regression assertion to a marker in an expected resource", () 
   const unbound = report.errors.filter((e) => e.code === "assertion_not_bound");
   const wrongFile = report.errors.filter((e) => e.code === "assertion_not_in_expected_resources");
   const orphans = report.errors.filter((e) => e.code === "assertion_marker_orphan");
+  const sharedRules = report.errors.filter(
+    (e) => e.code === "shared_rules_expected_resource_forbidden",
+  );
   assert.deepEqual(unbound, []);
   assert.deepEqual(wrongFile, []);
   assert.deepEqual(orphans, []);
+  assert.deepEqual(sharedRules, []);
 });
 
 test("executes scope cases and verifies probe-doc binding", () => {
@@ -89,8 +93,8 @@ function makeFixtureRoot() {
   writeFileSync(
     join(dir, "tests", "evals", "regression-cases.jsonl"),
     [
-      caseRow("R-fixture-bound", ["keeps-rule"], ["SKILL.md", "references/shared-rules.md"]),
-      caseRow("R-fixture-unbound", ["no-such-rule"], ["SKILL.md", "references/shared-rules.md"]),
+      caseRow("R-fixture-bound", ["keeps-rule"], ["SKILL.md"]),
+      caseRow("R-fixture-unbound", ["no-such-rule"], ["SKILL.md"]),
       caseRow(
         "R-fixture-wrong-file",
         ["keeps-rule"],
