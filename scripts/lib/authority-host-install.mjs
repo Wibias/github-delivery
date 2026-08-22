@@ -206,6 +206,20 @@ export async function startInstalledAuthorityHost({
 
 const WINDOWS_RUN_KEY = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 const WINDOWS_RUN_VALUE = "GitHubDeliveryAuthority";
+const WINDOWS_STARTUP_SHORTCUT_NAME = "GitHub Delivery Authority.lnk";
+
+function startupShortcutPath({ env = process.env, home = homedir() } = {}) {
+  const appdata = env.APPDATA || win32Path.join(home, "AppData", "Roaming");
+  return win32Path.join(
+    appdata,
+    "Microsoft",
+    "Windows",
+    "Start Menu",
+    "Programs",
+    "Startup",
+    WINDOWS_STARTUP_SHORTCUT_NAME,
+  );
+}
 
 function queryAuthorityHostStartup({ installed, runner }) {
   const expected = JSON.stringify(installed.exePath);
@@ -224,6 +238,9 @@ export function readAuthorityHostStartup({
   installed = readInstalledAuthorityHost(),
   platform = process.platform,
   runner = boundedSpawnSync,
+  env = process.env,
+  home = homedir(),
+  exists = existsSync,
 } = {}) {
   if (platform !== "win32") return { configured: false, enabled: false, changed: false, reason: "unsupported_platform" };
   if (!installed?.installed || !installed.exePath) {
@@ -231,9 +248,11 @@ export function readAuthorityHostStartup({
   }
 
   const current = queryAuthorityHostStartup({ installed, runner });
+  const shortcutEnabled = exists(startupShortcutPath({ env, home }));
+  const enabled = current.enabled || shortcutEnabled;
   return {
-    configured: current.enabled,
-    enabled: current.enabled,
+    configured: enabled,
+    enabled,
     changed: false,
     exePath: installed.exePath,
   };
@@ -244,6 +263,10 @@ export function setAuthorityHostStartup({
   installed = readInstalledAuthorityHost(),
   platform = process.platform,
   runner = boundedSpawnSync,
+  env = process.env,
+  home = homedir(),
+  exists = existsSync,
+  remove = rmSync,
 } = {}) {
   if (platform !== "win32") return { configured: false, enabled: false, changed: false, reason: "unsupported_platform" };
   if (!installed?.installed || !installed.exePath) {
@@ -252,20 +275,27 @@ export function setAuthorityHostStartup({
 
   const requested = enabled === true;
   const current = queryAuthorityHostStartup({ installed, runner });
+  const shortcutPath = startupShortcutPath({ env, home });
+  const shortcutEnabled = exists(shortcutPath);
   if (requested && current.enabled) {
     return { configured: true, enabled: true, changed: false, exePath: installed.exePath };
   }
-  if (!requested && !current.exists) {
+  if (!requested && !current.exists && !shortcutEnabled) {
     return { configured: false, enabled: false, changed: false, exePath: installed.exePath };
   }
 
-  const args = requested
-    ? ["ADD", WINDOWS_RUN_KEY, "/v", WINDOWS_RUN_VALUE, "/t", "REG_SZ", "/d", current.expected, "/f"]
-    : ["DELETE", WINDOWS_RUN_KEY, "/v", WINDOWS_RUN_VALUE, "/f"];
-  const result = runner("reg.exe", args, { encoding: "utf8", windowsHide: true });
-  if (result?.status !== 0 || result?.error) {
-    const code = requested ? "authority_host_startup_registration_failed" : "authority_host_startup_removal_failed";
-    throw new Error(`${code}:${result?.stderr || result?.error?.message || "reg.exe failed"}`);
+  if (requested || current.exists) {
+    const args = requested
+      ? ["ADD", WINDOWS_RUN_KEY, "/v", WINDOWS_RUN_VALUE, "/t", "REG_SZ", "/d", current.expected, "/f"]
+      : ["DELETE", WINDOWS_RUN_KEY, "/v", WINDOWS_RUN_VALUE, "/f"];
+    const result = runner("reg.exe", args, { encoding: "utf8", windowsHide: true });
+    if (result?.status !== 0 || result?.error) {
+      const code = requested ? "authority_host_startup_registration_failed" : "authority_host_startup_removal_failed";
+      throw new Error(`${code}:${result?.stderr || result?.error?.message || "reg.exe failed"}`);
+    }
+  }
+  if (!requested && shortcutEnabled) {
+    remove(shortcutPath, { force: true });
   }
   return {
     configured: requested,

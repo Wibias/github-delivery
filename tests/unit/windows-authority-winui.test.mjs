@@ -239,6 +239,8 @@ test("Settings exposes autostart synchronized with the Windows Run registration"
   assert.match(startup, /Registry\.CurrentUser/);
   assert.match(startup, /public static AuthorityStartupState Read\(\)/);
   assert.match(startup, /public static AuthorityStartupState Set\(bool enabled\)/);
+  assert.match(startup, /GitHub Delivery Authority\.lnk/);
+  assert.match(startup, /File\.Delete\(/);
   assert.match(window, /Start Delivery Authority when I sign in/);
   assert.match(window, /x:Name="AutostartToggle"/);
   assert.match(window, /Toggled="AutostartToggle_Toggled"/);
