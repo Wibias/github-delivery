@@ -76,13 +76,24 @@ test("body transport runner preserves ordinary commands and delivers stdin exact
   assert.equal(calls[1].options.input, undefined);
 });
 
-test("ambiguous API field transport fails closed", () => {
+test("API body fields with siblings fold into JSON stdin", () => {
+  const result = transportGitHubBody(
+    "gh",
+    ["api", "repos/acme/widgets/x", "-f", `body=${LARGE_BODY}`, "-f", "other=value"],
+    {},
+  );
+  assert.deepEqual(result.args, ["api", "repos/acme/widgets/x", "--input", "-"]);
+  assert.deepEqual(JSON.parse(result.options.input), { body: LARGE_BODY, other: "value" });
+  assert.equal(result.kind, "api_json_stdin");
+});
+
+test("typed field at-file body values still fail closed", () => {
   assert.throws(
     () => transportGitHubBody(
       "gh",
-      ["api", "repos/acme/widgets/x", "-f", `body=${LARGE_BODY}`, "-f", "other=value"],
+      ["api", "repos/acme/widgets/x", "-F", "body=@secret.txt"],
       {},
     ),
-    /github_body_transport_ambiguous_api_fields/,
+    /github_body_transport_field_at_file/,
   );
 });
