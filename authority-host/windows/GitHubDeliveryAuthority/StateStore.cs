@@ -84,6 +84,18 @@ internal sealed class StateStore : IDisposable
             );
             CREATE INDEX IF NOT EXISTS branch_leases_scope
               ON branch_leases(repo, branch, expires_at, revoked_at);
+            CREATE TABLE IF NOT EXISTS pr_sessions (
+              session_id TEXT PRIMARY KEY,
+              repo TEXT NOT NULL,
+              branch TEXT NOT NULL,
+              pr INTEGER NOT NULL CHECK(pr > 0),
+              created_at INTEGER NOT NULL,
+              expires_at INTEGER NOT NULL,
+              revoked_at INTEGER NULL,
+              CHECK(expires_at > created_at)
+            );
+            CREATE INDEX IF NOT EXISTS pr_sessions_scope
+              ON pr_sessions(repo, branch, pr, expires_at, revoked_at);
             CREATE TABLE IF NOT EXISTS audit_events (
               event_id TEXT PRIMARY KEY,
               event_type TEXT NOT NULL,
@@ -421,6 +433,211 @@ internal sealed class StateStore : IDisposable
         return true;
     }
 
+    public PrSessionRecord CreatePrSession(string repo, string branch, int pr, long now, int minutes)
+    {
+        ValidateRepo(repo);
+        branch = ValidateBranch(branch);
+        if (pr <= 0) throw new AuthorityException("pr_session_pr_invalid");
+        // minutes is not 5, 15, 30, or 60
+        if (minutes is not 5 and not 15 and not 30 and not 60) throw new AuthorityException("pr_session_minutes_invalid");
+        var session = new PrSessionRecord(
+            Guid.NewGuid().ToString("N"),
+            repo,
+            branch,
+            pr,
+            now,
+            checked(now + (minutes * 60L)),
+            null);
+
+        using var connection = Open();
+        using var transaction = connection.BeginTransaction(deferred: false);
+        using (var revoke = connection.CreateCommand())
+        {
+            revoke.Transaction = transaction;
+            revoke.CommandText = """
+                UPDATE pr_sessions
+                SET revoked_at=$now
+                WHERE lower(repo)=lower($repo) AND branch=$branch AND pr=$pr AND revoked_at IS NULL AND expires_at > $now;
+                """;
+            revoke.Parameters.AddWithValue("$now", now);
+            revoke.Parameters.AddWithValue("$repo", repo);
+            revoke.Parameters.AddWithValue("$branch", branch);
+            revoke.Parameters.AddWithValue("$pr", pr);
+            revoke.ExecuteNonQuery();
+        }
+        using (var insert = connection.CreateCommand())
+        {
+            insert.Transaction = transaction;
+            insert.CommandText = """
+                INSERT INTO pr_sessions(session_id,repo,branch,pr,created_at,expires_at,revoked_at)
+                VALUES($id,$repo,$branch,$pr,$created,$expires,NULL);
+                """;
+            insert.Parameters.AddWithValue("$id", session.SessionId);
+            insert.Parameters.AddWithValue("$repo", session.Repo);
+            insert.Parameters.AddWithValue("$branch", session.Branch);
+            insert.Parameters.AddWithValue("$pr", session.Pr);
+            insert.Parameters.AddWithValue("$created", session.CreatedAt);
+            insert.Parameters.AddWithValue("$expires", session.ExpiresAt);
+            insert.ExecuteNonQuery();
+        }
+        InsertAuditEvent(connection, transaction, "pr_session_created", repo, branch, "approved", $"pr={pr};expires_at={session.ExpiresAt}", now);
+        transaction.Commit();
+        return session;
+    }
+
+    public PrSessionRecord? TryGetActivePrSession(string repo, string branch, int pr, long now)
+    {
+        ValidateRepo(repo);
+        branch = ValidateBranch(branch);
+        if (pr <= 0) throw new AuthorityException("pr_session_pr_invalid");
+        using var connection = Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT session_id,repo,branch,pr,created_at,expires_at,revoked_at
+            FROM pr_sessions
+            WHERE lower(repo)=lower($repo) AND branch=$branch AND pr=$pr AND revoked_at IS NULL AND expires_at > $now
+            ORDER BY expires_at DESC LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$repo", repo);
+        command.Parameters.AddWithValue("$branch", branch);
+        command.Parameters.AddWithValue("$pr", pr);
+        command.Parameters.AddWithValue("$now", now);
+        using var reader = command.ExecuteReader();
+        return reader.Read() ? ReadPrSession(reader) : null;
+    }
+
+    public PrSessionRecord? TryUseActivePrSession(string repo, string branch, int pr, long now, int operationCount)
+    {
+        ValidateRepo(repo);
+        branch = ValidateBranch(branch);
+        if (pr <= 0) throw new AuthorityException("pr_session_pr_invalid");
+        if (operationCount <= 0) throw new AuthorityException("pr_session_operation_count_invalid");
+        using var connection = Open();
+        using var transaction = connection.BeginTransaction(deferred: false);
+        PrSessionRecord? session = null;
+        using (var select = connection.CreateCommand())
+        {
+            select.Transaction = transaction;
+            select.CommandText = """
+                SELECT session_id,repo,branch,pr,created_at,expires_at,revoked_at
+                FROM pr_sessions
+                WHERE lower(repo)=lower($repo) AND branch=$branch AND pr=$pr AND revoked_at IS NULL AND expires_at > $now
+                ORDER BY expires_at DESC LIMIT 1;
+                """;
+            select.Parameters.AddWithValue("$repo", repo);
+            select.Parameters.AddWithValue("$branch", branch);
+            select.Parameters.AddWithValue("$pr", pr);
+            select.Parameters.AddWithValue("$now", now);
+            using var reader = select.ExecuteReader();
+            if (reader.Read()) session = ReadPrSession(reader);
+        }
+        if (session is null)
+        {
+            transaction.Rollback();
+            return null;
+        }
+        InsertAuditEvent(
+            connection,
+            transaction,
+            "pr_session_used",
+            session.Repo,
+            session.Branch,
+            "approved",
+            $"session_id={session.SessionId};pr={session.Pr};operations={operationCount}",
+            now);
+        transaction.Commit();
+        return session;
+    }
+
+    public IReadOnlyList<PrSessionRecord> ListActivePrSessions(long now)
+    {
+        using var connection = Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT session_id,repo,branch,pr,created_at,expires_at,revoked_at
+            FROM pr_sessions
+            WHERE revoked_at IS NULL AND expires_at > $now
+            ORDER BY expires_at ASC, lower(repo), branch, pr;
+            """;
+        command.Parameters.AddWithValue("$now", now);
+        using var reader = command.ExecuteReader();
+        var sessions = new List<PrSessionRecord>();
+        while (reader.Read()) sessions.Add(ReadPrSession(reader));
+        return sessions;
+    }
+
+    public int RecordExpiredPrSessions(long now)
+    {
+        using var connection = Open();
+        using var transaction = connection.BeginTransaction(deferred: false);
+        var expired = new List<PrSessionRecord>();
+        using (var select = connection.CreateCommand())
+        {
+            select.Transaction = transaction;
+            select.CommandText = """
+                SELECT s.session_id,s.repo,s.branch,s.pr,s.created_at,s.expires_at,s.revoked_at
+                FROM pr_sessions s
+                WHERE s.revoked_at IS NULL
+                  AND s.expires_at <= $now
+                  AND NOT EXISTS (
+                    SELECT 1 FROM audit_events a
+                    WHERE a.event_type='pr_session_expired'
+                      AND a.detail=('session_id=' || s.session_id)
+                  )
+                ORDER BY s.expires_at, s.session_id;
+                """;
+            select.Parameters.AddWithValue("$now", now);
+            using var reader = select.ExecuteReader();
+            while (reader.Read()) expired.Add(ReadPrSession(reader));
+        }
+        foreach (var session in expired)
+        {
+            InsertAuditEvent(
+                connection,
+                transaction,
+                "pr_session_expired",
+                session.Repo,
+                session.Branch,
+                "expired",
+                $"session_id={session.SessionId}",
+                session.ExpiresAt);
+        }
+        transaction.Commit();
+        return expired.Count;
+    }
+
+    public bool RevokePrSession(string sessionId, long now)
+    {
+        if (string.IsNullOrWhiteSpace(sessionId)) throw new AuthorityException("pr_session_id_invalid");
+        using var connection = Open();
+        using var transaction = connection.BeginTransaction(deferred: false);
+        PrSessionRecord? session = null;
+        using (var select = connection.CreateCommand())
+        {
+            select.Transaction = transaction;
+            select.CommandText = "SELECT session_id,repo,branch,pr,created_at,expires_at,revoked_at FROM pr_sessions WHERE session_id=$id LIMIT 1;";
+            select.Parameters.AddWithValue("$id", sessionId);
+            using var reader = select.ExecuteReader();
+            if (reader.Read()) session = ReadPrSession(reader);
+        }
+        if (session is null || session.RevokedAt is not null || session.ExpiresAt <= now)
+        {
+            transaction.Rollback();
+            return false;
+        }
+        using (var update = connection.CreateCommand())
+        {
+            update.Transaction = transaction;
+            update.CommandText = "UPDATE pr_sessions SET revoked_at=$now WHERE session_id=$id AND revoked_at IS NULL;";
+            update.Parameters.AddWithValue("$now", now);
+            update.Parameters.AddWithValue("$id", sessionId);
+            if (update.ExecuteNonQuery() != 1) throw new AuthorityException("pr_session_revoke_race");
+        }
+        InsertAuditEvent(connection, transaction, "pr_session_revoked", session.Repo, session.Branch, "revoked", $"pr={session.Pr}", now);
+        transaction.Commit();
+        return true;
+    }
+
     public void RecordAuditEvent(string eventType, string? repo, string? branch, string outcome, string? detail, long now)
     {
         if (string.IsNullOrWhiteSpace(eventType)) throw new AuthorityException("audit_event_type_invalid");
@@ -609,6 +826,16 @@ internal sealed class StateStore : IDisposable
             reader.GetInt64(3),
             reader.GetInt64(4),
             reader.IsDBNull(5) ? null : reader.GetInt64(5));
+
+    private static PrSessionRecord ReadPrSession(SqliteDataReader reader)
+        => new(
+            reader.GetString(0),
+            reader.GetString(1),
+            reader.GetString(2),
+            reader.GetInt32(3),
+            reader.GetInt64(4),
+            reader.GetInt64(5),
+            reader.IsDBNull(6) ? null : reader.GetInt64(6));
 
     private static AuditEventRecord ReadAuditEvent(SqliteDataReader reader)
         => new(

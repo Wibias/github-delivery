@@ -44,6 +44,8 @@ test("mutation mode reference separates normal policy from secure-by-default tru
   assert.match(reference, /profile is an upper bound, not a waiver/);
   assert.match(reference, /generic `post_comment`[\s\S]*never satisfies merge review evidence/i);
   assert.match(reference, /`merge_pr` is deliberately rejected[\s\S]*merge-pr-driver\.mjs/i);
+  assert.match(reference, /PR session/);
+  assert.match(reference, /watch and autonomously merge PR #32/);
 });
 
 test("documented high-assurance actions exactly match the executable registry", () => {

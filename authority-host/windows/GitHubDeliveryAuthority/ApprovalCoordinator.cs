@@ -28,8 +28,13 @@ internal sealed class ApprovalCoordinator
                     approval.Summaries,
                     $"Approve {approval.Operations.Count} exact GitHub mutation(s) for {approval.Repo}",
                     approval.Repo,
-                    approval.Branch);
+                    approval.Branch,
+                    approval.Pr);
                 var decision = await window.ShowAsync();
+                if (decision.PrSessionMinutes is int sessionMinutes && sessionMinutes is not 5 and not 15 and not 30 and not 60)
+                {
+                    throw new AuthorityException("pr_session_minutes_invalid");
+                }
                 if (decision.BranchLeaseMinutes is int minutes && (minutes < 1 || minutes > 10))
                 {
                     throw new AuthorityException("branch_lease_minutes_invalid");

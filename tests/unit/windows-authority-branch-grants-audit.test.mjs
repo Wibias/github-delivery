@@ -98,3 +98,32 @@ test("host self-test covers lease expiry, repo-branch isolation, atomic use, aud
     "audit_event_roundtrip",
   ]) assert.match(selfTest, new RegExp(marker));
 });
+
+test("pr sessions cover push and merge only for one PR at five to sixty minutes", () => {
+  const classifier = read(`${host}/MutationClassifier.cs`);
+  const store = read(`${host}/StateStore.cs`);
+  const service = read(`${host}/AuthorityService.cs`);
+  const selfTest = read(`${host}/SelfTest.cs`);
+  const window = read(`${host}/ApprovalWindow.xaml.cs`);
+  const coordinator = read(`${host}/ApprovalCoordinator.cs`);
+  const center = read(`${host}/ControlCenterWindow.xaml.cs`);
+
+  assert.match(classifier, /IsPrSessionEligible/);
+  assert.match(classifier, /"merge_pr"/);
+  assert.match(store, /CREATE TABLE IF NOT EXISTS pr_sessions/);
+  assert.match(store, /minutes is not 5, 15, 30, or 60/);
+  assert.match(store, /CreatePrSession/);
+  assert.match(store, /TryUseActivePrSession/);
+  assert.match(store, /ListActivePrSessions/);
+  assert.match(store, /RevokePrSession/);
+  assert.match(store, /RecordExpiredPrSessions/);
+  assert.match(service, /approvalMethod = "pr_session"/);
+  assert.match(service, /activePrSessions/);
+  assert.match(window, /PrSessionMinutes/);
+  assert.match(coordinator, /PrSessionMinutes is int sessionMinutes && sessionMinutes is not 5 and not 15 and not 30 and not 60/);
+  assert.match(center, /ListActivePrSessions/);
+  assert.match(center, /RecordExpiredPrSessions/);
+  assert.match(selfTest, /pr_session_scope/);
+  assert.match(selfTest, /pr_session_expiry/);
+  assert.match(selfTest, /pr_session_revocation/);
+});

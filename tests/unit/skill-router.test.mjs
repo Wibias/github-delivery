@@ -290,6 +290,27 @@ test("watch auto-fix and autonomously do not grant merge, close, or delete", () 
   }
 });
 
+test("autonomous watch plus merge stays on watch with merge authority", () => {
+  for (const prompt of [
+    "watch PR #32 autonomously and merge it",
+    "watch and autonomously merge PR #32",
+    "watch PR #32 and merge it autonomously",
+  ]) {
+    const route = routeShippingGithubPrompt(prompt);
+    assert.equal(route.workflow, "references/watch-pr.md", prompt);
+    assert.equal(route.mutationMode, "autonomous", prompt);
+    assert.ok(route.explicitActions.includes("merge_pr"), prompt);
+  }
+});
+
+test("autonomous watch auto-fix plus merge also grants push_code", () => {
+  const route = routeShippingGithubPrompt("watch PR #32 auto-fix and merge it");
+  assert.equal(route.workflow, "references/watch-pr.md");
+  assert.equal(route.mutationMode, "autonomous");
+  assert.ok(route.explicitActions.includes("merge_pr"));
+  assert.ok(route.explicitActions.includes("push_code"));
+});
+
 test("routes fix-and-merge-ready to the maintainer workflow", () => {
   const route = routeShippingGithubPrompt(
     "fix the review comments on PR #18 and make it merge ready",

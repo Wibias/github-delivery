@@ -35,6 +35,7 @@ internal sealed class AuthorityService
             key = active is null ? null : new { kid = active.Kid, alg = "ES256", active.Status },
             allowedRepositories = _store.ListAllowedRepositories(),
             activeBranchLeases = _store.ListActiveBranchLeases(now).Count,
+            activePrSessions = _store.ListActivePrSessions(now).Count,
         };
     }
 
@@ -66,7 +67,9 @@ internal sealed class AuthorityService
         var expiresAt = checked(now + GrantTtlSeconds);
         var summaries = operations.Select((operation, index) => BuildSummary(index, operation, scopes[index])).ToArray();
         var branch = BranchScope.Resolve(operations);
-        var branchLeaseEligible = branch is not null && operations.All(MutationClassifier.IsBranchLeaseEligible);
+        var session = PrSessionScope.Resolve(operations);
+        var sessionEligible = session is not null;
+        var branchLeaseEligible = !sessionEligible && branch is not null && operations.All(MutationClassifier.IsBranchLeaseEligible);
         var requiresHello = operations.Any(MutationClassifier.RequiresWindowsHello);
         var hasStandaloneExactHumanReply = operations.Any(MutationClassifier.RequiresExactHumanApproval) && !requiresHello;
         if (hasStandaloneExactHumanReply)
@@ -77,40 +80,60 @@ internal sealed class AuthorityService
         var approvalMethod = "host_policy";
         if (requiresHello)
         {
-            var activeLease = branchLeaseEligible
-                ? _store.TryUseActiveBranchLease(repo, branch!, now, operations.Length)
+            var activeSession = sessionEligible
+                ? _store.TryUseActivePrSession(repo, session!.Branch, session.Pr, now, operations.Length)
                 : null;
-            if (activeLease is not null)
+            if (activeSession is not null)
             {
-                approvalMethod = "branch_lease";
+                approvalMethod = "pr_session";
+                branch = session!.Branch;
             }
             else
             {
-                var approval = new BatchApproval(
-                    repo,
-                    batchId,
-                    batchHash,
-                    operations,
-                    summaries,
-                    expiresAt,
-                    branchLeaseEligible ? branch : null);
-                var decision = await _approvals.ApproveBatchAsync(approval).ConfigureAwait(false);
-                if (!decision.Approved)
+                var activeLease = branchLeaseEligible
+                    ? _store.TryUseActiveBranchLease(repo, branch!, now, operations.Length)
+                    : null;
+                if (activeLease is not null)
                 {
-                    _store.RecordAuditEvent("approval_denied", repo, branch, "denied", $"operations={operations.Length}", now);
-                    throw new AuthorityException("user_denied");
+                    approvalMethod = "branch_lease";
                 }
-                approvalMethod = "windows_hello";
-                now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-                expiresAt = checked(now + GrantTtlSeconds);
-                _store.RecordAuditEvent("approval_granted", repo, branch, "approved", $"operations={operations.Length}", now);
-                if (decision.BranchLeaseMinutes is int branchLeaseMinutes)
+                else
                 {
-                    if (!branchLeaseEligible || branch is null)
+                    var approval = new BatchApproval(
+                        repo,
+                        batchId,
+                        batchHash,
+                        operations,
+                        summaries,
+                        expiresAt,
+                        sessionEligible ? session!.Branch : branchLeaseEligible ? branch : null,
+                        sessionEligible ? session!.Pr : null);
+                    var decision = await _approvals.ApproveBatchAsync(approval).ConfigureAwait(false);
+                    if (!decision.Approved)
                     {
-                        throw new AuthorityException("branch_lease_action_not_eligible");
+                        _store.RecordAuditEvent("approval_denied", repo, branch, "denied", $"operations={operations.Length}", now);
+                        throw new AuthorityException("user_denied");
                     }
-                    _store.CreateBranchLease(repo, branch, now, branchLeaseMinutes);
+                    approvalMethod = "windows_hello";
+                    now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+                    expiresAt = checked(now + GrantTtlSeconds);
+                    _store.RecordAuditEvent("approval_granted", repo, branch, "approved", $"operations={operations.Length}", now);
+                    if (decision.PrSessionMinutes is int sessionMinutes)
+                    {
+                        if (!sessionEligible || session is null)
+                        {
+                            throw new AuthorityException("pr_session_action_not_eligible");
+                        }
+                        _store.CreatePrSession(repo, session.Branch, session.Pr, now, sessionMinutes);
+                    }
+                    else if (decision.BranchLeaseMinutes is int branchLeaseMinutes)
+                    {
+                        if (!branchLeaseEligible || branch is null)
+                        {
+                            throw new AuthorityException("branch_lease_action_not_eligible");
+                        }
+                        _store.CreateBranchLease(repo, branch, now, branchLeaseMinutes);
+                    }
                 }
             }
         }

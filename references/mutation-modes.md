@@ -47,6 +47,8 @@ The persistent user config defaults to `high-assurance`. It lives outside the in
 
 Dry-run planning never requires trusted authority. When the selected mode requires authority at `--execute`, the trusted grant must contain `scopeSha256`; a legacy resource-only signature is not enough.
 
+A **PR session** is an opt-in Hello grant, distinct from a branch lease. After Windows Hello, the approval UI may start a 5–60 minute session bound to one allowlisted repo, one PR, and one head branch. Later exact-scope `push_code` and `merge_pr` batches on that tuple skip Hello (`approvalMethod: pr_session`) but still receive one-time redeemable grants. Branch leases remain `push_code` only for 1–10 minutes. Comments, human replies, close, and delete still need Hello. Mixed-action batches are not session-eligible.
+
 The canonical enabled high-assurance action set is listed below. CI verifies exact set equality against the executable registry. The list remains an intrinsic risk classification even when a user explicitly selects `off`.
 
 <!-- high-assurance-actions:start -->
@@ -114,6 +116,7 @@ Examples:
 - `merge PR #32` → `maintainer` with explicit mutation authority for the merge workflow; the default protection mode also requires trusted authority
 - `supersede PR #12 with #45` → `maintainer` with explicit authority for the close/comment actions
 - `maintainer overtake PR #32` → `maintainer` with explicit authority for the push/close/comment actions the overtake workflow needs
+- `watch and autonomously merge PR #32` → `watch-pr.md` in `autonomous` with `merge_pr`; trusted authority plus an optional PR session cover later push/merge without a second Hello
 - `watch and autonomously fix/merge PR #32` → `autonomous` only when the wording truly grants that scope; normal workflow bounds still apply, and trusted authority is required unless the user explicitly selected `off`
 
 Do not ask users to run scripts. These mappings are agent behavior.

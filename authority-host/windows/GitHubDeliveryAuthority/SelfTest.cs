@@ -16,6 +16,7 @@ internal static class SelfTest
             GrantFixture();
             LedgerFixture();
             BranchLeaseAndAuditFixture();
+            PrSessionFixture();
             ClassifierFixture();
             BusyGateFixture();
             HelloFailureFixture();
@@ -136,6 +137,62 @@ internal static class SelfTest
             var events = store.ListRecentAuditEvents();
             Assert(events.Any(entry => entry.EventType == "self_test_event" && entry.Repo == repo && entry.Branch == branch && entry.Outcome == "ok"), "audit event roundtrip failed");
             Console.WriteLine("audit_event_roundtrip");
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch { }
+        }
+    }
+
+    private static void PrSessionFixture()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"github-delivery-authority-session-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        try
+        {
+            using var store = new StateStore(Path.Combine(root, "authority.db"));
+            const string repo = "Wibias/github-delivery";
+            const string branch = "feature/session-test";
+            var now = 1_786_150_000L;
+
+            using var comment = JsonDocument.Parse("{\"action\":\"post_comment\",\"pr\":12}");
+            Assert(!MutationClassifier.IsPrSessionEligible(comment.RootElement), "comments must not be PR-session eligible");
+            using var merge = JsonDocument.Parse("{\"action\":\"merge_pr\",\"pr\":12,\"authorityBranch\":\"feature/session-test\"}");
+            using var push = JsonDocument.Parse("{\"action\":\"push_code\",\"pr\":12,\"branch\":\"feature/session-test\"}");
+            Assert(MutationClassifier.IsPrSessionEligible(merge.RootElement), "merge must be PR-session eligible");
+            Assert(MutationClassifier.IsPrSessionEligible(push.RootElement), "push must be PR-session eligible");
+            Assert(PrSessionScope.Resolve(new[] { merge.RootElement, push.RootElement })?.Pr == 12, "PR session scope missing");
+            using var otherPr = JsonDocument.Parse("{\"action\":\"merge_pr\",\"pr\":99,\"authorityBranch\":\"feature/session-test\"}");
+            Assert(PrSessionScope.Resolve(new[] { merge.RootElement, otherPr.RootElement }) is null, "mixed PR numbers must not resolve");
+            using var noPrPush = JsonDocument.Parse("{\"action\":\"push_code\",\"branch\":\"feature/session-test\"}");
+            Assert(PrSessionScope.Resolve(new[] { noPrPush.RootElement }) is null, "push without pr must not start a PR session");
+
+            try
+            {
+                store.CreatePrSession(repo, branch, 12, now, 7);
+                throw new Exception("invalid session minutes unexpectedly succeeded");
+            }
+            catch (AuthorityException error) when (error.Code == "pr_session_minutes_invalid") { }
+
+            var session = store.CreatePrSession(repo, branch, 12, now, 5);
+            Assert(store.TryGetActivePrSession(repo, branch, 12, now + 1)?.SessionId == session.SessionId, "PR session exact scope missing");
+            Assert(store.TryGetActivePrSession(repo, branch, 13, now + 1) is null, "PR session crossed pull request scope");
+            Assert(store.TryGetActivePrSession(repo, "feature/other", 12, now + 1) is null, "PR session crossed branch scope");
+            Assert(store.TryGetActivePrSession("Other/repo", branch, 12, now + 1) is null, "PR session crossed repository scope");
+            Console.WriteLine("pr_session_scope");
+
+            var used = store.TryUseActivePrSession(repo, branch, 12, now + 2, 2);
+            Assert(used?.SessionId == session.SessionId, "atomic PR session use failed");
+
+            Assert(store.TryGetActivePrSession(repo, branch, 12, now + 301) is null, "expired PR session remained active");
+            Assert(store.RecordExpiredPrSessions(now + 301) == 1, "expired PR session was not audited");
+            Assert(store.RecordExpiredPrSessions(now + 302) == 0, "expired PR session audit duplicated");
+            Console.WriteLine("pr_session_expiry");
+
+            var revoke = store.CreatePrSession(repo, "feature/revoke-session", 44, now + 2, 15);
+            Assert(store.RevokePrSession(revoke.SessionId, now + 3), "PR session revocation failed");
+            Assert(store.TryGetActivePrSession(repo, "feature/revoke-session", 44, now + 4) is null, "revoked PR session remained active");
+            Console.WriteLine("pr_session_revocation");
         }
         finally
         {
