@@ -35,6 +35,33 @@ style cleanup.
 10. **Keep names stable.** Do not cycle through synonyms for the same workflow,
     gate, state, action, or concept.
 
+## Publication tells
+
+Delete these when `github-delivery` authors the prose. This is a deletion list,
+not a voice. Do not add first person, personality, or "soul." Do not score
+whether the text "sounds human." Do not ban em dashes. Quoted user text and
+evidence states stay exact.
+
+- **Chatbot phrases.** Cut `I hope this helps`, `Let me know if you need
+  anything`, `Of course!`, `Certainly!`, `Great question!`, `You're absolutely
+  right!`, and `Found the smoking gun!`.
+- **Process narration.** Cut `I then ran`, `Let me now`, `After investigating`,
+  and other play-by-play of the agent's steps. State the result and the
+  evidence.
+- **Puffery.** Cut `crucial`, `delve`, `pivotal`, `showcase`, `testament`,
+  `underscore`, `vibrant`, `groundbreaking`, and abstract `landscape` /
+  `tapestry` when they add no fact.
+- **Contrast crutches.** Rewrite `not just X, but Y` and `not X, it's Y` as the
+  actual point.
+- **Vague attributions.** Name the source, or delete `experts believe` /
+  `industry reports suggest`.
+
+Typed-code anti-slop (chained assertions, known-value widening, `any` casts)
+stays in `references/type-evidence-review.md`. Extra comments, defensive
+try/catch on trusted paths, and similar code cleanup stay on the explicit
+`references/simplify-pr.md` workflow. Do not import a second lint stack or a
+standalone humanizer skill to do this job.
+
 ## Evidence-preservation rule
 
 Never rewrite exact evidence for style. Preserve these verbatim when present:
@@ -87,6 +114,8 @@ Before publication, ask:
 4. Does any sentence sound reusable in an unrelated repository because it says
    nothing specific about this work?
 5. Did the rewrite make uncertainty look more certain than the evidence allows?
+6. Did any publication tell remain (chatbot phrase, process narration, puffery,
+   or `not just X, but Y`)?
 
 Fix the prose only when the answer improves readability without weakening the
 underlying contract.
@@ -95,5 +124,8 @@ underlying contract.
 
 This reference adapts ideas from Cursor's `pstack` `unslop` and
 `technical-writing` skills. `pstack` is MIT licensed, copyright 2026 Lauren Tan.
-The rules here are rewritten for `github-delivery`'s evidence-first GitHub
-publication model rather than copied as a standalone Cursor skill.
+The publication-tell list reuses concrete phrase classes from that lineage.
+It does not import humanizer skills, authenticity scoring, first-person "soul,"
+or an em-dash ban. The rules here are rewritten for `github-delivery`'s
+evidence-first GitHub publication model rather than copied as a standalone
+Cursor skill.

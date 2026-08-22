@@ -21,6 +21,17 @@ test("durable GitHub prose uses the evidence-preserving quality contract", () =>
   assert.match(prose, /## Evidence-preservation rule/);
   assert.match(prose, /unknown.*not run.*blocked/is);
   assert.match(prose, /pstack.*unslop.*technical-writing/is);
+  assert.match(prose, /## Publication tells/);
+  assert.match(prose, /I hope this helps/);
+  assert.match(prose, /I then ran/);
+  assert.match(prose, /not just X, but Y/);
+  assert.match(prose, /Do not add first person, personality, or "soul\."/);
+  assert.match(prose, /Do not score[\s\S]*sounds human/i);
+  assert.match(prose, /Do not ban em dashes/);
+  assert.match(prose, /type-evidence-review\.md/);
+  assert.match(prose, /simplify-pr\.md/);
+  assert.match(prose, /Did any publication tell remain/);
+  assert.match(prose, /does not import humanizer skills, authenticity scoring/i);
   assert.match(publication, /GD-PUB-009/);
   assert.match(publication, /references\/prose-quality\.md/);
   assert.match(issueWorkflows, /references\/prose-quality\.md/);
