@@ -114,3 +114,39 @@ test("malformed existing hook configuration fails closed", () => {
     /parse|json/i,
   );
 });
+
+test("hooks.json apply refuses a concurrent writer", () => {
+  const f = fixture();
+  writeFileSync(join(f.root, "hooks.json.lock"), "foreign-holder\n");
+  assert.throws(
+    () => installCodexWatchdogHooks({
+      hooksPath: f.hooksPath,
+      skillDir: f.skillDir,
+      apply: true,
+    }),
+    /install_lock_held/,
+  );
+});
+
+test("hooks.json apply holds the lock across the write", () => {
+  const f = fixture();
+  let nestedError;
+  installCodexWatchdogHooks({
+    hooksPath: f.hooksPath,
+    skillDir: f.skillDir,
+    apply: true,
+    writeFile(path, data) {
+      try {
+        installCodexWatchdogHooks({
+          hooksPath: f.hooksPath,
+          skillDir: join(f.root, "other-skill"),
+          apply: true,
+        });
+      } catch (error) {
+        nestedError = error;
+      }
+      writeFileSync(path, data);
+    },
+  });
+  assert.match(String(nestedError?.message || nestedError), /install_lock_held/);
+});
