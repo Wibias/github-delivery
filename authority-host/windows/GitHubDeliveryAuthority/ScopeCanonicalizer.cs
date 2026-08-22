@@ -46,6 +46,8 @@ internal static partial class ScopeCanonicalizer
         {
             case "merge_pr":
                 AddPrScope(scope, request);
+                scope["expectedBase"] = RequiredString(request, "expectedBase");
+                scope["expectedBaseOid"] = RequiredString(request, "expectedBaseOid").ToLowerInvariant();
                 scope["mergeMethod"] = NormalizeMergeMethod(OptionalString(request, "mergeMethod"));
                 break;
 
@@ -165,6 +167,7 @@ internal static partial class ScopeCanonicalizer
                 break;
 
             case "close_linked_issue":
+                scope["pr"] = PositiveInt(request, "pr");
                 scope["issue"] = PositiveInt(request, "issue");
                 break;
 
@@ -197,7 +200,7 @@ internal static partial class ScopeCanonicalizer
     public static JsonObject BuildResource(JsonElement request)
     {
         var resource = new JsonObject();
-        foreach (var field in new[] { "pr", "issue", "commentId", "threadId", "expectedHead", "authorityBranch", "headRefName", "targetRepo", "supersedingPr", "remote", "branch", "expectedRemoteTip", "newTip", "base", "head", "headRepo", "assignee" })
+        foreach (var field in new[] { "pr", "issue", "commentId", "threadId", "expectedHead", "expectedBase", "expectedBaseOid", "authorityBranch", "headRefName", "targetRepo", "supersedingPr", "remote", "branch", "expectedRemoteTip", "newTip", "base", "head", "headRepo", "assignee" })
         {
             if (!request.TryGetProperty(field, out var value) || value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
             {
