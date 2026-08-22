@@ -95,8 +95,8 @@ For installation edge cases, backup/restore, downgrade behavior, manual recovery
 `1.0.0` is the first stable public release after `0.8.7`. User-facing work since that release:
 
 - SHA-bound remote repository context: resolve `owner/repo` or GitHub URLs, discover the real default branch, pin an exact commit SHA, and read files against that snapshot instead of guessing `main` / `master` / `HEAD` (`GD-EVID-007`);
-- optional Windows Authority **PR sessions** so one Hello can cover later exact-scope push and merge on one PR for 5–60 minutes; branch leases stay push-only;
-- explicit merge routing: attended `watch … and merge` stays prepare-and-merge; `watch and autonomously merge PR #N` stays on watch; attributed GitHub text is not user merge intent;
+- optional Windows Authority **PR sessions** so one Hello can cover later exact-scope push and merge on one PR and approved merge base for 5–60 minutes; a retargeted base requires Hello again; branch leases stay push-only;
+- explicit merge routing: attended `watch … and merge` stays prepare-and-merge; `watch and autonomously merge PR #N` stays on watch; attributed GitHub text is not user merge intent even after the first sentence;
 - fail closed on GitHub `UNKNOWN` mergeability and on native GitHub stacked-PR merge (do not `gh pr merge` those members);
 - policy modules are mandatory context (`shared-rules.md` is a compatibility index only);
 - install/update/Authority cutover, release SBOM/path identity, mutation retry identity, and watchdog/pre-open policy hardening listed in [`CHANGELOG.md`](CHANGELOG.md).
@@ -168,7 +168,7 @@ For trusted high-assurance operations, authority redemption happens before the f
 
 Where high assurance is required, trusted grants bind the semantic effect rather than a vague permission flag: repository, action, mode, PR/head, merge method, target identity, idempotency data, and hashes of human-visible text as applicable.
 
-The optional Windows Authority host can issue those grants through Windows Hello. Missing persistent user configuration defaults the effective preference to **Sensitive actions** (`high-assurance`); an explicitly stored `off` or `all` preference remains supported. After Hello, the approval UI can start a **PR session** (5 / 15 / 30 / 60 minutes) for later exact-scope push and merge on one PR, or a **branch lease** (1–10 minutes) for repeated `push_code` only. Mixed-action batches, comments, human replies, close, and delete still need Hello. `off` does not turn caller-supplied lifecycle flags into independently authenticated consent.
+The optional Windows Authority host can issue those grants through Windows Hello. Missing persistent user configuration defaults the effective preference to **Sensitive actions** (`high-assurance`); an explicitly stored `off` or `all` preference remains supported. After Hello, the approval UI can start a **PR session** (5 / 15 / 30 / 60 minutes) for later exact-scope push and merge on one PR and the approved merge base, or a **branch lease** (1–10 minutes) for repeated `push_code` only. Mixed-action batches, comments, human replies, close, and delete still need Hello. `off` does not turn caller-supplied lifecycle flags into independently authenticated consent.
 
 ### Safe retries and idempotency
 
@@ -549,7 +549,7 @@ Stable in this release:
 - issue research, implementation, publication, external work-item delivery, and exact-head duplicate prevention;
 - deep current-head review with deterministic probe coverage and conditional visual evidence;
 - mutation authority, exact-effect receipts, stale-head protection, and head-pinned merge execution;
-- optional Windows Authority Hello grants, push-only branch leases, and PR sessions for later exact-scope push and merge on one PR;
+- optional Windows Authority Hello grants, push-only branch leases, and PR sessions for later exact-scope push and merge on one PR and approved merge base;
 - inferred-stack restacking/merge-order safety and independent multi-base delivery;
 - SHA-bound remote repository context when a useful local checkout is not already available;
 - verified stable install/update;

@@ -47,7 +47,7 @@ The persistent user config defaults to `high-assurance`. It lives outside the in
 
 Dry-run planning never requires trusted authority. When the selected mode requires authority at `--execute`, the trusted grant must contain `scopeSha256`; a legacy resource-only signature is not enough.
 
-A **PR session** is an opt-in Hello grant, distinct from a branch lease. After Windows Hello, the approval UI may start a 5–60 minute session bound to one allowlisted repo, one PR, and one head branch. Later exact-scope `push_code` and `merge_pr` batches on that tuple skip Hello (`approvalMethod: pr_session`) but still receive one-time redeemable grants. Branch leases remain `push_code` only for 1–10 minutes. Comments, human replies, close, and delete still need Hello. Mixed-action batches are not session-eligible.
+A **PR session** is an opt-in Hello grant, distinct from a branch lease. After Windows Hello, the approval UI may start a 5–60 minute session bound to one allowlisted repo, one PR, one head branch, and the approved merge base for merge. Later exact-scope `push_code` and `merge_pr` batches on that tuple skip Hello (`approvalMethod: pr_session`) but still receive one-time redeemable grants. A retargeted base requires Hello again. Branch leases remain `push_code` only for 1–10 minutes. Comments, human replies, close, and delete still need Hello. Mixed-action batches are not session-eligible.
 
 The canonical enabled high-assurance action set is listed below. CI verifies exact set equality against the executable registry. The list remains an intrinsic risk classification even when a user explicitly selects `off`.
 
