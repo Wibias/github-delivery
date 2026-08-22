@@ -278,17 +278,56 @@ test("Authority startup state helper supports read enable disable and unchanged 
     throw new Error(`unexpected reg command: ${args.join(" ")}`);
   };
   const installed = { installed: true, exePath };
+  const exists = () => false;
 
-  assert.equal(install.readAuthorityHostStartup({ platform: "win32", installed, runner }).enabled, false);
+  assert.equal(install.readAuthorityHostStartup({ platform: "win32", installed, runner, exists }).enabled, false);
   assert.deepEqual(
-    install.setAuthorityHostStartup({ platform: "win32", installed, runner, enabled: true }),
+    install.setAuthorityHostStartup({ platform: "win32", installed, runner, exists, enabled: true }),
     { configured: true, enabled: true, changed: true, exePath },
   );
-  assert.equal(install.readAuthorityHostStartup({ platform: "win32", installed, runner }).enabled, true);
-  assert.equal(install.setAuthorityHostStartup({ platform: "win32", installed, runner, enabled: true }).changed, false);
+  assert.equal(install.readAuthorityHostStartup({ platform: "win32", installed, runner, exists }).enabled, true);
+  assert.equal(install.setAuthorityHostStartup({ platform: "win32", installed, runner, exists, enabled: true }).changed, false);
   assert.deepEqual(
-    install.setAuthorityHostStartup({ platform: "win32", installed, runner, enabled: false }),
+    install.setAuthorityHostStartup({ platform: "win32", installed, runner, exists, enabled: false }),
     { configured: false, enabled: false, changed: true, exePath },
   );
-  assert.equal(install.readAuthorityHostStartup({ platform: "win32", installed, runner }).enabled, false);
+  assert.equal(install.readAuthorityHostStartup({ platform: "win32", installed, runner, exists }).enabled, false);
+});
+
+test("autostart status and off include the Startup folder shortcut", async () => {
+  const install = await import("../../scripts/lib/authority-host-install.mjs");
+  const exePath = "C:\\Users\\me\\AppData\\Local\\GitHubDeliveryAuthority\\app\\v0.7.1\\GitHubDeliveryAuthority.exe";
+  const shortcut = "C:\\Users\\me\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\GitHub Delivery Authority.lnk";
+  let shortcutExists = true;
+  const removed = [];
+  const runner = () => ({ status: 1, stdout: "", stderr: "not found" });
+  const installed = { installed: true, exePath };
+  const env = { APPDATA: "C:\\Users\\me\\AppData\\Roaming" };
+  const exists = (path) => path === shortcut && shortcutExists;
+  const remove = (path) => {
+    removed.push(path);
+    shortcutExists = false;
+  };
+
+  const status = install.readAuthorityHostStartup({
+    platform: "win32",
+    installed,
+    runner,
+    env,
+    exists,
+  });
+  assert.equal(status.enabled, true);
+
+  const off = install.setAuthorityHostStartup({
+    enabled: false,
+    platform: "win32",
+    installed,
+    runner,
+    env,
+    exists,
+    remove,
+  });
+  assert.equal(off.enabled, false);
+  assert.equal(off.changed, true);
+  assert.deepEqual(removed, [shortcut]);
 });

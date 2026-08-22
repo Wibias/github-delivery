@@ -8,6 +8,7 @@ internal static class AuthorityStartup
 {
     private const string RunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
     private const string RunValueName = "GitHubDeliveryAuthority";
+    private const string ShortcutName = "GitHub Delivery Authority.lnk";
 
     private static string ExpectedValue()
     {
@@ -19,12 +20,31 @@ internal static class AuthorityStartup
         return $"\"{exePath}\"";
     }
 
+    private static string ShortcutPath()
+    {
+        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Startup), ShortcutName);
+    }
+
+    private static bool ShortcutExists()
+    {
+        return File.Exists(ShortcutPath());
+    }
+
+    private static void RemoveShortcut()
+    {
+        var shortcutPath = ShortcutPath();
+        if (File.Exists(shortcutPath))
+        {
+            File.Delete(shortcutPath);
+        }
+    }
+
     public static AuthorityStartupState Read()
     {
         using var key = Registry.CurrentUser.OpenSubKey(RunKeyPath, writable: false);
         var value = key?.GetValue(RunValueName) as string;
-        return new AuthorityStartupState(
-            string.Equals(value, ExpectedValue(), StringComparison.OrdinalIgnoreCase));
+        var registryEnabled = string.Equals(value, ExpectedValue(), StringComparison.OrdinalIgnoreCase);
+        return new AuthorityStartupState(registryEnabled || ShortcutExists());
     }
 
     public static AuthorityStartupState Set(bool enabled)
@@ -38,6 +58,7 @@ internal static class AuthorityStartup
         else
         {
             key.DeleteValue(RunValueName, throwOnMissingValue: false);
+            RemoveShortcut();
         }
         return Read();
     }
