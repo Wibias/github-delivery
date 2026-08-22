@@ -66,7 +66,7 @@ Caller fields such as `mutationMode` and `explicitInstruction` are policy assert
 
 Trusted grants bind a deterministic `scopeSha256` to the exact effect. Depending on action, this includes repository, action, mode, PR head, merge method, target IDs, reviewer set, idempotency key, and hashes of human-visible text. Changing a bound value after approval invalidates the grant.
 
-Batch approval is ordered and finite. Every operation receives a distinct nonce and exact scope. There is no wildcard grant. Bounded branch leases (`push_code` only, 1–10 minutes) and PR sessions (`push_code` and `merge_pr` on one PR, 5/15/30/60 minutes) only skip repeated Windows Hello; they still issue one-time redeemable grants for each exact operation.
+Batch approval is ordered and finite. Every operation receives a distinct nonce and exact scope. There is no wildcard grant. Bounded branch leases (`push_code` only, 1–10 minutes) and PR sessions (`push_code` and `merge_pr` on one PR and the approved merge base, 5/15/30/60 minutes) only skip repeated Windows Hello; they still issue one-time redeemable grants for each exact operation.
 
 Legacy Ed25519 public-key verification remains supported through `GITHUB_DELIVERY_AUTHORITY_PUBLIC_KEY`. Algorithm-agile issuers use the public trust store configured by `GITHUB_DELIVERY_AUTHORITY_TRUST_STORE`; the Windows host uses ES256 and a public-only trust store.
 

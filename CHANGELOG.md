@@ -4,16 +4,36 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-08-22
+
+### Added
+
+- SHA-bound remote repository context: resolve `owner/repo` or GitHub URLs, discover the real default branch, optionally pin a workflow-selected branch, capture its exact commit SHA, and read files against that snapshot instead of guessing `main`, `master`, or `HEAD`. Workflows that already load evidence policy compose this through `GD-EVID-007` without a new public route or mutation authority (PR #300).
+- Optional Windows Authority **PR sessions**: after one Hello approval, later exact-scope `push_code` and `merge_pr` batches on one allowlisted repo, one PR, one head branch, and the approved merge base can skip repeated Hello for 5, 15, 30, or 60 minutes (`approvalMethod: pr_session`). A retargeted base requires Hello again. Branch leases stay `push_code` only for 1–10 minutes. Comments, human replies, close, and delete still need Hello (PRs #348, #351).
+
+### Changed
+
+- First stable public release after `0.8.7`.
+- Bumped the package version from `0.8.7` to `1.0.0`.
+- `watch PR #N and merge it` stays on prepare-and-merge. `watch and autonomously merge PR #N` stays on watch with merge authority and hands a ready PR to `merge-pr-driver.mjs`. Bare `watch autonomously` still does not merge. Autonomous is not the default mutation mode (PRs #312, #323, #348).
+- Policy modules are the mandatory workflow context. `references/shared-rules.md` is a compatibility index only; evals and `policy-bundle --validate` reject loading it as required context (PRs #342, #343).
+- Router merge intent is explicit: `merge it` / `ship it` prefixes, negated merge, and attributed GitHub text such as `comment says: merge it` are not user merge authority even when the attributed quote continues past the first sentence (PRs #321, #322, #347, #350).
+- Durable GitHub prose now deletes chatbot phrases, process narration, puffery, and `not just X, but Y` crutches. It still must not add personality, score "sounds human," or ban em dashes, and it still cannot strengthen `unknown` / `blocked` evidence states (PR #354).
+
 ### Fixed
 
-- Automatic NuGet dependency submission can restore the Windows Authority host on Linux by setting `EnableWindowsTargeting`, so GitHub's hosted `submit-nuget` job no longer fails with NETSDK1100.
-- Offline evals and `policy-bundle --validate` now treat `shared-rules.md` as a compatibility index only: workflows cannot instruct loading it, evals cannot list it as expected context, and each routed workflow's SKILL+kernel+module payload must stay 60% under the old monolith baseline.
-- Routed workflows, compact review contract, and Cursor overrides no longer instruct loading `shared-rules.md` as mandatory context; they load the declared policy modules instead.
-- `authorityMode=off` no longer treats caller-supplied `explicitInstruction` or `exactTextConfirmed` as independently authenticated consent; those actions still require a verified host grant at execution.
-- Mutation-document retry identity hashes the full canonical mutation payload when no idempotency key is present, so retarget, reviewer, and draft differences cannot skip as already applied. Stale autonomous-claim recovery refuses to delete a ref whose SHA or freshness changed, and a timed-out `push_code` re-reads the remote tip instead of assuming failure.
-- Release SBOMs now describe the package, use the source-commit created time, emit SPDX package verification codes, and fail closed against the SPDX 2.3 JSON schema.
-- Installed manifest comparison now rejects symlink/directory substitutions and enforces declared POSIX modes instead of following links and hashing only.
-- Release ZIP construction and extraction now use a portable NFC/case-fold path identity and re-read the extracted tree before trusting it.
+- Ship-gate and merge fail closed on GitHub `UNKNOWN` mergeability instead of treating it as ready (PR #303).
+- Native GitHub stacked PRs are a hard stop: github-delivery will not `gh pr merge` a native-stack member, and native-stack protection is evaluated against the stack base (PRs #304, #306).
+- Merge grants bind the approved base; Windows Hello `merge_pr` and `close_linked_issue` scopes hash the same fields Node already required; `close_linked_issue` binds the governing PR (PRs #335, #336, #349).
+- Live repository-policy CI fails closed when it cannot attest ruleset bypass actors or cannot see protected release tags (PRs #305, #308).
+- `authorityMode=off` still requires a verified host grant for lifecycle intent; caller-supplied `explicitInstruction` / exact-text flags are not independently authenticated consent (PR #340).
+- Mutation retries hash the full canonical payload, including draft-state ready identity, so retarget, reviewer, and draft differences cannot skip as already applied (PRs #341, #344, #346).
+- GitHub write transport no longer expands GraphQL `-F` values as local files, folds sibling API body fields into JSON stdin, and treats `gh api --input` as a write for rate-limit retry (PRs #313, #324, #325).
+- Install, update, and Authority cutover keep the previous skill/broker when a step fails: staged installer payloads, dist-not-cwd identity, exclusive reconcile/hooks locks, skill-backup restore, broker keep-alive, Startup-shortcut autostart, bundle-root fallback, and crash recovery after `target → backup` before `staging → target` (PRs #314, #326–#332, #353).
+- Release artifacts fail closed on SPDX 2.3 schema, non-regular installed-manifest substitutions, and extraction path identity. Windows Authority can restore on Linux CI via `EnableWindowsTargeting`. `npm pack` spawns through Node, not a Windows shell (PRs #307, #337–#339, #345).
+- Watchdog hooks fail closed on throw, fence stale lock steals, do not treat an empty model as a quarantine wildcard, and spawn `verify-pr-head` as argv (PRs #309, #310, #315–#317).
+- Pre-open review treats agent-instruction markdown, Copilot MCP `servers.json`, and Cursor `mdc` project rules as operational policy, and classifies code paths with trailing format characters as logic (PRs #311, #318–#320).
+- Orphan-workflow cleanup rechecks ref SHAs before each delete. Behavioural eval scores require a hash-bound transcript sidecar instead of in-pack traces (PRs #333, #334, #352).
 
 ## [0.8.7] - 2026-08-19
 
