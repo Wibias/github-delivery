@@ -192,10 +192,14 @@ test("merge driver buildMergeRequest pins the head with --match-head-commit", ()
     repo: "acme/widget",
     pr: 42,
     expectedHead: HEAD,
+    expectedBase: "main",
+    expectedBaseOid: "b".repeat(40),
     mergeMethod: "merge",
   });
   const plan = planMutationRequest(request);
   assert.equal(plan.action, "merge_pr");
+  assert.equal(request.expectedBase, "main");
+  assert.equal(request.expectedBaseOid, "b".repeat(40));
   assert.deepEqual(plan.command, [
     "gh",
     "pr",
@@ -209,11 +213,26 @@ test("merge driver buildMergeRequest pins the head with --match-head-commit", ()
   ]);
 });
 
+test("merge driver merge request requires base identity", () => {
+  assert.throws(
+    () =>
+      buildMergeRequest({
+        repo: "acme/widget",
+        pr: 42,
+        expectedHead: HEAD,
+        mergeMethod: "merge",
+      }),
+    /expected_base_required/,
+  );
+});
+
 test("canonical merge execution fails closed when trusted authority is required", () => {
   const request = buildMergeRequest({
     repo: "acme/widget",
     pr: 42,
     expectedHead: HEAD,
+    expectedBase: "main",
+    expectedBaseOid: "b".repeat(40),
     mergeMethod: "merge",
   });
   let spawned = false;

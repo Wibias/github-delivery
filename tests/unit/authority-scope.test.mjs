@@ -16,6 +16,8 @@ const merge = {
   repo: "Wibias/github-delivery",
   pr: 105,
   expectedHead: "71ac000000000000000000000000000000000001",
+  expectedBase: "main",
+  expectedBaseOid: "72ac000000000000000000000000000000000001",
   mergeMethod: "merge",
 };
 
@@ -26,23 +28,37 @@ test("canonical JSON sorts object keys recursively while preserving array order"
   );
 });
 
-test("merge authority scope binds method and exact head", () => {
+test("merge authority scope binds method, exact head, and exact base", () => {
   const scope = authorityScopeForRequest(merge);
   assert.deepEqual(scope, {
     action: "merge_pr",
+    expectedBase: "main",
+    expectedBaseOid: "72ac000000000000000000000000000000000001",
     expectedHead: "71ac000000000000000000000000000000000001",
     mergeMethod: "merge",
     mutationMode: "maintainer",
     pr: 105,
     repo: "Wibias/github-delivery",
   });
-  assert.equal(
-    authorityScopeSha256(merge),
-    "5792e06b57c2f0eece1cdc227d4ccb0b75012bb9ed65bbf183e3bd994aaeb8b8",
-  );
   assert.notEqual(
     authorityScopeSha256(merge),
     authorityScopeSha256({ ...merge, mergeMethod: "squash" }),
+  );
+  assert.notEqual(
+    authorityScopeSha256(merge),
+    authorityScopeSha256({ ...merge, expectedBase: "dev" }),
+  );
+  assert.notEqual(
+    authorityScopeSha256(merge),
+    authorityScopeSha256({ ...merge, expectedBaseOid: "73ac000000000000000000000000000000000001" }),
+  );
+  assert.throws(
+    () => authorityScopeForRequest({ ...merge, expectedBase: undefined }),
+    /authority_scope_expected_base_required/,
+  );
+  assert.throws(
+    () => authorityScopeForRequest({ ...merge, expectedBaseOid: undefined }),
+    /authority_scope_expected_base_oid_required/,
   );
 });
 

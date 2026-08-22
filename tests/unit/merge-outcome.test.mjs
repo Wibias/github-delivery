@@ -15,6 +15,8 @@ function mergeRequest() {
     repo: "acme/widgets",
     pr: 32,
     expectedHead: HEAD,
+    expectedBase: "main",
+    expectedBaseOid: "b".repeat(40),
     mergeMethod: "merge",
   };
 }
@@ -50,6 +52,13 @@ function mergeRunner(afterMergeState, beforeMergeState = {}) {
     if (command === "gh" && args[0] === "pr" && args[1] === "view") {
       if (args.includes("--jq") && args.includes(".headRefOid")) {
         return { status: 0, stdout: `${HEAD}\n`, stderr: "" };
+      }
+      if (args.includes("baseRefName,baseRefOid")) {
+        return {
+          status: 0,
+          stdout: JSON.stringify({ baseRefName: "main", baseRefOid: "b".repeat(40) }),
+          stderr: "",
+        };
       }
       return {
         status: 0,

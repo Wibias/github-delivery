@@ -88,7 +88,7 @@ The driver performs two final live boundaries:
 1. after settle and before destructive authority acquisition, recapture the gate and compare exact head, base, active-rules fingerprint, feedback generation, and review evidence;
 2. after any authority/approval delay and immediately before the merge write, recapture and compare them again.
 
-Only then does it execute the head-pinned merge. GitHub still provides the atomic `--match-head-commit` protection for the head itself. The richer feedback/rules boundary is polling-based because GitHub does not expose one atomic compare-and-merge precondition for every comment/review/rules generation. Never describe that richer boundary as mathematically race-free.
+Only then does it execute the head-pinned merge. The merge grant also binds the approved base ref and base OID, and the broker rereads those live fields immediately before `gh pr merge`. GitHub still provides the atomic `--match-head-commit` protection for the head itself. The richer feedback/rules boundary is polling-based because GitHub does not expose one atomic compare-and-merge precondition for every comment/review/rules generation. Never describe that richer boundary as mathematically race-free.
 
 ### Driver transaction order
 
