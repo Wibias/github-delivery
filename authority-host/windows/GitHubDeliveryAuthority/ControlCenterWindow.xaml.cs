@@ -224,7 +224,9 @@ internal sealed partial class ControlCenterWindow : Window
     {
         var remaining = Math.Max(0, session.ExpiresAt - now);
         var minutes = Math.Max(1, (int)Math.Ceiling(remaining / 60d));
-        return $"{session.Repo}  •  PR #{session.Pr}  •  {session.Branch}  •  {minutes} min remaining";
+        return session.ExpectedBase is string expectedBase
+            ? $"{session.Repo}  •  PR #{session.Pr}  •  {session.Branch}  •  base {expectedBase}  •  {minutes} min remaining"
+            : $"{session.Repo}  •  PR #{session.Pr}  •  {session.Branch}  •  {minutes} min remaining";
     }
 
     private void Navigation_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
