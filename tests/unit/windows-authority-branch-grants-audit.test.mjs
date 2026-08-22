@@ -126,4 +126,23 @@ test("pr sessions cover push and merge only for one PR at five to sixty minutes"
   assert.match(selfTest, /pr_session_scope/);
   assert.match(selfTest, /pr_session_expiry/);
   assert.match(selfTest, /pr_session_revocation/);
+  assert.match(selfTest, /pr_session_base/);
+});
+
+test("pr sessions bind the approved merge base and do not cover merge without it", () => {
+  const scope = read(`${host}/PrSessionScope.cs`);
+  const store = read(`${host}/StateStore.cs`);
+  const service = read(`${host}/AuthorityService.cs`);
+  const selfTest = read(`${host}/SelfTest.cs`);
+
+  assert.match(scope, /record PrSessionKey\(string Branch, int Pr, string\? ExpectedBase, string\? ExpectedBaseOid\)/);
+  assert.match(scope, /expectedBaseOid/);
+  assert.match(store, /expected_base/);
+  assert.match(store, /expected_base_oid/);
+  assert.match(store, /TryUseActivePrSession\(string repo, string branch, int pr, string\? expectedBase, string\? expectedBaseOid, long now, int operationCount\)/);
+  assert.match(service, /session\.ExpectedBase/);
+  assert.match(service, /session\.ExpectedBaseOid/);
+  assert.match(selfTest, /pr_session_base/);
+  assert.match(selfTest, /crossed merge base/);
+  assert.match(selfTest, /base-less session must not cover merge/);
 });
