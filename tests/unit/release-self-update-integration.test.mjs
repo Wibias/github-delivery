@@ -310,3 +310,34 @@ test("unexpected user-config change fails closed and surfaces the rollback backu
     },
   );
 }));
+
+test("Authority reconciliation failure rolls the skill target back from backup", async () => withFixture(async ({ root, target }) => {
+  const candidate = verifiedCandidate(root, target);
+  const backupPath = join(root, "backup-0.4.0");
+  mkdirSync(backupPath, { recursive: true });
+  writeFileSync(join(backupPath, "marker.txt"), "old\n");
+  writeFileSync(join(target, "marker.txt"), "new\n");
+
+  await assert.rejects(
+    runInstallCommand({ update: true, apply: true, target }, {
+      ...workspaceDependencies(root),
+      prepareVerifiedReleaseCandidate: async () => candidate,
+      readUserConfig: () => ({ config: { schemaVersion: 1, authorityMode: "off" } }),
+      installSkill() {
+        writeFileSync(join(target, "marker.txt"), "new\n");
+        return { backupPath, watchdog: { hookTrustRequired: true } };
+      },
+      verifyInstalledRelease: () => ({ clean: true }),
+      async reconcileStableAuthorityHost() {
+        throw new Error("authority_host_install_failed");
+      },
+    }),
+    (error) => {
+      assert.match(error.message, /authority_host_install_failed/);
+      assert.equal(error.backupPath, backupPath);
+      assert.equal(error.rolledBack, true);
+      return true;
+    },
+  );
+  assert.equal(readFileSync(join(target, "marker.txt"), "utf8"), "old\n");
+}));

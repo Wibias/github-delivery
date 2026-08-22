@@ -367,10 +367,24 @@ export async function runInstallCommand(options, dependencies = {}) {
         targetVersion: authorityPlan.targetVersion,
       });
     }
-    const authorityHost = await reconcileAuthority({
-      expectedRelease: candidate.release,
-      scriptPath: join(options.target, "authority-host", "windows", "install-release.ps1"),
-    });
+    let authorityHost;
+    try {
+      authorityHost = await reconcileAuthority({
+        expectedRelease: candidate.release,
+        scriptPath: join(options.target, "authority-host", "windows", "install-release.ps1"),
+      });
+    } catch (error) {
+      if (installation?.backupPath) {
+        const restore = dependencies.restoreBackup || restoreBackup;
+        try {
+          restore({ backup: installation.backupPath, target: options.target });
+          if (error && typeof error === "object") error.rolledBack = true;
+        } catch {
+          // Keep the Authority error; backupPath is still attached below.
+        }
+      }
+      throw error;
+    }
     if (authorityHost?.changed === true) {
       progress({ stage: "authority_updated", version: authorityHost?.installed?.version || candidate.release.version });
     }

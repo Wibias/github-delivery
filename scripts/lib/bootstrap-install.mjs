@@ -15,6 +15,7 @@ import {
   compareInstalledManifest,
   readInstalledManifest,
 } from "./stable-release-update.mjs";
+import { restoreBackup } from "./distribution.mjs";
 import { readUserConfig } from "./user-config.mjs";
 import { checkBootstrapEnvironment, discoverInstallations } from "./bootstrap-cli.mjs";
 
@@ -216,6 +217,7 @@ export async function runGuidedInstall({
   const confirmAuthHost = dependencies.confirmAuthorityHost || confirmAuthorityHost;
   const confirmAuthStartup = dependencies.confirmAuthorityStartup || confirmAuthorityStartup;
   const reconcileAuthority = dependencies.reconcileStableAuthorityHost || reconcileStableAuthorityHost;
+  const restore = dependencies.restoreBackup || restoreBackup;
   const platform = dependencies.platform || process.platform;
   const startAuthority = dependencies.startInstalledAuthorityHost || startInstalledAuthorityHost;
   const workspace = make();
@@ -278,11 +280,23 @@ export async function runGuidedInstall({
     let authorityHost = null;
     if (installAuthorityHost) {
       output?.write?.("\nWindows approval GUI\n  Installing and verifying the approval host...\n");
-      authorityHost = await reconcileAuthority({
-        expectedRelease: payload.release,
-        scriptPath: join(target, "authority-host", "windows", "install-release.ps1"),
-        installWhenDisabled: true,
-      });
+      try {
+        authorityHost = await reconcileAuthority({
+          expectedRelease: payload.release,
+          scriptPath: join(target, "authority-host", "windows", "install-release.ps1"),
+          installWhenDisabled: true,
+        });
+      } catch (error) {
+        if (installation?.backupPath) {
+          try {
+            restore({ backup: installation.backupPath, target });
+            if (error && typeof error === "object") error.rolledBack = true;
+          } catch {
+            // Keep the Authority error; backupPath is still attached below.
+          }
+        }
+        throw error;
+      }
       const authorityStarted = authorityHost?.installed?.installed
         ? await startAuthority({ installed: authorityHost.installed })
         : { started: false, reason: "not_installed" };
