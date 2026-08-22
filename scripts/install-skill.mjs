@@ -88,6 +88,16 @@ export function parseInstallArgs(argv, { installedRoot = resolve(import.meta.dir
     if (!options.targetExplicit) options.target = installedRoot;
   }
 
+  if (!options.sourceExplicit) {
+    const packaged = resolve(installedRoot, "dist", "github-delivery");
+    const bundleRoot = resolve(installedRoot);
+    options.source = existsSync(join(packaged, "package.json"))
+      ? packaged
+      : existsSync(join(bundleRoot, "package.json"))
+        ? bundleRoot
+        : packaged;
+  }
+
   options.source = resolve(options.source);
   options.target = resolve(options.target);
   options.codexHome = resolve(options.codexHome);

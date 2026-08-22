@@ -97,6 +97,40 @@ test("explicit --source still wins over the package dist default", () => {
   assert.equal(options.sourceExplicit, true);
 });
 
+test("missing packaged dist falls back to the bundle root, not cwd", () => {
+  const packageRoot = mkdtempSync(join(tmpdir(), "gd-install-no-dist-"));
+  skill(packageRoot, "0.1.0");
+  const previousCwd = process.cwd();
+  const stray = mkdtempSync(join(tmpdir(), "gd-install-stray-"));
+  try {
+    process.chdir(stray);
+    const options = parseInstallArgs([], { installedRoot: packageRoot });
+    assert.equal(options.source, resolve(packageRoot));
+    assert.notEqual(options.source, resolve(stray, "dist", "github-delivery"));
+    assert.equal(options.sourceExplicit, false);
+  } finally {
+    process.chdir(previousCwd);
+  }
+});
+
+test("packaged dist wins over the bundle root when it exists", () => {
+  const packageRoot = mkdtempSync(join(tmpdir(), "gd-install-with-dist-"));
+  skill(packageRoot, "0.1.0");
+  const packaged = join(packageRoot, "dist", "github-delivery");
+  skill(packaged, "0.1.0");
+  const options = parseInstallArgs([], { installedRoot: packageRoot });
+  assert.equal(options.source, resolve(packaged));
+});
+
+test("explicit --source does not fall back when the path is missing", () => {
+  const packageRoot = mkdtempSync(join(tmpdir(), "gd-install-explicit-source-"));
+  skill(packageRoot, "0.1.0");
+  const source = resolve(packageRoot, "custom-source");
+  const options = parseInstallArgs(["--source", source], { installedRoot: packageRoot });
+  assert.equal(options.source, source);
+  assert.equal(options.sourceExplicit, true);
+});
+
 test("plans a new install without mutating the target", () => {
   const root = mkdtempSync(join(tmpdir(), "github-delivery-install-test-"));
   const source = join(root, "source");
