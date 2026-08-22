@@ -140,6 +140,20 @@ test("autonomous mode still requires exact text for human replies", () => {
   assert.equal(allowed.allowed, true);
 });
 
+test("autonomous merge, close, and delete still require explicit instruction", () => {
+  for (const action of ["merge_pr", "close_pr", "delete_head_branch"]) {
+    const denied = authorizeMutation({ mode: "autonomous", action });
+    const allowed = authorizeMutation({
+      mode: "autonomous",
+      action,
+      explicitInstruction: true,
+    });
+    assert.equal(denied.allowed, false, action);
+    assert.equal(denied.reason, "explicit_instruction_required", action);
+    assert.equal(allowed.allowed, true, action);
+  }
+});
+
 test("extracts mutation flags without leaking them to another parser", () => {
   const result = extractMutationModeArgs([
     "OWNER/REPO",

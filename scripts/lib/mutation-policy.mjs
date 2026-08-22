@@ -103,12 +103,10 @@ function buildProfile(mode) {
       "change_draft_state",
       "request_reviewers",
       "close_linked_issue",
-      "close_pr",
-      "merge_pr",
       "retarget_pr",
-      "delete_head_branch",
       "create_follow_up_issue",
     ]);
+    allow(profile, ["close_pr", "merge_pr", "delete_head_branch"], { explicit: true });
   }
   return profile;
 }
