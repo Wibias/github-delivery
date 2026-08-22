@@ -82,3 +82,16 @@ test("material non-local risk names and proves a safety invariant", () => {
   assert.match(reviews, /references\/safety-invariant\.md/);
   assert.match(bugHunt, /references\/safety-invariant\.md/);
 });
+
+test("behavioural eval docs do not show an in-pack trace in the run example", () => {
+  const docs = read("references/behavioural-evaluations.md");
+  const runSection = docs.split("## Run evidence schema")[1]?.split("## Compare")[0] ?? "";
+  assert.match(runSection, /transcriptsSha256/);
+  assert.match(runSection, /<run>\.transcript\.json/);
+  const fences = [...runSection.matchAll(/```json\r?\n([\s\S]*?)```/g)].map((match) => match[1]);
+  assert.ok(fences.length >= 1, "expected a JSON example in the run schema section");
+  for (const fence of fences) {
+    assert.doesNotMatch(fence, /"trace"\s*:/);
+  }
+  assert.match(docs, /Each run file must not embed `trace` objects/);
+});
