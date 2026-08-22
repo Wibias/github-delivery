@@ -32,3 +32,27 @@ test("direct present-tense merge authority remains explicit", () => {
   assert.equal(route?.mutationMode, "maintainer");
   assert.ok(route?.explicitActions.includes("merge_pr"));
 });
+
+test("merge-it and ship-it prefixes still require explicit merge intent", () => {
+  for (const prompt of [
+    "merge it only after I confirm",
+    "merge it only after I confirm PR #42",
+    "ship it only after I confirm",
+    "merge it after asking me",
+    "ship it, but do not merge PR #42",
+  ]) {
+    assert.equal(hasExplicitMergeIntent(prompt), false, prompt);
+    const route = routeShippingGithubPrompt(prompt);
+    assert.notEqual(route?.workflow, "references/merge-pr.md", prompt);
+    assert.ok(!route?.explicitActions?.includes("merge_pr"), prompt);
+  }
+});
+
+test("bare merge it and ship it remain merge-pr", () => {
+  for (const prompt of ["merge it", "ship it"]) {
+    assert.equal(hasExplicitMergeIntent(prompt), true, prompt);
+    const route = routeShippingGithubPrompt(prompt);
+    assert.equal(route?.workflow, "references/merge-pr.md", prompt);
+    assert.ok(route?.explicitActions.includes("merge_pr"), prompt);
+  }
+});
