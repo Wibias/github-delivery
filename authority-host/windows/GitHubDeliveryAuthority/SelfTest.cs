@@ -196,7 +196,8 @@ internal static class SelfTest
 
             Assert(store.TryGetActivePrSession(repo, branch, 12, now + 301) is null, "expired PR session remained active");
             Assert(store.RecordExpiredPrSessions(now + 301) == 1, "expired PR session was not audited");
-            Assert(store.RecordExpiredPrSessions(now + 302) == 0, "expired PR session audit duplicated");
+            Assert(store.RecordExpiredPrSessions(now + 302) == 1, "expired push-only PR session was not audited");
+            Assert(store.RecordExpiredPrSessions(now + 303) == 0, "expired PR session audit duplicated");
             Console.WriteLine("pr_session_expiry");
 
             var revoke = store.CreatePrSession(repo, "feature/revoke-session", 44, now + 2, 15);
