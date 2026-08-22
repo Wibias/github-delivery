@@ -9,6 +9,7 @@ import { authorizeMutation } from "./mutation-policy.mjs";
 import { evaluateHeadBranchCleanup } from "./merge-branch-cleanup.mjs";
 import { classifyMergeOutcome, readMergeState } from "./merge-outcome.mjs";
 import { boundedSpawnSync } from "./subprocess-policy.mjs";
+import { graphqlCliField } from "./graphql-cli-fields.mjs";
 
 const PR_ACTIONS = new Set([
   "post_review",
@@ -204,7 +205,7 @@ function commandFor(request) {
         "-f",
         "query=mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{id isResolved}}}",
         "-F",
-        `id=${required(request.threadId, "thread_id")}`,
+        `id=${graphqlCliField(required(request.threadId, "thread_id"), "thread_id")}`,
       ];
     case "change_draft_state":
       return request.ready === false
@@ -374,7 +375,7 @@ function verifyHead({ request, runner }) {
 
 function verifyReviewThreadTarget({ request, runner }) {
   if (!REVIEW_THREAD_ACTIONS.has(request.action)) return null;
-  const threadId = required(request.threadId, "thread_id");
+  const threadId = graphqlCliField(required(request.threadId, "thread_id"), "thread_id");
   const query = `query($id:ID!){node(id:$id){... on PullRequestReviewThread{id isResolved repository{nameWithOwner} pullRequest{number headRefOid} comments(first:1){nodes{author{login}}}}}}`;
   const payload = parseJson(
     runOrThrow(runner, [

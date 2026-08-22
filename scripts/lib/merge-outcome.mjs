@@ -1,3 +1,5 @@
+import { graphqlCliField } from "./graphql-cli-fields.mjs";
+
 function required(value, name) {
   if (value === undefined || value === null || value === "") {
     throw new Error(`${name}_required`);
@@ -76,9 +78,9 @@ export function readMergeState({ request, runner }) {
       "-f",
       `query=${query}`,
       "-F",
-      `owner=${owner}`,
+      `owner=${graphqlCliField(owner, "owner")}`,
       "-F",
-      `name=${name}`,
+      `name=${graphqlCliField(name, "name")}`,
       "-F",
       `number=${pr}`,
     ]),
