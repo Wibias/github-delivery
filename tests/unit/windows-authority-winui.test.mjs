@@ -18,6 +18,12 @@ test("authority host is unpackaged self-contained WinUI 3, not WinForms", () => 
   assert.doesNotMatch(project, /UseWindowsForms/);
 });
 
+test("Windows-targeted project allows restore on non-Windows runners", () => {
+  const project = read(`${root}/GitHubDeliveryAuthority.csproj`);
+  assert.match(project, /<TargetFramework>net8\.0-windows10\.0\.22000\.0<\/TargetFramework>/);
+  assert.match(project, /<EnableWindowsTargeting>true<\/EnableWindowsTargeting>/);
+});
+
 test("unpackaged publish carries compiled XAML and a root PRI resource index", () => {
   const project = read(`${root}/GitHubDeliveryAuthority.csproj`);
   const workflow = read(".github/workflows/ci.yml");
