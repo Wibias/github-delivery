@@ -6,6 +6,7 @@ import {
   issueCreationActionForPrompt,
   routeShippingGithubPrompt,
 } from "../../scripts/lib/skill-router.mjs";
+import { authorizeMutation } from "../../scripts/lib/mutation-policy.mjs";
 
 test("routes a natural-language merge request to the merge workflow", () => {
   assert.deepEqual(routeShippingGithubPrompt("merge PR #32"), {
@@ -250,6 +251,26 @@ test("routes status and watch requests without granting mutation authority", () 
     routeShippingGithubPrompt("watch PR #77 until it merges or needs me").mutationMode,
     "read-only",
   );
+});
+
+test("watch auto-fix and autonomously do not grant merge, close, or delete", () => {
+  for (const prompt of [
+    "watch PR #32 auto-fix",
+    "babysit PR #32 and auto-fix",
+    "monitor PR #32 auto-fix the bots",
+    "keep an eye on PR #32 auto-fix",
+    "watch PR #32 autonomously",
+  ]) {
+    const route = routeShippingGithubPrompt(prompt);
+    assert.equal(route.workflow, "references/watch-pr.md", prompt);
+    assert.ok(!route.explicitActions?.includes("merge_pr"), prompt);
+    assert.ok(!route.explicitActions?.includes("close_pr"), prompt);
+    assert.ok(!route.explicitActions?.includes("delete_head_branch"), prompt);
+    for (const action of ["merge_pr", "close_pr", "delete_head_branch"]) {
+      const decision = authorizeMutation({ mode: route.mutationMode, action });
+      assert.equal(decision.allowed, false, `${prompt} ${action}`);
+    }
+  }
 });
 
 test("routes fix-and-merge-ready to the maintainer workflow", () => {
