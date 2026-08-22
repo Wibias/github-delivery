@@ -4,6 +4,10 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- Durable GitHub prose now deletes chatbot phrases, process narration, puffery, and `not just X, but Y` crutches. It still must not add personality, score "sounds human," or ban em dashes, and it still cannot strengthen `unknown` / `blocked` evidence states.
+
 ### Fixed
 
 - Automatic NuGet dependency submission can restore the Windows Authority host on Linux by setting `EnableWindowsTargeting`, so GitHub's hosted `submit-nuget` job no longer fails with NETSDK1100.
