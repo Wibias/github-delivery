@@ -1,3 +1,7 @@
+import { createHash } from "node:crypto";
+
+import { canonicalJson } from "./authority-scope.mjs";
+
 function asArray(value, field) {
   if (!Array.isArray(value)) throw new TypeError(`${field} must be an array`);
   return value;
@@ -36,8 +40,28 @@ export function validateBehaviouralCase(item) {
   return true;
 }
 
-function requireTrace(result) {
-  const trace = result.trace;
+export function hashBehaviouralTranscripts(transcripts) {
+  if (!transcripts || typeof transcripts !== "object" || Array.isArray(transcripts)) {
+    throw new TypeError("behavioural transcripts must be an object");
+  }
+  return createHash("sha256").update(canonicalJson(transcripts), "utf8").digest("hex");
+}
+
+export function attachTranscriptProvenance(run, transcripts) {
+  return {
+    ...run,
+    provenance: {
+      kind: "github-delivery/behavioural-transcript",
+      transcriptsSha256: hashBehaviouralTranscripts(transcripts),
+    },
+  };
+}
+
+function requireTrace(result, transcripts) {
+  if (result.trace !== undefined) {
+    throw new TypeError(`${result.caseId}.in_pack_trace`);
+  }
+  const trace = transcripts?.[result.caseId];
   if (!trace || typeof trace !== "object" || Array.isArray(trace)) {
     throw new TypeError(`${result.caseId}.trace required`);
   }
@@ -95,8 +119,8 @@ function assertSummaryMatchesTrace(result, observed) {
   }
 }
 
-export function observedBehaviouralEvidence(result) {
-  const trace = requireTrace(result);
+export function observedBehaviouralEvidence(result, transcripts) {
+  const trace = requireTrace(result, transcripts);
   const observed = {
     findings: findingIds(trace.findings),
     actions: observedActionNames(trace),
@@ -107,21 +131,32 @@ export function observedBehaviouralEvidence(result) {
   return observed;
 }
 
-export function validateBehaviouralRun(run, casesById) {
+export function validateBehaviouralRun(run, casesById, transcripts) {
   if (!run || typeof run !== "object" || Array.isArray(run)) throw new TypeError("behavioural run must be an object");
   if (!run.model || typeof run.model !== "string") throw new TypeError("behavioural run requires model");
   if (!run.host || typeof run.host !== "string") throw new TypeError("behavioural run requires host");
   if (!run.variant || typeof run.variant !== "string") throw new TypeError("behavioural run requires variant");
   asArray(run.results, "run.results");
+  if (!transcripts || typeof transcripts !== "object" || Array.isArray(transcripts)) {
+    throw new TypeError("behavioural transcripts required");
+  }
+  if (run.provenance?.kind !== "github-delivery/behavioural-transcript") {
+    throw new TypeError("behavioural run provenance required");
+  }
+  const expectedHash = hashBehaviouralTranscripts(transcripts);
+  if (run.provenance.transcriptsSha256 !== expectedHash) {
+    throw new TypeError("behavioural_transcript_hash_mismatch");
+  }
   const seen = new Set();
   for (const result of run.results) {
     if (!result?.caseId || typeof result.caseId !== "string") throw new TypeError("run result requires caseId");
     if (!casesById.has(result.caseId)) throw new TypeError(`run references unknown case ${result.caseId}`);
     if (seen.has(result.caseId)) throw new TypeError(`duplicate run result ${result.caseId}`);
     seen.add(result.caseId);
+    if (result.trace !== undefined) throw new TypeError(`${result.caseId}.in_pack_trace`);
   }
   for (const result of run.results) {
-    observedBehaviouralEvidence(result);
+    observedBehaviouralEvidence(result, transcripts);
   }
   return true;
 }
@@ -130,13 +165,13 @@ function findingIds(findings) {
   return unique((findings ?? []).map((finding) => typeof finding === "string" ? finding : finding?.id).filter(Boolean));
 }
 
-export function scoreBehaviouralRun(cases, run) {
+export function scoreBehaviouralRun(cases, run, transcripts) {
   const casesById = new Map(cases.map((item) => {
     validateBehaviouralCase(item);
     return [item.id, item];
   }));
   if (casesById.size !== cases.length) throw new TypeError("behavioural case ids must be unique");
-  validateBehaviouralRun(run, casesById);
+  validateBehaviouralRun(run, casesById, transcripts);
 
   const resultsByCase = new Map(run.results.map((result) => [result.caseId, result]));
   const perCase = [];
@@ -165,7 +200,7 @@ export function scoreBehaviouralRun(cases, run) {
       continue;
     }
 
-    const observed = observedBehaviouralEvidence(result);
+    const observed = observedBehaviouralEvidence(result, transcripts);
     const predicted = asSet(observed.findings);
     const required = asSet(item.requiredFindings ?? []);
     const forbiddenFindings = asSet(item.forbiddenFindings ?? []);
