@@ -48,3 +48,21 @@ test("release installer does not persist authority overrides in the user environ
 
   assert.doesNotMatch(releaseInstaller, /SetEnvironmentVariable\(/);
 });
+
+test("release installer stages the new tree before stopping a healthy broker", () => {
+  const installer = read("authority-host/windows/install-release.ps1");
+  const copyAt = installer.indexOf("Copy-Item (Join-Path $SourceDir '*') $stagingDir");
+  const stopAt = installer.indexOf("Stop-Process -Id $process.Id -Force");
+  assert.notEqual(copyAt, -1);
+  assert.notEqual(stopAt, -1);
+  assert.ok(copyAt < stopAt, "Stop-Process must run only after the staging copy succeeds");
+});
+
+test("release installer restarts the previous broker if cutover fails after stop", () => {
+  const installer = read("authority-host/windows/install-release.ps1");
+  assert.match(installer, /\$previousExe/);
+  assert.match(
+    installer,
+    /catch\s*\{[\s\S]*Start-Process \$previousExe[\s\S]*throw/,
+  );
+});
