@@ -54,24 +54,47 @@ $targetDir = Join-Path $appRoot ('v' + $ExpectedVersion)
 $stagingDir = Join-Path $appRoot ('.staging-' + [guid]::NewGuid().ToString('N'))
 
 $installRootPrefix = $InstallDir.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
-$installedProcesses = Get-Process -Name 'GitHubDeliveryAuthority' -ErrorAction SilentlyContinue | Where-Object {
+$recordPath = Join-Path $InstallDir 'authority-host-install.json'
+$previousExe = $null
+if (Test-Path $recordPath -PathType Leaf) {
     try {
-        $processPath = $_.Path
-        if (-not $processPath) { return $false }
-        [IO.Path]::GetFullPath($processPath).StartsWith($installRootPrefix, [StringComparison]::OrdinalIgnoreCase)
+        $previousRecord = Get-Content $recordPath -Raw | ConvertFrom-Json
+        if ($previousRecord.appDir) {
+            $candidate = [IO.Path]::Combine(
+                $InstallDir,
+                ($previousRecord.appDir -replace '/', [string][char][IO.Path]::DirectorySeparatorChar),
+                'GitHubDeliveryAuthority.exe'
+            )
+            if (Test-Path $candidate -PathType Leaf) { $previousExe = $candidate }
+        }
     }
-    catch { $false }
+    catch { }
 }
-foreach ($process in $installedProcesses) {
-    Stop-Process -Id $process.Id -Force
-    Wait-Process -Id $process.Id -ErrorAction SilentlyContinue
+if (-not $previousExe) {
+    $legacyExe = Join-Path $InstallDir 'GitHubDeliveryAuthority.exe'
+    if (Test-Path $legacyExe -PathType Leaf) { $previousExe = $legacyExe }
 }
 
+$stoppedBroker = $false
 try {
     New-Item -ItemType Directory -Force -Path $stagingDir | Out-Null
     Copy-Item (Join-Path $SourceDir '*') $stagingDir -Recurse -Force
     $stagedExe = Join-Path $stagingDir 'GitHubDeliveryAuthority.exe'
     if (-not (Test-Path $stagedExe -PathType Leaf)) { throw 'Staged Authority executable is missing.' }
+
+    $installedProcesses = Get-Process -Name 'GitHubDeliveryAuthority' -ErrorAction SilentlyContinue | Where-Object {
+        try {
+            $processPath = $_.Path
+            if (-not $processPath) { return $false }
+            [IO.Path]::GetFullPath($processPath).StartsWith($installRootPrefix, [StringComparison]::OrdinalIgnoreCase)
+        }
+        catch { $false }
+    }
+    foreach ($process in $installedProcesses) {
+        Stop-Process -Id $process.Id -Force
+        Wait-Process -Id $process.Id -ErrorAction SilentlyContinue
+        $stoppedBroker = $true
+    }
 
     if (Test-Path $targetDir) {
         Remove-Item $targetDir -Recurse -Force
@@ -95,7 +118,6 @@ try {
         appDir = ('app/v' + $ExpectedVersion)
         installedAt = [DateTimeOffset]::UtcNow.ToString('o')
     }
-    $recordPath = Join-Path $InstallDir 'authority-host-install.json'
     $recordTemp = $recordPath + '.' + [guid]::NewGuid().ToString('N') + '.tmp'
     $recordJson = ($installRecord | ConvertTo-Json) + [Environment]::NewLine
     [IO.File]::WriteAllText($recordTemp, $recordJson, $utf8NoBom)
@@ -110,6 +132,12 @@ try {
         Start-Process $installedExe
     }
     Write-Host "Installed GitHub Delivery Authority $ExpectedVersion to $targetDir"
+}
+catch {
+    if ($stoppedBroker -and -not $SkipStart -and $previousExe -and (Test-Path $previousExe -PathType Leaf)) {
+        Start-Process $previousExe
+    }
+    throw
 }
 finally {
     if (Test-Path $stagingDir) { Remove-Item $stagingDir -Recurse -Force -ErrorAction SilentlyContinue }
