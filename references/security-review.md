@@ -36,7 +36,7 @@ Do **not** merge unless asked.
 
 ## Public vs chat (mandatory)
 
-Follow **Public security disclosure** in `shared-rules.md`. Private GHSA / advisory IDs: chat-only detail; public posts redacted.
+Follow **GD-REVIEW-009** in `references/policy/reviews.md`. Private GHSA / advisory IDs: chat-only detail; public posts redacted.
 
 **Chat (to the user):** full findings — severity, **confidence**, affected code, impact, abuse/repro path, fix, verification. Include completed **coverage matrix** + scope script output summary.
 
@@ -90,7 +90,7 @@ Issue-only (no PR): derive surfaces manually from implicated paths using the sam
 <!-- /assertion-anchors -->
 
 1. Checkout PR head (shared **Subagent preflight** — checkout rules still apply; bugbot may use them separately).
-2. Review **branch changes vs PR base** in this session (parent), **or** one **general-purpose** subagent whose prompt says: follow `github-delivery` `references/security-review.md` + shared-rules for this PR — **never** `subagent_type: "security-review"`.
+2. Review **branch changes vs PR base** in this session (parent), **or** one **general-purpose** subagent whose prompt says: follow `github-delivery` `references/security-review.md` and the workflow's declared policy modules for this PR — **never** `subagent_type: "security-review"`.
 3. Load personal skill **`security-review`** (category checklist / `<security-review>/references/security-checks.md`) when available — that is a knowledge skill, not the Cursor harness launcher.
 4. If scope says `requireAiAgentSecurity`: load **`ai-agent-security`** and apply its decision tree to touched LLM/tool/MCP/RAG paths (**defensive** controls only).
 5. If scope says `requireAgenticSkillsTop10`: also load **`references/agentic-skills-top10.md`** and complete the AST01–AST10 matrix for skill/MCP install files.

@@ -20,7 +20,7 @@ Prefer reporting **nothing worth simplifying** over manufacturing edits.
 
 ## Authority and scope
 
-- Read `references/shared-rules.md` before acting.
+- Load only the policy modules declared above.
 - Read `references/refactor-contract-card.md` before proposing or applying non-trivial candidates.
 - Use `references/minimal-solution.md` when evaluating an equivalent replacement so repository reuse, standard library/runtime, native platform behavior, or an already-installed dependency is considered before new custom structure.
 - Inspect the PR comparison plus only the directly necessary adjacent code needed to prove equivalence.

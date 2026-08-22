@@ -16,7 +16,7 @@ Policy modules:
 
 Use this workflow only when the user explicitly combines a merge request with work that must happen before the merge, such as review, full review, addressing review feedback, or safe simplification.
 
-Read `references/shared-rules.md` first. The explicit merge request authorizes the final merge step only after every requested preparation phase has completed successfully; it does not waive any gate or authorize unrelated code changes.
+Load only the policy modules declared above. The explicit merge request authorizes the final merge step only after every requested preparation phase has completed successfully; it does not waive any gate or authorize unrelated code changes.
 
 ## 1. Lock the target
 

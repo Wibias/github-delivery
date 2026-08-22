@@ -17,7 +17,7 @@ Report merge readiness **using the same bar as merge-ready / full-review** — w
 
 ## Steps
 
-1. Load PR `#N` with the **Final evidence sweep** inputs from `shared-rules.md` (read-only — do not update base or push):
+1. Load PR `#N` with the **Final evidence sweep** inputs from `references/policy/evidence.md` and `references/policy/ci.md` (read-only — do not update base or push):
    - draft/WIP/do-not-merge gates
    - behind-base / conflicts / `mergeStateStatus`
    - head SHA + whether it is tip-fresh (note if behind — do **not** claim merge-ready)
