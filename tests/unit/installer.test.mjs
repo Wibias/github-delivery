@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import test from "node:test";
 
 import { parseInstallArgs } from "../../scripts/install-skill.mjs";
@@ -399,6 +399,67 @@ test("restore keeps the live target if the backup cannot be swapped in", () => {
     }),
     /injected backup swap failure/,
   );
+  assert.equal(readFileSync(join(target, "marker.txt"), "utf8"), "new");
+});
+
+test("recover completes a crash after restore moves the live target aside", () => {
+  const root = mkdtempSync(join(tmpdir(), "github-delivery-install-test-"));
+  const source = join(root, "source");
+  const target = join(root, "target");
+  const backups = join(root, "backups");
+  skill(source, "0.2.0", "new");
+  skill(target, "0.1.0", "old");
+  const receipt = applyInstallation({ source, target, backupRoot: backups });
+
+  assert.throws(
+    () => restoreBackup({
+      backup: receipt.backupPath,
+      target,
+      restoreOnFailure: false,
+      renameSync(from, to) {
+        renameSync(from, to);
+        if (resolve(from) === resolve(target)) {
+          throw new Error("injected crash after restore aside");
+        }
+      },
+    }),
+    /injected crash after restore aside/,
+  );
+  assert.equal(existsSync(target), false);
+
+  const recovered = recoverInterruptedInstallation({ target });
+  assert.equal(recovered.recovered, true);
+  assert.equal(readFileSync(join(target, "marker.txt"), "utf8"), "old");
+});
+
+test("recover survives a truncated journal after displace", () => {
+  const root = mkdtempSync(join(tmpdir(), "github-delivery-install-test-"));
+  const source = join(root, "source");
+  const target = join(root, "target");
+  const backups = join(root, "backups");
+  skill(source, "0.2.0", "new");
+  skill(target, "0.1.0", "old");
+
+  assert.throws(
+    () => applyInstallation({
+      source,
+      target,
+      backupRoot: backups,
+      restoreOnFailure: false,
+      renameSync(from, to) {
+        renameSync(from, to);
+        if (resolve(from) === resolve(target)) {
+          writeFileSync(join(dirname(target), `.github-delivery-install-journal-${basename(target)}`), "{");
+          throw new Error("injected crash during journal update");
+        }
+      },
+    }),
+    /injected crash during journal update/,
+  );
+  assert.equal(existsSync(target), false);
+
+  const recovered = recoverInterruptedInstallation({ target });
+  assert.equal(recovered.recovered, true);
   assert.equal(readFileSync(join(target, "marker.txt"), "utf8"), "new");
 });
 
