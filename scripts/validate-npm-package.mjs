@@ -22,6 +22,7 @@ const RUNTIME_FILES = [
   "scripts/lib/bootstrap-install.mjs",
   "scripts/lib/bootstrap-maintenance.mjs",
   "scripts/lib/distribution.mjs",
+  "scripts/lib/install-lock.mjs",
   "scripts/lib/release-self-update.mjs",
   "scripts/lib/subprocess-policy.mjs",
   "scripts/lib/release-zip.mjs",

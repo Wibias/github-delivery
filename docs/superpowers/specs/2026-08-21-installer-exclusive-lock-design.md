@@ -17,7 +17,7 @@ Take an exclusive `wx` lock beside the mutation root before planning-and-applyin
 
 Write a fence token (`pid` + random bytes). On `EEXIST` (or Windows `EPERM` for an existing lock), throw `install_lock_held`. Unlink in `finally` only when the file still contains our token. Re-plan the skill install after the lock is held.
 
-Do not wait. Do not steal stale locks in this change. Do not lock `hooks.json`.
+Ship `scripts/lib/install-lock.mjs` on the npm bootstrap allowlist so packed installs can import it. Do not wait. Do not steal stale locks in this change. Do not lock `hooks.json`.
 
 ## Tests
 
