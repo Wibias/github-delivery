@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { attachAuthorityGrants } from "./authority-batch.mjs";
 import { refreshExpectedHeads } from "./authority-head-refresh.mjs";
 import { authorizeBatchSync } from "./authority-host-client.mjs";
+import { canonicalJson } from "./authority-scope.mjs";
 import {
   authorityRuntimeEnvironment,
   executeMutationWithAuthority,
@@ -24,24 +25,9 @@ function sha256(value) {
 export function mutationOperationKey(request = {}) {
   const idempotencyKey = String(request?.idempotencyKey || "").trim();
   if (idempotencyKey) return idempotencyKey;
-  return `payload:${sha256(JSON.stringify({
-    action: request.action ?? null,
-    repo: request.repo ?? null,
-    pr: request.pr ?? null,
-    issue: request.issue ?? null,
-    expectedHead: request.expectedHead ?? null,
-    expectedBase: request.expectedBase ?? null,
-    expectedBaseOid: request.expectedBaseOid ?? null,
-    commentId: request.commentId ?? null,
-    threadId: request.threadId ?? null,
-    remote: request.remote ?? null,
-    branch: request.branch ?? null,
-    expectedRemoteTip: request.expectedRemoteTip ?? null,
-    newTip: request.newTip ?? null,
-    title: request.title ?? null,
-    body: request.body ?? null,
-    assignee: request.assignee ?? null,
-  }))}`;
+  const payload = plainObject(request) ? { ...request } : {};
+  delete payload.authorityGrant;
+  return `payload:${sha256(canonicalJson(payload))}`;
 }
 
 function cloneRequests(requests) {

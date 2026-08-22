@@ -240,6 +240,89 @@ test("retries skip operations that already completed", () => {
   assert.equal(result.partialFailure, false);
 });
 
+test("retargets that differ only in newBase do not share a skip identity", () => {
+  const executed = [];
+  const base = request("retarget_pr", {
+    pr: 42,
+    expectedHead: "a".repeat(40),
+    expectedBase: "feature",
+  });
+  const result = executeMutationDocument({
+    document: [
+      { ...base, newBase: "main" },
+      { ...base, newBase: "dev" },
+    ],
+    execute: false,
+    dependencies: {
+      mutationRequiresTrustedAuthority: () => false,
+      executeMutationWithAuthority({ request: current }) {
+        executed.push(current.newBase);
+        return { action: current.action, status: "succeeded" };
+      },
+    },
+  });
+  assert.deepEqual(executed, ["main", "dev"]);
+  assert.equal(result.results[1].status, "succeeded");
+  assert.notEqual(result.results[0].operationKey, result.results[1].operationKey);
+});
+
+test("reviewer lists and draft flags that differ still execute", () => {
+  const executed = [];
+  const reviewers = request("request_reviewers", {
+    pr: 42,
+    expectedHead: "a".repeat(40),
+  });
+  const draft = request("change_draft_state", {
+    pr: 42,
+    expectedHead: "a".repeat(40),
+  });
+  const result = executeMutationDocument({
+    document: [
+      { ...reviewers, reviewers: ["alice"] },
+      { ...reviewers, reviewers: ["bob"] },
+      { ...draft, draft: true },
+      { ...draft, draft: false },
+    ],
+    execute: false,
+    dependencies: {
+      mutationRequiresTrustedAuthority: () => false,
+      executeMutationWithAuthority({ request: current }) {
+        executed.push(current.reviewers ?? current.draft);
+        return { action: current.action, status: "succeeded" };
+      },
+    },
+  });
+  assert.deepEqual(executed, [["alice"], ["bob"], true, false]);
+  assert.equal(new Set(result.results.map((entry) => entry.operationKey)).size, 4);
+});
+
+test("identical payloads still skip and authority grants are not part of the key", () => {
+  const executed = [];
+  const base = request("retarget_pr", {
+    pr: 42,
+    expectedHead: "a".repeat(40),
+    expectedBase: "feature",
+    newBase: "main",
+  });
+  const result = executeMutationDocument({
+    document: [
+      { ...base, authorityGrant: "gd1.first" },
+      { ...base, authorityGrant: "gd1.second" },
+    ],
+    execute: false,
+    dependencies: {
+      mutationRequiresTrustedAuthority: () => false,
+      executeMutationWithAuthority({ request: current }) {
+        executed.push(current.authorityGrant);
+        return { action: current.action, status: "succeeded" };
+      },
+    },
+  });
+  assert.deepEqual(executed, ["gd1.first"]);
+  assert.equal(result.results[1].status, "already_applied");
+  assert.equal(result.results[0].operationKey, result.results[1].operationKey);
+});
+
 test("execution validates every request before prompting for authority", () => {
   let authorized = false;
   let executed = false;

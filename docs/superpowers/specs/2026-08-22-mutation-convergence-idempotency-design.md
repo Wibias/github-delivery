@@ -12,16 +12,21 @@ Three leftover holes from the same convergence root cause:
 2. Stale autonomous-claim recovery re-reads the ref SHA and then DELETEs by name. A newer recovered claim can be deleted if the SHA changed after the age check.
 3. `push_code` treats a timed-out or signal-killed `git push` as a clean failure without re-reading the remote tip, so an uncertain success cannot converge.
 
+The payload hash must include every broker-load-bearing field. A subset that omits `newBase`, `reviewers`, or `draft` lets two different mutations share a skip identity.
+
 This does not reopen first-wave 004 (replay snapshot identity) or 003/009/011.
 
 ## Approach
 
-1. Operation keys prefer `idempotencyKey`. Otherwise they hash the mutation payload. Never use `action:repo:pr`.
+1. Operation keys prefer `idempotencyKey`. Otherwise they hash the canonical mutation payload, excluding only `authorityGrant`. Never use `action:repo:pr` or a field subset that omits broker-load-bearing values such as `newBase`, `reviewers`, or `draft`.
 2. Before deleting a stale claim, re-read SHA and created-at. If either shows a newer claim, fail closed and do not DELETE.
 3. If `git push` returns a null status or signal, `ls-remote` the branch. Match `newTip` → reconcile success; match the previous tip → original failure; anything else → `push_outcome_unknown`.
 
 ## Tests
 
 - Two `push_code` payloads without idempotency keys do not share a skip identity.
+- Two `retarget_pr` payloads that differ only in `newBase` both execute.
+- Reviewer lists and draft flags that differ do not share a skip identity.
+- Identical payloads still skip; `authorityGrant` is not part of the key.
 - A SHA or freshness change before stale-claim DELETE does not delete.
 - A timed-out push whose remote already shows `newTip` is reconciled, not retried as a lease failure.
