@@ -2,8 +2,18 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 
+import { boundedSpawnSync } from "./subprocess-policy.mjs";
+import { validateSpdx23Document } from "./spdx-23-validate.mjs";
+
+const SYNTHETIC_CREATED = "1980-01-01T00:00:00Z";
+const PACKAGE_SPDXID = "SPDXRef-Package-github-delivery";
+
 function sha256(buffer) {
   return createHash("sha256").update(buffer).digest("hex");
+}
+
+function sha1(buffer) {
+  return createHash("sha1").update(buffer).digest("hex");
 }
 
 function requireVersion(version) {
@@ -104,8 +114,33 @@ export function verifyDistribution({ dist, version, sourceCommit }) {
   return { valid: true, manifest, artifacts: expectedNames.filter((name) => name !== "manifest.json") };
 }
 
+export function resolveSpdxCreated(value) {
+  const raw = String(value || "").trim();
+  if (!raw) throw new Error("spdx_created_missing");
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) throw new Error("spdx_created_invalid");
+  const created = date.toISOString().replace(/\.\d{3}Z$/, "Z");
+  if (created === SYNTHETIC_CREATED) throw new Error("spdx_created_synthetic");
+  if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$/.test(created)) {
+    throw new Error("spdx_created_invalid");
+  }
+  return created;
+}
+
+export function readGitCommitCreated(sourceCommit, { cwd, spawn } = {}) {
+  requireCommit(sourceCommit);
+  const result = boundedSpawnSync(
+    "git",
+    ["show", "-s", "--format=%cI", sourceCommit],
+    { cwd, encoding: "utf8" },
+    spawn ? { spawn } : {},
+  );
+  if (result.status !== 0) throw new Error("spdx_created_unavailable");
+  return resolveSpdxCreated(String(result.stdout || "").trim().split(/\r?\n/, 1)[0]);
+}
+
 function artifactFiles(dist) {
-  return readdirSync(dist)
+  const files = readdirSync(dist)
     .filter((name) => /\.(?:zip|tar\.gz)$/.test(name))
     .sort()
     .map((name, index) => {
@@ -113,43 +148,62 @@ function artifactFiles(dist) {
       return {
         SPDXID: `SPDXRef-File-${index + 1}`,
         fileName: name,
-        checksums: [{ algorithm: "SHA256", checksumValue: sha256(content) }],
+        checksums: [
+          { algorithm: "SHA256", checksumValue: sha256(content) },
+          { algorithm: "SHA1", checksumValue: sha1(content) },
+        ],
       };
     });
+  if (files.length === 0) throw new Error("release artifacts missing");
+  return files;
 }
 
-export function createSpdxSbom({ dist, version, sourceCommit }) {
+export function createSpdxSbom({ dist, version, sourceCommit, created }) {
   dist = resolve(dist);
   version = requireVersion(version);
-  if (!/^[0-9a-f]{40}$/i.test(sourceCommit || "")) throw new Error("source commit must be a 40-character SHA");
+  sourceCommit = requireCommit(sourceCommit);
+  created = resolveSpdxCreated(created);
   const files = artifactFiles(dist);
-  return {
+  const verification = createHash("sha1")
+    .update(files.map((file) => file.checksums.find((entry) => entry.algorithm === "SHA1").checksumValue).sort().join(""))
+    .digest("hex");
+  const sbom = {
     spdxVersion: "SPDX-2.3",
     dataLicense: "CC0-1.0",
     SPDXID: "SPDXRef-DOCUMENT",
     name: `github-delivery-v${version}`,
     documentNamespace: `https://github.com/Wibias/github-delivery/releases/tag/v${version}#${sourceCommit}`,
+    documentDescribes: [PACKAGE_SPDXID],
     creationInfo: {
       creators: ["Organization: Wibias", "Tool: github-delivery-release-contract/1"],
-      created: "1980-01-01T00:00:00Z",
+      created,
     },
     packages: [{
       name: "github-delivery",
-      SPDXID: "SPDXRef-Package-github-delivery",
+      SPDXID: PACKAGE_SPDXID,
       versionInfo: version,
       downloadLocation: `https://github.com/Wibias/github-delivery/releases/tag/v${version}`,
       filesAnalyzed: true,
       licenseConcluded: "MIT",
       licenseDeclared: "MIT",
-      checksums: [{ algorithm: "SHA256", checksumValue: sha256(Buffer.from(files.map((file) => file.checksums[0].checksumValue).join("\n"))) }],
+      packageVerificationCode: { packageVerificationCodeValue: verification },
     }],
     files,
-    relationships: files.map((file) => ({
-      spdxElementId: "SPDXRef-Package-github-delivery",
-      relationshipType: "CONTAINS",
-      relatedSpdxElement: file.SPDXID,
-    })),
+    relationships: [
+      {
+        spdxElementId: "SPDXRef-DOCUMENT",
+        relationshipType: "DESCRIBES",
+        relatedSpdxElement: PACKAGE_SPDXID,
+      },
+      ...files.map((file) => ({
+        spdxElementId: PACKAGE_SPDXID,
+        relationshipType: "CONTAINS",
+        relatedSpdxElement: file.SPDXID,
+      })),
+    ],
   };
+  validateSpdx23Document(sbom);
+  return sbom;
 }
 
 export function releaseNotesForVersion(changelog, version) {

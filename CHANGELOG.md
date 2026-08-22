@@ -4,6 +4,10 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- Release SBOMs now describe the package, use the source-commit created time, emit SPDX package verification codes, and fail closed against the SPDX 2.3 JSON schema.
+
 ## [0.8.7] - 2026-08-19
 
 ### Changed
