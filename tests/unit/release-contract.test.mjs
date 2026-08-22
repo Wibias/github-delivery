@@ -7,11 +7,14 @@ import test from "node:test";
 
 import {
   createSpdxSbom,
+  readGitCommitCreated,
+  resolveSpdxCreated,
   validateReleaseContext,
   validateReleaseSourceComparison,
   verifyDistribution,
   releaseNotesForVersion,
 } from "../../scripts/lib/release-contract.mjs";
+import { validateSpdx23Document } from "../../scripts/lib/spdx-23-validate.mjs";
 import { verifyReleaseSource } from "../../scripts/verify-release-source.mjs";
 
 function fixture() {
@@ -148,11 +151,96 @@ test("distribution verification binds version, source commit, and checksums", ()
 
 test("creates an SPDX 2.3 SBOM for release artifacts", () => {
   const { dist } = fixture();
-  const sbom = createSpdxSbom({ dist, version: "0.1.0", sourceCommit: "a".repeat(40) });
+  const created = "2026-08-01T12:00:00Z";
+  const sbom = createSpdxSbom({
+    dist,
+    version: "0.1.0",
+    sourceCommit: "a".repeat(40),
+    created,
+  });
+  const zip = readFileSync(join(dist, "github-delivery-v0.1.0.zip"));
+  const tar = readFileSync(join(dist, "github-delivery-v0.1.0.tar.gz"));
+  const verification = createHash("sha1")
+    .update(
+      [createHash("sha1").update(tar).digest("hex"), createHash("sha1").update(zip).digest("hex")].sort().join(""),
+    )
+    .digest("hex");
+  const syntheticChecksum = createHash("sha256")
+    .update(Buffer.from(sbom.files.map((file) => file.checksums[0].checksumValue).join("\n")))
+    .digest("hex");
+
   assert.equal(sbom.spdxVersion, "SPDX-2.3");
   assert.equal(sbom.name, "github-delivery-v0.1.0");
+  assert.deepEqual(sbom.documentDescribes, ["SPDXRef-Package-github-delivery"]);
+  assert.equal(sbom.creationInfo.created, created);
   assert.equal(sbom.packages[0].versionInfo, "0.1.0");
+  assert.equal(sbom.packages[0].packageVerificationCode.packageVerificationCodeValue, verification);
+  assert.equal(sbom.packages[0].checksums, undefined);
+  assert.notEqual(syntheticChecksum, verification);
   assert(sbom.files.some((file) => file.fileName.endsWith(".zip")));
+  assert(sbom.relationships.some((rel) => (
+    rel.spdxElementId === "SPDXRef-DOCUMENT"
+    && rel.relationshipType === "DESCRIBES"
+    && rel.relatedSpdxElement === "SPDXRef-Package-github-delivery"
+  )));
+  assert.equal(validateSpdx23Document(sbom).valid, true);
+});
+
+test("SPDX creation timestamps must be the source commit time, not the zip epoch", () => {
+  assert.equal(resolveSpdxCreated("2026-08-01T14:00:00+02:00"), "2026-08-01T12:00:00Z");
+  assert.throws(() => resolveSpdxCreated("1980-01-01T00:00:00Z"), /spdx_created_synthetic/);
+  assert.throws(() => createSpdxSbom({
+    dist: fixture().dist,
+    version: "0.1.0",
+    sourceCommit: "a".repeat(40),
+  }), /spdx_created/);
+});
+
+test("git commit created timestamps fail closed when git evidence is missing", () => {
+  assert.equal(
+    readGitCommitCreated("a".repeat(40), {
+      cwd: ".",
+      spawn() {
+        return { status: 0, stdout: "2026-08-22T07:11:00+02:00\n", stderr: "" };
+      },
+    }),
+    "2026-08-22T05:11:00Z",
+  );
+  assert.throws(() => readGitCommitCreated("a".repeat(40), {
+    cwd: ".",
+    spawn() {
+      return { status: 1, stdout: "", stderr: "fatal" };
+    },
+  }), /spdx_created_unavailable/);
+});
+
+test("SPDX validation rejects missing describes, synthetic checksums, and the zip epoch", () => {
+  const { dist } = fixture();
+  const sbom = createSpdxSbom({
+    dist,
+    version: "0.1.0",
+    sourceCommit: "a".repeat(40),
+    created: "2026-08-01T12:00:00Z",
+  });
+  const { documentDescribes: _documentDescribes, ...withoutDescribes } = sbom;
+
+  assert.throws(() => validateSpdx23Document(withoutDescribes), /documentDescribes/);
+  assert.throws(() => validateSpdx23Document({
+    ...sbom,
+    creationInfo: { ...sbom.creationInfo, created: "1980-01-01T00:00:00Z" },
+  }), /spdx_created_synthetic/);
+  assert.throws(() => validateSpdx23Document({
+    ...sbom,
+    packages: [{
+      ...sbom.packages[0],
+      checksums: [{
+        algorithm: "SHA256",
+        checksumValue: createHash("sha256")
+          .update(Buffer.from(sbom.files.map((file) => file.checksums[0].checksumValue).join("\n")))
+          .digest("hex"),
+      }],
+    }],
+  }), /spdx_package_checksum_unbound/);
 });
 
 test("extracts exact-version release notes", () => {

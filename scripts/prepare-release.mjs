@@ -4,6 +4,7 @@ import { dirname, join, resolve } from "node:path";
 
 import {
   createSpdxSbom,
+  readGitCommitCreated,
   releaseNotesForVersion,
   validateReleaseContext,
   verifyDistribution,
@@ -32,7 +33,13 @@ export function main(argv = process.argv.slice(2)) {
   const pkg = JSON.parse(readFileSync(join(options.root, "package.json"), "utf8"));
   const context = validateReleaseContext({ eventName: options.eventName, ref: options.ref, version: pkg.version });
   const verified = verifyDistribution({ dist: options.dist, version: pkg.version, sourceCommit: options.sourceCommit });
-  const sbom = createSpdxSbom({ dist: options.dist, version: pkg.version, sourceCommit: options.sourceCommit });
+  const created = readGitCommitCreated(options.sourceCommit, { cwd: options.root });
+  const sbom = createSpdxSbom({
+    dist: options.dist,
+    version: pkg.version,
+    sourceCommit: options.sourceCommit,
+    created,
+  });
   const notes = releaseNotesForVersion(readFileSync(join(options.root, "CHANGELOG.md"), "utf8"), pkg.version);
   const sbomPath = join(options.dist, "sbom.spdx.json");
   const notesPath = join(options.dist, "RELEASE_NOTES.md");
