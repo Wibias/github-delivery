@@ -20,7 +20,17 @@ Persistently monitor an open PR: new **published** review feedback, required CI,
 
 If the user asked only for **merge-ready**, use `fix-pr-bots` instead (runs until merge-ready, then stops).
 
-Do **not** merge unless they also asked to merge (then hand off to `merge-pr` only after merge-ready bar / explicit override).
+Do **not** merge unless they also asked to merge.
+
+When the routed `explicitActions` include `merge_pr` (autonomous watch-and-merge), hand off only after ship-gate is `ready` on the current head:
+
+```bash
+node "<github-delivery>/scripts/merge-pr-driver.mjs" OWNER/REPO N --mode autonomous --settle --execute
+```
+
+Never a generic `merge_pr` mutation document. Attach `pr` to every `push_code` request in this run so a PR session can start on the first Hello. Treat `policy:github_merge_state_unknown` / GitHub `UNKNOWN` as wait, not ready. Stop on a human reply that needs exact-text confirmation, a native stack, or an expired PR session / Hello denial.
+
+Attended `watch PR #N and merge it` still uses prepare-and-merge, not this loop.
 
 ## Relation to other workflows
 
@@ -128,7 +138,7 @@ On **every** poll / wake (including the first):
 6. **Then** if behind/conflicted **or** wake-gate reports `base_dirty_or_behind`: update from base, resolve or ask, push — only when the PR is ours (shared **PR ownership boundary**); on a foreign PR, tell the owner to update from the latest base and do not push the base sync. Verify compile-against-tip. Prefer combining with review fixes in the **same** push. **Never** enter the 1–2 min poll loop while `DIRTY`/`CONFLICTING`.
 7. **Then CI:** classify branch vs flake. Fix branch-related **and** pre-existing/“unrelated” required failures (minimal patch); rerun flakes (max 3 / SHA); stop on exhausted infra failures. After push: re-check stale-approval / last-push via `pr-policy-gate`.
 8. Security-offer / changelog nudge once if applicable.
-9. Only if green + mergeable + **useful threads/comments quiet** on **current** SHA **and** wake-gate exit `0`: report milestone **“CI/reviews quiet — still watching (not full merge-ready bar)”**. Do **not** post `[GD] Merge ready` from watch alone. Keep polling while open.
+9. Only if green + mergeable + **useful threads/comments quiet** on **current** SHA **and** wake-gate exit `0`: report milestone **“CI/reviews quiet — still watching (not full merge-ready bar)”**. Do **not** post `[GD] Merge ready` from watch alone. If `explicitActions` includes `merge_pr`, run `scripts/merge-pr-driver.mjs` instead of keeping the green-and-watch loop; otherwise keep polling while open.
 
 <!-- assertion-anchors -->
 <!-- assertion: no-merge-ready-from-watch-alone -->

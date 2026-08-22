@@ -12,7 +12,8 @@ const MERGE_READY_PHRASE = /\bmerge[- ]?ready\b/g;
 const NEGATED_MERGE_INTENT = /\b(?:do not|don't|dont|never|without)\s+(?:merge|merging|ship|shipping)\b/;
 const DELIBERATIVE_MERGE = /\b(?:should|can|could|would)\s+(?:i|we)\b[\s\S]*\b(?:merge|ship)\b|\b(?:why can't|why can’t|when should)\s+(?:i|we)\b[\s\S]*\b(?:merge|ship)\b|\b(?:what happens if|what if)\b[\s\S]*\b(?:merge|ship)\b|\bbefore\s+(?:i|we)\s+(?:merge|ship)\b/;
 const DEFERRED_MERGE_AUTHORITY = /\b(?:merge|ship)\b[\s\S]*\b(?:only\s+)?(?:after|when|if)\s+(?:i|we)\s+(?:later\s+)?(?:confirm|approve|say\s+so|give\s+(?:you\s+)?(?:the\s+)?go-ahead)\b|\b(?:merge|ship)\b[\s\S]*\bafter\s+(?:asking|checking\s+with)\s+me\b|\b(?:ask|check\s+with)\s+me\s+(?:again\s+)?before\s+(?:you\s+)?(?:merge|ship)\b|\b(?:wait|hold)\s+(?:for\s+)?my\s+(?:confirmation|approval)\b/;
-const ASSISTANT_MERGE_REQUEST = /^(?:please\s+)?(?:merge|ship)\b|\b(?:and|then)\s+(?:please\s+)?(?:merge|ship)\b|\b(?:can|could|would|will)\s+you\s+(?:please\s+)?(?:merge|ship)\b|\b(?:i want|i need|i'd like|i would like)\s+you\s+to\s+(?:merge|ship)\b|\bgo ahead(?:\s+and)?\s+(?:merge|ship)\b/;
+const ASSISTANT_MERGE_REQUEST = /^(?:please\s+)?(?:merge|ship)\b|\b(?:and|then)\s+(?:please\s+)?(?:merge|ship)\b|\bautonomous(?:ly)?\s+(?:please\s+)?(?:merge|ship)\b|\b(?:can|could|would|will)\s+you\s+(?:please\s+)?(?:merge|ship)\b|\b(?:i want|i need|i'd like|i would like)\s+you\s+to\s+(?:merge|ship)\b|\bgo ahead(?:\s+and)?\s+(?:merge|ship)\b/;
+const AUTONOMOUS_WATCH_WORDING = /\bautonomous(ly)?\b|\bauto[- ]?fix\b|\bfix and merge without asking\b/;
 const PR_REFERENCE = /\b(?:pr|pull request)\s*#?\d+\b/;
 const PR_WORD = /\b(?:pr|pull request)\b/;
 const FULL_REVIEW_REQUEST = /\b(full review|review .* for real bugs|usefulness verdict)\b/;
@@ -137,6 +138,10 @@ export function issueCreationActionForPrompt(prompt) {
   return FOLLOW_UP_ISSUE_REQUEST.test(text) ? "create_follow_up_issue" : "create_issue";
 }
 
+function isAutonomousWatchMergeRequest(text) {
+  return WATCH_PR_REQUEST.test(text) && hasExplicitMergeIntent(text) && AUTONOMOUS_WATCH_WORDING.test(text);
+}
+
 function isPrepareAndMergeRequest(text) {
   if (!hasExplicitMergeIntent(text) || !PR_REFERENCE.test(text)) return false;
   return (
@@ -218,6 +223,11 @@ export function routeShippingGithubPrompt(prompt, context = {}) {
     );
   }
 
+  if (isAutonomousWatchMergeRequest(text)) {
+    const actions = ["merge_pr"];
+    if (/\bauto[- ]?fix\b/.test(text) || FIX_REVIEW_REQUEST.test(text)) actions.unshift("push_code");
+    return result("references/watch-pr.md", "autonomous", actions);
+  }
   if (isPrepareAndMergeRequest(text)) return result("references/prepare-and-merge-pr.md", "maintainer", prepareAndMergeActions(text));
   if (hasExplicitMergeIntent(text) && (PR_REFERENCE.test(text) || /^merge it\b/.test(text) || /^ship it\b/.test(text))) {
     return result("references/merge-pr.md", "maintainer", ["merge_pr", "post_comment", "post_issue_comment", "close_linked_issue"]);
@@ -241,8 +251,7 @@ export function routeShippingGithubPrompt(prompt, context = {}) {
   if (/\b(?:security review|review security)\b/.test(text)) return result("references/security-review.md", "review");
   if (/\b(re-review|review again|recheck .*review)\b/.test(text)) return result("references/re-review-pr.md", "review");
   if (WATCH_PR_REQUEST.test(text)) {
-    const autonomous = /\bautonomous(ly)?\b|\bauto[- ]?fix\b|\bfix and merge without asking\b/.test(text);
-    return result("references/watch-pr.md", autonomous ? "autonomous" : "read-only");
+    return result("references/watch-pr.md", AUTONOMOUS_WATCH_WORDING.test(text) ? "autonomous" : "read-only");
   }
   if (CREATE_PR_FOR_ISSUE_REQUEST.test(text) || IMPLEMENT_ISSUE_REQUEST.test(text)) {
     return result("references/create-pr-for-issue.md", "maintainer");

@@ -35,6 +35,15 @@ internal sealed record BranchLeaseRecord(
     long ExpiresAt,
     long? RevokedAt);
 
+internal sealed record PrSessionRecord(
+    string SessionId,
+    string Repo,
+    string Branch,
+    int Pr,
+    long CreatedAt,
+    long ExpiresAt,
+    long? RevokedAt);
+
 internal sealed record AuditEventRecord(
     string EventId,
     string EventType,
@@ -46,7 +55,8 @@ internal sealed record AuditEventRecord(
 
 internal sealed record ApprovalDecision(
     bool Approved,
-    int? BranchLeaseMinutes = null);
+    int? BranchLeaseMinutes = null,
+    int? PrSessionMinutes = null);
 
 internal sealed record BatchApproval(
     string Repo,
@@ -55,7 +65,8 @@ internal sealed record BatchApproval(
     IReadOnlyList<JsonElement> Operations,
     IReadOnlyList<string> Summaries,
     long ExpiresAt,
-    string? Branch = null);
+    string? Branch = null,
+    int? Pr = null);
 
 internal sealed record VerifiedGrant(
     string Kid,

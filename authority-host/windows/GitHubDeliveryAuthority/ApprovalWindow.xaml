@@ -169,8 +169,10 @@
                             Grid.Column="0"
                             Spacing="3"
                             MinWidth="0">
-                    <TextBlock Text="Only this branch" FontWeight="SemiBold" />
-                    <TextBlock Text="Temporarily skip repeated Hello prompts for this exact branch."
+                    <TextBlock x:Name="BranchGrantTitle"
+                               Text="Only this branch" FontWeight="SemiBold" />
+                    <TextBlock x:Name="BranchGrantCaption"
+                               Text="Temporarily skip repeated Hello prompts for this exact branch."
                                Style="{StaticResource CaptionTextBlockStyle}"
                                Opacity="0.72"
                                TextWrapping="WrapWholeWords" />

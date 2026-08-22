@@ -10,7 +10,7 @@ namespace GitHubDeliveryAuthority;
 
 internal sealed partial class ControlCenterWindow : Window
 {
-    private sealed record BranchLeaseListItem(string LeaseId, string Display)
+    private sealed record GrantListItem(string Kind, string Id, string Display)
     {
         public override string ToString() => Display;
     }
@@ -68,6 +68,7 @@ internal sealed partial class ControlCenterWindow : Window
     {
         var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         _store.RecordExpiredBranchLeases(now);
+        _store.RecordExpiredPrSessions(now);
         var repositories = _store.ListAllowedRepositories();
         AllowlistedCount.Text = repositories.Count.ToString(CultureInfo.InvariantCulture);
         AllowlistList.ItemsSource = repositories.Count == 0
@@ -80,16 +81,20 @@ internal sealed partial class ControlCenterWindow : Window
         UpdateActivityList(events);
 
         var leases = _store.ListActiveBranchLeases(now);
-        GrantList.ItemsSource = leases.Count == 0
-            ? new[] { new BranchLeaseListItem(string.Empty, "No active branch leases.") }
-            : leases.Select(lease => new BranchLeaseListItem(lease.LeaseId, FormatBranchLease(lease, now))).ToArray();
+        var sessions = _store.ListActivePrSessions(now);
+        var grants = new List<GrantListItem>();
+        grants.AddRange(leases.Select(lease => new GrantListItem("branch", lease.LeaseId, FormatBranchLease(lease, now))));
+        grants.AddRange(sessions.Select(session => new GrantListItem("session", session.SessionId, FormatPrSession(session, now))));
+        GrantList.ItemsSource = grants.Count == 0
+            ? new[] { new GrantListItem(string.Empty, string.Empty, "No active branch leases or PR sessions.") }
+            : grants.ToArray();
         GrantList.SelectedItem = null;
         RevokeGrantButton.IsEnabled = false;
-        ActiveGrantCount.Text = leases.Count.ToString(CultureInfo.InvariantCulture);
+        ActiveGrantCount.Text = grants.Count.ToString(CultureInfo.InvariantCulture);
 
         var today = DateTimeOffset.Now.Date;
         var todayEvents = events.Where(entry => DateTimeOffset.FromUnixTimeSeconds(entry.CreatedAt).ToLocalTime().Date == today).ToArray();
-        ApprovedTodayCount.Text = todayEvents.Count(entry => entry.EventType is "approval_granted" or "branch_lease_used").ToString(CultureInfo.InvariantCulture);
+        ApprovedTodayCount.Text = todayEvents.Count(entry => entry.EventType is "approval_granted" or "branch_lease_used" or "pr_session_used").ToString(CultureInfo.InvariantCulture);
         DeniedTodayCount.Text = todayEvents.Count(entry => entry.EventType == "approval_denied").ToString(CultureInfo.InvariantCulture);
         ExpiredTodayCount.Text = todayEvents.Count(entry => entry.EventType.EndsWith("_expired", StringComparison.Ordinal)).ToString(CultureInfo.InvariantCulture);
 
@@ -215,6 +220,13 @@ internal sealed partial class ControlCenterWindow : Window
         return $"{lease.Repo}  •  {lease.Branch}  •  {minutes} min remaining";
     }
 
+    private static string FormatPrSession(PrSessionRecord session, long now)
+    {
+        var remaining = Math.Max(0, session.ExpiresAt - now);
+        var minutes = Math.Max(1, (int)Math.Ceiling(remaining / 60d));
+        return $"{session.Repo}  •  PR #{session.Pr}  •  {session.Branch}  •  {minutes} min remaining";
+    }
+
     private void Navigation_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {
         var showSettings = args.IsSettingsSelected;
@@ -298,13 +310,15 @@ internal sealed partial class ControlCenterWindow : Window
 
     private void GrantList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        RevokeGrantButton.IsEnabled = GrantList.SelectedItem is BranchLeaseListItem item && !string.IsNullOrEmpty(item.LeaseId);
+        RevokeGrantButton.IsEnabled = GrantList.SelectedItem is GrantListItem item && !string.IsNullOrEmpty(item.Id);
     }
 
     private void RevokeGrant_Click(object sender, RoutedEventArgs e)
     {
-        if (GrantList.SelectedItem is not BranchLeaseListItem item || string.IsNullOrEmpty(item.LeaseId)) return;
-        _store.RevokeBranchLease(item.LeaseId, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        if (GrantList.SelectedItem is not GrantListItem item || string.IsNullOrEmpty(item.Id)) return;
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        if (item.Kind == "session") _store.RevokePrSession(item.Id, now);
+        else _store.RevokeBranchLease(item.Id, now);
         Refresh();
     }
 

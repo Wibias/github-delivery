@@ -9,22 +9,39 @@ internal sealed partial class ApprovalWindow : Window
 {
     private readonly string _helloMessage;
     private readonly string? _branch;
+    private readonly int? _pr;
     private readonly TaskCompletionSource<ApprovalDecision> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private bool _completed;
 
-    public ApprovalWindow(IReadOnlyList<string> lines, string helloMessage, string? repo = null, string? branch = null)
+    public ApprovalWindow(IReadOnlyList<string> lines, string helloMessage, string? repo = null, string? branch = null, int? pr = null)
     {
         InitializeComponent();
         _helloMessage = helloMessage;
         _branch = string.IsNullOrWhiteSpace(branch) ? null : branch.Trim();
+        _pr = pr is > 0 ? pr : null;
         RepositoryText.Text = string.IsNullOrWhiteSpace(repo) ? "Administrative action" : repo;
         ActionText.Text = string.Join(Environment.NewLine + Environment.NewLine, lines);
         BranchGrantToggle.IsEnabled = _branch is not null;
         BranchGrantToggle.IsOn = false;
         BranchGrantDuration.IsEnabled = false;
-        BranchGrantScopeText.Text = _branch is null
-            ? "Unavailable: this batch does not resolve to one exact branch."
-            : $"Branch: {_branch}";
+        if (_pr is int sessionPr && _branch is not null)
+        {
+            BranchGrantTitle.Text = "This pull request";
+            BranchGrantCaption.Text = "Temporarily skip repeated Hello prompts for push and merge on this exact PR.";
+            BranchGrantScopeText.Text = $"PR #{sessionPr} on {_branch}";
+            BranchGrantDuration.Items.Clear();
+            foreach (var minutes in new[] { 5, 15, 30, 60 })
+            {
+                BranchGrantDuration.Items.Add(new ComboBoxItem { Content = $"{minutes} min", Tag = minutes.ToString() });
+            }
+            BranchGrantDuration.SelectedIndex = 0;
+        }
+        else
+        {
+            BranchGrantScopeText.Text = _branch is null
+                ? "Unavailable: this batch does not resolve to one exact branch."
+                : $"Branch: {_branch}";
+        }
         Closed += (_, _) => Complete(new ApprovalDecision(false));
         RootLayout.Loaded += (_, _) => QueueEdgeSpacingUpdate(RootLayout.ActualWidth);
         RootLayout.SizeChanged += (_, args) => QueueEdgeSpacingUpdate(args.NewSize.Width);
@@ -50,7 +67,7 @@ internal sealed partial class ApprovalWindow : Window
                 var verification = await HelloVerifier.VerifyAsync(hwnd, _helloMessage);
                 if (verification.Verified)
                 {
-                    Complete(new ApprovalDecision(true, SelectedBranchLeaseMinutes()));
+                    Complete(new ApprovalDecision(true, SelectedBranchLeaseMinutes(), SelectedPrSessionMinutes()));
                     Close();
                     return;
                 }
@@ -102,9 +119,18 @@ internal sealed partial class ApprovalWindow : Window
 
     private int? SelectedBranchLeaseMinutes()
     {
-        if (_branch is null || !BranchGrantToggle.IsEnabled || !BranchGrantToggle.IsOn) return null;
+        if (_pr is not null || _branch is null || !BranchGrantToggle.IsEnabled || !BranchGrantToggle.IsOn) return null;
         if (BranchGrantDuration.SelectedItem is not ComboBoxItem item) return null;
         return int.TryParse(item.Tag?.ToString(), out var minutes) && minutes is >= 1 and <= 10
+            ? minutes
+            : null;
+    }
+
+    private int? SelectedPrSessionMinutes()
+    {
+        if (_pr is null || _branch is null || !BranchGrantToggle.IsEnabled || !BranchGrantToggle.IsOn) return null;
+        if (BranchGrantDuration.SelectedItem is not ComboBoxItem item) return null;
+        return int.TryParse(item.Tag?.ToString(), out var minutes) && minutes is 5 or 15 or 30 or 60
             ? minutes
             : null;
     }

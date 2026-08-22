@@ -48,6 +48,13 @@ internal static class MutationClassifier
     public static bool IsBranchLeaseEligible(JsonElement operation)
         => string.Equals(operation.GetProperty("action").GetString(), "push_code", StringComparison.Ordinal);
 
+    public static bool IsPrSessionEligible(JsonElement operation)
+    {
+        var action = operation.GetProperty("action").GetString();
+        return string.Equals(action, "push_code", StringComparison.Ordinal)
+            || string.Equals(action, "merge_pr", StringComparison.Ordinal);
+    }
+
     public static bool RequiresExactHumanApproval(JsonElement operation)
         => string.Equals(operation.GetProperty("action").GetString(), "reply_human_thread", StringComparison.Ordinal);
 }
