@@ -266,7 +266,7 @@ test("retargets that differ only in newBase do not share a skip identity", () =>
   assert.notEqual(result.results[0].operationKey, result.results[1].operationKey);
 });
 
-test("reviewer lists and draft flags that differ still execute", () => {
+test("reviewer lists and draft-ready flags that differ still execute", () => {
   const executed = [];
   const reviewers = request("request_reviewers", {
     pr: 42,
@@ -280,14 +280,14 @@ test("reviewer lists and draft flags that differ still execute", () => {
     document: [
       { ...reviewers, reviewers: ["alice"] },
       { ...reviewers, reviewers: ["bob"] },
-      { ...draft, draft: true },
-      { ...draft, draft: false },
+      { ...draft, ready: true },
+      { ...draft, ready: false },
     ],
     execute: false,
     dependencies: {
       mutationRequiresTrustedAuthority: () => false,
       executeMutationWithAuthority({ request: current }) {
-        executed.push(current.reviewers ?? current.draft);
+        executed.push(current.reviewers ?? current.ready);
         return { action: current.action, status: "succeeded" };
       },
     },
