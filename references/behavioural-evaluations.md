@@ -35,7 +35,13 @@ Use controlled fixture IDs for findings. A finding not present in the case's req
 
 ## Run evidence schema
 
-Each variant writes one JSON evidence pack. Verdicts are scored from `trace`, not from unbound summary arrays. If summary `findings` / `actions` / `coverage` / `mergeReady` fields are present, they must match the trace.
+Each variant writes one JSON evidence pack plus a sibling `<run>.transcript.json`.
+Verdicts are scored from the sidecar traces, not from unbound summary arrays.
+If summary `findings` / `actions` / `coverage` / `mergeReady` fields are present,
+they must match the sidecar. An in-pack `trace` is rejected. Missing sidecar
+traces fail closed. `run.provenance.transcriptsSha256` must match the sidecar.
+
+Pack (`candidate.json`):
 
 ```json
 {
@@ -43,26 +49,37 @@ Each variant writes one JSON evidence pack. Verdicts are scored from `trace`, no
   "model": "model-id",
   "host": "host-id",
   "skillVersion": "git-sha-or-version",
+  "provenance": {
+    "kind": "github-delivery/behavioural-transcript",
+    "transcriptsSha256": "<sha256 of candidate.transcript.json>"
+  },
   "results": [
     {
       "caseId": "security-authz-001",
       "tokenCount": 12345,
       "toolCalls": 19,
-      "durationMs": 42000,
-      "trace": {
-        "toolCalls": [{ "name": "security-review" }],
-        "authorityRedemptions": [],
-        "mutationReceipts": [],
-        "findings": [{ "id": "SEC-AUTHZ-001", "severity": "high" }],
-        "coverage": ["authz", "business-logic"],
-        "mergeReady": false
-      }
+      "durationMs": 42000
     }
   ]
 }
 ```
 
-Actions are the observed tool-call names plus authority-redemption and mutation-receipt actions. Missing traces fail closed. Do not grade free-form prose or self-attested summaries when the scorer can read a trace.
+Sidecar (`candidate.transcript.json`):
+
+```json
+{
+  "security-authz-001": {
+    "toolCalls": [{ "name": "security-review" }],
+    "authorityRedemptions": [],
+    "mutationReceipts": [],
+    "findings": [{ "id": "SEC-AUTHZ-001", "severity": "high" }],
+    "coverage": ["authz", "business-logic"],
+    "mergeReady": false
+  }
+}
+```
+
+Actions are the observed tool-call names plus authority-redemption and mutation-receipt actions. Do not grade free-form prose or self-attested summaries when the scorer can read a sidecar trace.
 
 ## Compare
 

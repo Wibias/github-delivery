@@ -6,6 +6,7 @@ All notable changes to `github-delivery` are documented here.
 
 ### Fixed
 
+- Behavioural-evaluation docs now show the run pack and `<run>.transcript.json` sidecar, matching the scorer that rejects in-pack `trace` objects.
 - Installer restore now journals before moving the live target aside, and journal updates replace a complete temp file instead of truncating the live journal, so a crash still leaves a recoverable tree.
 - Automatic NuGet dependency submission can restore the Windows Authority host on Linux by setting `EnableWindowsTargeting`, so GitHub's hosted `submit-nuget` job no longer fails with NETSDK1100.
 - Offline evals and `policy-bundle --validate` now treat `shared-rules.md` as a compatibility index only: workflows cannot instruct loading it, evals cannot list it as expected context, and each routed workflow's SKILL+kernel+module payload must stay 60% under the old monolith baseline.
