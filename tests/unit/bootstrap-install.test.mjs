@@ -364,6 +364,40 @@ test("post-install config drift fails closed before Authority reconciliation and
   assert.equal(authorityCalls, 0);
 });
 
+test("Authority reconciliation failure rolls the skill target back from backup", async () => {
+  const target = resolve("/tmp/skills/github-delivery");
+  let restored = null;
+  await assert.rejects(
+    runGuidedInstall({
+      target,
+      dependencies: dependencies({
+        installSkill(options) {
+          return {
+            action: "install",
+            apply: options.apply,
+            target,
+            backupPath: options.apply ? "/tmp/backup" : null,
+            watchdog: null,
+          };
+        },
+        restoreBackup(options) {
+          restored = options;
+        },
+        async reconcileStableAuthorityHost() {
+          throw new Error("authority_host_install_failed");
+        },
+      }),
+    }),
+    (error) => {
+      assert.match(error.message, /authority_host_install_failed/);
+      assert.equal(error.backupPath, "/tmp/backup");
+      assert.equal(error.rolledBack, true);
+      return true;
+    },
+  );
+  assert.deepEqual(restored, { backup: "/tmp/backup", target });
+});
+
 test("explicit install refuses to silently reinstall an already valid installation", async () => {
   const target = resolve("/tmp/skills/github-delivery");
   await assert.rejects(
