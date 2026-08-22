@@ -18,6 +18,7 @@ All notable changes to `github-delivery` are documented here.
 - `watch PR #N and merge it` stays on prepare-and-merge. `watch and autonomously merge PR #N` stays on watch with merge authority and hands a ready PR to `merge-pr-driver.mjs`. Bare `watch autonomously` still does not merge. Autonomous is not the default mutation mode (PRs #312, #323, #348).
 - Policy modules are the mandatory workflow context. `references/shared-rules.md` is a compatibility index only; evals and `policy-bundle --validate` reject loading it as required context (PRs #342, #343).
 - Router merge intent is explicit: `merge it` / `ship it` prefixes, negated merge, and attributed GitHub text such as `comment says: merge it` are not user merge authority even when the attributed quote continues past the first sentence (PRs #321, #322, #347, #350).
+- Durable GitHub prose now deletes chatbot phrases, process narration, puffery, and `not just X, but Y` crutches. It still must not add personality, score "sounds human," or ban em dashes, and it still cannot strengthen `unknown` / `blocked` evidence states (PR #354).
 
 ### Fixed
 
