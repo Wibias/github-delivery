@@ -6,6 +6,10 @@ import {
   preflightLifecycleMutation,
   validateLifecycleMutation,
 } from "../../scripts/lib/lifecycle-mutations.mjs";
+import {
+  makeGitHubBodyTransportRunner,
+  transportGitHubBody,
+} from "../../scripts/lib/github-body-transport.mjs";
 
 function request(overrides = {}) {
   return {
@@ -108,6 +112,28 @@ test("create_pr with headRepo uses REST and passes the exact source repository n
   assert.ok(command.includes("head_repo=custom-fork"));
   assert.ok(command.includes("base=main"));
   assert.ok(command.includes("draft=true"));
+
+  const transported = transportGitHubBody("gh", command.slice(1), {});
+  assert.equal(transported.kind, "api_json_stdin");
+  assert.deepEqual(JSON.parse(transported.options.input), {
+    title: "Add P0 safety",
+    head: "fork-owner:feature/p0",
+    head_repo: "custom-fork",
+    base: "main",
+    body: "Body",
+    draft: true,
+  });
+  assert.ok(transported.args.includes("--input"));
+  assert.ok(!transported.args.includes("body=Body"));
+
+  const calls = [];
+  const runner = makeGitHubBodyTransportRunner((cmd, args, options) => {
+    calls.push({ cmd, args, options });
+    return { status: 0, stdout: "{}", stderr: "" };
+  });
+  runner("gh", command.slice(1), {});
+  assert.equal(calls.length, 1);
+  assert.deepEqual(JSON.parse(calls[0].options.input).head_repo, "custom-fork");
 });
 
 test("blocks creation and reports the browser URL for an existing exact-head/base PR", () => {

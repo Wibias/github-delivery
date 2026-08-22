@@ -18,6 +18,21 @@ function bodyFlagTransport(args, options) {
   };
 }
 
+function parseApiField(value) {
+  const text = String(value ?? "");
+  const separator = text.indexOf("=");
+  if (separator < 1) throw new Error("github_body_transport_malformed_api_field");
+  return { key: text.slice(0, separator), value: text.slice(separator + 1) };
+}
+
+function typedFieldValue(flag, value) {
+  if (flag === "-F" || flag === "--field") {
+    if (String(value).startsWith("@")) throw new Error("github_body_transport_field_at_file");
+    return JSON.parse(value);
+  }
+  return value;
+}
+
 function apiBodyTransport(args, options) {
   if (args[0] !== "api") return null;
   const fields = [];
@@ -26,22 +41,28 @@ function apiBodyTransport(args, options) {
     fields.push({ index, flag: args[index], value: String(args[index + 1] ?? "") });
     index += 1;
   }
-  const bodyFields = fields.filter((field) => field.value.startsWith("body="));
+  const parsedFields = fields.map((field) => ({ ...field, ...parseApiField(field.value) }));
+  const bodyFields = parsedFields.filter((field) => field.key === "body");
   if (!bodyFields.length) return null;
-  if (bodyFields.length !== 1 || fields.length !== 1) {
+  if (bodyFields.length !== 1) {
     throw new Error("github_body_transport_ambiguous_api_fields");
   }
 
-  const field = bodyFields[0];
-  const body = field.value.slice("body=".length);
-  const nextArgs = [...args];
-  nextArgs.splice(field.index, 2);
+  const payload = {};
+  const skip = new Set();
+  for (const field of parsedFields) {
+    payload[field.key] = typedFieldValue(field.flag, field.value);
+    skip.add(field.index);
+    skip.add(field.index + 1);
+  }
+
+  const nextArgs = args.filter((_, index) => !skip.has(index));
   nextArgs.push("--input", "-");
   return {
     args: nextArgs,
     options: {
       ...options,
-      input: JSON.stringify({ body }),
+      input: JSON.stringify(payload),
     },
     kind: "api_json_stdin",
   };
