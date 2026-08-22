@@ -35,7 +35,7 @@ Use controlled fixture IDs for findings. A finding not present in the case's req
 
 ## Run evidence schema
 
-Each variant writes one JSON evidence pack:
+Each variant writes one JSON evidence pack. Verdicts are scored from `trace`, not from unbound summary arrays. If summary `findings` / `actions` / `coverage` / `mergeReady` fields are present, they must match the trace.
 
 ```json
 {
@@ -46,19 +46,23 @@ Each variant writes one JSON evidence pack:
   "results": [
     {
       "caseId": "security-authz-001",
-      "findings": [{ "id": "SEC-AUTHZ-001", "severity": "high" }],
-      "actions": ["security-review"],
-      "coverage": ["authz", "business-logic"],
-      "mergeReady": false,
       "tokenCount": 12345,
       "toolCalls": 19,
-      "durationMs": 42000
+      "durationMs": 42000,
+      "trace": {
+        "toolCalls": [{ "name": "security-review" }],
+        "authorityRedemptions": [],
+        "mutationReceipts": [],
+        "findings": [{ "id": "SEC-AUTHZ-001", "severity": "high" }],
+        "coverage": ["authz", "business-logic"],
+        "mergeReady": false
+      }
     }
   ]
 }
 ```
 
-`findings`, `actions`, and `coverage` should be derived from machine-readable run evidence where the host supports it. Do not grade free-form prose when a structured trace is available.
+Actions are the observed tool-call names plus authority-redemption and mutation-receipt actions. Missing traces fail closed. Do not grade free-form prose or self-attested summaries when the scorer can read a trace.
 
 ## Compare
 
