@@ -32,7 +32,7 @@ Enable merge commits and disable squash and rebase merges so stacked PR ancestry
 
 ## Mutation authority boundary
 
-The broker's legacy `mutationMode`, `explicitInstruction`, and `exactTextConfirmed` request fields remain caller-provided policy assertions. They help a compliant agent avoid accidental writes, but they are not independently authenticated user consent.
+The broker's legacy `mutationMode`, `explicitInstruction`, and `exactTextConfirmed` request fields remain caller-provided policy assertions. They help a compliant agent avoid accidental writes, but they are not independently authenticated user consent. `authorityMode=off` does not change that: actions that require explicit lifecycle instruction or exact-text confirmation still need a verified host grant at execution.
 
 Legacy Ed25519 `gd1` verification remains available through `GITHUB_DELIVERY_AUTHORITY_PUBLIC_KEY`. New issuers may instead provide a public-only algorithm-agile trust store through `GITHUB_DELIVERY_AUTHORITY_TRUST_STORE`. Invalid supplied grants fail closed instead of falling back to caller assertions.
 
