@@ -133,6 +133,21 @@ export function mutationProfile(mode = "read-only") {
   };
 }
 
+export function mutationRequiresIndependentIntent(request = {}) {
+  const action = String(request?.action || "");
+  if (!action) return false;
+  let mode;
+  try {
+    mode = normalizeMutationMode(request.mutationMode);
+  } catch {
+    return false;
+  }
+  const rule = mutationProfile(mode).actions[action];
+  return Boolean(
+    rule?.requiresExplicitInstruction || rule?.requiresExactTextConfirmation,
+  );
+}
+
 export function authorizeMutation({
   mode = "read-only",
   action,
