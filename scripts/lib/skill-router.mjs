@@ -106,7 +106,13 @@ function multiBaseDeliveryActions(text) {
   return actions;
 }
 
+const ATTRIBUTED_UNTRUSTED_SPAN =
+  /\b(?:(?:a|the)\s+)?(?:(?:coderabbit|bot|github|reviewer|review)\s+)?(?:comments?|pr body|pull request body|title\/body|readme|commit messages?)\s+(?:says|said|contains|claims?)\s*:\s*[^.!?\n]*(?:[.!?]\s*)?/gi;
+
 function unquotedText(text) { return text.replace(/"[^"\n]*"|`[^`\n]*`|'[^'\n]*'/g, " "); }
+function stripAttributedUntrustedText(text) {
+  return String(text).replace(ATTRIBUTED_UNTRUSTED_SPAN, " ");
+}
 function mergeText(text) { return unquotedText(text).replace(MERGE_READY_PHRASE, ""); }
 
 function hasActivePullRequestContext(context) {
@@ -117,7 +123,7 @@ function hasActivePullRequestContext(context) {
 
 export function hasExplicitMergeIntent(prompt) {
   const text = normalized(prompt);
-  const candidate = mergeText(text);
+  const candidate = mergeText(stripAttributedUntrustedText(text));
   if (!MERGE_INTENT.test(candidate)) return false;
   if (NEGATED_MERGE_INTENT.test(candidate)) return false;
   if (DELIBERATIVE_MERGE.test(candidate)) return false;
