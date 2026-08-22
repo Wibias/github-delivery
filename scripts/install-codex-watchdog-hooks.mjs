@@ -11,6 +11,8 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { withExclusiveInstallLock } from "./lib/install-lock.mjs";
+
 const EVENTS = Object.freeze([
   "PreToolUse",
   "PostToolUse",
@@ -134,31 +136,36 @@ export function installCodexWatchdogHooks({
   hooksPath = defaultHooksPath(),
   skillDir = defaultSkillDir(),
   apply = false,
+  writeFile = writeFileSync,
 } = {}) {
   const target = resolve(hooksPath);
   const skill = resolve(skillDir);
-  const existing = readExisting(target);
-  const { config, changed } = mergedConfig(existing, skill);
-  let backupPath = null;
+  const run = () => {
+    const existing = readExisting(target);
+    const { config, changed } = mergedConfig(existing, skill);
+    let backupPath = null;
 
-  if (apply && changed) {
-    mkdirSync(dirname(target), { recursive: true });
-    if (existsSync(target)) {
-      backupPath = backupName(target);
-      copyFileSync(target, backupPath);
+    if (apply && changed) {
+      mkdirSync(dirname(target), { recursive: true });
+      if (existsSync(target)) {
+        backupPath = backupName(target);
+        copyFileSync(target, backupPath);
+      }
+      writeFile(target, `${JSON.stringify(config, null, 2)}\n`, "utf8");
     }
-    writeFileSync(target, `${JSON.stringify(config, null, 2)}\n`, "utf8");
-  }
 
-  return {
-    schemaVersion: 1,
-    hooksPath: target,
-    skillDir: skill,
-    events: [...EVENTS],
-    wouldChange: changed,
-    applied: apply && changed,
-    backupPath,
+    return {
+      schemaVersion: 1,
+      hooksPath: target,
+      skillDir: skill,
+      events: [...EVENTS],
+      wouldChange: changed,
+      applied: apply && changed,
+      backupPath,
+    };
   };
+  if (!apply) return run();
+  return withExclusiveInstallLock(`${target}.lock`, run);
 }
 
 function parseArgs(argv) {
