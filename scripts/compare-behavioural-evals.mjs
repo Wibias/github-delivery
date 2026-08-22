@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 import {
   compareBehaviouralScores,
@@ -8,6 +8,16 @@ import {
 
 function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
+}
+
+function transcriptPath(runPath) {
+  return String(runPath).replace(/\.json$/i, ".transcript.json");
+}
+
+function scoreRunFile(cases, runPath) {
+  const sidecar = transcriptPath(runPath);
+  if (!existsSync(sidecar)) throw new TypeError(`missing transcripts sidecar: ${sidecar}`);
+  return scoreBehaviouralRun(cases, readJson(runPath), readJson(sidecar));
 }
 
 function usage() {
@@ -23,9 +33,9 @@ if (!casesPath || !baselinePath || !currentPath || !candidatePath) {
 try {
   const cases = readJson(casesPath);
   if (!Array.isArray(cases)) throw new TypeError("cases file must contain an array");
-  const baseline = scoreBehaviouralRun(cases, readJson(baselinePath));
-  const current = scoreBehaviouralRun(cases, readJson(currentPath));
-  const candidate = scoreBehaviouralRun(cases, readJson(candidatePath));
+  const baseline = scoreRunFile(cases, baselinePath);
+  const current = scoreRunFile(cases, currentPath);
+  const candidate = scoreRunFile(cases, candidatePath);
   const comparison = compareBehaviouralScores(baseline, current, candidate);
   process.stdout.write(`${JSON.stringify(comparison, null, 2)}\n`);
   if (!comparison.candidateImprovesOrMatchesCurrent) process.exitCode = 1;

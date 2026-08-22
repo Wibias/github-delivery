@@ -89,6 +89,8 @@ internal sealed class StateStore : IDisposable
               repo TEXT NOT NULL,
               branch TEXT NOT NULL,
               pr INTEGER NOT NULL CHECK(pr > 0),
+              expected_base TEXT NULL,
+              expected_base_oid TEXT NULL,
               created_at INTEGER NOT NULL,
               expires_at INTEGER NOT NULL,
               revoked_at INTEGER NULL,
@@ -109,6 +111,8 @@ internal sealed class StateStore : IDisposable
               ON audit_events(created_at DESC);
             """;
         command.ExecuteNonQuery();
+        EnsureColumn(connection, "pr_sessions", "expected_base", "TEXT NULL");
+        EnsureColumn(connection, "pr_sessions", "expected_base_oid", "TEXT NULL");
     }
 
     public bool IsRepositoryAllowed(string repo)
@@ -433,18 +437,26 @@ internal sealed class StateStore : IDisposable
         return true;
     }
 
-    public PrSessionRecord CreatePrSession(string repo, string branch, int pr, long now, int minutes)
+    public PrSessionRecord CreatePrSession(string repo, string branch, int pr, long now, int minutes, string? expectedBase = null, string? expectedBaseOid = null)
     {
         ValidateRepo(repo);
         branch = ValidateBranch(branch);
         if (pr <= 0) throw new AuthorityException("pr_session_pr_invalid");
         // minutes is not 5, 15, 30, or 60
         if (minutes is not 5 and not 15 and not 30 and not 60) throw new AuthorityException("pr_session_minutes_invalid");
+        expectedBase = NormalizeOptionalBase(expectedBase, "pr_session_expected_base_invalid");
+        expectedBaseOid = NormalizeOptionalBaseOid(expectedBaseOid, "pr_session_expected_base_oid_invalid");
+        if ((expectedBase is null) != (expectedBaseOid is null))
+        {
+            throw new AuthorityException("pr_session_expected_base_incomplete");
+        }
         var session = new PrSessionRecord(
             Guid.NewGuid().ToString("N"),
             repo,
             branch,
             pr,
+            expectedBase,
+            expectedBaseOid,
             now,
             checked(now + (minutes * 60L)),
             null);
@@ -469,13 +481,15 @@ internal sealed class StateStore : IDisposable
         {
             insert.Transaction = transaction;
             insert.CommandText = """
-                INSERT INTO pr_sessions(session_id,repo,branch,pr,created_at,expires_at,revoked_at)
-                VALUES($id,$repo,$branch,$pr,$created,$expires,NULL);
+                INSERT INTO pr_sessions(session_id,repo,branch,pr,expected_base,expected_base_oid,created_at,expires_at,revoked_at)
+                VALUES($id,$repo,$branch,$pr,$base,$oid,$created,$expires,NULL);
                 """;
             insert.Parameters.AddWithValue("$id", session.SessionId);
             insert.Parameters.AddWithValue("$repo", session.Repo);
             insert.Parameters.AddWithValue("$branch", session.Branch);
             insert.Parameters.AddWithValue("$pr", session.Pr);
+            insert.Parameters.AddWithValue("$base", (object?)session.ExpectedBase ?? DBNull.Value);
+            insert.Parameters.AddWithValue("$oid", (object?)session.ExpectedBaseOid ?? DBNull.Value);
             insert.Parameters.AddWithValue("$created", session.CreatedAt);
             insert.Parameters.AddWithValue("$expires", session.ExpiresAt);
             insert.ExecuteNonQuery();
@@ -485,33 +499,33 @@ internal sealed class StateStore : IDisposable
         return session;
     }
 
-    public PrSessionRecord? TryGetActivePrSession(string repo, string branch, int pr, long now)
-    {
-        ValidateRepo(repo);
-        branch = ValidateBranch(branch);
-        if (pr <= 0) throw new AuthorityException("pr_session_pr_invalid");
-        using var connection = Open();
-        using var command = connection.CreateCommand();
-        command.CommandText = """
-            SELECT session_id,repo,branch,pr,created_at,expires_at,revoked_at
-            FROM pr_sessions
-            WHERE lower(repo)=lower($repo) AND branch=$branch AND pr=$pr AND revoked_at IS NULL AND expires_at > $now
-            ORDER BY expires_at DESC LIMIT 1;
-            """;
-        command.Parameters.AddWithValue("$repo", repo);
-        command.Parameters.AddWithValue("$branch", branch);
-        command.Parameters.AddWithValue("$pr", pr);
-        command.Parameters.AddWithValue("$now", now);
-        using var reader = command.ExecuteReader();
-        return reader.Read() ? ReadPrSession(reader) : null;
-    }
+    public PrSessionRecord? TryGetActivePrSession(string repo, string branch, int pr, long now, string? expectedBase = null, string? expectedBaseOid = null)
+        => FindActivePrSession(repo, branch, pr, expectedBase, expectedBaseOid, now, consume: false, operationCount: 0);
 
-    public PrSessionRecord? TryUseActivePrSession(string repo, string branch, int pr, long now, int operationCount)
+    public PrSessionRecord? TryUseActivePrSession(string repo, string branch, int pr, string? expectedBase, string? expectedBaseOid, long now, int operationCount)
+        => FindActivePrSession(repo, branch, pr, expectedBase, expectedBaseOid, now, consume: true, operationCount);
+
+    private PrSessionRecord? FindActivePrSession(
+        string repo,
+        string branch,
+        int pr,
+        string? expectedBase,
+        string? expectedBaseOid,
+        long now,
+        bool consume,
+        int operationCount)
     {
         ValidateRepo(repo);
         branch = ValidateBranch(branch);
         if (pr <= 0) throw new AuthorityException("pr_session_pr_invalid");
-        if (operationCount <= 0) throw new AuthorityException("pr_session_operation_count_invalid");
+        if (consume && operationCount <= 0) throw new AuthorityException("pr_session_operation_count_invalid");
+        expectedBase = NormalizeOptionalBase(expectedBase, "pr_session_expected_base_invalid");
+        expectedBaseOid = NormalizeOptionalBaseOid(expectedBaseOid, "pr_session_expected_base_oid_invalid");
+        if ((expectedBase is null) != (expectedBaseOid is null))
+        {
+            throw new AuthorityException("pr_session_expected_base_incomplete");
+        }
+
         using var connection = Open();
         using var transaction = connection.BeginTransaction(deferred: false);
         PrSessionRecord? session = null;
@@ -519,15 +533,21 @@ internal sealed class StateStore : IDisposable
         {
             select.Transaction = transaction;
             select.CommandText = """
-                SELECT session_id,repo,branch,pr,created_at,expires_at,revoked_at
+                SELECT session_id,repo,branch,pr,expected_base,expected_base_oid,created_at,expires_at,revoked_at
                 FROM pr_sessions
                 WHERE lower(repo)=lower($repo) AND branch=$branch AND pr=$pr AND revoked_at IS NULL AND expires_at > $now
+                  AND (
+                    $base IS NULL
+                    OR (expected_base IS NOT NULL AND expected_base=$base AND lower(expected_base_oid)=lower($oid))
+                  )
                 ORDER BY expires_at DESC LIMIT 1;
                 """;
             select.Parameters.AddWithValue("$repo", repo);
             select.Parameters.AddWithValue("$branch", branch);
             select.Parameters.AddWithValue("$pr", pr);
             select.Parameters.AddWithValue("$now", now);
+            select.Parameters.AddWithValue("$base", (object?)expectedBase ?? DBNull.Value);
+            select.Parameters.AddWithValue("$oid", (object?)expectedBaseOid ?? DBNull.Value);
             using var reader = select.ExecuteReader();
             if (reader.Read()) session = ReadPrSession(reader);
         }
@@ -536,15 +556,18 @@ internal sealed class StateStore : IDisposable
             transaction.Rollback();
             return null;
         }
-        InsertAuditEvent(
-            connection,
-            transaction,
-            "pr_session_used",
-            session.Repo,
-            session.Branch,
-            "approved",
-            $"session_id={session.SessionId};pr={session.Pr};operations={operationCount}",
-            now);
+        if (consume)
+        {
+            InsertAuditEvent(
+                connection,
+                transaction,
+                "pr_session_used",
+                session.Repo,
+                session.Branch,
+                "approved",
+                $"session_id={session.SessionId};pr={session.Pr};operations={operationCount}",
+                now);
+        }
         transaction.Commit();
         return session;
     }
@@ -554,7 +577,7 @@ internal sealed class StateStore : IDisposable
         using var connection = Open();
         using var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT session_id,repo,branch,pr,created_at,expires_at,revoked_at
+            SELECT session_id,repo,branch,pr,expected_base,expected_base_oid,created_at,expires_at,revoked_at
             FROM pr_sessions
             WHERE revoked_at IS NULL AND expires_at > $now
             ORDER BY expires_at ASC, lower(repo), branch, pr;
@@ -575,7 +598,7 @@ internal sealed class StateStore : IDisposable
         {
             select.Transaction = transaction;
             select.CommandText = """
-                SELECT s.session_id,s.repo,s.branch,s.pr,s.created_at,s.expires_at,s.revoked_at
+                SELECT s.session_id,s.repo,s.branch,s.pr,s.expected_base,s.expected_base_oid,s.created_at,s.expires_at,s.revoked_at
                 FROM pr_sessions s
                 WHERE s.revoked_at IS NULL
                   AND s.expires_at <= $now
@@ -615,7 +638,7 @@ internal sealed class StateStore : IDisposable
         using (var select = connection.CreateCommand())
         {
             select.Transaction = transaction;
-            select.CommandText = "SELECT session_id,repo,branch,pr,created_at,expires_at,revoked_at FROM pr_sessions WHERE session_id=$id LIMIT 1;";
+            select.CommandText = "SELECT session_id,repo,branch,pr,expected_base,expected_base_oid,created_at,expires_at,revoked_at FROM pr_sessions WHERE session_id=$id LIMIT 1;";
             select.Parameters.AddWithValue("$id", sessionId);
             using var reader = select.ExecuteReader();
             if (reader.Read()) session = ReadPrSession(reader);
@@ -833,9 +856,11 @@ internal sealed class StateStore : IDisposable
             reader.GetString(1),
             reader.GetString(2),
             reader.GetInt32(3),
-            reader.GetInt64(4),
-            reader.GetInt64(5),
-            reader.IsDBNull(6) ? null : reader.GetInt64(6));
+            reader.IsDBNull(4) ? null : reader.GetString(4),
+            reader.IsDBNull(5) ? null : reader.GetString(5),
+            reader.GetInt64(6),
+            reader.GetInt64(7),
+            reader.IsDBNull(8) ? null : reader.GetInt64(8));
 
     private static AuditEventRecord ReadAuditEvent(SqliteDataReader reader)
         => new(
@@ -864,5 +889,36 @@ internal sealed class StateStore : IDisposable
             throw new AuthorityException("branch_invalid");
         }
         return value;
+    }
+
+    private static string? NormalizeOptionalBase(string? value, string code)
+    {
+        if (value is null) return null;
+        var text = value.Trim();
+        if (text.Length == 0 || text.Any(char.IsControl)) throw new AuthorityException(code);
+        return text;
+    }
+
+    private static string? NormalizeOptionalBaseOid(string? value, string code)
+    {
+        if (value is null) return null;
+        var text = value.Trim().ToLowerInvariant();
+        if (text.Length == 0 || text.Any(char.IsControl)) throw new AuthorityException(code);
+        return text;
+    }
+
+    private static void EnsureColumn(SqliteConnection connection, string table, string column, string type)
+    {
+        using var info = connection.CreateCommand();
+        info.CommandText = $"PRAGMA table_info({table});";
+        using var reader = info.ExecuteReader();
+        while (reader.Read())
+        {
+            if (string.Equals(reader.GetString(1), column, StringComparison.OrdinalIgnoreCase)) return;
+        }
+        reader.Close();
+        using var alter = connection.CreateCommand();
+        alter.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {type};";
+        alter.ExecuteNonQuery();
     }
 }

@@ -81,7 +81,7 @@ internal sealed class AuthorityService
         if (requiresHello)
         {
             var activeSession = sessionEligible
-                ? _store.TryUseActivePrSession(repo, session!.Branch, session.Pr, now, operations.Length)
+                ? _store.TryUseActivePrSession(repo, session!.Branch, session.Pr, session.ExpectedBase, session.ExpectedBaseOid, now, operations.Length)
                 : null;
             if (activeSession is not null)
             {
@@ -124,7 +124,7 @@ internal sealed class AuthorityService
                         {
                             throw new AuthorityException("pr_session_action_not_eligible");
                         }
-                        _store.CreatePrSession(repo, session.Branch, session.Pr, now, sessionMinutes);
+                        _store.CreatePrSession(repo, session.Branch, session.Pr, now, sessionMinutes, session.ExpectedBase, session.ExpectedBaseOid);
                     }
                     else if (decision.BranchLeaseMinutes is int branchLeaseMinutes)
                     {

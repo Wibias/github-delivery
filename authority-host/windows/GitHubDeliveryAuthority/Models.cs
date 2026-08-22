@@ -40,6 +40,8 @@ internal sealed record PrSessionRecord(
     string Repo,
     string Branch,
     int Pr,
+    string? ExpectedBase,
+    string? ExpectedBaseOid,
     long CreatedAt,
     long ExpiresAt,
     long? RevokedAt);

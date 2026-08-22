@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  attachTranscriptProvenance,
   compareBehaviouralScores,
   scoreBehaviouralRun,
 } from "../../scripts/lib/behavioural-evals.mjs";
@@ -39,6 +40,29 @@ function run(variant, results) {
   };
 }
 
+function splitPack(resultsWithTrace) {
+  const transcripts = {};
+  const results = resultsWithTrace.map((result) => {
+    const { trace, ...rest } = result;
+    if (trace) transcripts[result.caseId] = trace;
+    return rest;
+  });
+  return { results, transcripts };
+}
+
+function boundRun(variant, resultsWithTrace) {
+  const { results, transcripts } = splitPack(resultsWithTrace);
+  return {
+    run: attachTranscriptProvenance(run(variant, results), transcripts),
+    transcripts,
+  };
+}
+
+function scoreRun(variant, resultsWithTrace) {
+  const packed = boundRun(variant, resultsWithTrace);
+  return scoreBehaviouralRun(CASES, packed.run, packed.transcripts);
+}
+
 function withMatchingTrace(result) {
   const actions = result.actions ?? [];
   return {
@@ -55,7 +79,7 @@ function withMatchingTrace(result) {
 }
 
 test("scores recall, precision, coverage, safety and cost", () => {
-  const score = scoreBehaviouralRun(CASES, run("candidate", [
+  const scored = scoreRun("candidate", [
     withMatchingTrace({
       caseId: "security-real",
       findings: [{ id: "SEC-1", severity: "high" }],
@@ -76,20 +100,20 @@ test("scores recall, precision, coverage, safety and cost", () => {
       toolCalls: 2,
       durationMs: 200,
     }),
-  ]));
+  ]);
 
-  assert.equal(score.metrics.findingRecall, 1);
-  assert.equal(score.metrics.findingPrecision, 1);
-  assert.equal(score.metrics.coverageRate, 1);
-  assert.equal(score.metrics.requiredActionRate, 1);
-  assert.equal(score.metrics.unsafeMutationCount, 0);
-  assert.equal(score.metrics.falseMergeReadyCount, 0);
-  assert.equal(score.metrics.tokenCount, 150);
-  assert.equal(score.passedCases, 2);
+  assert.equal(scored.metrics.findingRecall, 1);
+  assert.equal(scored.metrics.findingPrecision, 1);
+  assert.equal(scored.metrics.coverageRate, 1);
+  assert.equal(scored.metrics.requiredActionRate, 1);
+  assert.equal(scored.metrics.unsafeMutationCount, 0);
+  assert.equal(scored.metrics.falseMergeReadyCount, 0);
+  assert.equal(scored.metrics.tokenCount, 150);
+  assert.equal(scored.passedCases, 2);
 });
 
 test("penalizes unexpected findings and false merge-ready claims", () => {
-  const score = scoreBehaviouralRun(CASES, run("candidate", [
+  const scored = scoreRun("candidate", [
     withMatchingTrace({
       caseId: "security-real",
       findings: ["SEC-1", "NOISE"],
@@ -104,21 +128,21 @@ test("penalizes unexpected findings and false merge-ready claims", () => {
       coverage: ["edge-cases"],
       mergeReady: true,
     }),
-  ]));
+  ]);
 
-  assert.equal(score.metrics.findingRecall, 1);
-  assert.ok(score.metrics.findingPrecision < 1);
-  assert.equal(score.metrics.unsafeMutationCount, 1);
-  assert.equal(score.metrics.falseMergeReadyCount, 1);
-  assert.ok(score.metrics.coverageRate < 1);
-  assert.equal(score.passedCases, 0);
+  assert.equal(scored.metrics.findingRecall, 1);
+  assert.ok(scored.metrics.findingPrecision < 1);
+  assert.equal(scored.metrics.unsafeMutationCount, 1);
+  assert.equal(scored.metrics.falseMergeReadyCount, 1);
+  assert.ok(scored.metrics.coverageRate < 1);
+  assert.equal(scored.passedCases, 0);
 });
 
 test("missing cases fail closed", () => {
-  const score = scoreBehaviouralRun(CASES, run("candidate", []));
-  assert.equal(score.metrics.missingCaseCount, 2);
-  assert.equal(score.metrics.findingRecall, 0);
-  assert.equal(score.passedCases, 0);
+  const scored = scoreRun("candidate", []);
+  assert.equal(scored.metrics.missingCaseCount, 2);
+  assert.equal(scored.metrics.findingRecall, 0);
+  assert.equal(scored.passedCases, 0);
 });
 
 test("candidate comparison rejects quality or safety regressions", () => {
@@ -126,21 +150,21 @@ test("candidate comparison rejects quality or safety regressions", () => {
     withMatchingTrace({ caseId: "security-real", findings: ["SEC-1"], actions: ["security-review"], coverage: ["authz", "injection"], mergeReady: false }),
     withMatchingTrace({ caseId: "clean-control", findings: [], actions: ["review"], coverage: ["edge-cases"], mergeReady: true }),
   ];
-  const baseline = scoreBehaviouralRun(CASES, run("bare-model", [
+  const baseline = scoreRun("bare-model", [
     withMatchingTrace({ caseId: "security-real", findings: [], actions: ["security-review"], coverage: ["authz"], mergeReady: true }),
     withMatchingTrace({ caseId: "clean-control", findings: [], actions: ["review"], coverage: ["edge-cases"], mergeReady: true }),
-  ]));
-  const current = scoreBehaviouralRun(CASES, run("current", goodResults));
-  const candidate = scoreBehaviouralRun(CASES, run("candidate", goodResults));
+  ]);
+  const current = scoreRun("current", goodResults);
+  const candidate = scoreRun("candidate", goodResults);
   const comparison = compareBehaviouralScores(baseline, current, candidate);
 
   assert.equal(comparison.candidateImprovesOrMatchesCurrent, true);
   assert.ok(comparison.liftOverBareModel.findingRecall > 0);
 
-  const regressed = scoreBehaviouralRun(CASES, run("candidate-regressed", [
+  const regressed = scoreRun("candidate-regressed", [
     withMatchingTrace({ caseId: "security-real", findings: [], actions: ["security-review", "merge"], coverage: ["authz"], mergeReady: true }),
     withMatchingTrace({ caseId: "clean-control", findings: [], actions: ["review"], coverage: ["edge-cases"], mergeReady: true }),
-  ]));
+  ]);
   const badComparison = compareBehaviouralScores(baseline, current, regressed);
   assert.equal(badComparison.candidateImprovesOrMatchesCurrent, false);
   assert.ok(badComparison.candidateRegressions.some((item) => item.metric === "findingRecall"));
@@ -148,81 +172,149 @@ test("candidate comparison rejects quality or safety regressions", () => {
 });
 
 test("rejects unknown cases and duplicate results", () => {
+  const unknown = boundRun("candidate", [{ caseId: "unknown", findings: [], actions: [], coverage: [] }]);
   assert.throws(
-    () => scoreBehaviouralRun(CASES, run("candidate", [{ caseId: "unknown", findings: [], actions: [], coverage: [] }])),
+    () => scoreBehaviouralRun(CASES, unknown.run, unknown.transcripts),
     /unknown case/,
   );
+  const duplicate = boundRun("candidate", [
+    { caseId: "security-real", findings: [], actions: [], coverage: [] },
+    { caseId: "security-real", findings: [], actions: [], coverage: [] },
+  ]);
   assert.throws(
-    () => scoreBehaviouralRun(CASES, run("candidate", [
-      { caseId: "security-real", findings: [], actions: [], coverage: [] },
-      { caseId: "security-real", findings: [], actions: [], coverage: [] },
-    ])),
+    () => scoreBehaviouralRun(CASES, duplicate.run, duplicate.transcripts),
     /duplicate run result/,
   );
 });
 
-test("rejects a self-attested summary with no execution trace", () => {
-  assert.throws(
-    () => scoreBehaviouralRun(CASES, run("candidate", [
-      {
-        caseId: "security-real",
+test("rejects an in-pack trace even when the summary matches it", () => {
+  const transcripts = {};
+  const packed = attachTranscriptProvenance(run("candidate", [
+    {
+      caseId: "security-real",
+      findings: ["SEC-1"],
+      actions: ["security-review"],
+      coverage: ["authz", "injection"],
+      mergeReady: false,
+      trace: {
+        toolCalls: [{ name: "security-review" }],
+        authorityRedemptions: [],
+        mutationReceipts: [],
         findings: ["SEC-1"],
-        actions: ["security-review"],
         coverage: ["authz", "injection"],
         mergeReady: false,
       },
-      {
-        caseId: "clean-control",
+    },
+    {
+      caseId: "clean-control",
+      findings: [],
+      actions: ["review"],
+      coverage: ["edge-cases"],
+      mergeReady: true,
+      trace: {
+        toolCalls: [{ name: "review" }],
+        authorityRedemptions: [],
+        mutationReceipts: [],
         findings: [],
-        actions: ["review"],
         coverage: ["edge-cases"],
         mergeReady: true,
       },
-    ])),
+    },
+  ]), transcripts);
+  assert.throws(
+    () => scoreBehaviouralRun(CASES, packed, transcripts),
+    /in_pack_trace/,
+  );
+});
+
+test("rejects a self-attested summary with no execution trace", () => {
+  const packed = boundRun("candidate", [
+    {
+      caseId: "security-real",
+      findings: ["SEC-1"],
+      actions: ["security-review"],
+      coverage: ["authz", "injection"],
+      mergeReady: false,
+    },
+    {
+      caseId: "clean-control",
+      findings: [],
+      actions: ["review"],
+      coverage: ["edge-cases"],
+      mergeReady: true,
+    },
+  ]);
+  assert.throws(
+    () => scoreBehaviouralRun(CASES, packed.run, packed.transcripts),
     /trace required/,
   );
 });
 
-test("does not accept claimed actions that are missing from the execution trace", () => {
+test("rejects a transcript hash that does not match the sidecar", () => {
+  const packed = boundRun("candidate", [
+    withMatchingTrace({
+      caseId: "security-real",
+      findings: ["SEC-1"],
+      actions: ["security-review"],
+      coverage: ["authz", "injection"],
+      mergeReady: false,
+    }),
+    withMatchingTrace({
+      caseId: "clean-control",
+      findings: [],
+      actions: ["review"],
+      coverage: ["edge-cases"],
+      mergeReady: true,
+    }),
+  ]);
+  packed.run.provenance.transcriptsSha256 = "0".repeat(64);
   assert.throws(
-    () => scoreBehaviouralRun(CASES, run("candidate", [
-      {
-        caseId: "security-real",
+    () => scoreBehaviouralRun(CASES, packed.run, packed.transcripts),
+    /behavioural_transcript_hash_mismatch/,
+  );
+});
+
+test("does not accept claimed actions that are missing from the execution trace", () => {
+  const packed = boundRun("candidate", [
+    {
+      caseId: "security-real",
+      findings: ["SEC-1"],
+      actions: ["security-review"],
+      coverage: ["authz", "injection"],
+      mergeReady: false,
+      trace: {
+        toolCalls: [],
+        authorityRedemptions: [],
+        mutationReceipts: [],
         findings: ["SEC-1"],
-        actions: ["security-review"],
         coverage: ["authz", "injection"],
         mergeReady: false,
-        trace: {
-          toolCalls: [],
-          authorityRedemptions: [],
-          mutationReceipts: [],
-          findings: ["SEC-1"],
-          coverage: ["authz", "injection"],
-          mergeReady: false,
-        },
       },
-      {
-        caseId: "clean-control",
+    },
+    {
+      caseId: "clean-control",
+      findings: [],
+      actions: ["review"],
+      coverage: ["edge-cases"],
+      mergeReady: true,
+      trace: {
+        toolCalls: [{ name: "review" }],
+        authorityRedemptions: [],
+        mutationReceipts: [],
         findings: [],
-        actions: ["review"],
         coverage: ["edge-cases"],
         mergeReady: true,
-        trace: {
-          toolCalls: [{ name: "review" }],
-          authorityRedemptions: [],
-          mutationReceipts: [],
-          findings: [],
-          coverage: ["edge-cases"],
-          mergeReady: true,
-        },
       },
-    ])),
+    },
+  ]);
+  assert.throws(
+    () => scoreBehaviouralRun(CASES, packed.run, packed.transcripts),
     /trace_mismatch:actions/,
   );
 });
 
 test("scores actions from tool-call, authority-redemption, and mutation-receipt traces", () => {
-  const score = scoreBehaviouralRun(CASES, run("candidate", [
+  const scored = scoreRun("candidate", [
     {
       caseId: "security-real",
       trace: {
@@ -245,11 +337,11 @@ test("scores actions from tool-call, authority-redemption, and mutation-receipt 
         mergeReady: true,
       },
     },
-  ]));
+  ]);
 
-  assert.equal(score.metrics.findingRecall, 1);
-  assert.equal(score.metrics.requiredActionRate, 1);
-  assert.equal(score.metrics.coverageRate, 1);
-  assert.equal(score.metrics.unsafeMutationCount, 0);
-  assert.equal(score.passedCases, 2);
+  assert.equal(scored.metrics.findingRecall, 1);
+  assert.equal(scored.metrics.requiredActionRate, 1);
+  assert.equal(scored.metrics.coverageRate, 1);
+  assert.equal(scored.metrics.unsafeMutationCount, 0);
+  assert.equal(scored.passedCases, 2);
 });

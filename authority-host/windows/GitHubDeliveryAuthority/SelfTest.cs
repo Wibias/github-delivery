@@ -6,7 +6,7 @@ namespace GitHubDeliveryAuthority;
 
 internal static class SelfTest
 {
-    private const string ExpectedMergeScope = "5792e06b57c2f0eece1cdc227d4ccb0b75012bb9ed65bbf183e3bd994aaeb8b8";
+    private const string ExpectedMergeScope = "4513a56e7639d6f8e83e8e43b8af2cb305b06674259527488595b8bef4040d60";
 
     public static int Run()
     {
@@ -35,16 +35,16 @@ internal static class SelfTest
     private static void ScopeFixture()
     {
         using var document = JsonDocument.Parse("""
-            {"schemaVersion":1,"action":"merge_pr","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","pr":105,"expectedHead":"71ac000000000000000000000000000000000001","mergeMethod":"merge"}
+            {"schemaVersion":1,"action":"merge_pr","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","pr":105,"expectedHead":"71ac000000000000000000000000000000000001","expectedBase":"main","expectedBaseOid":"72ac000000000000000000000000000000000001","mergeMethod":"merge"}
             """);
         var actual = ScopeCanonicalizer.ScopeSha256(document.RootElement);
         Assert(actual == ExpectedMergeScope, $"scope fixture mismatch: {actual}");
 
         using var branchA = JsonDocument.Parse("""
-            {"schemaVersion":1,"action":"merge_pr","mutationMode":"maintainer","repo":"Wibias/github-delivery","pr":105,"expectedHead":"71ac000000000000000000000000000000000001","authorityBranch":"feature/a","mergeMethod":"merge"}
+            {"schemaVersion":1,"action":"merge_pr","mutationMode":"maintainer","repo":"Wibias/github-delivery","pr":105,"expectedHead":"71ac000000000000000000000000000000000001","expectedBase":"main","expectedBaseOid":"72ac000000000000000000000000000000000001","authorityBranch":"feature/a","mergeMethod":"merge"}
             """);
         using var branchB = JsonDocument.Parse("""
-            {"schemaVersion":1,"action":"merge_pr","mutationMode":"maintainer","repo":"Wibias/github-delivery","pr":105,"expectedHead":"71ac000000000000000000000000000000000001","authorityBranch":"feature/b","mergeMethod":"merge"}
+            {"schemaVersion":1,"action":"merge_pr","mutationMode":"maintainer","repo":"Wibias/github-delivery","pr":105,"expectedHead":"71ac000000000000000000000000000000000001","expectedBase":"main","expectedBaseOid":"72ac000000000000000000000000000000000001","authorityBranch":"feature/b","mergeMethod":"merge"}
             """);
         Assert(
             ScopeCanonicalizer.ScopeSha256(branchA.RootElement) != ScopeCanonicalizer.ScopeSha256(branchB.RootElement),
@@ -157,15 +157,20 @@ internal static class SelfTest
 
             using var comment = JsonDocument.Parse("{\"action\":\"post_comment\",\"pr\":12}");
             Assert(!MutationClassifier.IsPrSessionEligible(comment.RootElement), "comments must not be PR-session eligible");
-            using var merge = JsonDocument.Parse("{\"action\":\"merge_pr\",\"pr\":12,\"authorityBranch\":\"feature/session-test\"}");
+            using var merge = JsonDocument.Parse("{\"action\":\"merge_pr\",\"pr\":12,\"authorityBranch\":\"feature/session-test\",\"expectedBase\":\"main\",\"expectedBaseOid\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}");
             using var push = JsonDocument.Parse("{\"action\":\"push_code\",\"pr\":12,\"branch\":\"feature/session-test\"}");
             Assert(MutationClassifier.IsPrSessionEligible(merge.RootElement), "merge must be PR-session eligible");
             Assert(MutationClassifier.IsPrSessionEligible(push.RootElement), "push must be PR-session eligible");
             Assert(PrSessionScope.Resolve(new[] { merge.RootElement, push.RootElement })?.Pr == 12, "PR session scope missing");
-            using var otherPr = JsonDocument.Parse("{\"action\":\"merge_pr\",\"pr\":99,\"authorityBranch\":\"feature/session-test\"}");
+            Assert(PrSessionScope.Resolve(new[] { merge.RootElement, push.RootElement })?.ExpectedBase == "main", "PR session base missing");
+            using var otherPr = JsonDocument.Parse("{\"action\":\"merge_pr\",\"pr\":99,\"authorityBranch\":\"feature/session-test\",\"expectedBase\":\"main\",\"expectedBaseOid\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}");
             Assert(PrSessionScope.Resolve(new[] { merge.RootElement, otherPr.RootElement }) is null, "mixed PR numbers must not resolve");
             using var noPrPush = JsonDocument.Parse("{\"action\":\"push_code\",\"branch\":\"feature/session-test\"}");
             Assert(PrSessionScope.Resolve(new[] { noPrPush.RootElement }) is null, "push without pr must not start a PR session");
+            using var mergeNoBase = JsonDocument.Parse("{\"action\":\"merge_pr\",\"pr\":12,\"authorityBranch\":\"feature/session-test\"}");
+            Assert(PrSessionScope.Resolve(new[] { mergeNoBase.RootElement }) is null, "merge without expected base must not resolve");
+            using var retargeted = JsonDocument.Parse("{\"action\":\"merge_pr\",\"pr\":12,\"authorityBranch\":\"feature/session-test\",\"expectedBase\":\"dev\",\"expectedBaseOid\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"}");
+            Assert(PrSessionScope.Resolve(new[] { merge.RootElement, retargeted.RootElement }) is null, "mixed merge bases must not resolve");
 
             try
             {
@@ -174,19 +179,25 @@ internal static class SelfTest
             }
             catch (AuthorityException error) when (error.Code == "pr_session_minutes_invalid") { }
 
-            var session = store.CreatePrSession(repo, branch, 12, now, 5);
+            var session = store.CreatePrSession(repo, branch, 12, now, 5, "main", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
             Assert(store.TryGetActivePrSession(repo, branch, 12, now + 1)?.SessionId == session.SessionId, "PR session exact scope missing");
             Assert(store.TryGetActivePrSession(repo, branch, 13, now + 1) is null, "PR session crossed pull request scope");
             Assert(store.TryGetActivePrSession(repo, "feature/other", 12, now + 1) is null, "PR session crossed branch scope");
             Assert(store.TryGetActivePrSession("Other/repo", branch, 12, now + 1) is null, "PR session crossed repository scope");
             Console.WriteLine("pr_session_scope");
 
-            var used = store.TryUseActivePrSession(repo, branch, 12, now + 2, 2);
+            var used = store.TryUseActivePrSession(repo, branch, 12, "main", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", now + 2, 2);
             Assert(used?.SessionId == session.SessionId, "atomic PR session use failed");
+            Assert(store.TryUseActivePrSession(repo, branch, 12, "dev", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", now + 2, 1) is null, "PR session crossed merge base");
+            var pushOnly = store.CreatePrSession(repo, "feature/push-only-session", 15, now + 2, 5);
+            Assert(store.TryUseActivePrSession(repo, "feature/push-only-session", 15, "main", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", now + 3, 1) is null, "base-less session must not cover merge");
+            Assert(store.TryUseActivePrSession(repo, "feature/push-only-session", 15, null, null, now + 3, 1)?.SessionId == pushOnly.SessionId, "push-only session use failed");
+            Console.WriteLine("pr_session_base");
 
             Assert(store.TryGetActivePrSession(repo, branch, 12, now + 301) is null, "expired PR session remained active");
             Assert(store.RecordExpiredPrSessions(now + 301) == 1, "expired PR session was not audited");
-            Assert(store.RecordExpiredPrSessions(now + 302) == 0, "expired PR session audit duplicated");
+            Assert(store.RecordExpiredPrSessions(now + 302) == 1, "expired push-only PR session was not audited");
+            Assert(store.RecordExpiredPrSessions(now + 303) == 0, "expired PR session audit duplicated");
             Console.WriteLine("pr_session_expiry");
 
             var revoke = store.CreatePrSession(repo, "feature/revoke-session", 44, now + 2, 15);
