@@ -14,6 +14,7 @@ test("git policy binds content-preserving rewrites to the original tree", () => 
   assert.match(git, /rewriteExemption/);
   assert.match(stacks, /GD-GIT-008/);
   assert.match(stacks, /rewriteExemption/);
+  assert.match(stacks, /"rewriteExemption": "restack"/);
 });
 
 test("PR descriptions call out core versus generated files", () => {

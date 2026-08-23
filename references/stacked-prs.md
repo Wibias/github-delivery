@@ -253,7 +253,8 @@ Build the broker request with the **actual repository targeted by `$PushRemote`*
   "branch": "CHILD_BRANCH",
   "expectedRemoteTip": "RECORDED_REMOTE_TIP",
   "newTip": "REWRITTEN_LOCAL_TIP",
-  "forceWithLease": true
+  "forceWithLease": true,
+  "rewriteExemption": "restack"
 }
 ```
 
@@ -261,7 +262,7 @@ Plan and execute it through `scripts/github-mutate.mjs`. The broker:
 
 - verifies the named Git remote resolves to the authorized GitHub repository;
 - re-reads the exact remote branch generation;
-- binds old/new tips and the rewrite flag into the trusted grant scope;
+- binds old/new tips, the rewrite flag, and a non-empty `rewriteExemption` into the trusted grant scope;
 - redeems the grant immediately before the exact push command;
 - uses an exact `--force-with-lease` expectation;
 - verifies the remote branch equals `newTip` after the push.

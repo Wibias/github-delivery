@@ -93,8 +93,10 @@ function detectMoves(dels, adds, preserveIndent) {
       if (matches >= MOVE_THRESHOLD && matches >= overlap * 0.7) {
         for (let offset = 0; offset < overlap; offset += 1) {
           if (delNorm[offset] === addNorm[offset]) {
-            movedDels[delBlock[offset]] = { exact: true };
-            movedAdds[addBlock[offset]] = { exact: true };
+            const exact = dels[delBlock[offset]].code === adds[addBlock[offset]].code;
+            movedDels[delBlock[offset]] = { exact };
+            movedAdds[addBlock[offset]] = { exact };
+            if (!exact) changedLineCount += 1;
           } else {
             changedLineCount += 1;
           }

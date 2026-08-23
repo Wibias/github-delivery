@@ -7,6 +7,10 @@ namespace GitHubDeliveryAuthority;
 internal static class SelfTest
 {
     private const string ExpectedMergeScope = "4513a56e7639d6f8e83e8e43b8af2cb305b06674259527488595b8bef4040d60";
+    private const string ExpectedPushScopeNone = "a7015b2cd5427b00930bd30d41d1339a9f9a2503855059bff722c9a6499dcf48";
+    private const string ExpectedPushScopeRestack = "c5f692087892baf9be58e3e28c321d3d17b7bcabbc4c93ae7be0a26190c86923";
+    private const string ExpectedPushScopeConflicts = "b5bcb2cbdc281ab87f36caef36093753b2751a83e796ecf8c29d3adeb4565bd1";
+    private const string ExpectedPushScopeSimplifyPr = "54e006d309afdcd7787b212d5ae0f2470903304d33ba4a20cfa7d6bbc6bc886d";
 
     public static int Run()
     {
@@ -49,6 +53,30 @@ internal static class SelfTest
         Assert(
             ScopeCanonicalizer.ScopeSha256(branchA.RootElement) != ScopeCanonicalizer.ScopeSha256(branchB.RootElement),
             "branch must change the exact authority scope");
+
+        using var pushNone = JsonDocument.Parse("""
+            {"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true}
+            """);
+        using var pushRestack = JsonDocument.Parse("""
+            {"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":"restack"}
+            """);
+        using var pushConflicts = JsonDocument.Parse("""
+            {"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":"conflicts"}
+            """);
+        using var pushSimplifyPr = JsonDocument.Parse("""
+            {"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":"simplify-pr"}
+            """);
+        var pushNoneHash = ScopeCanonicalizer.ScopeSha256(pushNone.RootElement);
+        var pushRestackHash = ScopeCanonicalizer.ScopeSha256(pushRestack.RootElement);
+        var pushConflictsHash = ScopeCanonicalizer.ScopeSha256(pushConflicts.RootElement);
+        var pushSimplifyHash = ScopeCanonicalizer.ScopeSha256(pushSimplifyPr.RootElement);
+        Assert(pushNoneHash == ExpectedPushScopeNone, $"push none fixture mismatch: {pushNoneHash}");
+        Assert(pushRestackHash == ExpectedPushScopeRestack, $"push restack fixture mismatch: {pushRestackHash}");
+        Assert(pushConflictsHash == ExpectedPushScopeConflicts, $"push conflicts fixture mismatch: {pushConflictsHash}");
+        Assert(pushSimplifyHash == ExpectedPushScopeSimplifyPr, $"push simplify-pr fixture mismatch: {pushSimplifyHash}");
+        Assert(
+            pushNoneHash != pushRestackHash && pushRestackHash != pushConflictsHash && pushConflictsHash != pushSimplifyHash,
+            "rewrite exemptions must change the exact push authority scope");
     }
 
     private static void GrantFixture()

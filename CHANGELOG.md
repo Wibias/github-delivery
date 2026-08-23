@@ -20,7 +20,9 @@ All notable changes to `github-delivery` are documented here.
 ### Fixed
 
 - Non-fast-forward force-with-lease `push_code` fails closed unless the new tip tree matches the previous tip or `rewriteExemption` is restack, conflicts, or simplify-pr.
+- Restack `push_code` requests include `rewriteExemption`, and Windows Hello hashes that field the same way Node does: omit it when empty, include it when set.
 - Moved-code hints only suppress exact unchanged relocations. Near-match and indentation-sensitive edits stay in review, and file roles follow review-scope logic paths with path-segment mechanical directories.
+- Exact moved-code classification uses raw source-line equality, so whitespace inside strings, template literals, and trailing spaces counts as a change.
 
 ## [1.0.0] - 2026-08-22
 

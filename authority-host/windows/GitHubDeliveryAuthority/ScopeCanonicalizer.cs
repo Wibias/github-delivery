@@ -63,6 +63,13 @@ internal static partial class ScopeCanonicalizer
                 scope["expectedRemoteTip"] = RequiredString(request, "expectedRemoteTip");
                 scope["newTip"] = RequiredString(request, "newTip");
                 scope["forceWithLease"] = request.TryGetProperty("forceWithLease", out var forceWithLease) && forceWithLease.ValueKind == JsonValueKind.True;
+                var rewriteExemption = OptionalString(request, "rewriteExemption");
+                if (rewriteExemption is not null)
+                {
+                    rewriteExemption = rewriteExemption.Trim();
+                    if (rewriteExemption.Length == 0) throw new AuthorityException("authority_scope_rewrite_exemption_required");
+                    scope["rewriteExemption"] = rewriteExemption;
+                }
                 break;
 
             case "create_pr":

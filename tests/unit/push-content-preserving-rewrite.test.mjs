@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  authorityScopeForRequest,
+} from "../../scripts/lib/authority-scope.mjs";
+import {
   preflightLifecycleMutation,
   validateLifecycleMutation,
 } from "../../scripts/lib/lifecycle-mutations.mjs";
@@ -87,12 +90,22 @@ test("changed-tree history rewrite cannot reach push_code", () => {
 });
 
 test("restack exemption skips tree identity", () => {
-  assert.equal(validateLifecycleMutation(pushRequest({ rewriteExemption: "restack" })), true);
+  const request = pushRequest({ rewriteExemption: "restack" });
+  assert.equal(validateLifecycleMutation(request), true);
+  assert.equal(authorityScopeForRequest(request).rewriteExemption, "restack");
   assert.doesNotThrow(() =>
     preflightLifecycleMutation({
-      request: pushRequest({ rewriteExemption: "restack" }),
+      request,
       runner: rewriteRunner({ ancestor: false, originalTree: TREE_A, newTree: TREE_B }),
     }),
+  );
+  assert.throws(
+    () =>
+      preflightLifecycleMutation({
+        request: pushRequest(),
+        runner: rewriteRunner({ ancestor: false, originalTree: TREE_A, newTree: TREE_B }),
+      }),
+    /content_preserving_rewrite_tree_mismatch/,
   );
 });
 

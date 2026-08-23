@@ -105,3 +105,51 @@ test("python indentation changes are not exact relocations", () => {
   ].join("\n");
   assert.equal(summarizeMovedCode(patch, "src/app.py"), null);
 });
+
+test("whitespace inside JS strings is not exact moved code", () => {
+  const patch = [
+    "@@ -1,6 +1,6 @@",
+    `-const label = "a  b";`,
+    "-return label;",
+    "-use(label);",
+    `+const label = "a b";`,
+    "+return label;",
+    "+use(label);",
+  ].join("\n");
+  const summary = summarizeMovedCode(patch, "src/app.mjs");
+  assert.equal(summary.movedLineCount, 3);
+  assert.equal(summary.changedLineCount, 1);
+  assert.equal(summary.exact, false);
+});
+
+test("template literal content changes are not exact moved code", () => {
+  const patch = [
+    "@@ -1,6 +1,6 @@",
+    "-const msg = `hello  world`;",
+    "-return msg;",
+    "-use(msg);",
+    "+const msg = `hello world`;",
+    "+return msg;",
+    "+use(msg);",
+  ].join("\n");
+  const summary = summarizeMovedCode(patch, "src/app.mjs");
+  assert.equal(summary.movedLineCount, 3);
+  assert.equal(summary.changedLineCount, 1);
+  assert.equal(summary.exact, false);
+});
+
+test("significant trailing whitespace is not exact moved code", () => {
+  const patch = [
+    "@@ -1,6 +1,6 @@",
+    "-const keep = value;",
+    "-return keep;  ",
+    "-use(keep);",
+    "+const keep = value;",
+    "+return keep;",
+    "+use(keep);",
+  ].join("\n");
+  const summary = summarizeMovedCode(patch, "src/app.mjs");
+  assert.equal(summary.movedLineCount, 3);
+  assert.equal(summary.changedLineCount, 1);
+  assert.equal(summary.exact, false);
+});

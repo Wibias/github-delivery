@@ -44,6 +44,12 @@ function pushRunner({ pushResult, remoteAfterPush }) {
       const tip = lsRemoteCount === 1 ? OLD : remoteAfterPush;
       return { status: 0, stdout: `${tip}\trefs/heads/feature/safe\n`, stderr: "" };
     }
+    if (command === "git" && args[0] === "merge-base") {
+      return { status: 1, stdout: "", stderr: "" };
+    }
+    if (command === "git" && args[0] === "rev-parse") {
+      return { status: 0, stdout: `${"e".repeat(40)}\n`, stderr: "" };
+    }
     if (command === "git" && args[0] === "push") {
       return pushResult;
     }
