@@ -4,6 +4,14 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- History-only Git rewrites (squash, reword, reorder, commit grouping) must keep the original `HEAD^{tree}` before a force-with-lease push (`GD-GIT-008`). Restack onto a new parent still skips that check.
+
+### Changed
+
+- Review briefs label files as core, mechanical, or other, and call out relocated blocks of three or more lines as moved code rather than new logic. PR description review notes name the core files when a diff mixes implementation with generated or lockfile changes.
+
 ## [1.0.0] - 2026-08-22
 
 ### Added
