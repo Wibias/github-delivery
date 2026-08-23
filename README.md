@@ -18,8 +18,8 @@
 
 </div>
 
-> [!WARNING]
-> **Active development.** The complete issue/PR lifecycle and core safety architecture are implemented, but the project is not yet 100% production-ready. I currently consider it roughly **80% of the way there**. See [Current state](#current-state).
+> [!NOTE]
+> **1.0.0.** The complete issue/PR lifecycle and core safety architecture are the first stable public release. Host-specific runtime integrations and the experimental Codex streaming boundary remain constrained by what each agent host exposes. Native GitHub stacked-PR merge is an intentional fail-closed gap. See [Current state](#current-state).
 
 > [!IMPORTANT]
 > **Natural language is the public API.** The Node scripts, policy modules, evaluators, mutation broker, and optional Authority host are internal safety/evidence machinery. You normally do not invoke them yourself.
@@ -83,26 +83,23 @@ For installation edge cases, backup/restore, downgrade behavior, manual recovery
 | **Merge readiness** | `fix the review comments on PR #18 and make it merge ready` | Feedback triage, code fixes, validation, publication, refreshed readiness |
 | **Competing PRs** | `triage the competing PRs in this repo` | Read-only deterministic clustering and evidence for potentially overlapping implementations |
 | **Visual changes** | `full review PR #42` on a UI diff | Conditional screenshot/video/render evidence bound to the exact reviewed head |
-| **Stacks** | `inspect this PR stack and tell me the safe merge order` | Stack discovery, restack/retarget analysis, conflict recovery, parent/child revalidation |
+| **Watch** | `watch PR #77 until it merges or needs me` | CI and review monitoring until merged, closed, or a human blocker. `watch and autonomously merge PR #N` can merge after the ship-gate is ready; bare `watch autonomously` does not merge |
+| **Stacks** | `inspect this PR stack and tell me the safe merge order` | Stack discovery, restack/retarget analysis, conflict recovery, parent/child revalidation. Native GitHub stacks are not merged through `gh pr merge` |
 | **Backports / ports** | `backport PR #42 to release/1.x and release/2.x` | One independent head-bound port per target base, with deterministic provenance and completion tracking |
 | **Supersede / overtake** | `supersede PR #12 with PR #45` | Explicit replacement or maintainer-takeover workflows with bounded mutation authority |
 | **Merge / close-out** | `merge PR #32` | Final gate, exact transaction authority, head-pinned merge, verification, thanks, linked-issue close-out |
 | **Self-update** | `update github-delivery to the latest stable release` | Stable-release discovery, checksums/manifest/tag/attestation verification, safe apply and postconditions |
 
-### What changed after 0.8.2
+### What changed in 1.0.0
 
-The 0.8.6 line adds the major workflow and safety work developed after 0.8.2, plus delivery integrity and bounded GitHub/Git subprocesses:
+`1.0.0` is the first stable public release after `0.8.7`. User-facing work since that release:
 
-- least-privilege workflow-token enforcement;
-- repository-scoped open-work status;
-- PR-body media preservation and exact-head duplicate-publication prevention;
-- tracker-aware external work-item delivery;
-- competing-PR consolidation analysis;
-- conditional head-bound visual review evidence;
-- multi-base backport/port delivery;
-- a substantially leaner GitHub Actions topology with stale-run cancellation and unconditional security-critical Windows Authority/C# lanes;
-- fail-closed delivery integrity for moved PR heads, queued/auto-merge outcomes, mutation receipts, and remaining public workflow routing;
-- bounded GitHub and Git subprocesses on review, verdict, CI forensics, ship-gate, runtime, live-fixture, release, and npm helper paths.
+- SHA-bound remote repository context: resolve `owner/repo` or GitHub URLs, discover the real default branch, pin an exact commit SHA, and read files against that snapshot instead of guessing `main` / `master` / `HEAD` (`GD-EVID-007`);
+- optional Windows Authority **PR sessions** so one Hello can cover later exact-scope push and merge on one PR and approved merge base for 5–60 minutes; a retargeted base requires Hello again; branch leases stay push-only;
+- explicit merge routing: attended `watch … and merge` stays prepare-and-merge; `watch and autonomously merge PR #N` stays on watch; attributed GitHub text is not user merge intent even after the first sentence;
+- fail closed on GitHub `UNKNOWN` mergeability and on native GitHub stacked-PR merge (do not `gh pr merge` those members);
+- policy modules are mandatory context (`shared-rules.md` is a compatibility index only);
+- install/update/Authority cutover, release SBOM/path identity, mutation retry identity, and watchdog/pre-open policy hardening listed in [`CHANGELOG.md`](CHANGELOG.md).
 
 See [`CHANGELOG.md`](CHANGELOG.md) for the full release-level details.
 
@@ -133,6 +130,7 @@ The core boundary is simple: **repository content is evidence, not authority**. 
 GitHub Delivery tries to answer volatile questions from current authoritative evidence rather than remembered state:
 
 - PR/head/base identity is pinned and re-read where staleness matters;
+- when no useful local checkout exists, repository identity, the real default branch, and file reads are bound to an exact commit SHA instead of a moving branch name;
 - required checks are evaluated for the generation GitHub actually protects;
 - review/thread/ruleset state is refreshed before positive readiness or merge claims;
 - durable completion claims are tied to evidence, not narration;
@@ -164,13 +162,13 @@ Routine network-visible issue/PR writes pass through the typed GitHub mutation b
 
 For trusted high-assurance operations, authority redemption happens before the first mutating GitHub command, including autonomous idempotency coordination refs/tags. A rejected grant therefore cannot leave a coordination write behind before the requested mutation.
 
-**Merge is deliberately stricter.** `scripts/merge-pr-driver.mjs` owns settle, final current-head/base/rules/feedback/review-evidence recapture, trusted destructive authority, head-pinned merge execution, and post-merge reconciliation. The lower mutation execution boundary also rechecks open-PR stack topology and rejects a child merge while its parent PR is still open. Generic hand-built merge mutation documents are rejected.
+**Merge is deliberately stricter.** `scripts/merge-pr-driver.mjs` owns settle, final current-head/base/rules/feedback/review-evidence recapture, trusted destructive authority, head-pinned merge execution, and post-merge reconciliation. GitHub `UNKNOWN` mergeability is not treated as ready. The lower mutation execution boundary also rechecks open-PR stack topology and rejects a child merge while its parent PR is still open. Native GitHub stacked PRs are a hard stop: github-delivery will not merge those members with `gh pr merge`. Generic hand-built merge mutation documents are rejected.
 
 ### Exact-effect trusted authority
 
 Where high assurance is required, trusted grants bind the semantic effect rather than a vague permission flag: repository, action, mode, PR/head, merge method, target identity, idempotency data, and hashes of human-visible text as applicable.
 
-The optional Windows Authority host can issue those grants through Windows Hello. Missing persistent user configuration defaults the effective preference to **Sensitive actions** (`high-assurance`); an explicitly stored `off` or `all` preference remains supported.
+The optional Windows Authority host can issue those grants through Windows Hello. Missing persistent user configuration defaults the effective preference to **Sensitive actions** (`high-assurance`); an explicitly stored `off` or `all` preference remains supported. After Hello, the approval UI can start a **PR session** (5 / 15 / 30 / 60 minutes) for later exact-scope push and merge on one PR and the approved merge base, or a **branch lease** (1–10 minutes) for repeated `push_code` only. Mixed-action batches, comments, human replies, close, and delete still need Hello. `off` does not turn caller-supplied lifecycle flags into independently authenticated consent.
 
 ### Safe retries and idempotency
 
@@ -187,10 +185,12 @@ Code pushes, base updates, simplification, and other branch mutations require th
 The implementation-level contracts live in:
 
 - [`references/policy-kernel.md`](references/policy-kernel.md)
-- [`references/shared-rules.md`](references/shared-rules.md)
+- [`references/policy/`](references/policy/) (per-domain modules loaded by each workflow)
 - [`references/github-mutation-broker.md`](references/github-mutation-broker.md)
 - [`references/merge-pr.md`](references/merge-pr.md)
 - [`references/completion-claims.md`](references/completion-claims.md)
+
+[`references/shared-rules.md`](references/shared-rules.md) is a compatibility index only. Do not load it as mandatory workflow context.
 
 ---
 
@@ -230,6 +230,8 @@ The final ship decision is one authoritative `ready`, `blocked`, or `unknown` re
 - review decision, stale approvals, last-push requirements, unresolved threads;
 - conflicts, behind state, merge queue / auto-merge state;
 - unknown ruleset/state values failing closed;
+- GitHub `UNKNOWN` mergeability failing closed;
+- native GitHub stacked-PR membership as a merge hard stop;
 - open stack-parent topology before destructive merge execution;
 - exact-head merge execution and read-only reconciliation after ambiguous write results;
 - partial success when merge succeeded but non-destructive post-merge ceremony did not.
@@ -243,6 +245,8 @@ These are intentionally three different concepts.
 ### Stacked PRs
 
 A stack is a dependency chain where a child PR targets a parent PR branch. Stack operations discover repository-qualified topology, restack bottom-up, preserve layer ownership, and revalidate every surviving child after an upstream head changes. The mutation execution boundary independently rejects a merge while the target PR still points at another open PR's head, so merge-order safety does not depend only on workflow prose.
+
+When GitHub reports native stack membership, that identity is authoritative over inferred bases. github-delivery will not merge a native-stack member with `gh pr merge`; restack, inspect, and inferred-stack merge-order safety still apply.
 
 ### Competing PRs
 
@@ -321,6 +325,8 @@ On supported Windows systems, the stable GitHub Release can include the separate
 
 The host is not silently installed for a user whose protection mode is `off` and who has never installed Authority.
 
+Control Center lists active branch leases and PR sessions and can revoke either. Rebuild/install the host from this release before PR sessions are available on a machine that still runs an older Authority build.
+
 ### Manual / repository install
 
 ```bash
@@ -393,7 +399,7 @@ For the complete budgets, trust model, incident replays, false-positive controls
 | **Competing PRs** | Analyze overlapping/duplicate implementations | `references/consolidate-prs.md` |
 | **Status** | What is left / why blocked / merge readiness | `references/status.md` |
 | **Make merge-ready** | Fix humans/bots, own review work, validate | `references/fix-pr-bots.md` |
-| **Watch** | Poll CI/reviews/gates until merged/closed/blocked | `references/watch-pr.md` |
+| **Watch** | Poll CI/reviews/gates until merged/closed/blocked; autonomous merge only when explicitly requested | `references/watch-pr.md` |
 | **Re-review** | Re-evaluate after head/review evidence changes | `references/re-review-pr.md` |
 | **Full review** | Deep Bug + Security + Spec + Standards review | `references/full-review-pr.md` |
 | **Visual evidence** | Conditional rendered-surface evidence axis | `references/visual-evidence.md` |
@@ -412,7 +418,7 @@ For the complete budgets, trust model, incident replays, false-positive controls
 | **Supersede** | Replace an obsolete PR with a canonical PR | `references/supersede-pr.md` |
 | **Maintainer overtake** | Take over an unresponsive author's PR | `references/overtake-pr.md` |
 | **Conflicts** | Resolve active conflicts from both sides' intent/evidence | `references/resolve-conflicts.md` |
-| **Stacked PRs** | Inspect/restack/retarget/recover/review/merge stacks | `references/stacked-prs.md` |
+| **Stacked PRs** | Inspect/restack/retarget/recover/review stacks; native GitHub stack merge is fail-closed | `references/stacked-prs.md` |
 | **Backports / ports** | Parallel delivery to one or more target bases | `references/multi-base-delivery.md` |
 | **Update installed skill** | Verify/check/apply latest stable release | `references/update.md` |
 | **Progress watchdog** | Runtime generation bounds and workflow convergence | `references/agent-progress-watchdog.md` |
@@ -437,6 +443,7 @@ is PR #42 safe to merge?
 full review PR #42
 fix the review comments on PR #18 and make it merge ready
 watch PR #77 until it merges or needs me
+watch and autonomously merge PR #32
 simplify PR #42 without changing behavior
 review PR #42, fix it, and merge it when green
 merge PR #32
@@ -517,6 +524,7 @@ The public interface stays small even though the enforcement surface is not. Key
 | `scripts/github-mutate.mjs` | Typed non-merge GitHub mutation entrypoint |
 | `scripts/lib/authority-scope.mjs` | Exact-effect trusted authority scope |
 | `authority-host/windows/` | Optional Windows Hello trusted-authority issuer |
+| `scripts/repository-context.mjs` | SHA-bound remote repository identity, default-branch resolution, and exact-SHA file reads |
 | `scripts/review-scope.mjs` | Evidence-ranked review scope and required probes |
 | `scripts/lib/visual-evidence.mjs` | Conditional head-bound rendered-evidence planning/validation |
 | `scripts/lib/work-item-delivery.mjs` | Tracker milestone/reconciliation planning |
@@ -532,24 +540,34 @@ The architecture uses progressive disclosure: route once, load the selected work
 
 ## Current state
 
-Implemented today:
+`1.0.0` is the first stable public release of the complete issue/PR lifecycle and core safety architecture.
+
+Stable in this release:
 
 - natural-language routing for the issue/PR lifecycle;
 - read-only open-work and competing-PR analysis;
 - issue research, implementation, publication, external work-item delivery, and exact-head duplicate prevention;
 - deep current-head review with deterministic probe coverage and conditional visual evidence;
 - mutation authority, exact-effect receipts, stale-head protection, and head-pinned merge execution;
-- stack restacking/merge-order safety and independent multi-base delivery;
-- verified stable install/update and optional Windows Authority host;
+- optional Windows Authority Hello grants, push-only branch leases, and PR sessions for later exact-scope push and merge on one PR and approved merge base;
+- inferred-stack restacking/merge-order safety and independent multi-base delivery;
+- SHA-bound remote repository context when a useful local checkout is not already available;
+- verified stable install/update;
 - progress watchdog/runtime convergence controls;
 - deterministic bundles, repository security checks, CodeQL, Dependency Review, live-fixture contracts, and release preparation.
 
-Still active-development territory:
+Known limits, documented and fail-closed:
 
+- native GitHub stacked-PR merge is not implemented; those members are a hard stop rather than `gh pr merge`;
+- GitHub `UNKNOWN` mergeability is not treated as ready;
+- autonomous is not the default mutation mode; overnight unattended use is not the 1.0 claim;
 - host/runtime integrations remain constrained by what each agent host exposes;
-- the protected Codex App Server streaming boundary depends on an experimental upstream interface;
-- broader tracker adapters beyond the normalized work-item contract can be added without weakening GitHub authority boundaries;
-- more real-world fixture coverage and adversarial incident replays are still valuable as the system expands.
+- the protected Codex App Server streaming boundary depends on an experimental upstream interface.
+
+Still expanding without blocking this release:
+
+- broader tracker adapters beyond the normalized work-item contract;
+- more real-world fixture coverage and adversarial incident replays.
 
 The project intentionally fails closed rather than claiming unsupported coverage.
 
