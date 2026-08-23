@@ -36,3 +36,10 @@ test("merge documentation cannot waive required current-head review evidence", (
     /explicit merge-anyway instruction|merge-anyway instruction/i,
   );
 });
+
+test("ship-gate snapshot retries rate-limited read-only GitHub calls", () => {
+  const source = read("scripts/ship-gate-snapshot.mjs");
+  assert.match(source, /runGitHubCommandWithRetry/);
+  assert.match(source, /from "\.\/lib\/github-retry\.mjs"/);
+  assert.match(source, /runGitHubCommandWithRetry\("gh", args,/);
+});
