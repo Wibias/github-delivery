@@ -96,6 +96,24 @@ test("the canonical broker implementation may contain GitHub mutation commands",
   assert.equal(report.valid, true, JSON.stringify(report.errors));
 });
 
+test("privileged mutation files still reject secret and variable writes", () => {
+  const secret = fixture(
+    "scripts/lib/github-mutation-broker.mjs",
+    'spawnSync("gh", ["secret", "set", "TOKEN"]);\n',
+  );
+  const secretReport = validateMutationBoundaryTree(secret);
+  assert.equal(secretReport.valid, false);
+  assert.ok(codes(secretReport).includes("direct_gh_mutation"));
+
+  const variable = fixture(
+    "scripts/lib/lifecycle-mutations.mjs",
+    'spawnSync("gh", ["variable", "set", "FLAG"]);\n',
+  );
+  const variableReport = validateMutationBoundaryTree(variable);
+  assert.equal(variableReport.valid, false);
+  assert.ok(codes(variableReport).includes("direct_gh_mutation"));
+});
+
 test("the lifecycle mutation implementation may contain the brokered git push primitive", () => {
   const root = fixture(
     "scripts/lib/lifecycle-mutations.mjs",

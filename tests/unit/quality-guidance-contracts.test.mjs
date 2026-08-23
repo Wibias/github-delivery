@@ -2,6 +2,11 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
 
+import {
+  hashBehaviouralTranscripts,
+  scoreBehaviouralRun,
+} from "../../scripts/lib/behavioural-evals.mjs";
+
 function read(path) {
   return readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
 }
@@ -81,4 +86,30 @@ test("material non-local risk names and proves a safety invariant", () => {
   assert.match(reviews, /GD-REVIEW-011/);
   assert.match(reviews, /references\/safety-invariant\.md/);
   assert.match(bugHunt, /references\/safety-invariant\.md/);
+});
+
+test("behavioural eval docs do not show an in-pack trace in the run example", () => {
+  const docs = read("references/behavioural-evaluations.md");
+  const runSection = docs.split("## Run evidence schema")[1]?.split("## Compare")[0] ?? "";
+  assert.match(runSection, /transcriptsSha256/);
+  assert.match(runSection, /<run>\.transcript\.json/);
+  const fences = [...runSection.matchAll(/```json\r?\n([\s\S]*?)```/g)].map((match) => match[1]);
+  assert.ok(fences.length >= 1, "expected a JSON example in the run schema section");
+  for (const fence of fences) {
+    assert.doesNotMatch(fence, /"trace"\s*:/);
+  }
+  assert.match(docs, /Each run file must not embed `trace` objects/);
+});
+
+test("behavioural eval docs example scores with the runtime transcript hash", () => {
+  const docs = read("references/behavioural-evaluations.md");
+  const jsonFences = (markdown) => [...markdown.matchAll(/```json\r?\n([\s\S]*?)```/g)].map((match) => JSON.parse(match[1]));
+  const caseSection = docs.split("## Case schema")[1]?.split("## Run evidence schema")[0] ?? "";
+  const runSection = docs.split("## Run evidence schema")[1]?.split("## Compare")[0] ?? "";
+  const [caseExample] = jsonFences(caseSection);
+  const [pack, transcripts] = jsonFences(runSection);
+  assert.equal(pack.provenance.transcriptsSha256, hashBehaviouralTranscripts(transcripts));
+  const scored = scoreBehaviouralRun([caseExample], pack, transcripts);
+  assert.equal(scored.metrics.missingCaseCount, 0);
+  assert.equal(scored.passedCases, 1);
 });

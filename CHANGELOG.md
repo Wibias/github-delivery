@@ -22,19 +22,20 @@ All notable changes to `github-delivery` are documented here.
 
 ### Fixed
 
-- Ship-gate and merge fail closed on GitHub `UNKNOWN` mergeability instead of treating it as ready (PR #303).
+- Ship-gate and merge fail closed on GitHub `UNKNOWN` mergeability instead of treating it as ready, and snapshot capture retries rate-limited read-only GitHub calls instead of failing the first 429 (PRs #303, #361).
 - Native GitHub stacked PRs are a hard stop: github-delivery will not `gh pr merge` a native-stack member, and native-stack protection is evaluated against the stack base (PRs #304, #306).
 - Merge grants bind the approved base; Windows Hello `merge_pr` and `close_linked_issue` scopes hash the same fields Node already required; `close_linked_issue` binds the governing PR (PRs #335, #336, #349).
 - Live repository-policy CI fails closed when it cannot attest ruleset bypass actors or cannot see protected release tags (PRs #305, #308).
 - `authorityMode=off` still requires a verified host grant for lifecycle intent; caller-supplied `explicitInstruction` / exact-text flags are not independently authenticated consent (PR #340).
 - Mutation retries hash the full canonical payload, including draft-state ready identity, so retarget, reviewer, and draft differences cannot skip as already applied (PRs #341, #344, #346).
 - GitHub write transport no longer expands GraphQL `-F` values as local files, folds sibling API body fields into JSON stdin, and treats `gh api --input` as a write for rate-limit retry (PRs #313, #324, #325).
-- Install, update, and Authority cutover keep the previous skill/broker when a step fails: staged installer payloads, dist-not-cwd identity, exclusive reconcile/hooks locks, skill-backup restore, broker keep-alive, Startup-shortcut autostart, bundle-root fallback, crash recovery after `target → backup` before `staging → target`, restore journaling before aside swap, and journal updates that replace a complete temp file (PRs #314, #326–#332, #353, #355).
+- The mutation-boundary scanner still inspects privileged broker and lifecycle files, so secret and variable writes there cannot skip the direct-write checks (PR #360).
+- Install, update, and Authority cutover keep the previous skill/broker when a step fails: staged installer payloads, dist-not-cwd identity, exclusive reconcile/hooks locks, skill-backup restore, broker keep-alive, Startup-shortcut autostart, bundle-root fallback, crash recovery after `target → backup` before `staging → target`, staging journalled before copy with no promotion of unverified or journal-less leftover staging, restore journaling before aside swap, journal updates that replace a complete temp file, and journal replacement that moves the previous valid journal aside instead of deleting it (PRs #314, #326–#332, #353, #355, #357, #359).
 - Release artifacts fail closed on SPDX 2.3 schema, non-regular installed-manifest substitutions, and extraction path identity. Windows Authority can restore on Linux CI via `EnableWindowsTargeting`. `npm pack` spawns through Node, not a Windows shell (PRs #307, #337–#339, #345).
 - Watchdog hooks fail closed on throw, fence stale lock steals, do not treat an empty model as a quarantine wildcard, and spawn `verify-pr-head` as argv (PRs #309, #310, #315–#317).
 - Pre-open review treats agent-instruction markdown, Copilot MCP `servers.json`, and Cursor `mdc` project rules as operational policy, and classifies code paths with trailing format characters as logic (PRs #311, #318–#320).
 - Orphan-workflow cleanup rechecks ref SHAs before each delete. Behavioural eval scores require a hash-bound transcript sidecar instead of in-pack traces (PRs #333, #334, #352).
-- Behavioural-evaluation docs set `transcriptsSha256` to the SHA-256 of `canonicalJson` of the parsed sidecar object, matching `hashBehaviouralTranscripts` (PR #358).
+- Behavioural-evaluation docs show the run pack and `<run>.transcript.json` sidecar, and set `transcriptsSha256` to the SHA-256 of `canonicalJson` of the parsed sidecar object, matching `hashBehaviouralTranscripts` (PRs #356, #358).
 
 ## [0.8.7] - 2026-08-19
 
