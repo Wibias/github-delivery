@@ -1,19 +1,22 @@
+import { isReviewLogicPath } from "./review-scope.mjs";
+
 const MECHANICAL_RE =
-  /(^|\/)(?:package-lock\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb?|Cargo\.lock|go\.sum|Gemfile\.lock|composer\.lock)$|(?:^|\/)(?:dist|build|coverage|generated)\b|\.(?:map|snap|min\.js)$/i;
-const CORE_RE =
-  /\.(?:[cm]?[jt]sx?|mjs|cjs|py|go|rs|java|kt|rb|php|cs|swift|c|cc|cpp|h|hpp|vue|svelte)$/i;
+  /(^|\/)(?:package-lock\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb?|Cargo\.lock|go\.sum|Gemfile\.lock|composer\.lock)$|(?:^|\/)(?:dist|build|coverage|generated)(?:\/|$)|\.(?:map|snap|min\.js)$/i;
+const INDENT_SENSITIVE_RE = /\.(?:py|yaml|yml)$/i;
 
 const MOVE_THRESHOLD = 3;
 
 export function classifyReviewFileRole(path) {
   const normalized = String(path || "").replaceAll("\\", "/");
   if (MECHANICAL_RE.test(normalized)) return "mechanical";
-  if (CORE_RE.test(normalized)) return "core";
+  if (isReviewLogicPath(normalized)) return "core";
   return "other";
 }
 
-function normalizeWhitespace(value) {
-  return String(value || "").replace(/\s+/g, " ").trim();
+function lineKey(value, preserveIndent) {
+  const text = String(value || "").replace(/[ \t]+$/g, "");
+  if (preserveIndent) return text;
+  return text.replace(/[ \t]+/g, " ").trim();
 }
 
 function parseDiffChanges(patch) {
@@ -50,9 +53,10 @@ function parseDiffChanges(patch) {
   return { dels, adds };
 }
 
-function detectMoves(dels, adds) {
+function detectMoves(dels, adds, preserveIndent) {
   const movedDels = {};
   const movedAdds = {};
+  let changedLineCount = 0;
   for (let delIndex = 0; delIndex < dels.length; delIndex += 1) {
     if (movedDels[delIndex]) continue;
     const delBlock = [delIndex];
@@ -65,7 +69,7 @@ function detectMoves(dels, adds) {
       else break;
     }
     if (delBlock.length < MOVE_THRESHOLD) continue;
-    const delNorm = delBlock.map((index) => normalizeWhitespace(dels[index].code));
+    const delNorm = delBlock.map((index) => lineKey(dels[index].code, preserveIndent));
     for (let addIndex = 0; addIndex < adds.length; addIndex += 1) {
       if (movedAdds[addIndex]) continue;
       const addBlock = [addIndex];
@@ -79,7 +83,7 @@ function detectMoves(dels, adds) {
       }
       if (addBlock.length < MOVE_THRESHOLD) continue;
       const addNorm = addBlock.map((index) =>
-        normalizeWhitespace(adds[index].code),
+        lineKey(adds[index].code, preserveIndent),
       );
       const overlap = Math.min(delNorm.length, addNorm.length);
       let matches = 0;
@@ -88,24 +92,30 @@ function detectMoves(dels, adds) {
       }
       if (matches >= MOVE_THRESHOLD && matches >= overlap * 0.7) {
         for (let offset = 0; offset < overlap; offset += 1) {
-          movedDels[delBlock[offset]] = { exact: delNorm[offset] === addNorm[offset] };
-          movedAdds[addBlock[offset]] = { exact: delNorm[offset] === addNorm[offset] };
+          if (delNorm[offset] === addNorm[offset]) {
+            movedDels[delBlock[offset]] = { exact: true };
+            movedAdds[addBlock[offset]] = { exact: true };
+          } else {
+            changedLineCount += 1;
+          }
         }
         break;
       }
     }
   }
-  return { movedDels, movedAdds };
+  return { movedDels, changedLineCount };
 }
 
-export function summarizeMovedCode(patch) {
+export function summarizeMovedCode(patch, path = "") {
+  const preserveIndent = INDENT_SENSITIVE_RE.test(String(path || "").replaceAll("\\", "/"));
   const { dels, adds } = parseDiffChanges(patch);
-  const { movedDels } = detectMoves(dels, adds);
-  const moved = Object.values(movedDels);
-  if (moved.length < MOVE_THRESHOLD) return null;
+  const { movedDels, changedLineCount } = detectMoves(dels, adds, preserveIndent);
+  const movedLineCount = Object.keys(movedDels).length;
+  if (movedLineCount < MOVE_THRESHOLD) return null;
   return {
-    movedLineCount: moved.length,
-    exact: moved.every((item) => item.exact === true),
+    movedLineCount,
+    changedLineCount,
+    exact: changedLineCount === 0,
   };
 }
 

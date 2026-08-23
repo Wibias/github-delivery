@@ -93,6 +93,10 @@ test("push authority scope binds repository remote, exact generation, new tip, a
     authorityScopeSha256(request),
     authorityScopeSha256({ ...request, branch: "feature/other" }),
   );
+  assert.notEqual(
+    authorityScopeSha256(request),
+    authorityScopeSha256({ ...request, rewriteExemption: "restack" }),
+  );
 });
 
 test("PR creation scope binds exact content, topology, optional head repository, and idempotency key", () => {

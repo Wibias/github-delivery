@@ -10,10 +10,10 @@ test("git policy binds content-preserving rewrites to the original tree", () => 
   const git = read("references/policy/git.md");
   const stacks = read("references/stacked-prs.md");
   assert.match(git, /GD-GIT-008/);
-  assert.match(git, /HEAD\^\{\s*tree\s*\}|original tree/i);
-  assert.match(git, /content.preserving|reviewability/i);
+  assert.match(git, /tree matches/);
+  assert.match(git, /rewriteExemption/);
   assert.match(stacks, /GD-GIT-008/);
-  assert.match(stacks, /content-preserving|original tree/i);
+  assert.match(stacks, /rewriteExemption/);
 });
 
 test("PR descriptions call out core versus generated files", () => {
@@ -23,8 +23,10 @@ test("PR descriptions call out core versus generated files", () => {
   assert.match(body, /generated|mechanical/i);
 });
 
-test("full review treats relocated blocks as moves, not new logic", () => {
+test("full review treats only exact relocated blocks as not new logic", () => {
   const review = read("references/full-review-pr.md");
   assert.match(review, /moved code|relocated/i);
   assert.match(review, /review-brief/);
+  assert.match(review, /exact relocate|exact relocated|unchanged lines/i);
+  assert.match(review, /still in review|Near relocations/i);
 });

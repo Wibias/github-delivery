@@ -23,6 +23,18 @@ test("docs and changelog are neither core nor mechanical", () => {
   assert.equal(classifyReviewFileRole("README.md"), "other");
 });
 
+test("operational policy and GitHub paths follow review-scope logic", () => {
+  assert.equal(classifyReviewFileRole("references/policy/git.md"), "core");
+  assert.equal(classifyReviewFileRole(".github/workflows/ci.yml"), "core");
+  assert.equal(classifyReviewFileRole("SKILL.md"), "core");
+});
+
+test("mechanical dirs are path segments, not prefix matches", () => {
+  assert.equal(classifyReviewFileRole("dist/bundle.js"), "mechanical");
+  assert.equal(classifyReviewFileRole("build-tools/help.mjs"), "core");
+  assert.equal(classifyReviewFileRole("generated-client/api.ts"), "core");
+});
+
 test("detects a relocated block of three or more lines", () => {
   const patch = [
     "@@ -1,8 +1,8 @@",
@@ -49,4 +61,47 @@ test("does not treat an unrelated add/delete as a move", () => {
     " stay",
   ].join("\n");
   assert.equal(summarizeMovedCode(patch), null);
+});
+
+test("near relocation keeps modified lines out of the not-new-logic count", () => {
+  const patch = [
+    "@@ -1,12 +1,12 @@",
+    "-alpha()",
+    "-bravo()",
+    "-charlie()",
+    "-delta()",
+    "-echo()",
+    "-foxtrot()",
+    "-golf()",
+    "-hotel()",
+    "-india()",
+    "-oldBehavior()",
+    "+alpha()",
+    "+bravo()",
+    "+charlie()",
+    "+delta()",
+    "+echo()",
+    "+foxtrot()",
+    "+golf()",
+    "+hotel()",
+    "+india()",
+    "+newBehavior()",
+  ].join("\n");
+  const summary = summarizeMovedCode(patch, "src/app.mjs");
+  assert.equal(summary.movedLineCount, 9);
+  assert.equal(summary.changedLineCount, 1);
+  assert.equal(summary.exact, false);
+});
+
+test("python indentation changes are not exact relocations", () => {
+  const patch = [
+    "@@ -1,6 +1,6 @@",
+    "-def run():",
+    "-    if ready:",
+    "-        work()",
+    "+def run():",
+    "+if ready:",
+    "+    work()",
+  ].join("\n");
+  assert.equal(summarizeMovedCode(patch, "src/app.py"), null);
 });

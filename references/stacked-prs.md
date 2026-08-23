@@ -210,7 +210,7 @@ git update-ref $BackupRef $LocalTip
 
 Plan must identify branch, old local tip, expected remote tip, new parent, backup ref, and lease-pinned brokered push. Create a backup ref for every branch whose tip may be lost.
 
-If the rewrite is history-only (squash, reword, reorder, or commit grouping with the same intended tree), also record the original tree with `git rev-parse HEAD^{tree}` and satisfy `GD-GIT-008` with `assertContentPreservingRewrite` before `push_code`. Restack onto a new parent is expected to change the tree; do not apply that check there.
+If the rewrite is history-only (squash, reword, reorder, or commit grouping), `push_code` compares trees (`GD-GIT-008`). Restack onto a new parent sets `rewriteExemption: restack`.
 
 ## 5. Restack execution
 

@@ -1,6 +1,9 @@
 import { classifyCoveringPullRequests, normalizeCoveringPullPages } from "./covering-pr.mjs";
+import { assertContentPreservingRewrite } from "./content-preserving-rewrite.mjs";
 import { diffPrBodyMedia } from "./pr-body-media.mjs";
 import { assertPublishedMarkdown } from "./published-body-integrity.mjs";
+
+const REWRITE_EXEMPTIONS = new Set(["restack", "conflicts", "simplify-pr"]);
 
 const LIFECYCLE_ACTIONS = new Set([
   "push_code",
@@ -32,15 +35,41 @@ function exactSha(value, name, { absent = false } = {}) {
 
 function run(runner, command) {
   const [executable, ...args] = command;
-  const result = runner(executable, args, {
-    encoding: "utf8",
-    maxBuffer: 20 * 1024 * 1024,
-  });
+  const result = spawnGitStatus(runner, executable, args);
   if (result.status !== 0) {
     const detail = String(result.stderr || result.stdout || "").trim();
     throw new Error(detail || `mutation_preflight_failed:${result.status}`);
   }
   return String(result.stdout || "").trim();
+}
+
+function spawnGitStatus(runner, executable, args) {
+  const result = runner(executable, args, {
+    encoding: "utf8",
+    maxBuffer: 20 * 1024 * 1024,
+  });
+  if (result?.status == null || result.signal) {
+    const detail = String(result?.stderr || result?.stdout || "").trim();
+    throw new Error(detail || "mutation_preflight_failed:unknown");
+  }
+  return result;
+}
+
+function rewriteExemptionOf(request) {
+  if (request.rewriteExemption === undefined || request.rewriteExemption === null || request.rewriteExemption === "") {
+    return null;
+  }
+  const value = String(request.rewriteExemption);
+  if (!REWRITE_EXEMPTIONS.has(value)) throw new Error("rewrite_exemption_invalid");
+  return value;
+}
+
+function isAncestor(runner, ancestor, descendant) {
+  const result = spawnGitStatus(runner, "git", ["merge-base", "--is-ancestor", ancestor, descendant]);
+  if (result.status === 0) return true;
+  if (result.status === 1) return false;
+  const detail = String(result.stderr || result.stdout || "").trim();
+  throw new Error(detail || `mutation_preflight_failed:${result.status}`);
 }
 
 function parseJson(value, errorCode) {
@@ -99,6 +128,14 @@ function assertPushTarget(request, runner) {
   }
   if (request.forceWithLease !== true && expected !== "absent") {
     run(runner, ["git", "merge-base", "--is-ancestor", expected, newTip]);
+  }
+  if (expected !== "absent" && request.forceWithLease === true && !isAncestor(runner, expected, newTip)) {
+    const exemption = rewriteExemptionOf(request);
+    if (!exemption) {
+      const originalTree = run(runner, ["git", "rev-parse", `${expected}^{tree}`]);
+      const nextTree = run(runner, ["git", "rev-parse", `${newTip}^{tree}`]);
+      assertContentPreservingRewrite({ originalTree, newTree: nextTree });
+    }
   }
   return { remote, branch, expectedRemoteTip: expected, newTip };
 }
@@ -268,6 +305,7 @@ export function validateLifecycleMutation(request = {}) {
       exactSha(request.expectedRemoteTip, "expected_remote_tip", { absent: true });
       exactSha(request.newTip, "new_tip");
       if (typeof request.forceWithLease !== "boolean") throw new Error("force_with_lease_required");
+      rewriteExemptionOf(request);
       break;
     case "create_pr":
       required(request.base, "base");

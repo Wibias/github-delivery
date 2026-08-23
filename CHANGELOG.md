@@ -17,6 +17,11 @@ All notable changes to `github-delivery` are documented here.
 - Absence claims need a positive-control search that matches a known hit before `no residual X`.
 - Confirmation checks re-run in the same shell and PATH as the original observation so a PATH switch cannot produce a false result.
 
+### Fixed
+
+- Non-fast-forward force-with-lease `push_code` fails closed unless the new tip tree matches the previous tip or `rewriteExemption` is restack, conflicts, or simplify-pr.
+- Moved-code hints only suppress exact unchanged relocations. Near-match and indentation-sensitive edits stay in review, and file roles follow review-scope logic paths with path-segment mechanical directories.
+
 ## [1.0.0] - 2026-08-22
 
 ### Added

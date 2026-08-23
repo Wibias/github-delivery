@@ -32,4 +32,4 @@ Do not automatically delete a merged PR head branch. GitHub's ref-delete API doe
 
 ### GD-GIT-008 — Content-preserving rewrites keep the original tree
 
-Before squash, reword, reorder, or commit grouping, record `git rev-parse HEAD^{tree}`. Call `assertContentPreservingRewrite` before force-with-lease `push_code`. Restack, conflicts, and simplify-pr skip this.
+Non-fast-forward force-with-lease `push_code` fails closed unless the new tip tree matches the previous tip or `rewriteExemption` is restack, conflicts, or simplify-pr.

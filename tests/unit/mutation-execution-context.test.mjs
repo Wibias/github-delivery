@@ -287,6 +287,9 @@ test("push preflight binds the named remote to the authorized GitHub repository 
       if (command === "git" && args[0] === "ls-remote") {
         return { status: 0, stdout: `${"a".repeat(40)}\trefs/heads/feature/safe\n`, stderr: "" };
       }
+      if (command === "git" && args[0] === "merge-base") {
+        return { status: 0, stdout: "", stderr: "" };
+      }
       throw new Error(`unexpected command: ${command} ${args.join(" ")}`);
     },
   });

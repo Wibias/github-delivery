@@ -54,9 +54,9 @@ node "<github-delivery>/scripts/review-brief.mjs" OWNER/REPO N
 
 The brief names every required bug lens, security surface, and probe the run
 must cover, plus the exact changed-file hunks. It labels files as `core`,
-`mechanical`, or `other`, and notes relocated blocks of three or more lines as
-moved code. Do not treat those moves as new logic unless surrounding call sites
-or behavior also changed. Open a source file **only when a
+`mechanical`, or `other`, and notes exact relocated blocks of three or more
+unchanged lines as moved code. Do not treat those exact moves as new logic.
+Near relocations and indentation-sensitive edits stay in review. Open a source file **only when a
 lens actually needs more than the hunk** — do not read whole files preemptively.
 The brief also appends the **required probe blocks** extracted from the review
 references (`<!-- probe: <id> -->` sections), so the agent applies exactly the

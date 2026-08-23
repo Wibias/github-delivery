@@ -169,10 +169,15 @@ export function briefText({
     const file = normalizeFile(raw);
     const role = reviewFileHintLabel(classifyReviewFileRole(file.path));
     out.push(`### ${file.path} (${role}, +${file.additions}/-${file.deletions})`);
-    const moved = summarizeMovedCode(file.patch);
+    const moved = summarizeMovedCode(file.patch, file.path);
     if (moved) {
-      const exact = moved.exact ? "exact relocate" : "near relocate";
-      out.push(`Moved code: ${moved.movedLineCount} lines (${exact}; not new logic)`);
+      if (moved.exact) {
+        out.push(`Moved code: ${moved.movedLineCount} lines (exact relocate; not new logic)`);
+      } else {
+        out.push(
+          `Moved code: ${moved.movedLineCount} lines relocated; ${moved.changedLineCount} changed lines still in review`,
+        );
+      }
     }
 
     if (!file.patch.trim()) {

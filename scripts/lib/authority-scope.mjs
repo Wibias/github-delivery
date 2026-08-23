@@ -147,7 +147,8 @@ export function authorityScopeForRequest(request = {}) {
         newBase: exactString(request.newBase, "new_base"),
       };
 
-    case "push_code":
+    case "push_code": {
+      const rewriteExemption = optionalExactString(request.rewriteExemption, "rewrite_exemption");
       return {
         ...scope,
         remote: exactString(request.remote, "remote"),
@@ -155,7 +156,9 @@ export function authorityScopeForRequest(request = {}) {
         expectedRemoteTip: exactString(request.expectedRemoteTip, "expected_remote_tip"),
         newTip: exactString(request.newTip, "new_tip"),
         forceWithLease: request.forceWithLease === true,
+        ...(rewriteExemption ? { rewriteExemption } : {}),
       };
+    }
 
     case "create_pr": {
       const headRepo = optionalExactString(request.headRepo, "head_repo");
