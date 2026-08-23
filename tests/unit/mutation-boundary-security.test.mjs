@@ -122,3 +122,58 @@ test("the lifecycle mutation implementation may contain the brokered git push pr
   const report = validateMutationBoundaryTree(root);
   assert.equal(report.valid, true, JSON.stringify(report.errors));
 });
+
+test("rejects a GitHub mutation whose argv is built in a variable", () => {
+  const root = fixture(
+    "scripts/helper.mjs",
+    'const args = ["secret", "set", "TOKEN"];\nspawnSync("gh", args);\n',
+  );
+  const report = validateMutationBoundaryTree(root);
+  assert.equal(report.valid, false);
+  assert.ok(
+    codes(report).includes("direct_gh_mutation") || codes(report).includes("dynamic_gh_argv"),
+    JSON.stringify(report.errors),
+  );
+});
+
+test("rejects a GitHub mutation whose argv is spread from another array", () => {
+  const root = fixture(
+    "scripts/helper.mjs",
+    'const args = ["secret", "set", "TOKEN"];\nspawnSync("gh", [...args]);\n',
+  );
+  const report = validateMutationBoundaryTree(root);
+  assert.equal(report.valid, false);
+  assert.ok(
+    codes(report).includes("direct_gh_mutation") || codes(report).includes("dynamic_gh_argv"),
+    JSON.stringify(report.errors),
+  );
+});
+
+test("privileged mutation files reject mutating REST endpoints outside the registry shape", () => {
+  const root = fixture(
+    "scripts/lib/github-mutation-broker.mjs",
+    'spawnSync("gh", ["api", "repos/acme/widgets/actions/secrets/TOKEN", "--method", "PUT"]);\n',
+  );
+  const report = validateMutationBoundaryTree(root);
+  assert.equal(report.valid, false);
+  assert.ok(codes(report).includes("unregistered_gh_api_mutation"), JSON.stringify(report.errors));
+});
+
+test("privileged mutation files reject GraphQL mutations outside the registry set", () => {
+  const root = fixture(
+    "scripts/lib/github-mutation-broker.mjs",
+    'spawnSync("gh", ["api", "graphql", "-f", "query=mutation { addStar(input:{starrableId:\\"x\\"}) { clientMutationId } }"]);\n',
+  );
+  const report = validateMutationBoundaryTree(root);
+  assert.equal(report.valid, false);
+  assert.ok(codes(report).includes("unregistered_graphql_mutation"), JSON.stringify(report.errors));
+});
+
+test("read-only gh wrappers that take an args parameter remain allowed", () => {
+  const root = fixture(
+    "scripts/helper.mjs",
+    'function ghOk(args) {\n  return boundedSpawnSync("gh", args);\n}\nghOk(["pr", "view", "42"]);\n',
+  );
+  const report = validateMutationBoundaryTree(root);
+  assert.equal(report.valid, true, JSON.stringify(report.errors));
+});
