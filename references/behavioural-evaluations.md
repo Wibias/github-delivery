@@ -39,7 +39,11 @@ Each variant writes one JSON evidence pack plus a sibling `<run>.transcript.json
 Verdicts are scored from the sidecar traces, not from unbound summary arrays.
 If summary `findings` / `actions` / `coverage` / `mergeReady` fields are present,
 they must match the sidecar. An in-pack `trace` is rejected. Missing sidecar
-traces fail closed. `run.provenance.transcriptsSha256` must match the sidecar.
+traces fail closed. `run.provenance.transcriptsSha256` must equal
+`hashBehaviouralTranscripts(parsedSidecar)`: the SHA-256 of `canonicalJson` of
+the parsed sidecar object, not of the sidecar file bytes. Hashing the pretty-printed
+file fails closed with `behavioural_transcript_hash_mismatch`.
+`attachTranscriptProvenance(run, transcripts)` writes this field.
 
 Pack (`candidate.json`):
 
@@ -51,7 +55,7 @@ Pack (`candidate.json`):
   "skillVersion": "git-sha-or-version",
   "provenance": {
     "kind": "github-delivery/behavioural-transcript",
-    "transcriptsSha256": "<sha256 of candidate.transcript.json>"
+    "transcriptsSha256": "f7897435e7bf6e3b54d36e86319a63049aa1f722fa4bd6ea500166947abd3cbc"
   },
   "results": [
     {
@@ -84,7 +88,8 @@ Actions are the observed tool-call names plus authority-redemption and mutation-
 ## Compare
 
 Each run file must not embed `trace` objects. Observed evidence comes from a sibling
-`<run>.transcript.json` file, and `run.provenance.transcriptsSha256` must match that sidecar.
+`<run>.transcript.json` file, and `run.provenance.transcriptsSha256` must equal
+`hashBehaviouralTranscripts` of that parsed object.
 
 ```bash
 node scripts/compare-behavioural-evals.mjs \

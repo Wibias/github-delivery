@@ -6,6 +6,7 @@ All notable changes to `github-delivery` are documented here.
 
 ### Fixed
 
+- Behavioural-evaluation docs now set `transcriptsSha256` to the SHA-256 of `canonicalJson` of the parsed sidecar object, matching `hashBehaviouralTranscripts`.
 - Behavioural-evaluation docs now show the run pack and `<run>.transcript.json` sidecar, matching the scorer that rejects in-pack `trace` objects.
 - Installer restore now journals before moving the live target aside, and journal updates replace a complete temp file instead of truncating the live journal, so a crash still leaves a recoverable tree.
 - Automatic NuGet dependency submission can restore the Windows Authority host on Linux by setting `EnableWindowsTargeting`, so GitHub's hosted `submit-nuget` job no longer fails with NETSDK1100.
