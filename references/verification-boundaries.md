@@ -48,6 +48,8 @@ Prefer real repository code over elaborate internal mocks. Stub or fake an exter
 
 Do not build a browser/service/production-like environment solely to make a small change look more realistic when a smaller stable boundary proves the same behavior. Conversely, do not retreat to a trivial unit test when only a CLI/API/runtime path can distinguish the real failure.
 
+Re-run confirmation checks in the same shell and PATH as the original observation; a PATH switch can hit a different binary and produce a false result.
+
 ## Preserve observable order when order matters
 
 When behavior depends on sequencing, retries, side-effect count/order, cleanup, locking, or lifecycle transitions, assert the **observable contract** for that order.

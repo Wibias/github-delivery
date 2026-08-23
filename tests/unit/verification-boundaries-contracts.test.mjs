@@ -19,6 +19,7 @@ test("verification chooses the narrowest stable boundary that observes behavior"
   assert.match(boundary, /would fail if the protected behavior were actually broken/i);
   assert.match(boundary, /Prefer behavior over implementation shape/i);
   assert.match(boundary, /Use real paths without forcing giant end-to-end tests/i);
+  assert.match(boundary, /same shell and PATH/i);
   assert.match(boundary, /Preserve observable order when order matters/i);
   assert.match(boundary, /Characterization before refactor/i);
   assert.match(boundary, /mock choreography/i);
