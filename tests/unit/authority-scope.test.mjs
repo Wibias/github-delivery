@@ -118,7 +118,15 @@ test("push authority scope binds repository remote, exact generation, new tip, a
     authorityScopeSha256({ ...request, rewriteExemption: "conflicts" }),
     authorityScopeSha256({ ...request, rewriteExemption: "simplify-pr" }),
   );
+  for (const rewriteExemption of [["restack"], { kind: "restack" }, 1, true]) {
+    assert.throws(
+      () => authorityScopeForRequest({ ...request, rewriteExemption }),
+      /authority_scope_rewrite_exemption_invalid/,
+      JSON.stringify(rewriteExemption),
+    );
+  }
 });
+
 
 test("PR creation scope binds exact content, topology, optional head repository, and idempotency key", () => {
   const request = {

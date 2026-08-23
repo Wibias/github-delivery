@@ -19,6 +19,7 @@ All notable changes to `github-delivery` are documented here.
 
 ### Fixed
 
+- `rewriteExemption` must be a JSON string. Arrays, objects, numbers, and booleans are rejected in Node and Windows Authority instead of being coerced or treated as absent.
 - Non-fast-forward force-with-lease `push_code` fails closed unless the new tip tree matches the previous tip or `rewriteExemption` is restack, conflicts, or simplify-pr.
 - Restack `push_code` requests include `rewriteExemption`, and Windows Hello hashes that field the same way Node does: omit it when empty, include it when set.
 - Moved-code hints report exact unchanged line text as a relocation, but they do not tell reviewers to skip that code as not-new-logic. Near-match, indentation-sensitive, and guard-crossing edits stay in review, and file roles follow review-scope logic paths with path-segment mechanical directories.

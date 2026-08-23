@@ -63,7 +63,7 @@ internal static partial class ScopeCanonicalizer
                 scope["expectedRemoteTip"] = RequiredString(request, "expectedRemoteTip");
                 scope["newTip"] = RequiredString(request, "newTip");
                 scope["forceWithLease"] = request.TryGetProperty("forceWithLease", out var forceWithLease) && forceWithLease.ValueKind == JsonValueKind.True;
-                var rewriteExemption = OptionalString(request, "rewriteExemption");
+                var rewriteExemption = OptionalRewriteExemption(request);
                 if (rewriteExemption is not null)
                 {
                     rewriteExemption = rewriteExemption.Trim();
@@ -310,6 +310,20 @@ internal static partial class ScopeCanonicalizer
         => element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
             ? value.GetString()
             : null;
+
+    private static string? OptionalRewriteExemption(JsonElement request)
+    {
+        if (!request.TryGetProperty("rewriteExemption", out var value)
+            || value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+        {
+            return null;
+        }
+        if (value.ValueKind != JsonValueKind.String)
+        {
+            throw new AuthorityException("authority_scope_rewrite_exemption_invalid");
+        }
+        return value.GetString();
+    }
 
     private static int PositiveInt(JsonElement element, string name)
     {

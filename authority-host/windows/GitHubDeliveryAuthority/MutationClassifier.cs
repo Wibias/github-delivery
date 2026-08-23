@@ -47,9 +47,14 @@ internal static class MutationClassifier
 
     public static bool HasRewriteExemption(JsonElement operation)
     {
-        if (!operation.TryGetProperty("rewriteExemption", out var value) || value.ValueKind != JsonValueKind.String)
+        if (!operation.TryGetProperty("rewriteExemption", out var value)
+            || value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
         {
             return false;
+        }
+        if (value.ValueKind != JsonValueKind.String)
+        {
+            throw new AuthorityException("authority_scope_rewrite_exemption_invalid");
         }
         return !string.IsNullOrWhiteSpace(value.GetString());
     }

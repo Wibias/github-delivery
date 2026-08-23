@@ -59,9 +59,11 @@ function rewriteExemptionOf(request) {
   if (request.rewriteExemption === undefined || request.rewriteExemption === null || request.rewriteExemption === "") {
     return null;
   }
-  const value = String(request.rewriteExemption);
-  if (!REWRITE_EXEMPTIONS.has(value)) throw new Error("rewrite_exemption_invalid");
-  return value;
+  if (typeof request.rewriteExemption !== "string") {
+    throw new Error("rewrite_exemption_invalid");
+  }
+  if (!REWRITE_EXEMPTIONS.has(request.rewriteExemption)) throw new Error("rewrite_exemption_invalid");
+  return request.rewriteExemption;
 }
 
 function isAncestor(runner, ancestor, descendant) {

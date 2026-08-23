@@ -55,6 +55,16 @@ function optionalExactString(value, name) {
   return text;
 }
 
+function optionalRewriteExemption(value) {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "string") {
+    throw new Error("authority_scope_rewrite_exemption_invalid");
+  }
+  const text = value.trim();
+  if (!text) throw new Error("authority_scope_rewrite_exemption_required");
+  return text;
+}
+
 function normalizedStringSet(value, name, { optional = false } = {}) {
   if (value === undefined && optional) return [];
   if (!Array.isArray(value)) throw new Error(`authority_scope_${name}_invalid`);
@@ -148,7 +158,7 @@ export function authorityScopeForRequest(request = {}) {
       };
 
     case "push_code": {
-      const rewriteExemption = optionalExactString(request.rewriteExemption, "rewrite_exemption");
+      const rewriteExemption = optionalRewriteExemption(request.rewriteExemption);
       return {
         ...scope,
         remote: exactString(request.remote, "remote"),

@@ -77,6 +77,40 @@ internal static class SelfTest
         Assert(
             pushNoneHash != pushRestackHash && pushRestackHash != pushConflictsHash && pushConflictsHash != pushSimplifyHash,
             "rewrite exemptions must change the exact push authority scope");
+
+        AssertRejectedRewriteExemption(
+            "MalformedArray",
+            """{"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":["restack"]}""");
+        AssertRejectedRewriteExemption(
+            "MalformedObject",
+            """{"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":{"kind":"restack"}}""");
+        AssertRejectedRewriteExemption(
+            "MalformedNumber",
+            """{"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":1}""");
+        AssertRejectedRewriteExemption(
+            "MalformedBoolean",
+            """{"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":true}""");
+    }
+
+    private static void AssertRejectedRewriteExemption(string label, string json)
+    {
+        using var document = JsonDocument.Parse(json);
+        try
+        {
+            ScopeCanonicalizer.ScopeSha256(document.RootElement);
+            throw new Exception($"{label} scope unexpectedly succeeded");
+        }
+        catch (AuthorityException error) when (error.Code == "authority_scope_rewrite_exemption_invalid")
+        {
+        }
+        try
+        {
+            MutationClassifier.HasRewriteExemption(document.RootElement);
+            throw new Exception($"{label} classifier unexpectedly succeeded");
+        }
+        catch (AuthorityException error) when (error.Code == "authority_scope_rewrite_exemption_invalid")
+        {
+        }
     }
 
     private static void GrantFixture()

@@ -115,3 +115,25 @@ test("unknown rewrite exemption fails closed", () => {
     /rewrite_exemption_invalid/,
   );
 });
+
+test("non-string rewrite exemptions cannot bypass tree identity", () => {
+  const malformed = [["restack"], { kind: "restack" }, 1, true];
+  for (const rewriteExemption of malformed) {
+    const request = pushRequest({ rewriteExemption });
+    assert.throws(
+      () => validateLifecycleMutation(request),
+      /rewrite_exemption_invalid/,
+      `validate ${JSON.stringify(rewriteExemption)}`,
+    );
+    assert.throws(
+      () =>
+        preflightLifecycleMutation({
+          request,
+          runner: rewriteRunner({ ancestor: false, originalTree: TREE_A, newTree: TREE_B }),
+        }),
+      /rewrite_exemption_invalid/,
+      `preflight ${JSON.stringify(rewriteExemption)}`,
+    );
+  }
+});
+

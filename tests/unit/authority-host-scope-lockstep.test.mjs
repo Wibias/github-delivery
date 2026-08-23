@@ -58,9 +58,57 @@ test("Windows Hello names rewrite exemptions and keeps them off leases and PR se
 test("Windows push_code canonicalizer omits empty rewrite exemptions and binds the rest", () => {
   const pushCase = switchCase(read(`${host}/ScopeCanonicalizer.cs`), "push_code");
   assert.match(pushCase, /rewriteExemption/);
-  assert.match(pushCase, /OptionalString\(request, "rewriteExemption"\)/);
+  assert.match(pushCase, /OptionalRewriteExemption\(request\)/);
   assert.match(pushCase, /scope\["rewriteExemption"\] = rewriteExemption/);
 });
+
+test("Node and Windows reject the same non-string rewriteExemption shapes", () => {
+  const canonicalizer = read(`${host}/ScopeCanonicalizer.cs`);
+  const classifier = read(`${host}/MutationClassifier.cs`);
+  const selfTest = read(`${host}/SelfTest.cs`);
+  assert.match(canonicalizer, /OptionalRewriteExemption\(JsonElement request\)/);
+  assert.match(canonicalizer, /value\.ValueKind != JsonValueKind\.String/);
+  assert.match(canonicalizer, /authority_scope_rewrite_exemption_invalid/);
+  assert.doesNotMatch(
+    switchCase(canonicalizer, "push_code"),
+    /OptionalString\(request, "rewriteExemption"\)/,
+  );
+  assert.match(classifier, /HasRewriteExemption[\s\S]*authority_scope_rewrite_exemption_invalid/);
+  const request = {
+    schemaVersion: 1,
+    action: "push_code",
+    mutationMode: "maintainer",
+    explicitInstruction: true,
+    repo: "Wibias/github-delivery",
+    remote: "origin",
+    branch: "feature/safe",
+    expectedRemoteTip: "a".repeat(40),
+    newTip: "b".repeat(40),
+    forceWithLease: true,
+  };
+  const malformed = [
+    ["MalformedArray", ["restack"]],
+    ["MalformedObject", { kind: "restack" }],
+    ["MalformedNumber", 1],
+    ["MalformedBoolean", true],
+  ];
+  for (const [label, rewriteExemption] of malformed) {
+    const needle = JSON.stringify({ ...request, rewriteExemption });
+    assert.ok(selfTest.includes(needle), `missing SelfTest fixture ${label}`);
+    assert.match(
+      selfTest,
+      new RegExp(
+        `${label}[\\s\\S]*ScopeCanonicalizer\\.ScopeSha256[\\s\\S]*authority_scope_rewrite_exemption_invalid`,
+      ),
+    );
+    assert.throws(
+      () => authorityScopeSha256({ ...request, rewriteExemption }),
+      /authority_scope_rewrite_exemption_invalid/,
+      label,
+    );
+  }
+});
+
 
 test("host SelfTest push rewrite-exemption fixtures hash under the Node canonicalizer", () => {
   const selfTest = read(`${host}/SelfTest.cs`);
