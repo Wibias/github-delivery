@@ -439,8 +439,13 @@ function installJournalPath(target) {
   return join(dirname(target), `.github-delivery-install-journal-${basename(target)}`);
 }
 
-function writeInstallJournal(path, journal) {
+function previousInstallJournalPath(path) {
+  return `${path}.prev`;
+}
+
+function writeInstallJournal(path, journal, { renameSync: rename = renameSync, unlinkSync: unlink = unlinkSync } = {}) {
   const tmp = `${path}.${process.pid}.tmp`;
+  const previous = previousInstallJournalPath(path);
   const fd = openSync(tmp, "w");
   try {
     writeSync(fd, `${JSON.stringify(journal)}\n`);
@@ -449,16 +454,35 @@ function writeInstallJournal(path, journal) {
     closeSync(fd);
   }
   try {
-    renameSync(tmp, path);
+    rename(tmp, path);
+    if (existsSync(previous)) unlink(previous);
+    return;
   } catch {
-    if (existsSync(path)) unlinkSync(path);
+    // dest exists (Windows rename-over) or another replace failure
+  }
+  if (!existsSync(path)) {
     try {
-      renameSync(tmp, path);
+      rename(tmp, path);
+      return;
     } catch (retryError) {
-      if (existsSync(tmp)) unlinkSync(tmp);
+      if (existsSync(tmp)) unlink(tmp);
       throw retryError;
     }
   }
+  if (existsSync(previous)) unlink(previous);
+  try {
+    rename(path, previous);
+  } catch (asideError) {
+    if (existsSync(tmp)) unlink(tmp);
+    throw asideError;
+  }
+  try {
+    rename(tmp, path);
+  } catch (retryError) {
+    if (existsSync(path) && existsSync(tmp)) unlink(tmp);
+    throw retryError;
+  }
+  if (existsSync(previous)) unlink(previous);
 }
 
 function readInstallJournal(path) {
@@ -469,6 +493,41 @@ function readInstallJournal(path) {
     return parsed;
   } catch {
     return null;
+  }
+}
+
+function readDurableInstallJournal(journalPath) {
+  const live = readInstallJournal(journalPath);
+  if (live) return live;
+  const directory = dirname(journalPath);
+  const prefix = `${basename(journalPath)}.`;
+  try {
+    for (const entry of readdirSync(directory)) {
+      if (!entry.startsWith(prefix) || !entry.endsWith(".tmp")) continue;
+      const parsed = readInstallJournal(join(directory, entry));
+      if (parsed) return parsed;
+    }
+  } catch {
+    // missing directory
+  }
+  return readInstallJournal(previousInstallJournalPath(journalPath));
+}
+
+function clearInstallJournal(journalPath, unlink = unlinkSync) {
+  const directory = dirname(journalPath);
+  const base = basename(journalPath);
+  const candidates = [journalPath, previousInstallJournalPath(journalPath)];
+  try {
+    for (const entry of readdirSync(directory)) {
+      if (entry.startsWith(`${base}.`) && entry.endsWith(".tmp")) {
+        candidates.push(join(directory, entry));
+      }
+    }
+  } catch {
+    // missing directory
+  }
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) unlink(candidate);
   }
 }
 
@@ -554,13 +613,13 @@ function recoverInterruptedInstallationHeld({
 } = {}) {
   target = resolve(target);
   const journalPath = installJournalPath(target);
-  const journal = readInstallJournal(journalPath);
+  const journal = readDurableInstallJournal(journalPath);
   const { stagingPath, backupPath, asidePath } = resolveRecoveryPaths(target, journal);
   if (!journal && !stagingPath && !asidePath && !backupPath) return { recovered: false };
 
   if (!existsSync(target) && stagingPath && existsSync(stagingPath) && canPromoteStaging(journal, stagingPath)) {
     rename(stagingPath, target);
-    if (existsSync(journalPath)) unlinkSync(journalPath);
+    clearInstallJournal(journalPath);
     return { recovered: true, action: "completed", backupPath };
   }
   if (!existsSync(target) && journal?.phase === "restoring" && backupPath && existsSync(backupPath)) {
@@ -568,18 +627,18 @@ function recoverInterruptedInstallationHeld({
     if (asidePath && existsSync(asidePath) && resolve(asidePath) !== target) {
       remove(asidePath, { recursive: true, force: true });
     }
-    if (existsSync(journalPath)) unlinkSync(journalPath);
+    clearInstallJournal(journalPath);
     return { recovered: true, action: "completed", backupPath };
   }
   if (!existsSync(target) && asidePath && existsSync(asidePath)) {
     rename(asidePath, target);
-    if (existsSync(journalPath)) unlinkSync(journalPath);
+    clearInstallJournal(journalPath);
     return { recovered: true, action: "rolled-back", backupPath };
   }
   if (!existsSync(target) && backupPath && existsSync(backupPath)) {
     rename(backupPath, target);
     if (stagingPath && existsSync(stagingPath)) remove(stagingPath, { recursive: true, force: true });
-    if (existsSync(journalPath)) unlinkSync(journalPath);
+    clearInstallJournal(journalPath);
     return { recovered: true, action: "rolled-back", backupPath };
   }
   if (stagingPath && existsSync(stagingPath) && resolve(stagingPath) !== target) {
@@ -588,7 +647,7 @@ function recoverInterruptedInstallationHeld({
   if (asidePath && existsSync(asidePath) && resolve(asidePath) !== target) {
     remove(asidePath, { recursive: true, force: true });
   }
-  if (existsSync(journalPath)) unlinkSync(journalPath);
+  clearInstallJournal(journalPath);
   return { recovered: false };
 }
 
@@ -643,24 +702,25 @@ function applyInstallationHeld({
     backupPath,
     expectedFiles,
   });
-  writeInstallJournal(journalPath, journalState("staging"));
+  const journalIo = { renameSync: rename, unlinkSync };
+  writeInstallJournal(journalPath, journalState("staging"), journalIo);
   try {
     copySync(plan.source, stagingPath, { recursive: true, errorOnExist: true, force: false });
   } catch (error) {
     if (restoreOnFailure !== false) {
       if (existsSync(stagingPath)) remove(stagingPath, { recursive: true, force: true });
-      if (existsSync(journalPath)) unlinkSync(journalPath);
+      clearInstallJournal(journalPath);
     }
     throw error;
   }
   if (!stagingMatchesExpected(stagingPath, expectedFiles)) {
     if (restoreOnFailure !== false) {
       if (existsSync(stagingPath)) remove(stagingPath, { recursive: true, force: true });
-      if (existsSync(journalPath)) unlinkSync(journalPath);
+      clearInstallJournal(journalPath);
     }
     throw new Error("install_staging_incomplete");
   }
-  writeInstallJournal(journalPath, journalState("staged"));
+  writeInstallJournal(journalPath, journalState("staged"), journalIo);
 
   let backupPath = null;
   try {
@@ -668,16 +728,16 @@ function applyInstallationHeld({
       const root = resolve(backupRoot || join(dirname(plan.target), ".github-delivery-backups"));
       mkdirSync(root, { recursive: true });
       backupPath = join(root, `github-delivery-${Date.now()}-${plan.targetVersion || "unknown"}`);
-      writeInstallJournal(journalPath, journalState("displacing", backupPath));
+      writeInstallJournal(journalPath, journalState("displacing", backupPath), journalIo);
       rename(plan.target, backupPath);
-      writeInstallJournal(journalPath, journalState("displaced", backupPath));
+      writeInstallJournal(journalPath, journalState("displaced", backupPath), journalIo);
       if (typeof afterDisplace === "function") afterDisplace({ target: plan.target, backupPath, stagingPath });
     }
     if (!stagingMatchesExpected(stagingPath, expectedFiles)) {
       throw new Error("install_staging_incomplete");
     }
     rename(stagingPath, plan.target);
-    if (existsSync(journalPath)) unlinkSync(journalPath);
+    clearInstallJournal(journalPath);
   } catch (error) {
     if (restoreOnFailure !== false) {
       recoverInterruptedInstallationHeld({ target: plan.target, renameSync: rename, rmSync: remove });
@@ -720,15 +780,15 @@ function restoreBackupHeld({
       stagingPath: null,
       backupPath: backup,
       asidePath,
-    });
+    }, { renameSync: rename, unlinkSync });
     rename(target, asidePath);
     rename(backup, target);
-    if (existsSync(journalPath)) unlinkSync(journalPath);
+    clearInstallJournal(journalPath);
   } catch (error) {
     if (restoreOnFailure !== false) {
       if (!existsSync(target) && existsSync(asidePath)) rename(asidePath, target);
       else recoverInterruptedInstallationHeld({ target, renameSync: rename, rmSync: remove });
-      if (existsSync(journalPath) && existsSync(target)) unlinkSync(journalPath);
+      if (existsSync(target)) clearInstallJournal(journalPath);
     }
     throw error;
   }
