@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  MOVE_DETECT_MAX_CANDIDATE_PAIRS,
+  MOVE_DETECT_MAX_LINE_PRODUCT,
   classifyReviewFileRole,
   summarizeMovedCode,
 } from "../../scripts/lib/review-diff-hints.mjs";
@@ -155,6 +157,39 @@ test("identical relocation across different guards is still a detected move", ()
   const summary = summarizeMovedCode(patch, "src/app.mjs");
   assert.equal(summary.movedLineCount, 3);
   assert.equal(summary.exact, true);
+});
+
+test("large non-matching replacement skips move detection under a candidate budget", () => {
+  const deleteCount = 250;
+  const addCount = 250;
+  const patch = [
+    `@@ -1,${deleteCount} +1,${addCount} @@`,
+    ...Array.from({ length: deleteCount }, (_, index) => `-old_${index}();`),
+    ...Array.from({ length: addCount }, (_, index) => `+new_${index}();`),
+  ].join("\n");
+  const stats = {};
+  const summary = summarizeMovedCode(patch, "src/app.mjs", { stats });
+  assert.equal(summary, null);
+  assert.equal(stats.skippedByBudget, true);
+  assert.equal(stats.candidatePairs, 0);
+  assert.ok(stats.lineProduct > MOVE_DETECT_MAX_LINE_PRODUCT);
+});
+
+test("non-matching replacement under the line-product budget still aborts at the pair budget", () => {
+  const deleteCount = 90;
+  const addCount = 90;
+  const patch = [
+    `@@ -1,${deleteCount} +1,${addCount} @@`,
+    ...Array.from({ length: deleteCount }, (_, index) => `-old_${index}();`),
+    ...Array.from({ length: addCount }, (_, index) => `+new_${index}();`),
+  ].join("\n");
+  const stats = {};
+  const summary = summarizeMovedCode(patch, "src/app.mjs", { stats });
+  assert.equal(summary, null);
+  assert.equal(stats.skippedByBudget, true);
+  assert.ok(stats.lineProduct <= MOVE_DETECT_MAX_LINE_PRODUCT);
+  assert.ok(stats.lineProduct > MOVE_DETECT_MAX_CANDIDATE_PAIRS);
+  assert.equal(stats.candidatePairs, MOVE_DETECT_MAX_CANDIDATE_PAIRS);
 });
 
 test("significant trailing whitespace is not exact moved code", () => {

@@ -5,6 +5,8 @@ const MECHANICAL_RE =
 const INDENT_SENSITIVE_RE = /\.(?:py|yaml|yml)$/i;
 
 const MOVE_THRESHOLD = 3;
+export const MOVE_DETECT_MAX_LINE_PRODUCT = 10_000;
+export const MOVE_DETECT_MAX_CANDIDATE_PAIRS = 2_000;
 
 export function classifyReviewFileRole(path) {
   const normalized = String(path || "").replaceAll("\\", "/");
@@ -53,10 +55,11 @@ function parseDiffChanges(patch) {
   return { dels, adds };
 }
 
-function detectMoves(dels, adds, preserveIndent) {
+function detectMoves(dels, adds, preserveIndent, stats) {
   const movedDels = {};
   const movedAdds = {};
   let changedLineCount = 0;
+  let candidatePairs = stats?.candidatePairs ?? 0;
   for (let delIndex = 0; delIndex < dels.length; delIndex += 1) {
     if (movedDels[delIndex]) continue;
     const delBlock = [delIndex];
@@ -82,6 +85,15 @@ function detectMoves(dels, adds, preserveIndent) {
         else break;
       }
       if (addBlock.length < MOVE_THRESHOLD) continue;
+      if (candidatePairs >= MOVE_DETECT_MAX_CANDIDATE_PAIRS) {
+        if (stats) {
+          stats.candidatePairs = candidatePairs;
+          stats.skippedByBudget = true;
+        }
+        return { movedDels: {}, changedLineCount: 0, budgetExceeded: true };
+      }
+      candidatePairs += 1;
+      if (stats) stats.candidatePairs = candidatePairs;
       const addNorm = addBlock.map((index) =>
         lineKey(adds[index].code, preserveIndent),
       );
@@ -105,13 +117,32 @@ function detectMoves(dels, adds, preserveIndent) {
       }
     }
   }
-  return { movedDels, changedLineCount };
+  return { movedDels, changedLineCount, budgetExceeded: false };
 }
 
-export function summarizeMovedCode(patch, path = "") {
+export function summarizeMovedCode(patch, path = "", options = {}) {
+  const stats = options.stats;
   const preserveIndent = INDENT_SENSITIVE_RE.test(String(path || "").replaceAll("\\", "/"));
   const { dels, adds } = parseDiffChanges(patch);
-  const { movedDels, changedLineCount } = detectMoves(dels, adds, preserveIndent);
+  const lineProduct = dels.length * adds.length;
+  if (stats) {
+    stats.deleteCount = dels.length;
+    stats.addCount = adds.length;
+    stats.lineProduct = lineProduct;
+    stats.candidatePairs = 0;
+    stats.skippedByBudget = false;
+  }
+  if (lineProduct > MOVE_DETECT_MAX_LINE_PRODUCT) {
+    if (stats) stats.skippedByBudget = true;
+    return null;
+  }
+  const { movedDels, changedLineCount, budgetExceeded } = detectMoves(
+    dels,
+    adds,
+    preserveIndent,
+    stats,
+  );
+  if (budgetExceeded) return null;
   const movedLineCount = Object.keys(movedDels).length;
   if (movedLineCount < MOVE_THRESHOLD) return null;
   return {

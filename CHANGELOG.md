@@ -23,6 +23,7 @@ All notable changes to `github-delivery` are documented here.
 - Restack `push_code` requests include `rewriteExemption`, and Windows Hello hashes that field the same way Node does: omit it when empty, include it when set.
 - Moved-code hints report exact unchanged line text as a relocation, but they do not tell reviewers to skip that code as not-new-logic. Near-match, indentation-sensitive, and guard-crossing edits stay in review, and file roles follow review-scope logic paths with path-segment mechanical directories.
 - Exact moved-code classification uses raw source-line equality, so whitespace inside strings, template literals, and trailing spaces counts as a change.
+- Moved-code detection skips oversized replacement diffs when the delete×add line product or candidate-pair budget is exceeded, so a large foreign PR cannot make review-brief quadratic before output limits apply.
 
 ## [1.0.0] - 2026-08-22
 
