@@ -42,6 +42,19 @@ test("host SelfTest merge fixture hashes under the Node canonicalizer", () => {
   assert.equal(authorityScopeSha256(request), pinned);
 });
 
+test("Windows Hello names rewrite exemptions and keeps them off leases and PR sessions", () => {
+  const service = read(`${host}/AuthorityService.cs`);
+  const classifier = read(`${host}/MutationClassifier.cs`);
+  const selfTest = read(`${host}/SelfTest.cs`);
+  assert.match(service, /content-changing non-fast-forward rewrite allowed: \{rewriteExemption\}/);
+  assert.match(classifier, /HasRewriteExemption/);
+  assert.match(classifier, /IsBranchLeaseEligible[\s\S]*!HasRewriteExemption\(operation\)/);
+  assert.match(classifier, /IsPrSessionEligible[\s\S]*!HasRewriteExemption\(operation\)/);
+  assert.match(selfTest, /content-changing non-fast-forward rewrite allowed: restack/);
+  assert.match(selfTest, /exempt rewrite must not reuse a branch lease/);
+  assert.match(selfTest, /exempt rewrite Hello presentation must differ from an ordinary push/);
+});
+
 test("Windows push_code canonicalizer omits empty rewrite exemptions and binds the rest", () => {
   const pushCase = switchCase(read(`${host}/ScopeCanonicalizer.cs`), "push_code");
   assert.match(pushCase, /rewriteExemption/);

@@ -70,7 +70,9 @@ test("branch leases can authorize repeated code pushes but never another action 
   const approval = read(`${host}/ApprovalWindow.xaml`);
 
   assert.match(classifier, /IsBranchLeaseEligible/);
+  assert.match(classifier, /HasRewriteExemption/);
   assert.match(classifier, /"push_code"/);
+  assert.match(classifier, /!HasRewriteExemption\(operation\)/);
   assert.match(service, /operations\.All\(MutationClassifier\.IsBranchLeaseEligible\)/);
   assert.match(service, /branchLeaseEligible\s*\?\s*_store\.TryUseActiveBranchLease/);
   assert.match(service, /branchLeaseEligible \? branch : null/);

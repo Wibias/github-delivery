@@ -99,7 +99,7 @@ For installation edge cases, backup/restore, downgrade behavior, manual recovery
 - absence claims need a positive-control search that matches a known hit before `no residual X`;
 - confirmation checks re-run in the same shell and PATH as the original observation;
 - non-fast-forward force-with-lease pushes fail closed unless trees match or an explicit restack/conflicts/simplify exemption is set;
-- moved-code hints only suppress exact unchanged relocations.
+- moved-code hints distinguish exact raw-text relocations from modified moves while keeping surrounding context in review.
 
 See [`CHANGELOG.md`](CHANGELOG.md) for the full release-level details, including the `1.0.0` notes.
 

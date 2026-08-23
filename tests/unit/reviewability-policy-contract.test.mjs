@@ -24,6 +24,13 @@ test("PR descriptions call out core versus generated files", () => {
   assert.match(body, /generated|mechanical/i);
 });
 
+test("README treats moved-code hints as review labels, not suppressions", () => {
+  const readme = read("README.md");
+  assert.doesNotMatch(readme, /only suppress exact unchanged relocations/);
+  assert.match(readme, /distinguish exact raw-text relocations/);
+  assert.match(readme, /keeping surrounding context in review/);
+});
+
 test("full review treats textual relocation as a hint, not proof of unchanged behavior", () => {
   const review = read("references/full-review-pr.md");
   assert.match(review, /moved code|relocated/i);

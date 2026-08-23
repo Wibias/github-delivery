@@ -259,6 +259,23 @@ internal static class SelfTest
         Assert(MutationClassifier.RequiresWindowsHello(review.RootElement), "review publication must require independent Hello approval");
         Assert(MutationClassifier.RequiresWindowsHello(botReply.RootElement), "bot reply must require independent Hello approval");
         Assert(MutationClassifier.RequiresWindowsHello(humanReply.RootElement), "human reply must require Hello");
+
+        using var ordinaryPush = JsonDocument.Parse("""
+            {"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true}
+            """);
+        using var restackPush = JsonDocument.Parse("""
+            {"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":"restack"}
+            """);
+        const string scope = "scope-fixture";
+        var ordinarySummary = AuthorityService.BuildSummary(0, ordinaryPush.RootElement, scope);
+        var restackSummary = AuthorityService.BuildSummary(0, restackPush.RootElement, scope);
+        Assert(MutationClassifier.IsBranchLeaseEligible(ordinaryPush.RootElement), "ordinary push must remain branch-lease eligible");
+        Assert(MutationClassifier.IsPrSessionEligible(ordinaryPush.RootElement), "ordinary push must remain PR-session eligible");
+        Assert(!MutationClassifier.IsBranchLeaseEligible(restackPush.RootElement), "exempt rewrite must not reuse a branch lease");
+        Assert(!MutationClassifier.IsPrSessionEligible(restackPush.RootElement), "exempt rewrite must not reuse a PR session");
+        Assert(!ordinarySummary.Contains("content-changing non-fast-forward rewrite allowed", StringComparison.Ordinal), "ordinary push must not claim an exemption");
+        Assert(restackSummary.Contains("content-changing non-fast-forward rewrite allowed: restack", StringComparison.Ordinal), "Hello summary must name the exemption and its effect");
+        Assert(ordinarySummary != restackSummary, "exempt rewrite Hello presentation must differ from an ordinary push");
     }
 
     private static void BusyGateFixture()
