@@ -12,6 +12,17 @@ const APPROVED_MUTATION_FILES = new Set([
   "scripts/lib/live-fixture-cleanup.mjs",
 ]);
 
+const DETECTOR_FILES = new Set(["scripts/lib/mutation-boundary-security.mjs"]);
+
+const FIXTURE_FILES = new Set([
+  "scripts/live-github-fixture.mjs",
+  "scripts/cleanup-live-github-fixture.mjs",
+  "scripts/lib/live-github-fixture.mjs",
+  "scripts/lib/live-fixture-cleanup.mjs",
+]);
+
+const BOUNDARY_GH_GROUPS = new Set(["pr", "issue"]);
+
 const WRITE_GROUP_VERBS = {
   pr: new Set(["create", "close", "comment", "edit", "merge", "ready", "reopen", "review"]),
   issue: new Set(["create", "close", "comment", "edit", "reopen"]),
@@ -55,8 +66,8 @@ function productionScripts(root) {
   return files.sort();
 }
 
-function error(path, code, message) {
-  return { path, code, message };
+function error(path, code, message, extra = {}) {
+  return { path, code, message, ...extra };
 }
 
 function hasError(errors, code) {
@@ -65,7 +76,7 @@ function hasError(errors, code) {
 
 export function validateMutationBoundarySource(path, source) {
   path = portable(path);
-  if (APPROVED_MUTATION_FILES.has(path)) return [];
+  if (DETECTOR_FILES.has(path) || FIXTURE_FILES.has(path)) return [];
   const errors = [];
 
   GH_COMMAND_RE.lastIndex = 0;
@@ -78,6 +89,7 @@ export function validateMutationBoundarySource(path, source) {
           path,
           "direct_gh_mutation",
           `Direct gh ${group} ${verb} mutation must route through the mutation broker.`,
+          { group, verb },
         ),
       );
     }
@@ -153,7 +165,16 @@ export function validateMutationBoundarySource(path, source) {
     );
   }
 
-  return errors;
+  return errors.filter((item) => !isAllowedBoundaryWrite(path, item));
+}
+
+function isAllowedBoundaryWrite(path, item) {
+  if (!APPROVED_MUTATION_FILES.has(path)) return false;
+  if (item.code === "direct_gh_mutation") return BOUNDARY_GH_GROUPS.has(item.group);
+  if (item.code === "direct_git_push") return path === "scripts/lib/lifecycle-mutations.mjs";
+  return item.code === "direct_gh_api_mutation"
+    || item.code === "direct_graphql_mutation"
+    || item.code === "dynamic_gh_api_method";
 }
 
 export function validateMutationBoundaryTree(root = process.cwd()) {
