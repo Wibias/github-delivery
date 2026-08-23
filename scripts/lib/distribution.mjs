@@ -472,6 +472,46 @@ function readInstallJournal(path) {
   }
 }
 
+function collectInstallFileDigests(root) {
+  const files = [];
+  function walk(relative) {
+    const absolute = relative ? join(root, ...relative.split("/")) : root;
+    for (const entry of readdirSync(absolute, { withFileTypes: true }).sort((left, right) => left.name.localeCompare(right.name))) {
+      const child = relative ? `${relative}/${entry.name}` : entry.name;
+      const childAbsolute = join(absolute, entry.name);
+      if (lstatSync(childAbsolute).isSymbolicLink()) {
+        throw new Error(`install source cannot contain a symlink: ${child}`);
+      }
+      if (entry.isDirectory()) walk(child);
+      else if (entry.isFile()) files.push({ path: child, sha256: sha256(readFileSync(childAbsolute)) });
+    }
+  }
+  walk("");
+  return files;
+}
+
+function stagingMatchesExpected(stagingPath, expectedFiles) {
+  if (!Array.isArray(expectedFiles) || expectedFiles.length === 0) return false;
+  let actual;
+  try {
+    actual = collectInstallFileDigests(stagingPath);
+  } catch {
+    return false;
+  }
+  if (actual.length !== expectedFiles.length) return false;
+  const expected = new Map(expectedFiles.map((file) => [file.path, file.sha256]));
+  for (const file of actual) {
+    if (expected.get(file.path) !== file.sha256) return false;
+  }
+  return true;
+}
+
+function canPromoteStaging(journal, stagingPath) {
+  if (!journal) return false;
+  if (journal.phase !== "staged" && journal.phase !== "displacing" && journal.phase !== "displaced") return false;
+  return stagingMatchesExpected(stagingPath, journal.expectedFiles);
+}
+
 function findSiblingWithPrefix(target, prefix) {
   const directory = dirname(target);
   const marker = `${prefix}${basename(target)}-`;
@@ -518,7 +558,7 @@ function recoverInterruptedInstallationHeld({
   const { stagingPath, backupPath, asidePath } = resolveRecoveryPaths(target, journal);
   if (!journal && !stagingPath && !asidePath && !backupPath) return { recovered: false };
 
-  if (!existsSync(target) && stagingPath && existsSync(stagingPath)) {
+  if (!existsSync(target) && stagingPath && existsSync(stagingPath) && canPromoteStaging(journal, stagingPath)) {
     rename(stagingPath, target);
     if (existsSync(journalPath)) unlinkSync(journalPath);
     return { recovered: true, action: "completed", backupPath };
@@ -590,14 +630,37 @@ function applyInstallationHeld({
       unchanged: true,
     };
   }
+  mkdirSync(dirname(plan.target), { recursive: true });
   const stagingPath = siblingPath(plan.target, ".github-delivery-staging-");
   const journalPath = installJournalPath(plan.target);
+  const expectedFiles = collectInstallFileDigests(plan.source);
+  const journalState = (phase, backupPath = null) => ({
+    schemaVersion: 1,
+    kind: "github-delivery/install-journal",
+    phase,
+    target: plan.target,
+    stagingPath,
+    backupPath,
+    expectedFiles,
+  });
+  writeInstallJournal(journalPath, journalState("staging"));
   try {
     copySync(plan.source, stagingPath, { recursive: true, errorOnExist: true, force: false });
   } catch (error) {
-    remove(stagingPath, { recursive: true, force: true });
+    if (restoreOnFailure !== false) {
+      if (existsSync(stagingPath)) remove(stagingPath, { recursive: true, force: true });
+      if (existsSync(journalPath)) unlinkSync(journalPath);
+    }
     throw error;
   }
+  if (!stagingMatchesExpected(stagingPath, expectedFiles)) {
+    if (restoreOnFailure !== false) {
+      if (existsSync(stagingPath)) remove(stagingPath, { recursive: true, force: true });
+      if (existsSync(journalPath)) unlinkSync(journalPath);
+    }
+    throw new Error("install_staging_incomplete");
+  }
+  writeInstallJournal(journalPath, journalState("staged"));
 
   let backupPath = null;
   try {
@@ -605,33 +668,13 @@ function applyInstallationHeld({
       const root = resolve(backupRoot || join(dirname(plan.target), ".github-delivery-backups"));
       mkdirSync(root, { recursive: true });
       backupPath = join(root, `github-delivery-${Date.now()}-${plan.targetVersion || "unknown"}`);
-      writeInstallJournal(journalPath, {
-        schemaVersion: 1,
-        kind: "github-delivery/install-journal",
-        phase: "displacing",
-        target: plan.target,
-        stagingPath,
-        backupPath,
-      });
+      writeInstallJournal(journalPath, journalState("displacing", backupPath));
       rename(plan.target, backupPath);
-      writeInstallJournal(journalPath, {
-        schemaVersion: 1,
-        kind: "github-delivery/install-journal",
-        phase: "displaced",
-        target: plan.target,
-        stagingPath,
-        backupPath,
-      });
+      writeInstallJournal(journalPath, journalState("displaced", backupPath));
       if (typeof afterDisplace === "function") afterDisplace({ target: plan.target, backupPath, stagingPath });
-    } else {
-      writeInstallJournal(journalPath, {
-        schemaVersion: 1,
-        kind: "github-delivery/install-journal",
-        phase: "staged",
-        target: plan.target,
-        stagingPath,
-        backupPath: null,
-      });
+    }
+    if (!stagingMatchesExpected(stagingPath, expectedFiles)) {
+      throw new Error("install_staging_incomplete");
     }
     rename(stagingPath, plan.target);
     if (existsSync(journalPath)) unlinkSync(journalPath);
