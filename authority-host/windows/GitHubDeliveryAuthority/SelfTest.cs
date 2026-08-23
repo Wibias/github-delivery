@@ -7,10 +7,10 @@ namespace GitHubDeliveryAuthority;
 internal static class SelfTest
 {
     private const string ExpectedMergeScope = "4513a56e7639d6f8e83e8e43b8af2cb305b06674259527488595b8bef4040d60";
-    private const string ExpectedPushScopeNone = "a7015b2cd5427b00930bd30d41d1339a9f9a2503855059bff722c9a6499dcf48";
-    private const string ExpectedPushScopeRestack = "c5f692087892baf9be58e3e28c321d3d17b7bcabbc4c93ae7be0a26190c86923";
-    private const string ExpectedPushScopeConflicts = "b5bcb2cbdc281ab87f36caef36093753b2751a83e796ecf8c29d3adeb4565bd1";
-    private const string ExpectedPushScopeSimplifyPr = "54e006d309afdcd7787b212d5ae0f2470903304d33ba4a20cfa7d6bbc6bc886d";
+    private const string ExpectedPushScopeNone = "3f709285ecf97bdc71fef30467b43fb073c5be923c2c2e0589aaa1f42a286149";
+    private const string ExpectedPushScopeRestack = "a98e603c0df482df40343d78e2b5617941430102bbbc9bd4e01b2c3ae3b230d2";
+    private const string ExpectedPushScopeConflicts = "5e0e1755947ce47e871b1a6a60c22f5e4ab22a0d49477ff95016a79a6819ab21";
+    private const string ExpectedPushScopeSimplifyPr = "1eb711f613caec7c21f691e24e21a5c8edd465f428d14cfcb1d02f49662ec268";
 
     public static int Run()
     {
@@ -55,16 +55,16 @@ internal static class SelfTest
             "branch must change the exact authority scope");
 
         using var pushNone = JsonDocument.Parse("""
-            {"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true}
+            {"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","originalLocalTip":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true}
             """);
         using var pushRestack = JsonDocument.Parse("""
-            {"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":"restack"}
+            {"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","originalLocalTip":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":"restack"}
             """);
         using var pushConflicts = JsonDocument.Parse("""
-            {"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":"conflicts"}
+            {"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","originalLocalTip":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":"conflicts"}
             """);
         using var pushSimplifyPr = JsonDocument.Parse("""
-            {"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":"simplify-pr"}
+            {"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","originalLocalTip":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":"simplify-pr"}
             """);
         var pushNoneHash = ScopeCanonicalizer.ScopeSha256(pushNone.RootElement);
         var pushRestackHash = ScopeCanonicalizer.ScopeSha256(pushRestack.RootElement);
@@ -79,7 +79,7 @@ internal static class SelfTest
             "rewrite exemptions must change the exact push authority scope");
 
         using var pushEmpty = JsonDocument.Parse("""
-            {"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":""}
+            {"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","originalLocalTip":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":""}
             """);
         Assert(ScopeCanonicalizer.ScopeSha256(pushEmpty.RootElement) == ExpectedPushScopeNone, "empty rewrite exemption must hash as omitted");
         Assert(!MutationClassifier.HasRewriteExemption(pushEmpty.RootElement), "empty rewrite exemption must stay absent for leases");
@@ -87,25 +87,25 @@ internal static class SelfTest
 
         AssertRejectedRewriteExemption(
             "PaddedRestack",
-            """{"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":" restack "}""");
+            """{"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","originalLocalTip":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":" restack "}""");
         AssertRejectedRewriteExemption(
             "WhitespaceOnly",
-            """{"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":" "}""");
+            """{"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","originalLocalTip":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":" "}""");
         AssertRejectedRewriteExemption(
             "UnknownAmend",
-            """{"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":"amend"}""");
+            """{"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","originalLocalTip":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":"amend"}""");
         AssertRejectedRewriteExemption(
             "MalformedArray",
-            """{"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":["restack"]}""");
+            """{"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","originalLocalTip":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":["restack"]}""");
         AssertRejectedRewriteExemption(
             "MalformedObject",
-            """{"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":{"kind":"restack"}}""");
+            """{"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","originalLocalTip":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":{"kind":"restack"}}""");
         AssertRejectedRewriteExemption(
             "MalformedNumber",
-            """{"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":1}""");
+            """{"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","originalLocalTip":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":1}""");
         AssertRejectedRewriteExemption(
             "MalformedBoolean",
-            """{"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":true}""");
+            """{"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","originalLocalTip":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":true}""");
     }
 
     private static void AssertRejectedRewriteExemption(string label, string json)
@@ -311,10 +311,10 @@ internal static class SelfTest
         Assert(MutationClassifier.RequiresWindowsHello(humanReply.RootElement), "human reply must require Hello");
 
         using var ordinaryPush = JsonDocument.Parse("""
-            {"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true}
+            {"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","originalLocalTip":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true}
             """);
         using var restackPush = JsonDocument.Parse("""
-            {"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":"restack"}
+            {"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","originalLocalTip":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":"restack"}
             """);
         const string scope = "scope-fixture";
         var ordinarySummary = AuthorityService.BuildSummary(0, ordinaryPush.RootElement, scope);

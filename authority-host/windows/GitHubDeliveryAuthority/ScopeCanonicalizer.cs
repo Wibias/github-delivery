@@ -61,6 +61,7 @@ internal static partial class ScopeCanonicalizer
                 scope["remote"] = RequiredString(request, "remote");
                 scope["branch"] = RequiredString(request, "branch");
                 scope["expectedRemoteTip"] = RequiredString(request, "expectedRemoteTip");
+                scope["originalLocalTip"] = RequiredString(request, "originalLocalTip");
                 scope["newTip"] = RequiredString(request, "newTip");
                 scope["forceWithLease"] = request.TryGetProperty("forceWithLease", out var forceWithLease) && forceWithLease.ValueKind == JsonValueKind.True;
                 var rewriteExemption = OptionalRewriteExemption(request);
@@ -205,7 +206,7 @@ internal static partial class ScopeCanonicalizer
     public static JsonObject BuildResource(JsonElement request)
     {
         var resource = new JsonObject();
-        foreach (var field in new[] { "pr", "issue", "commentId", "threadId", "expectedHead", "expectedBase", "expectedBaseOid", "authorityBranch", "headRefName", "targetRepo", "supersedingPr", "remote", "branch", "expectedRemoteTip", "newTip", "base", "head", "headRepo", "assignee" })
+        foreach (var field in new[] { "pr", "issue", "commentId", "threadId", "expectedHead", "expectedBase", "expectedBaseOid", "authorityBranch", "headRefName", "targetRepo", "supersedingPr", "remote", "branch", "expectedRemoteTip", "originalLocalTip", "newTip", "base", "head", "headRepo", "assignee" })
         {
             if (!request.TryGetProperty(field, out var value) || value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
             {

@@ -8,7 +8,7 @@ All notable changes to `github-delivery` are documented here.
 
 ### Added
 
-- History-only Git rewrites (squash, reword, reorder, commit grouping) must keep the original `HEAD^{tree}` before a force-with-lease push (`GD-GIT-008`). Restack onto a new parent still skips that check.
+- History-only Git rewrites (squash, reword, reorder, commit grouping) must keep the original local `HEAD^{tree}` captured before the rewrite (`originalLocalTip`) on a force-with-lease push (`GD-GIT-008`). The remote lease tip is only a race check. Restack onto a new parent still skips the tree check.
 
 ### Changed
 
@@ -20,7 +20,7 @@ All notable changes to `github-delivery` are documented here.
 ### Fixed
 
 - `rewriteExemption` uses one contract in the lifecycle broker, Node Authority, and Windows Authority: omit undefined, null, and `""`; accept only exact `restack`, `conflicts`, or `simplify-pr`; reject padded, unknown, and non-string values. Empty string is omitted from the Hello hash, not an error.
-- Non-fast-forward force-with-lease `push_code` fails closed unless the new tip tree matches the previous tip or `rewriteExemption` is restack, conflicts, or simplify-pr.
+- Non-fast-forward force-with-lease `push_code` fails closed unless the new tip tree matches `originalLocalTip^{tree}` or `rewriteExemption` is restack, conflicts, or simplify-pr. `expectedRemoteTip` stays the lease/race check only.
 - Moved-code hints report exact unchanged line text as a relocation, but they do not tell reviewers to skip that code as not-new-logic. Near-match, indentation-sensitive, and guard-crossing edits stay in review, and file roles follow review-scope logic paths with path-segment mechanical directories.
 - Exact moved-code classification uses raw source-line equality, so whitespace inside strings, template literals, and trailing spaces counts as a change.
 - Moved-code detection skips oversized replacement diffs when the delete×add line product or candidate-pair budget is exceeded, so a large foreign PR cannot make review-brief quadratic before output limits apply.

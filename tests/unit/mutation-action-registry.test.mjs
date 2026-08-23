@@ -37,6 +37,7 @@ function fixtureFor(action) {
     remote: "origin",
     branch: "feature/safe",
     expectedRemoteTip: "b".repeat(40),
+    originalLocalTip: "e".repeat(40),
     newTip: "c".repeat(40),
     forceWithLease: true,
     base: "main",

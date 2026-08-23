@@ -114,6 +114,7 @@ function assertPushTarget(request, runner) {
   }
 
   const expected = exactSha(request.expectedRemoteTip, "expected_remote_tip", { absent: true });
+  const originalLocalTip = exactSha(request.originalLocalTip, "original_local_tip");
   const newTip = exactSha(request.newTip, "new_tip");
   const remoteRow = run(runner, ["git", "ls-remote", "--heads", remote, `refs/heads/${branch}`]);
   const observed = remoteRow ? String(remoteRow.split(/\s+/)[0] || "").toLowerCase() : "absent";
@@ -126,12 +127,12 @@ function assertPushTarget(request, runner) {
   if (expected !== "absent" && request.forceWithLease === true && !isAncestor(runner, expected, newTip)) {
     const exemption = rewriteExemptionOf(request);
     if (!exemption) {
-      const originalTree = run(runner, ["git", "rev-parse", `${expected}^{tree}`]);
+      const originalTree = run(runner, ["git", "rev-parse", `${originalLocalTip}^{tree}`]);
       const nextTree = run(runner, ["git", "rev-parse", `${newTip}^{tree}`]);
       assertContentPreservingRewrite({ originalTree, newTree: nextTree });
     }
   }
-  return { remote, branch, expectedRemoteTip: expected, newTip };
+  return { remote, branch, expectedRemoteTip: expected, originalLocalTip, newTip };
 }
 
 function validateApprovedMediaRemovals(value) {
@@ -297,6 +298,7 @@ export function validateLifecycleMutation(request = {}) {
       required(request.remote, "remote");
       required(request.branch, "branch");
       exactSha(request.expectedRemoteTip, "expected_remote_tip", { absent: true });
+      exactSha(request.originalLocalTip, "original_local_tip");
       exactSha(request.newTip, "new_tip");
       if (typeof request.forceWithLease !== "boolean") throw new Error("force_with_lease_required");
       rewriteExemptionOf(request);

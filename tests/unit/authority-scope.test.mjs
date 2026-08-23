@@ -72,6 +72,7 @@ test("push authority scope binds repository remote, exact generation, new tip, a
     remote: "origin",
     branch: "feature/safe",
     expectedRemoteTip: "a".repeat(40),
+    originalLocalTip: "e".repeat(40),
     newTip: "b".repeat(40),
     forceWithLease: true,
   };
@@ -82,9 +83,14 @@ test("push authority scope binds repository remote, exact generation, new tip, a
     remote: "origin",
     branch: "feature/safe",
     expectedRemoteTip: "a".repeat(40),
+    originalLocalTip: "e".repeat(40),
     newTip: "b".repeat(40),
     forceWithLease: true,
   });
+  assert.notEqual(
+    authorityScopeSha256(request),
+    authorityScopeSha256({ ...request, originalLocalTip: "f".repeat(40) }),
+  );
   assert.notEqual(
     authorityScopeSha256(request),
     authorityScopeSha256({ ...request, newTip: "c".repeat(40) }),

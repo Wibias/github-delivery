@@ -40,6 +40,7 @@ function pushRequest(overrides = {}) {
     remote: "origin",
     branch: "feature/safe",
     expectedRemoteTip: "a".repeat(40),
+    originalLocalTip: "e".repeat(40),
     newTip: "b".repeat(40),
     forceWithLease: true,
     ...overrides,

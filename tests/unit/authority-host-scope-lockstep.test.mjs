@@ -63,6 +63,7 @@ test("Windows push_code canonicalizer omits empty rewrite exemptions and binds e
   const pushCase = switchCase(canonicalizer, "push_code");
   const helper = canonicalizer.match(/OptionalRewriteExemption\(JsonElement request\)[\s\S]*?return text;/)?.[0] || "";
   const selfTest = read(`${host}/SelfTest.cs`);
+  assert.match(pushCase, /scope\["originalLocalTip"\] = RequiredString\(request, "originalLocalTip"\)/);
   assert.match(pushCase, /OptionalRewriteExemption\(request\)/);
   assert.match(pushCase, /scope\["rewriteExemption"\] = rewriteExemption/);
   assert.doesNotMatch(pushCase, /\.Trim\(\)/);
@@ -70,7 +71,7 @@ test("Windows push_code canonicalizer omits empty rewrite exemptions and binds e
   assert.match(helper, /"restack" or "conflicts" or "simplify-pr"/);
   const noneHash = selfTest.match(/ExpectedPushScopeNone = "([0-9a-f]{64})"/)?.[1];
   const emptyNeedle =
-    '{"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":""}';
+    '{"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","originalLocalTip":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":""}';
   assert.equal(typeof noneHash, "string");
   assert.ok(selfTest.includes(emptyNeedle));
   assert.match(selfTest, /empty rewrite exemption must hash as omitted/);
@@ -101,6 +102,7 @@ test("Node and Windows reject the same non-string rewriteExemption shapes", () =
     remote: "origin",
     branch: "feature/safe",
     expectedRemoteTip: "a".repeat(40),
+    originalLocalTip: "e".repeat(40),
     newTip: "b".repeat(40),
     forceWithLease: true,
   };
@@ -146,8 +148,8 @@ test("host SelfTest push rewrite-exemption fixtures hash under the Node canonica
     )?.[1];
     const needle =
       exemption === undefined
-        ? '{"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true}'
-        : `{"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":"${exemption}"}`;
+        ? '{"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","originalLocalTip":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true}'
+        : `{"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","originalLocalTip":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":"${exemption}"}`;
     assert.equal(typeof pinned, "string", `missing ExpectedPushScope${label}`);
     assert.ok(selfTest.includes(needle));
     const request = JSON.parse(needle);

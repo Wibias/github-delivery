@@ -15,6 +15,7 @@ function pushRequest() {
     remote: "origin",
     branch: "feature/safe",
     expectedRemoteTip: OLD,
+    originalLocalTip: "e".repeat(40),
     newTip: NEW,
     forceWithLease: true,
   };

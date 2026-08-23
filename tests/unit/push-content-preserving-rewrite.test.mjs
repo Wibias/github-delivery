@@ -12,6 +12,8 @@ import {
 
 const OLD = "a".repeat(40);
 const NEXT = "b".repeat(40);
+const LOCAL = "e".repeat(40);
+const OTHER = "f".repeat(40);
 const TREE_A = "c".repeat(40);
 const TREE_B = "d".repeat(40);
 
@@ -25,6 +27,7 @@ function pushRequest(overrides = {}) {
     remote: "origin",
     branch: "feature/safe",
     expectedRemoteTip: OLD,
+    originalLocalTip: LOCAL,
     newTip: NEXT,
     forceWithLease: true,
     ...overrides,
@@ -38,7 +41,13 @@ function identityOk() {
   };
 }
 
-function rewriteRunner({ ancestor = false, originalTree = TREE_A, newTree = TREE_A } = {}) {
+function rewriteRunner({
+  ancestor = false,
+  remoteTip = OLD,
+  remoteTree = TREE_A,
+  originalTree = TREE_A,
+  newTree = TREE_A,
+} = {}) {
   return (command, args) => {
     if (command === "git" && args[0] === "check-ref-format") return { status: 0, stdout: "", stderr: "" };
     if (command === "git" && args[0] === "remote") {
@@ -48,14 +57,15 @@ function rewriteRunner({ ancestor = false, originalTree = TREE_A, newTree = TREE
       return { status: 0, stdout: JSON.stringify(identityOk()), stderr: "" };
     }
     if (command === "git" && args[0] === "ls-remote") {
-      return { status: 0, stdout: `${OLD}\trefs/heads/feature/safe\n`, stderr: "" };
+      return { status: 0, stdout: `${remoteTip}\trefs/heads/feature/safe\n`, stderr: "" };
     }
     if (command === "git" && args[0] === "merge-base") {
       return { status: ancestor ? 0 : 1, stdout: "", stderr: "" };
     }
     if (command === "git" && args[0] === "rev-parse") {
       const spec = String(args[1] || "");
-      if (spec.startsWith(OLD)) return { status: 0, stdout: `${originalTree}\n`, stderr: "" };
+      if (spec.startsWith(OLD)) return { status: 0, stdout: `${remoteTree}\n`, stderr: "" };
+      if (spec.startsWith(LOCAL)) return { status: 0, stdout: `${originalTree}\n`, stderr: "" };
       if (spec.startsWith(NEXT)) return { status: 0, stdout: `${newTree}\n`, stderr: "" };
     }
     throw new Error(`unexpected command: ${command} ${args.join(" ")}`);
@@ -87,6 +97,65 @@ test("changed-tree history rewrite cannot reach push_code", () => {
         runner: rewriteRunner({ ancestor: false, originalTree: TREE_A, newTree: TREE_B }),
       }),
     /content_preserving_rewrite_tree_mismatch/,
+  );
+});
+
+test("a rewrite that keeps the original local tree is allowed when the remote tree differs", () => {
+  const result = preflightLifecycleMutation({
+    request: pushRequest(),
+    runner: rewriteRunner({
+      ancestor: false,
+      remoteTree: TREE_A,
+      originalTree: TREE_B,
+      newTree: TREE_B,
+    }),
+  });
+  assert.equal(result.newTip, NEXT);
+  assert.equal(result.originalLocalTip, LOCAL);
+});
+
+test("a rewrite that drops unpublished local commits back to the remote tree is blocked", () => {
+  assert.throws(
+    () =>
+      preflightLifecycleMutation({
+        request: pushRequest(),
+        runner: rewriteRunner({
+          ancestor: false,
+          remoteTree: TREE_A,
+          originalTree: TREE_B,
+          newTree: TREE_A,
+        }),
+      }),
+    /content_preserving_rewrite_tree_mismatch/,
+  );
+});
+
+test("rewrite exemptions skip only tree identity and still require the exact remote lease", () => {
+  const request = pushRequest({ rewriteExemption: "restack" });
+  assert.doesNotThrow(() =>
+    preflightLifecycleMutation({
+      request,
+      runner: rewriteRunner({
+        ancestor: false,
+        remoteTree: TREE_A,
+        originalTree: TREE_B,
+        newTree: TREE_A,
+      }),
+    }),
+  );
+  assert.throws(
+    () =>
+      preflightLifecycleMutation({
+        request,
+        runner: rewriteRunner({
+          ancestor: false,
+          remoteTip: OTHER,
+          remoteTree: TREE_A,
+          originalTree: TREE_B,
+          newTree: TREE_A,
+        }),
+      }),
+    /expected_remote_tip_mismatch/,
   );
 });
 

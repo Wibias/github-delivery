@@ -159,6 +159,7 @@ export function authorityScopeForRequest(request = {}) {
         remote: exactString(request.remote, "remote"),
         branch: exactString(request.branch, "branch"),
         expectedRemoteTip: exactString(request.expectedRemoteTip, "expected_remote_tip"),
+        originalLocalTip: exactString(request.originalLocalTip, "original_local_tip"),
         newTip: exactString(request.newTip, "new_tip"),
         forceWithLease: request.forceWithLease === true,
         ...(rewriteExemption ? { rewriteExemption } : {}),
