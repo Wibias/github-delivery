@@ -6,6 +6,7 @@ All notable changes to `github-delivery` are documented here.
 
 ### Fixed
 
+- Installer now journals staging before the copy, promotes only a verified staged tree, and never installs a leftover staging directory that has no journal.
 - Behavioural-evaluation docs now show the run pack and `<run>.transcript.json` sidecar, matching the scorer that rejects in-pack `trace` objects.
 - Installer restore now journals before moving the live target aside, and journal updates replace a complete temp file instead of truncating the live journal, so a crash still leaves a recoverable tree.
 - Automatic NuGet dependency submission can restore the Windows Authority host on Linux by setting `EnableWindowsTargeting`, so GitHub's hosted `submit-nuget` job no longer fails with NETSDK1100.

@@ -349,6 +349,51 @@ test("a later apply recovers an interrupted displace before copying again", () =
   assert.equal(readFileSync(join(target, "marker.txt"), "utf8"), "new");
 });
 
+test("recover does not promote a unique staging directory when there is no journal", () => {
+  const root = mkdtempSync(join(tmpdir(), "github-delivery-install-test-"));
+  const target = join(root, "target");
+  const staging = join(root, `.github-delivery-staging-target-${process.pid}-1-0`);
+  mkdirSync(staging);
+  writeFileSync(join(staging, "package.json"), JSON.stringify({ name: "github-delivery", version: "0.2.0" }, null, 2));
+  writeFileSync(join(staging, "marker.txt"), "partial");
+
+  const recovered = recoverInterruptedInstallation({ target });
+  assert.equal(existsSync(target), false);
+  assert.notEqual(recovered.action, "completed");
+});
+
+test("recover does not promote a partial staging tree after a crash during a fresh installation copy", () => {
+  const root = mkdtempSync(join(tmpdir(), "github-delivery-install-test-"));
+  const source = join(root, "source");
+  const target = join(root, "target");
+  skill(source, "0.2.0", "complete");
+
+  assert.throws(
+    () => applyInstallation({
+      source,
+      target,
+      restoreOnFailure: false,
+      copySync(from, to) {
+        mkdirSync(to, { recursive: true });
+        writeFileSync(join(to, "package.json"), "{}");
+        writeFileSync(join(to, "marker.txt"), "partial");
+        throw new Error("injected crash during copy");
+      },
+    }),
+    /injected crash during copy/,
+  );
+  assert.equal(existsSync(target), false);
+  const journal = JSON.parse(readFileSync(join(dirname(target), `.github-delivery-install-journal-${basename(target)}`), "utf8"));
+  assert.equal(journal.phase, "staging");
+
+  const recovered = recoverInterruptedInstallation({ target });
+  assert.equal(existsSync(target), false);
+  assert.notEqual(recovered.action, "completed");
+
+  applyInstallation({ source, target });
+  assert.equal(readFileSync(join(target, "marker.txt"), "utf8"), "complete");
+});
+
 test("failed staging copy does not displace the live target", () => {
   const root = mkdtempSync(join(tmpdir(), "github-delivery-install-test-"));
   const source = join(root, "source");
@@ -432,7 +477,7 @@ test("recover completes a crash after restore moves the live target aside", () =
   assert.equal(readFileSync(join(target, "marker.txt"), "utf8"), "old");
 });
 
-test("recover survives a truncated journal after displace", () => {
+test("recover does not promote unverified staging after a truncated journal", () => {
   const root = mkdtempSync(join(tmpdir(), "github-delivery-install-test-"));
   const source = join(root, "source");
   const target = join(root, "target");
@@ -459,7 +504,10 @@ test("recover survives a truncated journal after displace", () => {
   assert.equal(existsSync(target), false);
 
   const recovered = recoverInterruptedInstallation({ target });
-  assert.equal(recovered.recovered, true);
+  assert.equal(existsSync(target), false);
+  assert.notEqual(recovered.action, "completed");
+
+  applyInstallation({ source, target, backupRoot: backups });
   assert.equal(readFileSync(join(target, "marker.txt"), "utf8"), "new");
 });
 
