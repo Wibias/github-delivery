@@ -477,6 +477,48 @@ test("recover completes a crash after restore moves the live target aside", () =
   assert.equal(readFileSync(join(target, "marker.txt"), "utf8"), "old");
 });
 
+test("recover completes after a crash during journal replacement", () => {
+  const root = mkdtempSync(join(tmpdir(), "github-delivery-install-test-"));
+  const source = join(root, "source");
+  const target = join(root, "target");
+  const backups = join(root, "backups");
+  skill(source, "0.2.0", "new");
+  skill(target, "0.1.0", "old");
+  const journalPath = join(dirname(target), `.github-delivery-install-journal-${basename(target)}`);
+
+  let displaced = false;
+  assert.throws(
+    () => applyInstallation({
+      source,
+      target,
+      backupRoot: backups,
+      restoreOnFailure: false,
+      renameSync(from, to) {
+        if (resolve(from) === resolve(target)) {
+          renameSync(from, to);
+          displaced = true;
+          return;
+        }
+        if (displaced && resolve(to) === resolve(journalPath) && from.endsWith(".tmp")) {
+          if (existsSync(to)) {
+            const error = new Error("EPERM");
+            error.code = "EPERM";
+            throw error;
+          }
+          throw new Error("injected crash during journal replace");
+        }
+        renameSync(from, to);
+      },
+    }),
+    /injected crash during journal replace/,
+  );
+  assert.equal(existsSync(target), false);
+
+  const recovered = recoverInterruptedInstallation({ target });
+  assert.equal(recovered.recovered, true);
+  assert.equal(readFileSync(join(target, "marker.txt"), "utf8"), "new");
+});
+
 test("recover does not promote unverified staging after a truncated journal", () => {
   const root = mkdtempSync(join(tmpdir(), "github-delivery-install-test-"));
   const source = join(root, "source");
