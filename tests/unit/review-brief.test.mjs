@@ -176,4 +176,46 @@ test("review brief labels mechanical files and moved code", () => {
   assert.match(text, /package-lock\.json.*mechanical/i);
   assert.match(text, /example\.mjs.*core/i);
   assert.match(text, /moved code: 3 lines/i);
+  assert.doesNotMatch(text, /not new logic/i);
+  assert.match(text, /surrounding context still requires review/i);
+});
+
+test("identical relocation across different guards still requires context review", () => {
+  const text = briefText({
+    meta: { repo: "Wibias/github-delivery", pr: 1 },
+    plan: {
+      fileCount: 1,
+      logicFiles: ["src/app.mjs"],
+      headRefOid: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      requiredProbes: [],
+      dependencyChanges: [],
+      removedControlLeads: [],
+      uncertainty: [],
+    },
+    files: [
+      {
+        path: "src/app.mjs",
+        additions: 3,
+        deletions: 3,
+        patch: [
+          "@@ -1,8 +1,8 @@",
+          " if (allowed) {",
+          "-  audit();",
+          "-  charge();",
+          "-  notify();",
+          " }",
+          " if (admin) {",
+          "+  audit();",
+          "+  charge();",
+          "+  notify();",
+          " }",
+        ].join("\n"),
+      },
+    ],
+    bugScope: { requiredLenses: [] },
+    securityScope: { requiredSurfaces: [] },
+  });
+  assert.match(text, /moved code: 3 lines/i);
+  assert.doesNotMatch(text, /not new logic/i);
+  assert.match(text, /surrounding context still requires review/i);
 });

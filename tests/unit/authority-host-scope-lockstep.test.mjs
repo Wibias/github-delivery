@@ -67,7 +67,7 @@ test("host SelfTest push rewrite-exemption fixtures hash under the Node canonica
         ? '{"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true}'
         : `{"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":"${exemption}"}`;
     assert.equal(typeof pinned, "string", `missing ExpectedPushScope${label}`);
-    assert.match(selfTest, new RegExp(needle.replace(/[{}]/g, "\\$&")));
+    assert.ok(selfTest.includes(needle));
     const request = JSON.parse(needle);
     assert.equal(authorityScopeSha256(request), pinned, label);
     hashes.add(pinned);

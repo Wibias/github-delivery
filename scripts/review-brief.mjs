@@ -172,7 +172,9 @@ export function briefText({
     const moved = summarizeMovedCode(file.patch, file.path);
     if (moved) {
       if (moved.exact) {
-        out.push(`Moved code: ${moved.movedLineCount} lines (exact relocate; not new logic)`);
+        out.push(
+          `Moved code: ${moved.movedLineCount} lines (textually identical relocate; surrounding context still requires review)`,
+        );
       } else {
         out.push(
           `Moved code: ${moved.movedLineCount} lines relocated; ${moved.changedLineCount} changed lines still in review`,

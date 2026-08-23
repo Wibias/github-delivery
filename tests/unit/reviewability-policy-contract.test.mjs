@@ -24,10 +24,12 @@ test("PR descriptions call out core versus generated files", () => {
   assert.match(body, /generated|mechanical/i);
 });
 
-test("full review treats only exact relocated blocks as not new logic", () => {
+test("full review treats textual relocation as a hint, not proof of unchanged behavior", () => {
   const review = read("references/full-review-pr.md");
   assert.match(review, /moved code|relocated/i);
   assert.match(review, /review-brief/);
-  assert.match(review, /exact relocate|exact relocated|unchanged lines/i);
-  assert.match(review, /still in review|Near relocations/i);
+  assert.match(review, /textually identical|identical reloc/i);
+  assert.match(review, /surrounding context still requires review/i);
+  assert.doesNotMatch(review, /not new logic|Do not treat those exact moves as new logic/);
+  assert.match(review, /stay in review|Near relocations/i);
 });

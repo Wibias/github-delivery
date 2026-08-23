@@ -13,7 +13,7 @@ All notable changes to `github-delivery` are documented here.
 ### Changed
 
 - Bumped the package version from `1.0.0` to `1.0.1`.
-- Review briefs label files as core, mechanical, or other, and call out relocated blocks of three or more lines as moved code rather than new logic. PR description review notes name the core files when a diff mixes implementation with generated or lockfile changes.
+- Review briefs label files as core, mechanical, or other, and call out relocated blocks of three or more lines as moved code. Textually identical relocation does not prove unchanged behavior; surrounding context still requires review. PR description review notes name the core files when a diff mixes implementation with generated or lockfile changes.
 - Absence claims need a positive-control search that matches a known hit before `no residual X`.
 - Confirmation checks re-run in the same shell and PATH as the original observation so a PATH switch cannot produce a false result.
 
@@ -21,7 +21,7 @@ All notable changes to `github-delivery` are documented here.
 
 - Non-fast-forward force-with-lease `push_code` fails closed unless the new tip tree matches the previous tip or `rewriteExemption` is restack, conflicts, or simplify-pr.
 - Restack `push_code` requests include `rewriteExemption`, and Windows Hello hashes that field the same way Node does: omit it when empty, include it when set.
-- Moved-code hints only suppress exact unchanged relocations. Near-match and indentation-sensitive edits stay in review, and file roles follow review-scope logic paths with path-segment mechanical directories.
+- Moved-code hints report exact unchanged line text as a relocation, but they do not tell reviewers to skip that code as not-new-logic. Near-match, indentation-sensitive, and guard-crossing edits stay in review, and file roles follow review-scope logic paths with path-segment mechanical directories.
 - Exact moved-code classification uses raw source-line equality, so whitespace inside strings, template literals, and trailing spaces counts as a change.
 
 ## [1.0.0] - 2026-08-22

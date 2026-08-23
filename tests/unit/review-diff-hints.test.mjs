@@ -138,6 +138,25 @@ test("template literal content changes are not exact moved code", () => {
   assert.equal(summary.exact, false);
 });
 
+test("identical relocation across different guards is still a detected move", () => {
+  const patch = [
+    "@@ -1,8 +1,8 @@",
+    " if (allowed) {",
+    "-  audit();",
+    "-  charge();",
+    "-  notify();",
+    " }",
+    " if (admin) {",
+    "+  audit();",
+    "+  charge();",
+    "+  notify();",
+    " }",
+  ].join("\n");
+  const summary = summarizeMovedCode(patch, "src/app.mjs");
+  assert.equal(summary.movedLineCount, 3);
+  assert.equal(summary.exact, true);
+});
+
 test("significant trailing whitespace is not exact moved code", () => {
   const patch = [
     "@@ -1,6 +1,6 @@",
