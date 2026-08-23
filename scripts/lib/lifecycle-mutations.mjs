@@ -2,8 +2,7 @@ import { classifyCoveringPullRequests, normalizeCoveringPullPages } from "./cove
 import { assertContentPreservingRewrite } from "./content-preserving-rewrite.mjs";
 import { diffPrBodyMedia } from "./pr-body-media.mjs";
 import { assertPublishedMarkdown } from "./published-body-integrity.mjs";
-
-const REWRITE_EXEMPTIONS = new Set(["restack", "conflicts", "simplify-pr"]);
+import { parseRewriteExemption } from "./rewrite-exemption.mjs";
 
 const LIFECYCLE_ACTIONS = new Set([
   "push_code",
@@ -56,14 +55,7 @@ function spawnGitStatus(runner, executable, args) {
 }
 
 function rewriteExemptionOf(request) {
-  if (request.rewriteExemption === undefined || request.rewriteExemption === null || request.rewriteExemption === "") {
-    return null;
-  }
-  if (typeof request.rewriteExemption !== "string") {
-    throw new Error("rewrite_exemption_invalid");
-  }
-  if (!REWRITE_EXEMPTIONS.has(request.rewriteExemption)) throw new Error("rewrite_exemption_invalid");
-  return request.rewriteExemption;
+  return parseRewriteExemption(request.rewriteExemption, "rewrite_exemption_invalid");
 }
 
 function isAncestor(runner, ancestor, descendant) {

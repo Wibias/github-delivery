@@ -78,6 +78,22 @@ internal static class SelfTest
             pushNoneHash != pushRestackHash && pushRestackHash != pushConflictsHash && pushConflictsHash != pushSimplifyHash,
             "rewrite exemptions must change the exact push authority scope");
 
+        using var pushEmpty = JsonDocument.Parse("""
+            {"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":""}
+            """);
+        Assert(ScopeCanonicalizer.ScopeSha256(pushEmpty.RootElement) == ExpectedPushScopeNone, "empty rewrite exemption must hash as omitted");
+        Assert(!MutationClassifier.HasRewriteExemption(pushEmpty.RootElement), "empty rewrite exemption must stay absent for leases");
+        Assert(MutationClassifier.IsBranchLeaseEligible(pushEmpty.RootElement), "empty rewrite exemption must remain branch-lease eligible");
+
+        AssertRejectedRewriteExemption(
+            "PaddedRestack",
+            """{"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":" restack "}""");
+        AssertRejectedRewriteExemption(
+            "WhitespaceOnly",
+            """{"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":" "}""");
+        AssertRejectedRewriteExemption(
+            "UnknownAmend",
+            """{"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":"amend"}""");
         AssertRejectedRewriteExemption(
             "MalformedArray",
             """{"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":["restack"]}""");

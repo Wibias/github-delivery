@@ -242,8 +242,8 @@ internal sealed class AuthorityService
             operation.TryGetProperty("branch", out var pushBranch) && pushBranch.ValueKind == JsonValueKind.String)
         {
             lines.Add($"   branch: {pushBranch.GetString()}");
-            var rewriteExemption = OptionalString(operation, "rewriteExemption")?.Trim();
-            if (!string.IsNullOrEmpty(rewriteExemption))
+            var rewriteExemption = ScopeCanonicalizer.OptionalRewriteExemption(operation);
+            if (rewriteExemption is not null)
             {
                 lines.Add($"   content-changing non-fast-forward rewrite allowed: {rewriteExemption}");
             }

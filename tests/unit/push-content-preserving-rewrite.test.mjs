@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   authorityScopeForRequest,
+  authorityScopeSha256,
 } from "../../scripts/lib/authority-scope.mjs";
 import {
   preflightLifecycleMutation,
@@ -114,6 +115,50 @@ test("unknown rewrite exemption fails closed", () => {
     () => validateLifecycleMutation(pushRequest({ rewriteExemption: "amend" })),
     /rewrite_exemption_invalid/,
   );
+});
+
+test("lifecycle and authority share the rewriteExemption accept/reject matrix", () => {
+  const omitted = pushRequest();
+  const omittedHash = authorityScopeSha256(omitted);
+  const cases = [
+    [undefined, "omit"],
+    [null, "omit"],
+    ["", "omit"],
+    ["restack", "accept"],
+    ["conflicts", "accept"],
+    ["simplify-pr", "accept"],
+    [" restack ", "reject"],
+    [" ", "reject"],
+    ["amend", "reject"],
+    [["restack"], "reject"],
+    [{ kind: "restack" }, "reject"],
+    [1, "reject"],
+    [true, "reject"],
+  ];
+  for (const [value, expected] of cases) {
+    const request = { ...omitted };
+    if (value !== undefined) request.rewriteExemption = value;
+    const label = JSON.stringify(value);
+    if (expected === "omit") {
+      assert.equal(validateLifecycleMutation(request), true, `lifecycle omit ${label}`);
+      assert.equal("rewriteExemption" in authorityScopeForRequest(request), false, `authority omit ${label}`);
+      assert.equal(authorityScopeSha256(request), omittedHash, `authority hash omit ${label}`);
+    } else if (expected === "accept") {
+      assert.equal(validateLifecycleMutation(request), true, `lifecycle accept ${label}`);
+      assert.equal(authorityScopeForRequest(request).rewriteExemption, value, `authority accept ${label}`);
+    } else {
+      assert.throws(
+        () => validateLifecycleMutation(request),
+        /rewrite_exemption_invalid/,
+        `lifecycle reject ${label}`,
+      );
+      assert.throws(
+        () => authorityScopeForRequest(request),
+        /authority_scope_rewrite_exemption_invalid/,
+        `authority reject ${label}`,
+      );
+    }
+  }
 });
 
 test("non-string rewrite exemptions cannot bypass tree identity", () => {

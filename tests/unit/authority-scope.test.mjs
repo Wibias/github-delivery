@@ -118,13 +118,18 @@ test("push authority scope binds repository remote, exact generation, new tip, a
     authorityScopeSha256({ ...request, rewriteExemption: "conflicts" }),
     authorityScopeSha256({ ...request, rewriteExemption: "simplify-pr" }),
   );
-  for (const rewriteExemption of [["restack"], { kind: "restack" }, 1, true]) {
+  for (const rewriteExemption of [["restack"], { kind: "restack" }, 1, true, "amend", " restack ", " "]) {
     assert.throws(
       () => authorityScopeForRequest({ ...request, rewriteExemption }),
       /authority_scope_rewrite_exemption_invalid/,
       JSON.stringify(rewriteExemption),
     );
   }
+  assert.equal("rewriteExemption" in authorityScopeForRequest({ ...request, rewriteExemption: "" }), false);
+  assert.equal(
+    authorityScopeSha256({ ...request, rewriteExemption: "" }),
+    authorityScopeSha256(request),
+  );
 });
 
 

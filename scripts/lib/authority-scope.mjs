@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { actionDefinition } from "./mutation-action-registry.mjs";
+import { parseRewriteExemption } from "./rewrite-exemption.mjs";
 import { stripReviewAuthorityMarker } from "./review-verdict-marker.mjs";
 
 const MUTATION_MODES = new Set(["read-only", "review", "maintainer", "autonomous"]);
@@ -56,13 +57,7 @@ function optionalExactString(value, name) {
 }
 
 function optionalRewriteExemption(value) {
-  if (value === undefined || value === null) return null;
-  if (typeof value !== "string") {
-    throw new Error("authority_scope_rewrite_exemption_invalid");
-  }
-  const text = value.trim();
-  if (!text) throw new Error("authority_scope_rewrite_exemption_required");
-  return text;
+  return parseRewriteExemption(value, "authority_scope_rewrite_exemption_invalid");
 }
 
 function normalizedStringSet(value, name, { optional = false } = {}) {

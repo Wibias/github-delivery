@@ -66,8 +66,6 @@ internal static partial class ScopeCanonicalizer
                 var rewriteExemption = OptionalRewriteExemption(request);
                 if (rewriteExemption is not null)
                 {
-                    rewriteExemption = rewriteExemption.Trim();
-                    if (rewriteExemption.Length == 0) throw new AuthorityException("authority_scope_rewrite_exemption_required");
                     scope["rewriteExemption"] = rewriteExemption;
                 }
                 break;
@@ -311,7 +309,7 @@ internal static partial class ScopeCanonicalizer
             ? value.GetString()
             : null;
 
-    private static string? OptionalRewriteExemption(JsonElement request)
+    internal static string? OptionalRewriteExemption(JsonElement request)
     {
         if (!request.TryGetProperty("rewriteExemption", out var value)
             || value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
@@ -322,7 +320,13 @@ internal static partial class ScopeCanonicalizer
         {
             throw new AuthorityException("authority_scope_rewrite_exemption_invalid");
         }
-        return value.GetString();
+        var text = value.GetString();
+        if (string.IsNullOrEmpty(text)) return null;
+        if (text is not ("restack" or "conflicts" or "simplify-pr"))
+        {
+            throw new AuthorityException("authority_scope_rewrite_exemption_invalid");
+        }
+        return text;
     }
 
     private static int PositiveInt(JsonElement element, string name)

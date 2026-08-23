@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-import { authorityScopeSha256 } from "../../scripts/lib/authority-scope.mjs";
+import {
+  authorityScopeForRequest,
+  authorityScopeSha256,
+} from "../../scripts/lib/authority-scope.mjs";
 
 function read(path) {
   return readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
@@ -55,11 +58,26 @@ test("Windows Hello names rewrite exemptions and keeps them off leases and PR se
   assert.match(selfTest, /exempt rewrite Hello presentation must differ from an ordinary push/);
 });
 
-test("Windows push_code canonicalizer omits empty rewrite exemptions and binds the rest", () => {
-  const pushCase = switchCase(read(`${host}/ScopeCanonicalizer.cs`), "push_code");
-  assert.match(pushCase, /rewriteExemption/);
+test("Windows push_code canonicalizer omits empty rewrite exemptions and binds exact allowlisted values", () => {
+  const canonicalizer = read(`${host}/ScopeCanonicalizer.cs`);
+  const pushCase = switchCase(canonicalizer, "push_code");
+  const helper = canonicalizer.match(/OptionalRewriteExemption\(JsonElement request\)[\s\S]*?return text;/)?.[0] || "";
+  const selfTest = read(`${host}/SelfTest.cs`);
   assert.match(pushCase, /OptionalRewriteExemption\(request\)/);
   assert.match(pushCase, /scope\["rewriteExemption"\] = rewriteExemption/);
+  assert.doesNotMatch(pushCase, /\.Trim\(\)/);
+  assert.doesNotMatch(helper, /\.Trim\(\)/);
+  assert.match(helper, /"restack" or "conflicts" or "simplify-pr"/);
+  const noneHash = selfTest.match(/ExpectedPushScopeNone = "([0-9a-f]{64})"/)?.[1];
+  const emptyNeedle =
+    '{"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":""}';
+  assert.equal(typeof noneHash, "string");
+  assert.ok(selfTest.includes(emptyNeedle));
+  assert.match(selfTest, /empty rewrite exemption must hash as omitted/);
+  const emptyRequest = JSON.parse(emptyNeedle);
+  assert.equal(emptyRequest.rewriteExemption, "");
+  assert.equal("rewriteExemption" in authorityScopeForRequest(emptyRequest), false);
+  assert.equal(authorityScopeSha256(emptyRequest), noneHash);
 });
 
 test("Node and Windows reject the same non-string rewriteExemption shapes", () => {
@@ -73,7 +91,7 @@ test("Node and Windows reject the same non-string rewriteExemption shapes", () =
     switchCase(canonicalizer, "push_code"),
     /OptionalString\(request, "rewriteExemption"\)/,
   );
-  assert.match(classifier, /HasRewriteExemption[\s\S]*authority_scope_rewrite_exemption_invalid/);
+  assert.match(classifier, /HasRewriteExemption[\s\S]*OptionalRewriteExemption/);
   const request = {
     schemaVersion: 1,
     action: "push_code",
@@ -91,6 +109,9 @@ test("Node and Windows reject the same non-string rewriteExemption shapes", () =
     ["MalformedObject", { kind: "restack" }],
     ["MalformedNumber", 1],
     ["MalformedBoolean", true],
+    ["PaddedRestack", " restack "],
+    ["WhitespaceOnly", " "],
+    ["UnknownAmend", "amend"],
   ];
   for (const [label, rewriteExemption] of malformed) {
     const needle = JSON.stringify({ ...request, rewriteExemption });
