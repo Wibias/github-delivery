@@ -10,10 +10,12 @@ test("git policy binds content-preserving rewrites to the original tree", () => 
   const git = read("references/policy/git.md");
   const stacks = read("references/stacked-prs.md");
   assert.match(git, /GD-GIT-008/);
+  assert.match(git, /record_rewrite_baseline/);
   assert.match(git, /originalLocalTip/);
   assert.match(git, /tree matches/);
   assert.match(git, /rewriteExemption/);
   assert.match(stacks, /GD-GIT-008/);
+  assert.match(stacks, /record_rewrite_baseline/);
   assert.match(stacks, /originalLocalTip/);
   assert.match(stacks, /rewriteExemption/);
   assert.match(stacks, /"rewriteExemption": "restack"/);

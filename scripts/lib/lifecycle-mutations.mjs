@@ -3,9 +3,15 @@ import { assertContentPreservingRewrite } from "./content-preserving-rewrite.mjs
 import { diffPrBodyMedia } from "./pr-body-media.mjs";
 import { assertPublishedMarkdown } from "./published-body-integrity.mjs";
 import { parseRewriteExemption } from "./rewrite-exemption.mjs";
+import {
+  consumeRewriteBaselineCommand,
+  readRewriteBaseline,
+  rewriteBaselineRef,
+} from "./rewrite-baseline.mjs";
 
 const LIFECYCLE_ACTIONS = new Set([
   "push_code",
+  "record_rewrite_baseline",
   "create_pr",
   "update_pr_body",
   "create_issue",
@@ -127,12 +133,33 @@ function assertPushTarget(request, runner) {
   if (expected !== "absent" && request.forceWithLease === true && !isAncestor(runner, expected, newTip)) {
     const exemption = rewriteExemptionOf(request);
     if (!exemption) {
-      const originalTree = run(runner, ["git", "rev-parse", `${originalLocalTip}^{tree}`]);
+      const recorded = readRewriteBaseline(runner, remote, branch);
+      if (!recorded) throw new Error("original_local_tip_baseline_required");
+      if (recorded !== originalLocalTip) {
+        throw new Error(
+          `original_local_tip_baseline_mismatch: expected ${recorded}, observed ${originalLocalTip}`,
+        );
+      }
+      if (recorded === newTip) throw new Error("original_local_tip_tautological");
+      const originalTree = run(runner, ["git", "rev-parse", `${recorded}^{tree}`]);
       const nextTree = run(runner, ["git", "rev-parse", `${newTip}^{tree}`]);
       assertContentPreservingRewrite({ originalTree, newTree: nextTree });
     }
   }
   return { remote, branch, expectedRemoteTip: expected, originalLocalTip, newTip };
+}
+
+function assertRewriteBaselineCapture(request, runner) {
+  const remote = String(required(request.remote, "remote"));
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(remote)) throw new Error("remote_invalid");
+  const branch = String(required(request.branch, "branch"));
+  run(runner, ["git", "check-ref-format", `refs/heads/${branch}`]);
+  run(runner, ["git", "check-ref-format", rewriteBaselineRef(remote, branch)]);
+  const originalLocalTip = exactSha(
+    run(runner, ["git", "rev-parse", "--verify", `refs/heads/${branch}`]),
+    "original_local_tip",
+  );
+  return { remote, branch, originalLocalTip };
 }
 
 function validateApprovedMediaRemovals(value) {
@@ -303,6 +330,10 @@ export function validateLifecycleMutation(request = {}) {
       if (typeof request.forceWithLease !== "boolean") throw new Error("force_with_lease_required");
       rewriteExemptionOf(request);
       break;
+    case "record_rewrite_baseline":
+      required(request.remote, "remote");
+      required(request.branch, "branch");
+      break;
     case "create_pr":
       required(request.base, "base");
       createPrHeadIdentity(request);
@@ -349,6 +380,16 @@ export function lifecycleCommandFor(request = {}) {
         `${newTip}:refs/heads/${branch}`,
       ];
     }
+    case "record_rewrite_baseline": {
+      const remote = String(required(request.remote, "remote"));
+      const branch = String(required(request.branch, "branch"));
+      return [
+        "git",
+        "update-ref",
+        rewriteBaselineRef(remote, branch),
+        `refs/heads/${branch}`,
+      ];
+    }
     case "create_pr":
       return createPrCommand(request, repo);
     case "update_pr_body":
@@ -392,6 +433,7 @@ export function lifecycleCommandFor(request = {}) {
 
 export function preflightLifecycleMutation({ request, runner }) {
   if (request.action === "push_code") return assertPushTarget(request, runner);
+  if (request.action === "record_rewrite_baseline") return assertRewriteBaselineCapture(request, runner);
   if (request.action === "update_pr_body") return assertUpdatePrBodySafe(request, runner);
   if (request.action === "create_pr") return assertCreatePrNotDuplicate(request, runner);
   return null;
@@ -407,6 +449,8 @@ export function verifyLifecycleMutation({ request, runner }) {
     if (observed !== expected) {
       throw new Error(`push_verification_failed: expected ${expected}, observed ${observed}`);
     }
+    const recorded = readRewriteBaseline(runner, remote, branch);
+    if (recorded) run(runner, consumeRewriteBaselineCommand(remote, branch));
     return observed;
   }
   if (request.action === "update_pr_body") {

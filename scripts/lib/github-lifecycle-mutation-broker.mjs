@@ -17,6 +17,7 @@ import { boundedSpawnSync } from "./subprocess-policy.mjs";
 
 const ACTIONS = new Set([
   "push_code",
+  "record_rewrite_baseline",
   "create_pr",
   "update_pr_body",
   "create_issue",

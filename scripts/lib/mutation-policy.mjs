@@ -15,6 +15,7 @@ const ACTIONS = [
   "reply_bot_thread",
   "reply_human_thread",
   "push_code",
+  "record_rewrite_baseline",
   "create_pr",
   "update_pr_body",
   "create_issue",
@@ -70,7 +71,7 @@ function buildProfile(mode) {
     allow(profile, ["reply_human_thread"], { exactText: true });
   }
   if (["maintainer", "autonomous"].includes(mode)) {
-    allow(profile, ["push_code", "post_resolution_record"]);
+    allow(profile, ["push_code", "record_rewrite_baseline", "post_resolution_record"]);
   }
   if (mode === "maintainer") {
     allow(

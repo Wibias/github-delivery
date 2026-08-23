@@ -166,6 +166,13 @@ export function authorityScopeForRequest(request = {}) {
       };
     }
 
+    case "record_rewrite_baseline":
+      return {
+        ...scope,
+        remote: exactString(request.remote, "remote"),
+        branch: exactString(request.branch, "branch"),
+      };
+
     case "create_pr": {
       const headRepo = optionalExactString(request.headRepo, "head_repo");
       return {

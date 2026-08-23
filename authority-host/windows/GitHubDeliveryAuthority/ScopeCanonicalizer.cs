@@ -71,6 +71,11 @@ internal static partial class ScopeCanonicalizer
                 }
                 break;
 
+            case "record_rewrite_baseline":
+                scope["remote"] = RequiredString(request, "remote");
+                scope["branch"] = RequiredString(request, "branch");
+                break;
+
             case "create_pr":
                 scope["base"] = RequiredString(request, "base");
                 scope["head"] = RequiredString(request, "head");

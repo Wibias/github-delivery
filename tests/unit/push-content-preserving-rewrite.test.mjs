@@ -6,9 +6,11 @@ import {
   authorityScopeSha256,
 } from "../../scripts/lib/authority-scope.mjs";
 import {
+  lifecycleCommandFor,
   preflightLifecycleMutation,
   validateLifecycleMutation,
 } from "../../scripts/lib/lifecycle-mutations.mjs";
+import { rewriteBaselineRef } from "../../scripts/lib/rewrite-baseline.mjs";
 
 const OLD = "a".repeat(40);
 const NEXT = "b".repeat(40);
@@ -47,7 +49,11 @@ function rewriteRunner({
   remoteTree = TREE_A,
   originalTree = TREE_A,
   newTree = TREE_A,
+  baselineTip = LOCAL,
+  baselineMissing = false,
+  headTip = LOCAL,
 } = {}) {
+  const baselineRef = rewriteBaselineRef("origin", "feature/safe");
   return (command, args) => {
     if (command === "git" && args[0] === "check-ref-format") return { status: 0, stdout: "", stderr: "" };
     if (command === "git" && args[0] === "remote") {
@@ -62,8 +68,18 @@ function rewriteRunner({
     if (command === "git" && args[0] === "merge-base") {
       return { status: ancestor ? 0 : 1, stdout: "", stderr: "" };
     }
+    if (command === "git" && args[0] === "update-ref") {
+      return { status: 0, stdout: "", stderr: "" };
+    }
     if (command === "git" && args[0] === "rev-parse") {
-      const spec = String(args[1] || "");
+      const spec = args[1] === "--verify" ? String(args[2] || "") : String(args[1] || "");
+      if (spec === baselineRef || spec.startsWith("refs/github-delivery/rewrite-baseline/")) {
+        if (baselineMissing) return { status: 128, stdout: "", stderr: "missing" };
+        return { status: 0, stdout: `${baselineTip}\n`, stderr: "" };
+      }
+      if (spec === "refs/heads/feature/safe") {
+        return { status: 0, stdout: `${headTip}\n`, stderr: "" };
+      }
       if (spec.startsWith(OLD)) return { status: 0, stdout: `${remoteTree}\n`, stderr: "" };
       if (spec.startsWith(LOCAL)) return { status: 0, stdout: `${originalTree}\n`, stderr: "" };
       if (spec.startsWith(NEXT)) return { status: 0, stdout: `${newTree}\n`, stderr: "" };
@@ -71,6 +87,85 @@ function rewriteRunner({
     throw new Error(`unexpected command: ${command} ${args.join(" ")}`);
   };
 }
+
+test("a same-request originalLocalTip equal to newTip cannot satisfy the rewrite guard", () => {
+  assert.throws(
+    () =>
+      preflightLifecycleMutation({
+        request: pushRequest({ originalLocalTip: NEXT }),
+        runner: rewriteRunner({
+          ancestor: false,
+          baselineTip: NEXT,
+          originalTree: TREE_A,
+          newTree: TREE_A,
+        }),
+      }),
+    /original_local_tip_tautological/,
+  );
+});
+
+test("history-only rewrite without a broker rewrite baseline cannot reach push_code", () => {
+  assert.throws(
+    () =>
+      preflightLifecycleMutation({
+        request: pushRequest(),
+        runner: rewriteRunner({
+          ancestor: false,
+          baselineMissing: true,
+          originalTree: TREE_A,
+          newTree: TREE_A,
+        }),
+      }),
+    /original_local_tip_baseline_required/,
+  );
+});
+
+test("push_code originalLocalTip must match the broker-owned rewrite baseline", () => {
+  assert.throws(
+    () =>
+      preflightLifecycleMutation({
+        request: pushRequest({ originalLocalTip: NEXT }),
+        runner: rewriteRunner({
+          ancestor: false,
+          baselineTip: LOCAL,
+          originalTree: TREE_A,
+          newTree: TREE_A,
+        }),
+      }),
+    /original_local_tip_baseline_mismatch/,
+  );
+});
+
+test("record_rewrite_baseline captures refs/heads/branch rather than a caller SHA", () => {
+  const request = {
+    schemaVersion: 1,
+    action: "record_rewrite_baseline",
+    mutationMode: "maintainer",
+    explicitInstruction: true,
+    repo: "Wibias/github-delivery",
+    remote: "origin",
+    branch: "feature/safe",
+  };
+  assert.equal(validateLifecycleMutation(request), true);
+  assert.deepEqual(lifecycleCommandFor(request), [
+    "git",
+    "update-ref",
+    rewriteBaselineRef("origin", "feature/safe"),
+    "refs/heads/feature/safe",
+  ]);
+  const result = preflightLifecycleMutation({
+    request,
+    runner: rewriteRunner({ headTip: LOCAL }),
+  });
+  assert.equal(result.originalLocalTip, LOCAL);
+  assert.deepEqual(authorityScopeForRequest(request), {
+    action: "record_rewrite_baseline",
+    mutationMode: "maintainer",
+    repo: "Wibias/github-delivery",
+    remote: "origin",
+    branch: "feature/safe",
+  });
+});
 
 test("fast-forward force-with-lease skips the tree identity check", () => {
   assert.doesNotThrow(() =>
