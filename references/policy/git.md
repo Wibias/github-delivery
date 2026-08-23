@@ -29,3 +29,7 @@ Before readiness or merge, update topology as required, then verify build/tests 
 ### GD-GIT-007 — Automatic branch deletion is disabled
 
 Do not automatically delete a merged PR head branch. GitHub's ref-delete API does not expose an expected-tip compare-and-delete precondition, so a branch can advance after cleanup is authorized but before deletion reaches GitHub. Keep the branch and report that automatic cleanup is disabled until the delete operation can be atomically bound to the expected remote tip. Never convert a prior cleanup decision into authority to delete a later branch generation.
+
+### GD-GIT-008 — Content-preserving rewrites keep the original tree
+
+Before squash, reword, reorder, or commit grouping, record `git rev-parse HEAD^{tree}`. Call `assertContentPreservingRewrite` before force-with-lease `push_code`. Restack, conflicts, and simplify-pr skip this.

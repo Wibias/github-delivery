@@ -132,3 +132,48 @@ test("briefText renders required probe blocks", () => {
   assert.match(text, /credential-transport/);
   assert.match(text, /Check credential transport/);
 });
+
+test("review brief labels mechanical files and moved code", () => {
+  const text = briefText({
+    meta: { repo: "Wibias/github-delivery", pr: 1 },
+    plan: {
+      fileCount: 2,
+      logicFiles: ["scripts/lib/example.mjs"],
+      headRefOid: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      requiredProbes: [],
+      dependencyChanges: [],
+      removedControlLeads: [],
+      uncertainty: [],
+    },
+    files: [
+      {
+        path: "package-lock.json",
+        additions: 2,
+        deletions: 1,
+        patch: "@@ -1,2 +1,3 @@\n {\n+  \"lockfileVersion\": 3\n",
+      },
+      {
+        path: "scripts/lib/example.mjs",
+        additions: 3,
+        deletions: 3,
+        patch: [
+          "@@ -1,8 +1,8 @@",
+          " keep",
+          "-alpha",
+          "-bravo",
+          "-charlie",
+          " middle",
+          "+alpha",
+          "+bravo",
+          "+charlie",
+          " after",
+        ].join("\n"),
+      },
+    ],
+    bugScope: { requiredLenses: [] },
+    securityScope: { requiredSurfaces: [] },
+  });
+  assert.match(text, /package-lock\.json.*mechanical/i);
+  assert.match(text, /example\.mjs.*core/i);
+  assert.match(text, /moved code: 3 lines/i);
+});

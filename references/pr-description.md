@@ -56,7 +56,7 @@ Do not lose or weaken the closing reference while editing the body.
 
 Add these only when they carry useful information:
 
-- **Review notes:** non-obvious choices, risk areas, migration details, or where review attention is most valuable.
+- **Review notes:** non-obvious choices, risk areas, migration details, or where review attention is most valuable. When the diff mixes implementation with generated, lockfile, or other mechanical files, name the core files a reviewer should read first.
 - **Limitations:** known gaps, explicit exclusions, deferred follow-ups, or validation that could not be completed.
 
 ## Default template
@@ -73,7 +73,7 @@ Add these only when they carry useful information:
 
 ## Review notes
 
-- <optional non-obvious decision or review focus>
+- <optional non-obvious decision, core vs generated files, or review focus>
 
 ## Limitations
 
