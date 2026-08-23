@@ -25,6 +25,7 @@ import {
   attachRepositoryPermissions,
   feedbackPermissionLogins,
 } from "./lib/feedback-authority.mjs";
+import { runGitHubCommandWithRetry } from "./lib/github-retry.mjs";
 import { boundedSpawnSync } from "./lib/subprocess-policy.mjs";
 import { graphqlCliField } from "./lib/graphql-cli-fields.mjs";
 import { normalizeNativeStack } from "./lib/native-stack-policy.mjs";
@@ -59,9 +60,12 @@ function parseArgs(argv) {
 }
 
 function ghOk(args) {
-  const result = boundedSpawnSync("gh", args, {
-    encoding: "utf8",
-    maxBuffer: 50 * 1024 * 1024,
+  const result = runGitHubCommandWithRetry("gh", args, {
+    runner: boundedSpawnSync,
+    options: {
+      encoding: "utf8",
+      maxBuffer: 50 * 1024 * 1024,
+    },
   });
   return {
     ok: result.status === 0,
