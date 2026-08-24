@@ -33,6 +33,16 @@ function exactSha(value, name) {
   return sha;
 }
 
+function assertConsumeExpected(actual, expected) {
+  if (expected === undefined || expected === null) return;
+  const normalized = exactSha(expected, "expected_original_local_tip_baseline");
+  if (actual !== normalized) {
+    throw new Error(
+      `rewrite_baseline_consume_mismatch: expected ${normalized}, observed ${actual}`,
+    );
+  }
+}
+
 function sleep(ms) {
   Atomics.wait(sleeper, 0, 0, ms);
 }
@@ -253,12 +263,13 @@ function createStore(readAll, writeAll) {
       writeAll(data);
       return data[key];
     },
-    consume(scope) {
+    consume(scope, expectedOriginalLocalTip) {
       const data = readAll();
       const key = rewriteBaselineScopeKey(scope);
       const value = data[key];
       if (value == null) return null;
       const sha = exactSha(value, "original_local_tip_baseline");
+      assertConsumeExpected(sha, expectedOriginalLocalTip);
       delete data[key];
       writeAll(data);
       return sha;
@@ -306,13 +317,14 @@ export function createFileRewriteBaselineStore({
         return data[key];
       });
     },
-    consume(scope) {
+    consume(scope, expectedOriginalLocalTip) {
       return withStoreLock(lockPath, lockOptions, (lease) => {
         const data = readAll();
         const key = rewriteBaselineScopeKey(scope);
         const value = data[key];
         if (value == null) return null;
         const sha = exactSha(value, "original_local_tip_baseline");
+        assertConsumeExpected(sha, expectedOriginalLocalTip);
         delete data[key];
         writeAll(data, lease);
         return sha;
