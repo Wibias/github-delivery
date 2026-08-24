@@ -180,12 +180,19 @@ function requestForAuthorityMode(request, options) {
   if (options?.authorityMode !== "off") return request;
   const normalized = {
     ...request,
-    // Off is a user-configured opt-out of independent OS-backed approval.
-    // Direct lifecycle intent is derived from the selected route/profile here,
-    // not trusted from the raw request boolean. Exact-text confirmation is
-    // deliberately preserved: Off removes Windows Hello, not body confirmation.
-    explicitInstruction: true,
+    // Off is a user-configured opt-out of independent OS-backed approval, not
+    // permission for a mutation document to mint direct user intent. Governing
+    // workflows provide that fact out-of-band through execution context.
+    explicitInstruction: options?.trustedWorkflowIntent === true,
   };
+  if (
+    Object.prototype.hasOwnProperty.call(normalized, "exactTextConfirmed") ||
+    options?.trustedExactTextConfirmation === true
+  ) {
+    // Exact-text confirmation is likewise execution context, never a trusted
+    // fact merely because caller-controlled JSON set a boolean.
+    normalized.exactTextConfirmed = options?.trustedExactTextConfirmation === true;
+  }
   delete normalized.authorityGrant;
   return normalized;
 }
@@ -211,16 +218,23 @@ export function planMutationWithAuthority(
     env = process.env,
     readFile = readFileSync,
     config = undefined,
+    trustedWorkflowIntent = false,
+    trustedExactTextConfirmation = false,
   } = {},
 ) {
   const runtimeEnv = authorityRuntimeEnvironment({ env });
-  const options = mutationAuthorityOptions({
+  const authorityOptions = mutationAuthorityOptions({
     request,
     enforceHighAssurance: false,
     env: runtimeEnv,
     readFile,
     config,
   });
+  const options = {
+    ...authorityOptions,
+    trustedWorkflowIntent: trustedWorkflowIntent === true,
+    trustedExactTextConfirmation: trustedExactTextConfirmation === true,
+  };
   return planWithAuthorityOptions(request, options);
 }
 
@@ -253,17 +267,24 @@ export function executeMutationWithAuthority({
   readFile = readFileSync,
   config = undefined,
   redeemer = undefined,
+  trustedWorkflowIntent = false,
+  trustedExactTextConfirmation = false,
 } = {}) {
   const runtimeEnv = authorityRuntimeEnvironment({ env });
-  const options = mutationAuthorityOptions({
+  const authorityOptions = mutationAuthorityOptions({
     request,
     enforceHighAssurance: execute === true,
     env: runtimeEnv,
     readFile,
     config,
   });
+  const options = {
+    ...authorityOptions,
+    trustedWorkflowIntent: trustedWorkflowIntent === true,
+    trustedExactTextConfirmation: trustedExactTextConfirmation === true,
+  };
   const effectiveRequest = requestForAuthorityMode(request, options);
-  const planned = planWithAuthorityOptions(effectiveRequest, options);
+  const planned = planWithAuthorityOptions(request, options);
 
   // Merge topology and final conversation safety are execution invariants, not
   // only workflow instructions. Conversation safety additionally proves that
