@@ -9,6 +9,7 @@ const DEFINITIONS = [
   { action: "read_evidence", enabled: true, mutation: false, route: "local", minimumMode: "read-only", authorityScopeKind: null },
   { action: "draft_text", enabled: true, mutation: false, route: "local", minimumMode: "read-only", authorityScopeKind: null },
   { action: "post_review", enabled: true, mutation: true, route: "legacy", minimumMode: "review", prBound: true, social: true, highAssurance: true, remoteIdempotentCreate: true, authorityScopeKind: "pr_body_social" },
+  { action: "dismiss_review", enabled: true, mutation: true, route: "legacy", minimumMode: "review", prBound: true, highAssurance: true, authorityScopeKind: "dismiss_review" },
   { action: "post_comment", enabled: true, mutation: true, route: "legacy", minimumMode: "review", prBound: true, social: true, highAssurance: true, remoteIdempotentCreate: true, authorityScopeKind: "pr_body_social" },
   { action: "post_issue_comment", enabled: true, mutation: true, route: "legacy", minimumMode: "review", social: true, highAssurance: true, remoteIdempotentCreate: true, authorityScopeKind: "issue_comment" },
   { action: "edit_own_comment", enabled: true, mutation: true, route: "legacy", minimumMode: "review", prBound: true, social: true, highAssurance: true, authorityScopeKind: "edit_own_comment" },

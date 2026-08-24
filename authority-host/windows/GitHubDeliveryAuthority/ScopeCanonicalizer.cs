@@ -114,10 +114,16 @@ internal static partial class ScopeCanonicalizer
 
             case "post_comment":
             case "post_resolution_record":
+                AddPrScope(scope, request);
+                scope["idempotencyKey"] = RequiredString(request, "idempotencyKey");
+                scope["bodySha256"] = BodySha256(request);
+                break;
+
             case "post_review":
                 AddPrScope(scope, request);
                 scope["idempotencyKey"] = RequiredString(request, "idempotencyKey");
                 scope["bodySha256"] = BodySha256(request);
+                scope["event"] = ReviewEvent(request);
                 break;
 
             case "post_issue_comment":
@@ -145,6 +151,13 @@ internal static partial class ScopeCanonicalizer
             case "resolve_bot_thread":
                 AddPrScope(scope, request);
                 scope["threadId"] = RequiredString(request, "threadId");
+                break;
+
+            case "dismiss_review":
+                AddPrScope(scope, request);
+                scope["reviewId"] = RequiredString(request, "reviewId");
+                scope["actorLogin"] = RequiredString(request, "actorLogin");
+                scope["messageSha256"] = Sha256(RequiredString(request, "message"));
                 break;
 
             case "change_draft_state":
@@ -287,6 +300,20 @@ internal static partial class ScopeCanonicalizer
 
     private static string NormalizeMergeMethod(string? value)
         => value is "squash" or "rebase" ? value : "merge";
+
+    private static string ReviewEvent(JsonElement request)
+    {
+        if (!request.TryGetProperty("event", out var value) || value.ValueKind == JsonValueKind.Null) return "comment";
+        if (value.ValueKind != JsonValueKind.String) throw new AuthorityException("review_event_invalid");
+        var eventName = value.GetString();
+        if (string.IsNullOrEmpty(eventName)) return "comment";
+        if (eventName == "approve") throw new AuthorityException("review_event_approve_forbidden");
+        if (eventName is not ("comment" or "request-changes"))
+        {
+            throw new AuthorityException("review_event_invalid");
+        }
+        return eventName;
+    }
 
     private static string BodySha256(JsonElement request)
         => Sha256(VisibleBody(RequiredString(request, "body")));

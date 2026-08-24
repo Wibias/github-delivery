@@ -1,0 +1,50 @@
+name: Native review regression
+
+on:
+  pull_request:
+    paths:
+      - "scripts/lib/github-mutation-broker.mjs"
+      - "scripts/lib/authority-scope.mjs"
+      - "scripts/lib/review-event.mjs"
+      - "scripts/lib/native-review-sidecar.mjs"
+      - "authority-host/windows/GitHubDeliveryAuthority/ScopeCanonicalizer.cs"
+      - "authority-host/windows/GitHubDeliveryAuthority/SelfTest.cs"
+      - "tests/unit/authority-host-scope-lockstep.test.mjs"
+      - "tests/unit/mutation-action-registry.test.mjs"
+      - "tests/unit/mutation-execution-context.test.mjs"
+      - "tests/unit/native-review-broker.test.mjs"
+      - "tests/unit/native-review-sidecar.test.mjs"
+      - ".github/workflows/native-review-regression.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-review-regression-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-review:
+    name: Native review / Node 24
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Run native review regressions
+        run: >-
+          node --test
+          tests/unit/native-review-broker.test.mjs
+          tests/unit/native-review-sidecar.test.mjs
+          tests/unit/authority-host-scope-lockstep.test.mjs
+          tests/unit/mutation-action-registry.test.mjs
+          tests/unit/mutation-execution-context.test.mjs

@@ -4,6 +4,10 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Full-review verdicts can now submit GitHub Request changes through the mutation broker, and later passes dismiss our pending Request changes before a new request or a merge-ready comment. GitHub Approve stays off unless the user explicitly asks.
+
 ## [1.0.1] - 2026-08-23
 
 ### Added

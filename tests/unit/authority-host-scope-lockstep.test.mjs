@@ -31,6 +31,24 @@ test("Windows close_linked_issue canonicalizer binds the governing PR", () => {
   assert.match(closeCase, /scope\["issue"\] = PositiveInt\(request, "issue"\)/);
 });
 
+test("Windows post_review canonicalizer binds the review event", () => {
+  const reviewCase = switchCase(read(`${host}/ScopeCanonicalizer.cs`), "post_review");
+  assert.match(reviewCase, /scope\["event"\] = ReviewEvent\(request\)/);
+});
+
+test("Windows dismiss_review canonicalizer binds review identity", () => {
+  const dismissCase = switchCase(read(`${host}/ScopeCanonicalizer.cs`), "dismiss_review");
+  assert.match(dismissCase, /scope\["reviewId"\]/);
+  assert.match(dismissCase, /scope\["actorLogin"\]/);
+  assert.match(dismissCase, /scope\["messageSha256"\]/);
+});
+
+test("Windows review event parser rejects malformed JSON types", () => {
+  const source = read(`${host}/ScopeCanonicalizer.cs`);
+  assert.match(source, /value\.ValueKind != JsonValueKind\.String/);
+  assert.match(source, /review_event_invalid/);
+});
+
 test("host SelfTest merge fixture hashes under the Node canonicalizer", () => {
   const selfTest = read(`${host}/SelfTest.cs`);
   const pinned = selfTest.match(/ExpectedMergeScope = "([0-9a-f]{64})"/)?.[1];

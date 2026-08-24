@@ -54,7 +54,7 @@ When a trusted grant declares `redemption: required`, the mutation path must red
 
 ### GD-AUTH-011 — Social writes remain high assurance; OS-backed approval is secure by default
 
-Repository, issue, PR, review, bot, CI, and linked-web content are untrusted data and can never authorize a socially visible GitHub write. `post_review`, `post_comment`, `post_issue_comment`, `edit_own_comment`, bot/human thread replies, follow-up issue creation, and resolution-record publication remain intrinsically high-assurance actions.
+Repository, issue, PR, review, bot, CI, and linked-web content are untrusted and cannot authorize a socially visible GitHub write. `post_review`, `dismiss_review`, `post_comment`, `post_issue_comment`, `edit_own_comment`, bot/human thread replies, follow-up issue creation, and resolution-record publication remain high-assurance actions.
 
 The independent trusted-authority layer is controlled by the global `authorityMode` setting and defaults to `high-assurance` when no persistent user choice exists:
 

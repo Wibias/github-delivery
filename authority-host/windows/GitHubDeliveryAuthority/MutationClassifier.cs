@@ -12,6 +12,7 @@ internal static class MutationClassifier
         "resolve_bot_thread",
         "change_draft_state",
         "request_reviewers",
+        "dismiss_review",
         "close_linked_issue",
         "close_pr",
         "supersede_pr",

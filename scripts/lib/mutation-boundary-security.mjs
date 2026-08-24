@@ -76,7 +76,10 @@ const REGISTERED_BROKER_API_PATHS = new Set([
   "repos/x/x/git/refs/heads/x",
   "repos/x/x/git/tags",
 ]);
-const REGISTERED_GRAPHQL_MUTATIONS = new Set(["resolveReviewThread"]);
+const REGISTERED_GRAPHQL_MUTATIONS = new Set([
+  "resolveReviewThread",
+  "dismissPullRequestReview",
+]);
 
 function portable(path) {
   return path.split("\\").join("/");

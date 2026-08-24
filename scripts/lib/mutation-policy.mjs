@@ -9,6 +9,7 @@ const ACTIONS = [
   "read_evidence",
   "draft_text",
   "post_review",
+  "dismiss_review",
   "post_comment",
   "post_issue_comment",
   "edit_own_comment",
@@ -60,6 +61,7 @@ function buildProfile(mode) {
   if (["review", "maintainer", "autonomous"].includes(mode)) {
     allow(profile, [
       "post_review",
+      "dismiss_review",
       "post_comment",
       "post_issue_comment",
       "edit_own_comment",

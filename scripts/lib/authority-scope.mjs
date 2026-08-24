@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { actionDefinition } from "./mutation-action-registry.mjs";
 import { parseRewriteExemption } from "./rewrite-exemption.mjs";
 import { stripReviewAuthorityMarker } from "./review-verdict-marker.mjs";
+import { reviewEventOf } from "./review-event.mjs";
 
 const MUTATION_MODES = new Set(["read-only", "review", "maintainer", "autonomous"]);
 const IDEMPOTENCY_MARKER_RE = /\n\n<!-- github-delivery:idempotency [0-9a-f]{64} -->\s*$/i;
@@ -47,6 +48,13 @@ function bodyHash(value) {
 
 function exactString(value, name) {
   return String(required(value, name));
+}
+
+function strictString(value, name) {
+  if (typeof value !== "string" || value === "") {
+    throw new Error(`authority_scope_${name}_invalid`);
+  }
+  return value;
 }
 
 function optionalExactString(value, name) {
@@ -217,13 +225,18 @@ export function authorityScopeForRequest(request = {}) {
         assignee: exactString(request.assignee, "assignee"),
       };
 
-    case "pr_body_social":
-      return {
+    case "pr_body_social": {
+      const social = {
         ...scope,
         ...prScope(request),
         idempotencyKey: exactString(request.idempotencyKey, "idempotency_key"),
         bodySha256: bodyHash(request.body),
       };
+      if (scope.action === "post_review") {
+        social.event = reviewEventOf(request);
+      }
+      return social;
+    }
 
     case "issue_comment":
       return {
@@ -256,6 +269,15 @@ export function authorityScopeForRequest(request = {}) {
         ...scope,
         ...prScope(request),
         threadId: exactString(request.threadId, "thread_id"),
+      };
+
+    case "dismiss_review":
+      return {
+        ...scope,
+        ...prScope(request),
+        reviewId: strictString(request.reviewId, "review_id"),
+        actorLogin: strictString(request.actorLogin, "actor_login"),
+        messageSha256: sha256(strictString(request.message, "message")),
       };
 
     case "change_draft_state":
