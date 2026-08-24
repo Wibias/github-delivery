@@ -90,6 +90,57 @@ function readPushedTip(request, runner) {
   return row ? String(row.split(/\s+/)[0] || "").toLowerCase() : "absent";
 }
 
+function pushVerificationStore(plan, baselineStore) {
+  if (!baselineStore || typeof baselineStore.consume !== "function") return baselineStore;
+  return {
+    consume(scope) {
+      return baselineStore.consume(scope, plan.request.originalLocalTip);
+    },
+  };
+}
+
+function previousRemotePreflightRunner(request, runner) {
+  const remote = String(request.remote);
+  const ref = `refs/heads/${request.branch}`;
+  const expected = String(request.expectedRemoteTip || "").toLowerCase();
+  return (command, args, options) => {
+    if (
+      command === "git" &&
+      args[0] === "ls-remote" &&
+      args[1] === "--heads" &&
+      String(args[2]) === remote &&
+      String(args[3]) === ref
+    ) {
+      return {
+        status: 0,
+        stdout: expected === "absent" ? "" : `${expected}\t${ref}\n`,
+        stderr: "",
+      };
+    }
+    return runner(command, args, options);
+  };
+}
+
+function recoverAppliedPush({ plan, runner, baselineStore, preflightError }) {
+  if (!String(preflightError?.message || "").startsWith("expected_remote_tip_mismatch:")) {
+    return null;
+  }
+  const desired = String(plan.request.newTip || "").toLowerCase();
+  if (readPushedTip(plan.request, runner) !== desired) return null;
+
+  const preflight = preflightLifecycleMutation({
+    request: plan.request,
+    runner: previousRemotePreflightRunner(plan.request, runner),
+    baselineStore,
+  });
+  const verification = verifyLifecycleMutation({
+    request: plan.request,
+    runner,
+    baselineStore: pushVerificationStore(plan, baselineStore),
+  });
+  return { preflight, verification };
+}
+
 function reconcileUncertainPush({ plan, runner, writeResult, baselineStore }) {
   const observed = readPushedTip(plan.request, runner);
   const expected = String(plan.request.newTip || "").toLowerCase();
@@ -296,14 +347,45 @@ export function executeLifecycleMutationRequest({
     };
   }
 
-  const preflight = preflightLifecycleMutation({ request: plan.request, runner, baselineStore: store });
+  let preflight;
+  try {
+    preflight = preflightLifecycleMutation({ request: plan.request, runner, baselineStore: store });
+  } catch (error) {
+    const recovered =
+      plan.action === "push_code"
+        ? recoverAppliedPush({
+            plan,
+            runner,
+            baselineStore: store,
+            preflightError: error,
+          })
+        : null;
+    if (!recovered) throw error;
+    return {
+      ...plan,
+      executed: false,
+      status: "already_applied",
+      observedHead,
+      preflight: recovered.preflight,
+      existingMutation: null,
+      stdout: "",
+      verification: recovered.verification,
+    };
+  }
+
   let stdout;
   let status = "succeeded";
   let verification;
   if (plan.action === "push_code") {
+    const verificationStore = pushVerificationStore(plan, store);
     const writeResult = runCommand(runner, plan.command);
     if (uncertainSpawn(writeResult)) {
-      const reconciled = reconcileUncertainPush({ plan, runner, writeResult, baselineStore: store });
+      const reconciled = reconcileUncertainPush({
+        plan,
+        runner,
+        writeResult,
+        baselineStore: verificationStore,
+      });
       stdout = reconciled.stdout;
       status = reconciled.status;
       verification = reconciled.verification;
@@ -311,7 +393,11 @@ export function executeLifecycleMutationRequest({
       throw spawnFailure(writeResult);
     } else {
       stdout = String(writeResult.stdout || "").trim();
-      verification = verifyLifecycleMutation({ request: plan.request, runner, baselineStore: store });
+      verification = verifyLifecycleMutation({
+        request: plan.request,
+        runner,
+        baselineStore: verificationStore,
+      });
     }
   } else {
     stdout = runOrThrow(runner, plan.command);
