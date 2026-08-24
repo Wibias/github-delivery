@@ -43,7 +43,7 @@ traces fail closed. `run.provenance.transcriptsSha256` must equal
 `hashBehaviouralTranscripts(parsedSidecar)`: the SHA-256 of `canonicalJson` of
 the parsed sidecar object, not of the sidecar file bytes. Hashing the pretty-printed
 file fails closed with `behavioural_transcript_hash_mismatch`.
-`attachTranscriptProvenance(run, transcripts)` writes this field.
+`attachTranscriptProvenance(run, transcripts)` writes this integrity binding.
 
 Pack (`candidate.json`):
 
@@ -85,22 +85,51 @@ Sidecar (`candidate.transcript.json`):
 
 Actions are the observed tool-call names plus authority-redemption and mutation-receipt actions. Do not grade free-form prose or self-attested summaries when the scorer can read a sidecar trace.
 
+### Integrity is not trusted execution provenance
+
+A plain run pack plus a matching transcript hash is internally consistent but still caller-produced evidence. `scoreBehaviouralRun` therefore marks the ordinary `github-delivery/behavioural-transcript` form as:
+
+- `provenance.trusted: false`;
+- `provenance.reason: unattested_behavioural_transcript`;
+- `gatingEligible: false`.
+
+Such scores remain useful for local diagnostics and quality comparisons. They must **not** be cited as trusted release or merge-gating evidence.
+
+Trusted gating requires a host-produced signature over the canonical attestation payload returned by `behaviouralAttestationPayload(run, transcriptsSha256)`. The run uses provenance kind `github-delivery/behavioural-transcript-attestation` and carries the base64 signature. Verification uses a separately supplied trusted public key; a signature or `trusted:true` field embedded in the run is never sufficient by itself. The signed payload binds model, host, variant, skill version, and the canonical transcript hash.
+
+Only a successfully verified attestation produces `provenance.trusted: true` and `gatingEligible: true`.
+
 ## Compare
 
 Each run file must not embed `trace` objects. Observed evidence comes from a sibling
 `<run>.transcript.json` file, and `run.provenance.transcriptsSha256` must equal
 `hashBehaviouralTranscripts` of that parsed object.
 
+Diagnostic comparison remains available without an attestation key:
+
 ```bash
 node scripts/compare-behavioural-evals.mjs \
   cases.json baseline.json current.json candidate.json
 ```
 
+This reports metric quality while leaving each ordinary score `gatingEligible:false`.
+
+Any workflow that wants to use behavioural results as a release/merge gate must require trusted attestations explicitly:
+
+```bash
+node scripts/compare-behavioural-evals.mjs \
+  --require-trusted \
+  --attestation-public-key host-public-key.pem \
+  cases.json baseline.json current.json candidate.json
+```
+
+The strict form exits non-zero unless **all three** runs have valid signatures under that externally supplied key and the candidate also matches/improves current quality and safety.
+
 The command exits:
 
-- `0` when the candidate matches or improves current quality/safety metrics;
-- `1` when the candidate regresses a protected quality or safety metric;
-- `2` for malformed/incomplete evaluation inputs.
+- `0` when the candidate matches or improves current quality/safety metrics, and in `--require-trusted` mode all runs are trusted;
+- `1` when the candidate regresses a protected metric or strict trusted-gating requirements are not satisfied;
+- `2` for malformed/incomplete evaluation inputs or invalid attestation material.
 
 The comparison reports:
 
@@ -113,7 +142,8 @@ The comparison reports:
 - missing case count;
 - tokens, tool calls, and duration as cost evidence;
 - lift over the bare model;
-- delta from the current skill.
+- delta from the current skill;
+- whether trusted gating is eligible.
 
 Cost metrics are recorded, not automatically optimized at the expense of correctness. A future acceptance policy may require a minimum quality lift per token/tool-call cost once enough real runs exist.
 
@@ -164,4 +194,4 @@ Do not retain a new workflow, reviewer, prompt block, scanner, or context expans
 - improve measured recall/precision/coverage/safety against current; or
 - close a deterministic policy/evidence gap that cannot sensibly be measured by model output.
 
-If a candidate adds cost without measurable quality/safety benefit, simplify or remove it.
+Unsigned/local behavioural evidence may inform diagnosis, but it is not trusted release/merge-gating evidence. If a candidate adds cost without measurable quality/safety benefit, simplify or remove it.

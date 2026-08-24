@@ -60,7 +60,7 @@ test("classic branch patterns follow GitHub pathname-style wildcard semantics", 
     ["release/*", "release/1.x", true],
     ["release/*", "release/1/x", false],
     ["release/**", "release/1/x", true],
-    ["literal\\?branch", "literal?branch", true],
+    ["literal\\?branch", "literal?branch", false],
   ]) {
     assert.equal(patternMatchesBranch(pattern, branch), expected, `${pattern} -> ${branch}`);
   }

@@ -108,7 +108,7 @@ function multiBaseDeliveryActions(text) {
 }
 
 const ATTRIBUTED_UNTRUSTED_SPAN =
-  /\b(?:(?:a|the)\s+)?(?:(?:coderabbit|bot|github|reviewer|review)\s+)?(?:comments?|pr body|pull request body|title\/body|readme|commit messages?)\s+(?:says|said|contains|claims?)\s*:\s*[\s\S]*?(?:\n\n|$)/gi;
+  /\b(?:(?:a|the)\s+)?(?:(?:coderabbit|bot|github|reviewer|review)\s+)?(?:comments?|pr body|pull request body|issue body|issue description|repository text|repo text|title\/body|readme|commit messages?)\s+(?:says|said|contains|claims?)\s*:\s*[\s\S]*?(?:\n\n|$)/gi;
 
 function unquotedText(text) { return text.replace(/"[^"\n]*"|`[^`\n]*`|'[^'\n]*'/g, " "); }
 function stripAttributedUntrustedText(text) {

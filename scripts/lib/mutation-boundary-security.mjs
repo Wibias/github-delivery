@@ -42,8 +42,8 @@ const STANDALONE_API_RE = /\[\s*["']api["']\s*,[\s\S]{0,1200}?(?:["']--method["'
 const GH_API_DYNAMIC_METHOD_RE = /["']gh["']\s*,\s*(?:\[\s*)?["']api["'][\s\S]{0,1800}?["'](?:--method|-X)["']\s*,(?!\s*["'])\s*/g;
 const GH_GRAPHQL_INVOCATION_RE = /["']gh["']\s*,\s*(?:\[\s*)?["']api["']\s*,\s*["']graphql["']/i;
 const MUTATING_METHOD_RE = /(?:["']--method["']\s*,\s*["'](?:POST|PATCH|PUT|DELETE)["']|["']-X["']\s*,\s*["'](?:POST|PATCH|PUT|DELETE)["']|["']--method=(?:POST|PATCH|PUT|DELETE)["'])/i;
-const GRAPHQL_MUTATION_RE = /\bmutation\s*(?:\([^)]*\))?\s*\{/i;
-const GRAPHQL_MUTATION_NAME_RE = /\bmutation\s*(?:\([^)]*\))?\s*\{\s*([A-Za-z_]\w*)/g;
+const GRAPHQL_MUTATION_RE = /\bmutation(?:\s+[A-Za-z_]\w*)?\s*(?:\([^)]*\))?\s*\{/i;
+const GRAPHQL_MUTATION_NAME_RE = /\bmutation(?:\s+[A-Za-z_]\w*)?\s*(?:\([^)]*\))?\s*\{\s*([A-Za-z_]\w*)/g;
 const GIT_PUSH_RE = /["']git["']\s*,\s*(?:\[\s*)?["']push["']/g;
 const FORBIDDEN_API_SEGMENT_RE = /\/(?:actions|secrets|variables|environments|rulesets|hooks|releases)(?:\/|$)/i;
 const API_PATH_KEEP = new Set([

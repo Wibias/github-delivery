@@ -45,6 +45,8 @@ The persistent user config defaults to `high-assurance`. It lives outside the in
 
 `off` is an explicit opt-out that means **no Windows Hello / trusted-authority prompt**. It does not mean “the agent can do anything.” Direct merge instruction, exact-text confirmation for human replies, expected-head checks, ownership checks, idempotency, workflow routing, ship gates, and all other mutation-policy rules remain mandatory.
 
+In `off`, caller-controlled mutation JSON is not provenance for those user-confirmation facts. Request fields such as `explicitInstruction` and `exactTextConfirmed` are ignored as authorization claims. A governing workflow that actually observed the current user instruction or exact outgoing text must provide that fact out-of-band through the mutation execution context. The generic mutation-document entrypoint cannot mint it. This preserves zero-Hello operation without turning a self-attested request boolean into consent.
+
 Dry-run planning never requires trusted authority. When the selected mode requires authority at `--execute`, the trusted grant must contain `scopeSha256`; a legacy resource-only signature is not enough.
 
 A **PR session** is an opt-in Hello grant, distinct from a branch lease. After Windows Hello, the approval UI may start a 5–60 minute session bound to one allowlisted repo, one PR, one head branch, and the approved merge base for merge. Later exact-scope `push_code` and `merge_pr` batches on that tuple skip Hello (`approvalMethod: pr_session`) but still receive one-time redeemable grants. A retargeted base requires Hello again. Branch leases remain `push_code` only for 1–10 minutes. Comments, human replies, close, and delete still need Hello. Mixed-action batches are not session-eligible.
