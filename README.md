@@ -102,7 +102,7 @@ For installation edge cases, backup/restore, downgrade behavior, manual recovery
 - classic branch-protection matching follows the supported GitHub pathname-style pattern subset and fails closed on syntax the implementation cannot prove compatible;
 - attributed issue/repository text cannot become current-user merge authority, and named GitHub GraphQL mutations remain broker-owned and registered;
 - behavioural-evaluation gating requires trusted hash-bound transcript provenance instead of accepting self-consistent local summaries as gating evidence;
-- review briefs distinguish core/mechanical files, require positive controls for absence claims, preserve shell/PATH identity for confirmation checks, and treat exact raw-text relocation separately from modified moves.
+- review briefs distinguish core/mechanical files, require positive controls for absence claims, preserve shell/PATH identity for confirmation checks, and moved-code hints distinguish exact raw-text relocations from modified moves while keeping surrounding context in review.
 
 See [`CHANGELOG.md`](CHANGELOG.md) for the full release-level details, including the `1.0.0` notes.
 
