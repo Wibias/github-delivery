@@ -61,8 +61,20 @@ internal static partial class ScopeCanonicalizer
                 scope["remote"] = RequiredString(request, "remote");
                 scope["branch"] = RequiredString(request, "branch");
                 scope["expectedRemoteTip"] = RequiredString(request, "expectedRemoteTip");
+                scope["originalLocalTip"] = RequiredString(request, "originalLocalTip");
                 scope["newTip"] = RequiredString(request, "newTip");
                 scope["forceWithLease"] = request.TryGetProperty("forceWithLease", out var forceWithLease) && forceWithLease.ValueKind == JsonValueKind.True;
+                var rewriteExemption = OptionalRewriteExemption(request);
+                if (rewriteExemption is not null)
+                {
+                    scope["rewriteExemption"] = rewriteExemption;
+                }
+                break;
+
+            case "record_rewrite_baseline":
+                scope["remote"] = RequiredString(request, "remote");
+                scope["branch"] = RequiredString(request, "branch");
+                scope["originalLocalTip"] = RequiredString(request, "originalLocalTip");
                 break;
 
             case "create_pr":
@@ -200,7 +212,7 @@ internal static partial class ScopeCanonicalizer
     public static JsonObject BuildResource(JsonElement request)
     {
         var resource = new JsonObject();
-        foreach (var field in new[] { "pr", "issue", "commentId", "threadId", "expectedHead", "expectedBase", "expectedBaseOid", "authorityBranch", "headRefName", "targetRepo", "supersedingPr", "remote", "branch", "expectedRemoteTip", "newTip", "base", "head", "headRepo", "assignee" })
+        foreach (var field in new[] { "pr", "issue", "commentId", "threadId", "expectedHead", "expectedBase", "expectedBaseOid", "authorityBranch", "headRefName", "targetRepo", "supersedingPr", "remote", "branch", "expectedRemoteTip", "originalLocalTip", "newTip", "base", "head", "headRepo", "assignee" })
         {
             if (!request.TryGetProperty(field, out var value) || value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
             {
@@ -303,6 +315,26 @@ internal static partial class ScopeCanonicalizer
         => element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
             ? value.GetString()
             : null;
+
+    internal static string? OptionalRewriteExemption(JsonElement request)
+    {
+        if (!request.TryGetProperty("rewriteExemption", out var value)
+            || value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+        {
+            return null;
+        }
+        if (value.ValueKind != JsonValueKind.String)
+        {
+            throw new AuthorityException("authority_scope_rewrite_exemption_invalid");
+        }
+        var text = value.GetString();
+        if (string.IsNullOrEmpty(text)) return null;
+        if (text is not ("restack" or "conflicts" or "simplify-pr"))
+        {
+            throw new AuthorityException("authority_scope_rewrite_exemption_invalid");
+        }
+        return text;
+    }
 
     private static int PositiveInt(JsonElement element, string name)
     {

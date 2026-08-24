@@ -4,6 +4,28 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-08-23
+
+### Added
+
+- History-only Git rewrites (squash, reword, reorder, commit grouping) must keep the original local `HEAD^{tree}` from a broker-owned `record_rewrite_baseline` captured before the rewrite. `push_code` `originalLocalTip` must equal that baseline (`GD-GIT-008`). The remote lease tip is only a race check. Restack onto a new parent still skips the tree check.
+
+### Changed
+
+- Bumped the package version from `1.0.0` to `1.0.1`.
+- Review briefs label files as core, mechanical, or other, and call out relocated blocks of three or more lines as moved code. Textually identical relocation does not prove unchanged behavior; surrounding context still requires review. PR description review notes name the core files when a diff mixes implementation with generated or lockfile changes.
+- Absence claims need a positive-control search that matches a known hit before `no residual X`.
+- Confirmation checks re-run in the same shell and PATH as the original observation so a PATH switch cannot produce a false result.
+
+### Fixed
+
+- `rewriteExemption` uses one contract in the lifecycle broker, Node Authority, and Windows Authority: omit undefined, null, and `""`; accept only exact `restack`, `conflicts`, or `simplify-pr`; reject padded, unknown, and non-string values. Empty string is omitted from the Hello hash, not an error.
+- Non-fast-forward force-with-lease `push_code` fails closed unless the new tip tree matches a broker-owned rewrite baseline (`record_rewrite_baseline` before the rewrite) or `rewriteExemption` is restack, conflicts, or simplify-pr. `record_rewrite_baseline` stores that SHA in broker state outside the Git repo after a compare-and-swap of the live branch tip, refuses replacement, post-verifies it, and binds it into Node/Windows Authority. Capture uses the same remote/repo identity check as `push_code`, so the recorded SHA is provenance for the authorized repository rather than an unverified checkout label. File-store create and consume take a generation-fenced cross-process lock and refuse to write after a stale takeover, so concurrent mutations cannot drop or resurrect a one-shot baseline. Stale empty or truncated lock files are reclaimed after the stale timeout with a re-check, so a crashed lock create cannot block consume after a successful push. A writable `refs/github-delivery/rewrite-baseline/...` ref is not proof. Successful push verification, including uncertain-push reconciliation, consumes that baseline. Caller-supplied `originalLocalTip` must equal that baseline; the same-request SHA is not provenance. `expectedRemoteTip` stays the lease/race check only. The branch reflog must show the rewrite started from that recorded generation, so a later local commit with a different tree cannot be force-pushed away under a stale baseline. File-store writes publish generation-numbered snapshots, so a rename after the last lock check cannot overlay a newer create or restore a consumed baseline. Reflog generation allows different-tree ancestor commits of the recorded baseline, so a content-preserving squash is not rejected as stale.
+- Moved-code hints report exact unchanged line text as a relocation, but they do not tell reviewers to skip that code as not-new-logic. Near-match, indentation-sensitive, and guard-crossing edits stay in review, and file roles follow review-scope logic paths with path-segment mechanical directories.
+- Exact moved-code classification uses raw source-line equality, so whitespace inside strings, template literals, and trailing spaces counts as a change.
+- Moved-code detection skips oversized replacement diffs when the delete×add line product or candidate-pair budget is exceeded, so a large foreign PR cannot make review-brief quadratic before output limits apply.
+- Windows Hello names a content-changing non-fast-forward rewrite and its `rewriteExemption`, and those pushes cannot reuse a branch lease or PR session.
+
 ## [1.0.0] - 2026-08-22
 
 ### Added

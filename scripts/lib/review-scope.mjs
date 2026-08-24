@@ -206,6 +206,11 @@ export function assertCompletePrFileEnumeration(expectedCount, observedCount) {
   }
 }
 
+export function isReviewLogicPath(path) {
+  const normalized = normalizeReviewPath(String(path || "").replaceAll("\\", "/"));
+  return CODE_RE.test(normalized) || OPERATIONAL_POLICY_RE.test(normalized) || /^\.github\//.test(normalized);
+}
+
 export function planReviewScope(input = {}) {
   const files = (input.files || []).map(normalizeFile).filter((file) => file.path);
   const visualEvidence = planVisualEvidence(files);
@@ -225,9 +230,7 @@ export function planReviewScope(input = {}) {
     const { added, removed } = patchLines(file.patch);
     const changedText = [...added, ...removed].join("\n");
     const symbols = extractSymbols(file.path, changedText);
-    const isLogic = classifiedPaths.some(
-      (path) => CODE_RE.test(path) || OPERATIONAL_POLICY_RE.test(path) || /^\.github\//.test(path),
-    );
+    const isLogic = classifiedPaths.some((path) => isReviewLogicPath(path));
     if (isLogic) logicFiles.push(file.path);
     if (isLogic && !file.patch && file.status !== "removed") missingPatches.push(file.path);
 

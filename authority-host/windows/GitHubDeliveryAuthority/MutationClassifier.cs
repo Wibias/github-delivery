@@ -45,14 +45,19 @@ internal static class MutationClassifier
             || SocialActions.Contains(action);
     }
 
+    public static bool HasRewriteExemption(JsonElement operation)
+        => ScopeCanonicalizer.OptionalRewriteExemption(operation) is not null;
+
     public static bool IsBranchLeaseEligible(JsonElement operation)
-        => string.Equals(operation.GetProperty("action").GetString(), "push_code", StringComparison.Ordinal);
+        => string.Equals(operation.GetProperty("action").GetString(), "push_code", StringComparison.Ordinal)
+            && !HasRewriteExemption(operation);
 
     public static bool IsPrSessionEligible(JsonElement operation)
     {
         var action = operation.GetProperty("action").GetString();
+        if (string.Equals(action, "merge_pr", StringComparison.Ordinal)) return true;
         return string.Equals(action, "push_code", StringComparison.Ordinal)
-            || string.Equals(action, "merge_pr", StringComparison.Ordinal);
+            && !HasRewriteExemption(operation);
     }
 
     public static bool RequiresExactHumanApproval(JsonElement operation)

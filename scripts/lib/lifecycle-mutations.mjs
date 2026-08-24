@@ -1,9 +1,16 @@
 import { classifyCoveringPullRequests, normalizeCoveringPullPages } from "./covering-pr.mjs";
+import {
+  assertContentPreservingRewrite,
+  assertRewriteBaselineGeneration,
+  parseReflogGenerationEntries,
+} from "./content-preserving-rewrite.mjs";
 import { diffPrBodyMedia } from "./pr-body-media.mjs";
 import { assertPublishedMarkdown } from "./published-body-integrity.mjs";
+import { parseRewriteExemption } from "./rewrite-exemption.mjs";
 
 const LIFECYCLE_ACTIONS = new Set([
   "push_code",
+  "record_rewrite_baseline",
   "create_pr",
   "update_pr_body",
   "create_issue",
@@ -32,15 +39,36 @@ function exactSha(value, name, { absent = false } = {}) {
 
 function run(runner, command) {
   const [executable, ...args] = command;
-  const result = runner(executable, args, {
-    encoding: "utf8",
-    maxBuffer: 20 * 1024 * 1024,
-  });
+  const result = spawnGitStatus(runner, executable, args);
   if (result.status !== 0) {
     const detail = String(result.stderr || result.stdout || "").trim();
     throw new Error(detail || `mutation_preflight_failed:${result.status}`);
   }
   return String(result.stdout || "").trim();
+}
+
+function spawnGitStatus(runner, executable, args) {
+  const result = runner(executable, args, {
+    encoding: "utf8",
+    maxBuffer: 20 * 1024 * 1024,
+  });
+  if (result?.status == null || result.signal) {
+    const detail = String(result?.stderr || result?.stdout || "").trim();
+    throw new Error(detail || "mutation_preflight_failed:unknown");
+  }
+  return result;
+}
+
+function rewriteExemptionOf(request) {
+  return parseRewriteExemption(request.rewriteExemption, "rewrite_exemption_invalid");
+}
+
+function isAncestor(runner, ancestor, descendant) {
+  const result = spawnGitStatus(runner, "git", ["merge-base", "--is-ancestor", ancestor, descendant]);
+  if (result.status === 0) return true;
+  if (result.status === 1) return false;
+  const detail = String(result.stderr || result.stdout || "").trim();
+  throw new Error(detail || `mutation_preflight_failed:${result.status}`);
 }
 
 function parseJson(value, errorCode) {
@@ -68,12 +96,8 @@ function canonicalRemoteUrl(value) {
   }
 }
 
-function assertPushTarget(request, runner) {
+function assertRemoteRepoIdentity(request, runner) {
   const remote = String(required(request.remote, "remote"));
-  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(remote)) throw new Error("remote_invalid");
-  const branch = String(required(request.branch, "branch"));
-  run(runner, ["git", "check-ref-format", `refs/heads/${branch}`]);
-
   const actualUrl = run(runner, ["git", "remote", "get-url", remote]);
   const repoJson = run(runner, [
     "gh",
@@ -89,8 +113,17 @@ function assertPushTarget(request, runner) {
   if (!actual || !allowed.has(actual)) {
     throw new Error(`push_remote_repo_mismatch:${actual || "unreadable"}`);
   }
+}
+
+function assertPushTarget(request, runner, baselineStore) {
+  const remote = String(required(request.remote, "remote"));
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(remote)) throw new Error("remote_invalid");
+  const branch = String(required(request.branch, "branch"));
+  run(runner, ["git", "check-ref-format", `refs/heads/${branch}`]);
+  assertRemoteRepoIdentity(request, runner);
 
   const expected = exactSha(request.expectedRemoteTip, "expected_remote_tip", { absent: true });
+  const originalLocalTip = exactSha(request.originalLocalTip, "original_local_tip");
   const newTip = exactSha(request.newTip, "new_tip");
   const remoteRow = run(runner, ["git", "ls-remote", "--heads", remote, `refs/heads/${branch}`]);
   const observed = remoteRow ? String(remoteRow.split(/\s+/)[0] || "").toLowerCase() : "absent";
@@ -100,7 +133,67 @@ function assertPushTarget(request, runner) {
   if (request.forceWithLease !== true && expected !== "absent") {
     run(runner, ["git", "merge-base", "--is-ancestor", expected, newTip]);
   }
-  return { remote, branch, expectedRemoteTip: expected, newTip };
+  if (expected !== "absent" && request.forceWithLease === true && !isAncestor(runner, expected, newTip)) {
+    const exemption = rewriteExemptionOf(request);
+    if (!exemption) {
+      if (!baselineStore || typeof baselineStore.read !== "function") {
+        throw new Error("original_local_tip_baseline_required");
+      }
+      const recorded = baselineStore.read({ repo: request.repo, remote, branch });
+      if (!recorded) throw new Error("original_local_tip_baseline_required");
+      if (recorded !== originalLocalTip) {
+        throw new Error(
+          `original_local_tip_baseline_mismatch: expected ${recorded}, observed ${originalLocalTip}`,
+        );
+      }
+      if (recorded === newTip) throw new Error("original_local_tip_tautological");
+      const originalTree = run(runner, ["git", "rev-parse", `${recorded}^{tree}`]);
+      const nextTree = run(runner, ["git", "rev-parse", `${newTip}^{tree}`]);
+      assertContentPreservingRewrite({ originalTree, newTree: nextTree });
+      const reflog = spawnGitStatus(runner, "git", [
+        "log",
+        "-g",
+        "--format=%H %T",
+        `refs/heads/${branch}`,
+      ]);
+      if (reflog.status !== 0) {
+        throw new Error("rewrite_baseline_generation_unproven");
+      }
+      assertRewriteBaselineGeneration({
+        recorded,
+        newTip,
+        recordedTree: originalTree,
+        entries: parseReflogGenerationEntries(reflog.stdout),
+        isAncestor: (sha, recordedSha) => isAncestor(runner, sha, recordedSha),
+      });
+    }
+  }
+  return { remote, branch, expectedRemoteTip: expected, originalLocalTip, newTip };
+}
+
+function assertRewriteBaselineCapture(request, runner, baselineStore) {
+  const remote = String(required(request.remote, "remote"));
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(remote)) throw new Error("remote_invalid");
+  const branch = String(required(request.branch, "branch"));
+  const originalLocalTip = exactSha(request.originalLocalTip, "original_local_tip");
+  run(runner, ["git", "check-ref-format", `refs/heads/${branch}`]);
+  assertRemoteRepoIdentity(request, runner);
+  const observed = exactSha(
+    run(runner, ["git", "rev-parse", "--verify", `refs/heads/${branch}`]),
+    "observed_local_tip",
+  );
+  if (observed !== originalLocalTip) {
+    throw new Error(
+      `original_local_tip_baseline_head_mismatch: expected ${originalLocalTip}, observed ${observed}`,
+    );
+  }
+  if (!baselineStore || typeof baselineStore.read !== "function") {
+    throw new Error("rewrite_baseline_store_required");
+  }
+  if (baselineStore.read({ repo: request.repo, remote, branch })) {
+    throw new Error("rewrite_baseline_already_exists");
+  }
+  return { remote, branch, originalLocalTip };
 }
 
 function validateApprovedMediaRemovals(value) {
@@ -266,8 +359,15 @@ export function validateLifecycleMutation(request = {}) {
       required(request.remote, "remote");
       required(request.branch, "branch");
       exactSha(request.expectedRemoteTip, "expected_remote_tip", { absent: true });
+      exactSha(request.originalLocalTip, "original_local_tip");
       exactSha(request.newTip, "new_tip");
       if (typeof request.forceWithLease !== "boolean") throw new Error("force_with_lease_required");
+      rewriteExemptionOf(request);
+      break;
+    case "record_rewrite_baseline":
+      required(request.remote, "remote");
+      required(request.branch, "branch");
+      exactSha(request.originalLocalTip, "original_local_tip");
       break;
     case "create_pr":
       required(request.base, "base");
@@ -315,6 +415,11 @@ export function lifecycleCommandFor(request = {}) {
         `${newTip}:refs/heads/${branch}`,
       ];
     }
+    case "record_rewrite_baseline": {
+      const branch = String(required(request.branch, "branch"));
+      const sha = exactSha(request.originalLocalTip, "original_local_tip");
+      return ["git", "update-ref", `refs/heads/${branch}`, sha, sha];
+    }
     case "create_pr":
       return createPrCommand(request, repo);
     case "update_pr_body":
@@ -356,14 +461,43 @@ export function lifecycleCommandFor(request = {}) {
   }
 }
 
-export function preflightLifecycleMutation({ request, runner }) {
-  if (request.action === "push_code") return assertPushTarget(request, runner);
+export function preflightLifecycleMutation({ request, runner, baselineStore }) {
+  if (request.action === "push_code") return assertPushTarget(request, runner, baselineStore);
+  if (request.action === "record_rewrite_baseline") {
+    return assertRewriteBaselineCapture(request, runner, baselineStore);
+  }
   if (request.action === "update_pr_body") return assertUpdatePrBodySafe(request, runner);
   if (request.action === "create_pr") return assertCreatePrNotDuplicate(request, runner);
   return null;
 }
 
-export function verifyLifecycleMutation({ request, runner }) {
+export function verifyLifecycleMutation({ request, runner, baselineStore }) {
+  if (request.action === "record_rewrite_baseline") {
+    const remote = String(required(request.remote, "remote"));
+    const branch = String(required(request.branch, "branch"));
+    const expected = exactSha(request.originalLocalTip, "original_local_tip");
+    if (!baselineStore || typeof baselineStore.create !== "function") {
+      throw new Error("rewrite_baseline_store_required");
+    }
+    const observed = exactSha(
+      run(runner, ["git", "rev-parse", "--verify", `refs/heads/${branch}`]),
+      "observed_local_tip",
+    );
+    if (observed !== expected) {
+      throw new Error(
+        `original_local_tip_baseline_head_mismatch: expected ${expected}, observed ${observed}`,
+      );
+    }
+    const scope = { repo: request.repo, remote, branch };
+    baselineStore.create(scope, expected);
+    const recorded = baselineStore.read(scope);
+    if (recorded !== expected) {
+      throw new Error(
+        `rewrite_baseline_verification_failed: expected ${expected}, observed ${recorded || "missing"}`,
+      );
+    }
+    return recorded;
+  }
   if (request.action === "push_code") {
     const remote = String(required(request.remote, "remote"));
     const branch = String(required(request.branch, "branch"));
@@ -372,6 +506,9 @@ export function verifyLifecycleMutation({ request, runner }) {
     const observed = row ? String(row.split(/\s+/)[0] || "").toLowerCase() : "absent";
     if (observed !== expected) {
       throw new Error(`push_verification_failed: expected ${expected}, observed ${observed}`);
+    }
+    if (baselineStore && typeof baselineStore.consume === "function") {
+      baselineStore.consume({ repo: request.repo, remote, branch });
     }
     return observed;
   }

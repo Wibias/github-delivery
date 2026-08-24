@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { actionDefinition } from "./mutation-action-registry.mjs";
+import { parseRewriteExemption } from "./rewrite-exemption.mjs";
 import { stripReviewAuthorityMarker } from "./review-verdict-marker.mjs";
 
 const MUTATION_MODES = new Set(["read-only", "review", "maintainer", "autonomous"]);
@@ -53,6 +54,10 @@ function optionalExactString(value, name) {
   const text = String(value).trim();
   if (!text) throw new Error(`authority_scope_${name}_required`);
   return text;
+}
+
+function optionalRewriteExemption(value) {
+  return parseRewriteExemption(value, "authority_scope_rewrite_exemption_invalid");
 }
 
 function normalizedStringSet(value, name, { optional = false } = {}) {
@@ -147,14 +152,26 @@ export function authorityScopeForRequest(request = {}) {
         newBase: exactString(request.newBase, "new_base"),
       };
 
-    case "push_code":
+    case "push_code": {
+      const rewriteExemption = optionalRewriteExemption(request.rewriteExemption);
       return {
         ...scope,
         remote: exactString(request.remote, "remote"),
         branch: exactString(request.branch, "branch"),
         expectedRemoteTip: exactString(request.expectedRemoteTip, "expected_remote_tip"),
+        originalLocalTip: exactString(request.originalLocalTip, "original_local_tip"),
         newTip: exactString(request.newTip, "new_tip"),
         forceWithLease: request.forceWithLease === true,
+        ...(rewriteExemption ? { rewriteExemption } : {}),
+      };
+    }
+
+    case "record_rewrite_baseline":
+      return {
+        ...scope,
+        remote: exactString(request.remote, "remote"),
+        branch: exactString(request.branch, "branch"),
+        originalLocalTip: exactString(request.originalLocalTip, "original_local_tip"),
       };
 
     case "create_pr": {

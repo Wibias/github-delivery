@@ -74,6 +74,8 @@ test("completion reports remeasure material claims instead of trusting memory", 
   assert.match(completion, /Do not recount from memory/i);
   assert.match(completion, /0 unresolved threads/);
   assert.match(completion, /head-bound claims/i);
+  assert.match(completion, /positive control/i);
+  assert.match(completion, /no residual X/);
   assert.match(publication, /GD-PUB-010/);
   assert.match(publication, /references\/completion-claims\.md/);
   assert.match(createPr, /## H\. Completion report/);

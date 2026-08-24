@@ -230,7 +230,7 @@ internal sealed class AuthorityService
         }
     }
 
-    private static string BuildSummary(int index, JsonElement operation, string scope)
+    internal static string BuildSummary(int index, JsonElement operation, string scope)
     {
         var action = RequiredString(operation, "action");
         var repo = RequiredString(operation, "repo");
@@ -242,6 +242,11 @@ internal sealed class AuthorityService
             operation.TryGetProperty("branch", out var pushBranch) && pushBranch.ValueKind == JsonValueKind.String)
         {
             lines.Add($"   branch: {pushBranch.GetString()}");
+            var rewriteExemption = ScopeCanonicalizer.OptionalRewriteExemption(operation);
+            if (rewriteExemption is not null)
+            {
+                lines.Add($"   content-changing non-fast-forward rewrite allowed: {rewriteExemption}");
+            }
         }
         else if (string.Equals(action, "create_pr", StringComparison.Ordinal))
         {

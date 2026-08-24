@@ -72,6 +72,7 @@ test("push authority scope binds repository remote, exact generation, new tip, a
     remote: "origin",
     branch: "feature/safe",
     expectedRemoteTip: "a".repeat(40),
+    originalLocalTip: "e".repeat(40),
     newTip: "b".repeat(40),
     forceWithLease: true,
   };
@@ -82,9 +83,14 @@ test("push authority scope binds repository remote, exact generation, new tip, a
     remote: "origin",
     branch: "feature/safe",
     expectedRemoteTip: "a".repeat(40),
+    originalLocalTip: "e".repeat(40),
     newTip: "b".repeat(40),
     forceWithLease: true,
   });
+  assert.notEqual(
+    authorityScopeSha256(request),
+    authorityScopeSha256({ ...request, originalLocalTip: "f".repeat(40) }),
+  );
   assert.notEqual(
     authorityScopeSha256(request),
     authorityScopeSha256({ ...request, newTip: "c".repeat(40) }),
@@ -93,7 +99,45 @@ test("push authority scope binds repository remote, exact generation, new tip, a
     authorityScopeSha256(request),
     authorityScopeSha256({ ...request, branch: "feature/other" }),
   );
+  assert.notEqual(
+    authorityScopeSha256(request),
+    authorityScopeSha256({ ...request, rewriteExemption: "restack" }),
+  );
+  assert.equal("rewriteExemption" in authorityScopeForRequest(request), false);
+  assert.equal(
+    authorityScopeForRequest({ ...request, rewriteExemption: "restack" }).rewriteExemption,
+    "restack",
+  );
+  assert.equal(
+    authorityScopeForRequest({ ...request, rewriteExemption: "conflicts" }).rewriteExemption,
+    "conflicts",
+  );
+  assert.equal(
+    authorityScopeForRequest({ ...request, rewriteExemption: "simplify-pr" }).rewriteExemption,
+    "simplify-pr",
+  );
+  assert.notEqual(
+    authorityScopeSha256({ ...request, rewriteExemption: "restack" }),
+    authorityScopeSha256({ ...request, rewriteExemption: "conflicts" }),
+  );
+  assert.notEqual(
+    authorityScopeSha256({ ...request, rewriteExemption: "conflicts" }),
+    authorityScopeSha256({ ...request, rewriteExemption: "simplify-pr" }),
+  );
+  for (const rewriteExemption of [["restack"], { kind: "restack" }, 1, true, "amend", " restack ", " "]) {
+    assert.throws(
+      () => authorityScopeForRequest({ ...request, rewriteExemption }),
+      /authority_scope_rewrite_exemption_invalid/,
+      JSON.stringify(rewriteExemption),
+    );
+  }
+  assert.equal("rewriteExemption" in authorityScopeForRequest({ ...request, rewriteExemption: "" }), false);
+  assert.equal(
+    authorityScopeSha256({ ...request, rewriteExemption: "" }),
+    authorityScopeSha256(request),
+  );
 });
+
 
 test("PR creation scope binds exact content, topology, optional head repository, and idempotency key", () => {
   const request = {

@@ -19,7 +19,7 @@
 </div>
 
 > [!NOTE]
-> **1.0.0.** The complete issue/PR lifecycle and core safety architecture are the first stable public release. Host-specific runtime integrations and the experimental Codex streaming boundary remain constrained by what each agent host exposes. Native GitHub stacked-PR merge is an intentional fail-closed gap. See [Current state](#current-state).
+> **1.0.1.** Patch after the first stable public release of the complete issue/PR lifecycle and core safety architecture. Host-specific runtime integrations and the experimental Codex streaming boundary remain constrained by what each agent host exposes. Native GitHub stacked-PR merge is an intentional fail-closed gap. See [Current state](#current-state).
 
 > [!IMPORTANT]
 > **Natural language is the public API.** The Node scripts, policy modules, evaluators, mutation broker, and optional Authority host are internal safety/evidence machinery. You normally do not invoke them yourself.
@@ -90,18 +90,18 @@ For installation edge cases, backup/restore, downgrade behavior, manual recovery
 | **Merge / close-out** | `merge PR #32` | Final gate, exact transaction authority, head-pinned merge, verification, thanks, linked-issue close-out |
 | **Self-update** | `update github-delivery to the latest stable release` | Stable-release discovery, checksums/manifest/tag/attestation verification, safe apply and postconditions |
 
-### What changed in 1.0.0
+### What changed in 1.0.1
 
-`1.0.0` is the first stable public release after `0.8.7`. User-facing work since that release:
+`1.0.1` is a patch after the first stable public release. User-facing work since `1.0.0`:
 
-- SHA-bound remote repository context: resolve `owner/repo` or GitHub URLs, discover the real default branch, pin an exact commit SHA, and read files against that snapshot instead of guessing `main` / `master` / `HEAD` (`GD-EVID-007`);
-- optional Windows Authority **PR sessions** so one Hello can cover later exact-scope push and merge on one PR and approved merge base for 5–60 minutes; a retargeted base requires Hello again; branch leases stay push-only;
-- explicit merge routing: attended `watch … and merge` stays prepare-and-merge; `watch and autonomously merge PR #N` stays on watch; attributed GitHub text is not user merge intent even after the first sentence;
-- fail closed on GitHub `UNKNOWN` mergeability and on native GitHub stacked-PR merge (do not `gh pr merge` those members);
-- policy modules are mandatory context (`shared-rules.md` is a compatibility index only);
-- install/update/Authority cutover, release SBOM/path identity, mutation retry identity, and watchdog/pre-open policy hardening listed in [`CHANGELOG.md`](CHANGELOG.md).
+- history-only Git rewrites must keep the original `HEAD^{tree}` before a force-with-lease push (`GD-GIT-008`);
+- review briefs label core vs mechanical files and call out relocated blocks as moved code;
+- absence claims need a positive-control search that matches a known hit before `no residual X`;
+- confirmation checks re-run in the same shell and PATH as the original observation;
+- non-fast-forward force-with-lease pushes fail closed unless trees match or an explicit restack/conflicts/simplify exemption is set;
+- moved-code hints distinguish exact raw-text relocations from modified moves while keeping surrounding context in review.
 
-See [`CHANGELOG.md`](CHANGELOG.md) for the full release-level details.
+See [`CHANGELOG.md`](CHANGELOG.md) for the full release-level details, including the `1.0.0` notes.
 
 ---
 
@@ -540,7 +540,7 @@ The architecture uses progressive disclosure: route once, load the selected work
 
 ## Current state
 
-`1.0.0` is the first stable public release of the complete issue/PR lifecycle and core safety architecture.
+`1.0.1` is a patch after the first stable public release of the complete issue/PR lifecycle and core safety architecture.
 
 Stable in this release:
 

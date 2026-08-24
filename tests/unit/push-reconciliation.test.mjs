@@ -1,10 +1,26 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, utimesSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 
 import { executeLifecycleMutationRequest } from "../../scripts/lib/github-lifecycle-mutation-broker.mjs";
+import {
+  createFileRewriteBaselineStore,
+  createMemoryRewriteBaselineStore,
+} from "../../scripts/lib/rewrite-baseline-store.mjs";
 
 const OLD = "a".repeat(40);
 const NEW = "b".repeat(40);
+
+function seededStore() {
+  const store = createMemoryRewriteBaselineStore();
+  store.create(
+    { repo: "Wibias/github-delivery", remote: "origin", branch: "feature/safe" },
+    "e".repeat(40),
+  );
+  return store;
+}
 
 function pushRequest() {
   return {
@@ -15,6 +31,7 @@ function pushRequest() {
     remote: "origin",
     branch: "feature/safe",
     expectedRemoteTip: OLD,
+    originalLocalTip: "e".repeat(40),
     newTip: NEW,
     forceWithLease: true,
   };
@@ -44,6 +61,20 @@ function pushRunner({ pushResult, remoteAfterPush }) {
       const tip = lsRemoteCount === 1 ? OLD : remoteAfterPush;
       return { status: 0, stdout: `${tip}\trefs/heads/feature/safe\n`, stderr: "" };
     }
+    if (command === "git" && args[0] === "merge-base") {
+      return { status: 1, stdout: "", stderr: "" };
+    }
+    if (command === "git" && args[0] === "rev-parse") {
+      return { status: 0, stdout: `${"e".repeat(40)}\n`, stderr: "" };
+    }
+    if (command === "git" && args[0] === "log") {
+      const local = "e".repeat(40);
+      return {
+        status: 0,
+        stdout: `${NEW} ${local}\n${local} ${local}\n`,
+        stderr: "",
+      };
+    }
     if (command === "git" && args[0] === "push") {
       return pushResult;
     }
@@ -52,6 +83,7 @@ function pushRunner({ pushResult, remoteAfterPush }) {
 }
 
 test("a timed-out push that already landed on newTip is reconciled", () => {
+  const store = seededStore();
   const result = executeLifecycleMutationRequest({
     request: pushRequest(),
     execute: true,
@@ -60,10 +92,15 @@ test("a timed-out push that already landed on newTip is reconciled", () => {
       pushResult: { status: null, signal: "SIGKILL", stdout: "", stderr: "subprocess_timeout:git:30000ms" },
       remoteAfterPush: NEW,
     }),
+    baselineStore: store,
   });
   assert.equal(result.status, "reconciled_after_error");
   assert.equal(result.executed, true);
   assert.equal(result.verification, NEW);
+  assert.equal(
+    store.read({ repo: "Wibias/github-delivery", remote: "origin", branch: "feature/safe" }),
+    null,
+  );
 });
 
 test("a timed-out push whose remote is still the old tip stays a failure", () => {
@@ -77,6 +114,7 @@ test("a timed-out push whose remote is still the old tip stays a failure", () =>
           pushResult: { status: null, signal: "SIGKILL", stdout: "", stderr: "subprocess_timeout:git:30000ms" },
           remoteAfterPush: OLD,
         }),
+        baselineStore: seededStore(),
       }),
     /subprocess_timeout|mutation_command_failed/,
   );
@@ -93,7 +131,37 @@ test("a timed-out push whose remote moved to a third tip is unknown", () => {
           pushResult: { status: null, signal: "SIGKILL", stdout: "", stderr: "subprocess_timeout:git:30000ms" },
           remoteAfterPush: "c".repeat(40),
         }),
+        baselineStore: seededStore(),
       }),
     /push_outcome_unknown/,
   );
+});
+
+test("a successful push still consumes the baseline after a stale empty lock is reclaimed", () => {
+  const root = mkdtempSync(join(tmpdir(), "gd-rewrite-push-lock-"));
+  const filePath = join(root, "rewrite-baselines.json");
+  const store = createFileRewriteBaselineStore({
+    path: filePath,
+    lockWaitMs: 200,
+    staleLockMs: 50,
+  });
+  const scope = { repo: "Wibias/github-delivery", remote: "origin", branch: "feature/safe" };
+  store.create(scope, "e".repeat(40));
+  const lockPath = `${filePath}.lock`;
+  writeFileSync(lockPath, "");
+  const past = new Date(Date.now() - 1_000);
+  utimesSync(lockPath, past, past);
+  const result = executeLifecycleMutationRequest({
+    request: pushRequest(),
+    execute: true,
+    requireTrustedAuthority: false,
+    runner: pushRunner({
+      pushResult: { status: 0, stdout: "", stderr: "" },
+      remoteAfterPush: NEW,
+    }),
+    baselineStore: store,
+  });
+  assert.equal(result.status, "succeeded");
+  assert.equal(result.verification, NEW);
+  assert.equal(store.read(scope), null);
 });

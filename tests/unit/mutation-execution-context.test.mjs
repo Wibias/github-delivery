@@ -40,6 +40,7 @@ function pushRequest(overrides = {}) {
     remote: "origin",
     branch: "feature/safe",
     expectedRemoteTip: "a".repeat(40),
+    originalLocalTip: "e".repeat(40),
     newTip: "b".repeat(40),
     forceWithLease: true,
     ...overrides,
@@ -132,6 +133,7 @@ test("autonomous execution remains intrinsically high assurance", () => {
 test("high-assurance lifecycle and social actions remain intrinsically classified", () => {
   for (const action of [
     "push_code",
+    "record_rewrite_baseline",
     "create_pr",
     "update_pr_body",
     "create_issue",
@@ -286,6 +288,9 @@ test("push preflight binds the named remote to the authorized GitHub repository 
       }
       if (command === "git" && args[0] === "ls-remote") {
         return { status: 0, stdout: `${"a".repeat(40)}\trefs/heads/feature/safe\n`, stderr: "" };
+      }
+      if (command === "git" && args[0] === "merge-base") {
+        return { status: 0, stdout: "", stderr: "" };
       }
       throw new Error(`unexpected command: ${command} ${args.join(" ")}`);
     },

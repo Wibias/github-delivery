@@ -67,6 +67,7 @@ The canonical enabled high-assurance action set is listed below. CI verifies exa
 - `post_resolution_record`
 - `post_review`
 - `push_code`
+- `record_rewrite_baseline`
 - `reply_bot_thread`
 - `reply_human_thread`
 - `request_reviewers`

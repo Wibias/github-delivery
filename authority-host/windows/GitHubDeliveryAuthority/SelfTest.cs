@@ -7,6 +7,11 @@ namespace GitHubDeliveryAuthority;
 internal static class SelfTest
 {
     private const string ExpectedMergeScope = "4513a56e7639d6f8e83e8e43b8af2cb305b06674259527488595b8bef4040d60";
+    private const string ExpectedPushScopeNone = "3f709285ecf97bdc71fef30467b43fb073c5be923c2c2e0589aaa1f42a286149";
+    private const string ExpectedPushScopeRestack = "a98e603c0df482df40343d78e2b5617941430102bbbc9bd4e01b2c3ae3b230d2";
+    private const string ExpectedPushScopeConflicts = "5e0e1755947ce47e871b1a6a60c22f5e4ab22a0d49477ff95016a79a6819ab21";
+    private const string ExpectedPushScopeSimplifyPr = "1eb711f613caec7c21f691e24e21a5c8edd465f428d14cfcb1d02f49662ec268";
+    private const string ExpectedRecordRewriteBaselineScope = "0a17346b1b7e27c7ca08d0a51295f9d0412a3bf47538a861fcd1502e8d1fd416";
 
     public static int Run()
     {
@@ -49,6 +54,86 @@ internal static class SelfTest
         Assert(
             ScopeCanonicalizer.ScopeSha256(branchA.RootElement) != ScopeCanonicalizer.ScopeSha256(branchB.RootElement),
             "branch must change the exact authority scope");
+
+        using var pushNone = JsonDocument.Parse("""
+            {"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","originalLocalTip":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true}
+            """);
+        using var pushRestack = JsonDocument.Parse("""
+            {"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","originalLocalTip":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":"restack"}
+            """);
+        using var pushConflicts = JsonDocument.Parse("""
+            {"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","originalLocalTip":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":"conflicts"}
+            """);
+        using var pushSimplifyPr = JsonDocument.Parse("""
+            {"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","originalLocalTip":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":"simplify-pr"}
+            """);
+        var pushNoneHash = ScopeCanonicalizer.ScopeSha256(pushNone.RootElement);
+        var pushRestackHash = ScopeCanonicalizer.ScopeSha256(pushRestack.RootElement);
+        var pushConflictsHash = ScopeCanonicalizer.ScopeSha256(pushConflicts.RootElement);
+        var pushSimplifyHash = ScopeCanonicalizer.ScopeSha256(pushSimplifyPr.RootElement);
+        Assert(pushNoneHash == ExpectedPushScopeNone, $"push none fixture mismatch: {pushNoneHash}");
+        Assert(pushRestackHash == ExpectedPushScopeRestack, $"push restack fixture mismatch: {pushRestackHash}");
+        Assert(pushConflictsHash == ExpectedPushScopeConflicts, $"push conflicts fixture mismatch: {pushConflictsHash}");
+        Assert(pushSimplifyHash == ExpectedPushScopeSimplifyPr, $"push simplify-pr fixture mismatch: {pushSimplifyHash}");
+        Assert(
+            pushNoneHash != pushRestackHash && pushRestackHash != pushConflictsHash && pushConflictsHash != pushSimplifyHash,
+            "rewrite exemptions must change the exact push authority scope");
+
+        using var recordBaseline = JsonDocument.Parse("""
+            {"schemaVersion":1,"action":"record_rewrite_baseline","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","originalLocalTip":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"}
+            """);
+        var recordBaselineHash = ScopeCanonicalizer.ScopeSha256(recordBaseline.RootElement);
+        Assert(recordBaselineHash == ExpectedRecordRewriteBaselineScope, $"record rewrite baseline fixture mismatch: {recordBaselineHash}");
+
+        using var pushEmpty = JsonDocument.Parse("""
+            {"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","originalLocalTip":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":""}
+            """);
+        Assert(ScopeCanonicalizer.ScopeSha256(pushEmpty.RootElement) == ExpectedPushScopeNone, "empty rewrite exemption must hash as omitted");
+        Assert(!MutationClassifier.HasRewriteExemption(pushEmpty.RootElement), "empty rewrite exemption must stay absent for leases");
+        Assert(MutationClassifier.IsBranchLeaseEligible(pushEmpty.RootElement), "empty rewrite exemption must remain branch-lease eligible");
+
+        AssertRejectedRewriteExemption(
+            "PaddedRestack",
+            """{"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","originalLocalTip":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":" restack "}""");
+        AssertRejectedRewriteExemption(
+            "WhitespaceOnly",
+            """{"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","originalLocalTip":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":" "}""");
+        AssertRejectedRewriteExemption(
+            "UnknownAmend",
+            """{"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","originalLocalTip":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":"amend"}""");
+        AssertRejectedRewriteExemption(
+            "MalformedArray",
+            """{"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","originalLocalTip":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":["restack"]}""");
+        AssertRejectedRewriteExemption(
+            "MalformedObject",
+            """{"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","originalLocalTip":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":{"kind":"restack"}}""");
+        AssertRejectedRewriteExemption(
+            "MalformedNumber",
+            """{"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","originalLocalTip":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":1}""");
+        AssertRejectedRewriteExemption(
+            "MalformedBoolean",
+            """{"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","originalLocalTip":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":true}""");
+    }
+
+    private static void AssertRejectedRewriteExemption(string label, string json)
+    {
+        using var document = JsonDocument.Parse(json);
+        try
+        {
+            ScopeCanonicalizer.ScopeSha256(document.RootElement);
+            throw new Exception($"{label} scope unexpectedly succeeded");
+        }
+        catch (AuthorityException error) when (error.Code == "authority_scope_rewrite_exemption_invalid")
+        {
+        }
+        try
+        {
+            MutationClassifier.HasRewriteExemption(document.RootElement);
+            throw new Exception($"{label} classifier unexpectedly succeeded");
+        }
+        catch (AuthorityException error) when (error.Code == "authority_scope_rewrite_exemption_invalid")
+        {
+        }
     }
 
     private static void GrantFixture()
@@ -231,6 +316,23 @@ internal static class SelfTest
         Assert(MutationClassifier.RequiresWindowsHello(review.RootElement), "review publication must require independent Hello approval");
         Assert(MutationClassifier.RequiresWindowsHello(botReply.RootElement), "bot reply must require independent Hello approval");
         Assert(MutationClassifier.RequiresWindowsHello(humanReply.RootElement), "human reply must require Hello");
+
+        using var ordinaryPush = JsonDocument.Parse("""
+            {"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","originalLocalTip":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true}
+            """);
+        using var restackPush = JsonDocument.Parse("""
+            {"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","originalLocalTip":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":"restack"}
+            """);
+        const string scope = "scope-fixture";
+        var ordinarySummary = AuthorityService.BuildSummary(0, ordinaryPush.RootElement, scope);
+        var restackSummary = AuthorityService.BuildSummary(0, restackPush.RootElement, scope);
+        Assert(MutationClassifier.IsBranchLeaseEligible(ordinaryPush.RootElement), "ordinary push must remain branch-lease eligible");
+        Assert(MutationClassifier.IsPrSessionEligible(ordinaryPush.RootElement), "ordinary push must remain PR-session eligible");
+        Assert(!MutationClassifier.IsBranchLeaseEligible(restackPush.RootElement), "exempt rewrite must not reuse a branch lease");
+        Assert(!MutationClassifier.IsPrSessionEligible(restackPush.RootElement), "exempt rewrite must not reuse a PR session");
+        Assert(!ordinarySummary.Contains("content-changing non-fast-forward rewrite allowed", StringComparison.Ordinal), "ordinary push must not claim an exemption");
+        Assert(restackSummary.Contains("content-changing non-fast-forward rewrite allowed: restack", StringComparison.Ordinal), "Hello summary must name the exemption and its effect");
+        Assert(ordinarySummary != restackSummary, "exempt rewrite Hello presentation must differ from an ordinary push");
     }
 
     private static void BusyGateFixture()

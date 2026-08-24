@@ -17,6 +17,11 @@ import { projectBugScope, projectSecurityScope } from "./lib/review-scope-compat
 import { planReviewDepthExecution } from "./lib/review-depth-execution.mjs";
 import { extractRequiredProbeBlocks } from "./lib/probe-blocks.mjs";
 import { ownedHelperEffect } from "./lib/watchdog-evidence-registry.mjs";
+import {
+  classifyReviewFileRole,
+  reviewFileHintLabel,
+  summarizeMovedCode,
+} from "./lib/review-diff-hints.mjs";
 
 const DEFAULT_MAX_HUNK_LINES = 24;
 const DEFAULT_MAX_TOTAL_HUNK_LINES = 1_200;
@@ -162,7 +167,20 @@ export function briefText({
   let remainingHunkLines = maxTotalHunkLines;
   for (const raw of files) {
     const file = normalizeFile(raw);
-    out.push(`### ${file.path} (+${file.additions}/-${file.deletions})`);
+    const role = reviewFileHintLabel(classifyReviewFileRole(file.path));
+    out.push(`### ${file.path} (${role}, +${file.additions}/-${file.deletions})`);
+    const moved = summarizeMovedCode(file.patch, file.path);
+    if (moved) {
+      if (moved.exact) {
+        out.push(
+          `Moved code: ${moved.movedLineCount} lines (textually identical relocate; surrounding context still requires review)`,
+        );
+      } else {
+        out.push(
+          `Moved code: ${moved.movedLineCount} lines relocated; ${moved.changedLineCount} changed lines still in review`,
+        );
+      }
+    }
 
     if (!file.patch.trim()) {
       out.push("_(no patch text available)_");

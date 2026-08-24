@@ -62,7 +62,7 @@ Use the workflow's existing freshness and generation rules. This companion does 
 
 ## Coverage and absence claims
 
-Positive absence claims require complete enough coverage to observe the thing claimed absent.
+Positive absence claims require complete enough coverage to observe the thing claimed absent. Before claiming `no residual X`, run a search that matches a known present hit; a query that never produced a positive control is not evidence of absence.
 
 Do not say:
 
