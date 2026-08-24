@@ -95,6 +95,40 @@ function assertOwnsLock(lockPath, lease) {
   }
 }
 
+function inspectLock(lockPath) {
+  const stat = statSync(lockPath);
+  return {
+    stat,
+    lease: readLease(lockPath),
+  };
+}
+
+function reclaimStaleLock(lockPath, staleLockMs) {
+  const first = inspectLock(lockPath);
+  if (Date.now() - first.stat.mtimeMs < staleLockMs) return null;
+
+  if (first.lease) {
+    const current = readLease(lockPath);
+    if (
+      current &&
+      current.generation === first.lease.generation &&
+      current.token === first.lease.token
+    ) {
+      rmSync(lockPath, { force: true });
+      return first.lease.generation + 1;
+    }
+    return null;
+  }
+
+  const second = inspectLock(lockPath);
+  if (second.lease) return null;
+  if (second.stat.mtimeMs !== first.stat.mtimeMs || second.stat.size !== first.stat.size) {
+    return null;
+  }
+  rmSync(lockPath, { force: true });
+  return 1;
+}
+
 function acquireLock(lockPath, { lockWaitMs, staleLockMs }) {
   mkdirSync(dirname(lockPath), { recursive: true });
   const started = Date.now();
@@ -111,21 +145,8 @@ function acquireLock(lockPath, { lockWaitMs, staleLockMs }) {
     }
 
     try {
-      const existing = readLease(lockPath);
-      if (existing) {
-        const age = Date.now() - statSync(lockPath).mtimeMs;
-        if (age >= staleLockMs) {
-          const current = readLease(lockPath);
-          if (
-            current &&
-            current.generation === existing.generation &&
-            current.token === existing.token
-          ) {
-            nextGeneration = existing.generation + 1;
-            rmSync(lockPath, { force: true });
-          }
-        }
-      }
+      const reclaimed = reclaimStaleLock(lockPath, staleLockMs);
+      if (reclaimed != null) nextGeneration = reclaimed;
     } catch (error) {
       if (error?.code !== "ENOENT") throw error;
     }

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -355,5 +355,43 @@ test("stale lock takeover cannot resurrect a consumed baseline", async () => {
   const store = createFileRewriteBaselineStore({ path: filePath });
   assert.equal(store.read(scopeA), shaA);
   assert.equal(store.read(scopeB), null);
+});
+
+function ageLockFile(lockPath) {
+  const past = new Date(Date.now() - 1_000);
+  utimesSync(lockPath, past, past);
+}
+
+test("a stale empty lock file can be reclaimed", () => {
+  const root = mkdtempSync(join(tmpdir(), "gd-rewrite-empty-lock-"));
+  const filePath = join(root, "rewrite-baselines.json");
+  const store = createFileRewriteBaselineStore({
+    path: filePath,
+    lockWaitMs: 200,
+    staleLockMs: 50,
+  });
+  store.create(SCOPE, SHA);
+  const lockPath = `${filePath}.lock`;
+  writeFileSync(lockPath, "");
+  ageLockFile(lockPath);
+  assert.equal(store.consume(SCOPE), SHA);
+  assert.equal(store.read(SCOPE), null);
+  assert.equal(existsSync(lockPath), false);
+});
+
+test("a stale truncated lock file can be reclaimed", () => {
+  const root = mkdtempSync(join(tmpdir(), "gd-rewrite-trunc-lock-"));
+  const filePath = join(root, "rewrite-baselines.json");
+  const store = createFileRewriteBaselineStore({
+    path: filePath,
+    lockWaitMs: 200,
+    staleLockMs: 50,
+  });
+  store.create(SCOPE, SHA);
+  const lockPath = `${filePath}.lock`;
+  writeFileSync(lockPath, "{");
+  ageLockFile(lockPath);
+  assert.equal(store.consume(SCOPE), SHA);
+  assert.equal(store.read(SCOPE), null);
 });
 
