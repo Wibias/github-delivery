@@ -190,7 +190,11 @@ export function executeMergeTransaction({
   mergeRequest,
   thankRequest = null,
   beforeMerge = null,
-  executeRequest = (request) => executeMutationWithAuthority({ request, execute: true }),
+  executeRequest = (request) => executeMutationWithAuthority({
+    request,
+    execute: true,
+    trustedWorkflowIntent: request?.action === "merge_pr",
+  }),
 } = {}) {
   if (!mergeRequest) throw new Error("merge_request_required");
   const receipts = [];
@@ -438,7 +442,9 @@ async function main() {
   ];
   const plans = requests.map(({ name, request }) => ({
     name,
-    plan: planMutationWithAuthority(request),
+    plan: planMutationWithAuthority(request, {
+      trustedWorkflowIntent: name === "merge",
+    }),
   }));
 
   const summary = {
@@ -513,7 +519,11 @@ async function main() {
       });
     },
     executeRequest(request) {
-      const receipt = executeMutationWithAuthority({ request, execute: true });
+      const receipt = executeMutationWithAuthority({
+        request,
+        execute: true,
+        trustedWorkflowIntent: request?.action === "merge_pr",
+      });
       if (args.audit) appendFileSync(args.audit, `${JSON.stringify(receipt)}\n`, "utf8");
       return receipt;
     },
