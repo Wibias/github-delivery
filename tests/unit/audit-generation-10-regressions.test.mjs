@@ -47,10 +47,11 @@ function mergeRequest(overrides = {}) {
   };
 }
 
-test("Off mode does not require caller-attested explicitInstruction to plan an allowed routed merge", () => {
+test("Off mode routed merge uses governing workflow intent without caller attestation", () => {
   const plan = planMutationWithAuthority(mergeRequest(), {
     config: { schemaVersion: 1, authorityMode: "off" },
     env: {},
+    trustedWorkflowIntent: true,
   });
   assert.equal(plan.authorization.allowed, true);
   assert.equal(plan.authority.verified, false);
