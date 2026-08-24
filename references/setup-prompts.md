@@ -15,10 +15,10 @@ Guide me through the installation interactively. Check my environment and explai
 Show me my current github-delivery settings and let me change them. Show the stored and effective Windows Hello protection mode, explain the available modes, apply only the changes I choose, and verify the resulting configuration.
 ```
 
-Direct natural language is also valid, for example:
+Direct natural language is also valid. Off disables ordinary high-assurance Hello protection, not independently authenticated lifecycle intent or exact-text human-reply approval. For example:
 
 ```text
-Disable Windows Hello protection for github-delivery.
+Set github-delivery's Windows Hello protection mode to Off.
 ```
 
 ```text
