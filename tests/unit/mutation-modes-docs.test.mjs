@@ -62,10 +62,6 @@ test("bare full review selects review mode and follows configured authority prot
   assert.match(reference, /full review PR #32[\s\S]*→ `review`/);
   assert.match(reference, /full-review workflow[\s\S]*trusted authority is required by the default protection mode/i);
   assert.match(reference, /When `authorityMode` is explicitly `off`[\s\S]*does not require OS-backed provenance/i);
-  assert.match(
-    reference,
-    /`off`[\s\S]*independent(?:ly authenticated)?(?: lifecycle)? intent[\s\S]*exact-text/i,
-  );
   assert.match(reference, /reports `trusted:false`/);
 });
 

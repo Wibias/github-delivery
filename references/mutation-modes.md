@@ -37,13 +37,13 @@ The global user setting `authorityMode` has exactly three values:
 
 | authorityMode | Extra trusted-authority requirement at execution |
 |---|---|
-| `off` | independent intent (explicit lifecycle instruction and exact-text consent) still required; other high-assurance writes skip Hello |
+| `off` | none; explicit compatibility opt-out |
 | `high-assurance` | autonomous execution and registry actions marked `highAssurance` |
 | `all` | every executed GitHub mutation |
 
 The persistent user config defaults to `high-assurance`. It lives outside the installed skill directory so upgrading the skill cannot overwrite an explicit user choice. `GITHUB_DELIVERY_AUTHORITY_MODE=off|high-assurance|all` may override the persistent value for automation or diagnosis. The legacy `GITHUB_DELIVERY_REQUIRE_TRUSTED_AUTHORITY=1` switch remains supported and maps to the stricter `all` mode.
 
-`off` is an explicit opt-out that skips Windows Hello for high-assurance writes that do **not** require independently authenticated lifecycle intent or exact-text consent. It does not mean “the agent can do anything.” Direct merge instruction, exact-text confirmation for human replies, expected-head checks, ownership checks, idempotency, workflow routing, ship gates, and all other mutation-policy rules remain mandatory. Caller-supplied `explicitInstruction` and `exactTextConfirmed` are never themselves that independent intent.
+`off` is an explicit opt-out that means **no Windows Hello / trusted-authority prompt**. It does not mean “the agent can do anything.” Direct merge instruction, exact-text confirmation for human replies, expected-head checks, ownership checks, idempotency, workflow routing, ship gates, and all other mutation-policy rules remain mandatory.
 
 Dry-run planning never requires trusted authority. When the selected mode requires authority at `--execute`, the trusted grant must contain `scopeSha256`; a legacy resource-only signature is not enough.
 
@@ -78,7 +78,7 @@ The canonical enabled high-assurance action set is listed below. CI verifies exa
 - `update_pr_body`
 <!-- high-assurance-actions:end -->
 
-This keeps hostile repository text and model-selected mode inside the request layer. In the default `high-assurance` mode and in `all`, a protected write additionally needs an independently verified grant for the exact effect. An explicit `off` configuration skips that additional trusted-authority requirement for writes that are not independent-intent actions. Independent intent still requires a verified host grant at `--execute`.
+This keeps hostile repository text and model-selected mode inside the request layer. In the default `high-assurance` mode and in `all`, a protected write additionally needs an independently verified grant for the exact effect. Only an explicit `off` configuration skips that additional trusted-authority requirement.
 
 A human reply always needs exact-text confirmation. When authority protection requires a grant, the grant additionally binds `exactTextSha256` to the exact outgoing body. Caller-supplied `exactTextConfirmed` is never itself trusted provenance.
 
