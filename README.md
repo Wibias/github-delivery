@@ -19,7 +19,7 @@
 </div>
 
 > [!NOTE]
-> **1.0.1.** Patch after the first stable public release of the complete issue/PR lifecycle and core safety architecture. Host-specific runtime integrations and the experimental Codex streaming boundary remain constrained by what each agent host exposes. Native GitHub stacked-PR merge is an intentional fail-closed gap. See [Current state](#current-state).
+> **1.1.0.** First minor release after `1.0.0`, rolling up rewrite safety, review/evidence hardening, and the generation-10 adversarial-audit remediation. Host-specific runtime integrations and the experimental Codex streaming boundary remain constrained by what each agent host exposes. Native GitHub stacked-PR merge is an intentional fail-closed gap. See [Current state](#current-state).
 
 > [!IMPORTANT]
 > **Natural language is the public API.** The Node scripts, policy modules, evaluators, mutation broker, and optional Authority host are internal safety/evidence machinery. You normally do not invoke them yourself.
@@ -90,16 +90,19 @@ For installation edge cases, backup/restore, downgrade behavior, manual recovery
 | **Merge / close-out** | `merge PR #32` | Final gate, exact transaction authority, head-pinned merge, verification, thanks, linked-issue close-out |
 | **Self-update** | `update github-delivery to the latest stable release` | Stable-release discovery, checksums/manifest/tag/attestation verification, safe apply and postconditions |
 
-### What changed in 1.0.1
+### What changed in 1.1.0
 
-`1.0.1` is a patch after the first stable public release. User-facing work since `1.0.0`:
+`1.1.0` is a minor release after `1.0.0`, rolling up the rewrite-safety work and the generation-10 adversarial-audit remediation:
 
 - history-only Git rewrites must keep the original `HEAD^{tree}` before a force-with-lease push (`GD-GIT-008`);
-- review briefs label core vs mechanical files and call out relocated blocks as moved code;
-- absence claims need a positive-control search that matches a known hit before `no residual X`;
-- confirmation checks re-run in the same shell and PATH as the original observation;
-- non-fast-forward force-with-lease pushes fail closed unless trees match or an explicit restack/conflicts/simplify exemption is set;
-- moved-code hints distinguish exact raw-text relocations from modified moves while keeping surrounding context in review.
+- full-review verdicts can publish GitHub Request changes through the mutation broker, with later passes dismissing our stale pending Request changes before a new request or merge-ready verdict;
+- `authorityMode=off` now means zero Windows Hello prompts while caller-controlled mutation JSON cannot self-attest direct user intent or exact-text confirmation; governing workflows supply those facts out of band;
+- merge execution adds final conversation-safety verification so unresolved review-thread races still fail closed at the destructive boundary;
+- required clean probe evidence must cover the exact deterministic trigger-file set;
+- classic branch-protection matching follows the supported GitHub pathname-style pattern subset and fails closed on syntax the implementation cannot prove compatible;
+- attributed issue/repository text cannot become current-user merge authority, and named GitHub GraphQL mutations remain broker-owned and registered;
+- behavioural-evaluation gating requires trusted hash-bound transcript provenance instead of accepting self-consistent local summaries as gating evidence;
+- review briefs distinguish core/mechanical files, require positive controls for absence claims, preserve shell/PATH identity for confirmation checks, and moved-code hints distinguish exact raw-text relocations from modified moves while keeping surrounding context in review.
 
 See [`CHANGELOG.md`](CHANGELOG.md) for the full release-level details, including the `1.0.0` notes.
 
@@ -168,7 +171,7 @@ For trusted high-assurance operations, authority redemption happens before the f
 
 Where high assurance is required, trusted grants bind the semantic effect rather than a vague permission flag: repository, action, mode, PR/head, merge method, target identity, idempotency data, and hashes of human-visible text as applicable.
 
-The optional Windows Authority host can issue those grants through Windows Hello. Missing persistent user configuration defaults the effective preference to **Sensitive actions** (`high-assurance`); an explicitly stored `off` or `all` preference remains supported. After Hello, the approval UI can start a **PR session** (5 / 15 / 30 / 60 minutes) for later exact-scope push and merge on one PR and the approved merge base, or a **branch lease** (1–10 minutes) for repeated `push_code` only. Mixed-action batches, comments, human replies, close, and delete still need Hello. `off` does not turn caller-supplied lifecycle flags into independently authenticated consent.
+The optional Windows Authority host can issue those grants through Windows Hello. Missing persistent user configuration defaults the effective preference to **Sensitive actions** (`high-assurance`); an explicitly stored `off` or `all` preference remains supported. After Hello, the approval UI can start a **PR session** (5 / 15 / 30 / 60 minutes) for later exact-scope push and merge on one PR and the approved merge base, or a **branch lease** (1–10 minutes) for repeated `push_code` only. Mixed-action batches, comments, human replies, close, and delete still need Hello. `off` means no Windows Hello or Authority-host approval; it does not trust caller-supplied lifecycle or exact-text booleans as provenance. Governing workflows must supply direct intent and exact-text confirmation through trusted execution context when those facts are required.
 
 ### Safe retries and idempotency
 
@@ -540,7 +543,7 @@ The architecture uses progressive disclosure: route once, load the selected work
 
 ## Current state
 
-`1.0.1` is a patch after the first stable public release of the complete issue/PR lifecycle and core safety architecture.
+`1.1.0` is the first minor release after `1.0.0`, expanding the safety/evidence architecture and incorporating the generation-10 adversarial-audit remediation.
 
 Stable in this release:
 
@@ -560,7 +563,7 @@ Known limits, documented and fail-closed:
 
 - native GitHub stacked-PR merge is not implemented; those members are a hard stop rather than `gh pr merge`;
 - GitHub `UNKNOWN` mergeability is not treated as ready;
-- autonomous is not the default mutation mode; overnight unattended use is not the 1.0 claim;
+- autonomous is not the default mutation mode; overnight unattended use is not part of this release's stability claim;
 - host/runtime integrations remain constrained by what each agent host exposes;
 - the protected Codex App Server streaming boundary depends on an experimental upstream interface.
 
