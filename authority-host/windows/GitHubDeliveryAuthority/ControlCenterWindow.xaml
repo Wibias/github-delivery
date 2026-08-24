@@ -564,7 +564,7 @@
                             <StackPanel Spacing="16">
                                 <TextBlock Text="Protection mode" FontWeight="SemiBold" FontSize="16" />
                                 <RadioButton x:Name="OffModeRadio" GroupName="ProtectionMode" Content="Off" />
-                                <TextBlock Text="No Windows Hello prompts. Normal GitHub Delivery authorization, workflow, head-freshness and policy rules still apply."
+                                <TextBlock Text="Ordinary high-assurance writes skip Hello. Independent lifecycle intent and exact-text human replies still require Windows Hello."
                                            Margin="28,-10,0,0"
                                            Opacity="0.70"
                                            TextWrapping="WrapWholeWords" />
