@@ -171,6 +171,7 @@ export function authorityScopeForRequest(request = {}) {
         ...scope,
         remote: exactString(request.remote, "remote"),
         branch: exactString(request.branch, "branch"),
+        originalLocalTip: exactString(request.originalLocalTip, "original_local_tip"),
       };
 
     case "create_pr": {

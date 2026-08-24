@@ -133,6 +133,7 @@ test("autonomous execution remains intrinsically high assurance", () => {
 test("high-assurance lifecycle and social actions remain intrinsically classified", () => {
   for (const action of [
     "push_code",
+    "record_rewrite_baseline",
     "create_pr",
     "update_pr_body",
     "create_issue",

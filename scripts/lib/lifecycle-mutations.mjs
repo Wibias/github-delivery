@@ -5,6 +5,7 @@ import { assertPublishedMarkdown } from "./published-body-integrity.mjs";
 import { parseRewriteExemption } from "./rewrite-exemption.mjs";
 import {
   consumeRewriteBaselineCommand,
+  createRewriteBaselineCommand,
   readRewriteBaseline,
   rewriteBaselineRef,
 } from "./rewrite-baseline.mjs";
@@ -153,12 +154,21 @@ function assertRewriteBaselineCapture(request, runner) {
   const remote = String(required(request.remote, "remote"));
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(remote)) throw new Error("remote_invalid");
   const branch = String(required(request.branch, "branch"));
+  const originalLocalTip = exactSha(request.originalLocalTip, "original_local_tip");
   run(runner, ["git", "check-ref-format", `refs/heads/${branch}`]);
   run(runner, ["git", "check-ref-format", rewriteBaselineRef(remote, branch)]);
-  const originalLocalTip = exactSha(
+  const observed = exactSha(
     run(runner, ["git", "rev-parse", "--verify", `refs/heads/${branch}`]),
-    "original_local_tip",
+    "observed_local_tip",
   );
+  if (observed !== originalLocalTip) {
+    throw new Error(
+      `original_local_tip_baseline_head_mismatch: expected ${originalLocalTip}, observed ${observed}`,
+    );
+  }
+  if (readRewriteBaseline(runner, remote, branch)) {
+    throw new Error("rewrite_baseline_already_exists");
+  }
   return { remote, branch, originalLocalTip };
 }
 
@@ -333,6 +343,7 @@ export function validateLifecycleMutation(request = {}) {
     case "record_rewrite_baseline":
       required(request.remote, "remote");
       required(request.branch, "branch");
+      exactSha(request.originalLocalTip, "original_local_tip");
       break;
     case "create_pr":
       required(request.base, "base");
@@ -380,16 +391,12 @@ export function lifecycleCommandFor(request = {}) {
         `${newTip}:refs/heads/${branch}`,
       ];
     }
-    case "record_rewrite_baseline": {
-      const remote = String(required(request.remote, "remote"));
-      const branch = String(required(request.branch, "branch"));
-      return [
-        "git",
-        "update-ref",
-        rewriteBaselineRef(remote, branch),
-        `refs/heads/${branch}`,
-      ];
-    }
+    case "record_rewrite_baseline":
+      return createRewriteBaselineCommand(
+        String(required(request.remote, "remote")),
+        String(required(request.branch, "branch")),
+        exactSha(request.originalLocalTip, "original_local_tip"),
+      );
     case "create_pr":
       return createPrCommand(request, repo);
     case "update_pr_body":
@@ -440,6 +447,18 @@ export function preflightLifecycleMutation({ request, runner }) {
 }
 
 export function verifyLifecycleMutation({ request, runner }) {
+  if (request.action === "record_rewrite_baseline") {
+    const remote = String(required(request.remote, "remote"));
+    const branch = String(required(request.branch, "branch"));
+    const expected = exactSha(request.originalLocalTip, "original_local_tip");
+    const recorded = readRewriteBaseline(runner, remote, branch);
+    if (recorded !== expected) {
+      throw new Error(
+        `rewrite_baseline_verification_failed: expected ${expected}, observed ${recorded || "missing"}`,
+      );
+    }
+    return recorded;
+  }
   if (request.action === "push_code") {
     const remote = String(required(request.remote, "remote"));
     const branch = String(required(request.branch, "branch"));

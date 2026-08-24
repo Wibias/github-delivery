@@ -15,7 +15,7 @@ const DEFINITIONS = [
   { action: "reply_bot_thread", enabled: true, mutation: true, route: "legacy", minimumMode: "review", prBound: true, social: true, highAssurance: true, remoteIdempotentCreate: true, authorityScopeKind: "reply_thread" },
   { action: "reply_human_thread", enabled: true, mutation: true, route: "legacy", minimumMode: "review", prBound: true, social: true, remoteIdempotentCreate: true, humanReply: true, highAssurance: true, authorityScopeKind: "reply_thread" },
   { action: "push_code", enabled: true, mutation: true, route: "lifecycle", minimumMode: "maintainer", highAssurance: true, authorityScopeKind: "push_code" },
-  { action: "record_rewrite_baseline", enabled: true, mutation: true, route: "lifecycle", minimumMode: "maintainer", highAssurance: false, authorityScopeKind: "record_rewrite_baseline" },
+  { action: "record_rewrite_baseline", enabled: true, mutation: true, route: "lifecycle", minimumMode: "maintainer", highAssurance: true, authorityScopeKind: "record_rewrite_baseline" },
   { action: "create_pr", enabled: true, mutation: true, route: "lifecycle", minimumMode: "maintainer", highAssurance: true, remoteIdempotentCreate: true, authorityScopeKind: "create_pr" },
   { action: "update_pr_body", enabled: true, mutation: true, route: "lifecycle", minimumMode: "maintainer", prBound: true, highAssurance: true, authorityScopeKind: "update_pr_body" },
   { action: "create_issue", enabled: true, mutation: true, route: "lifecycle", minimumMode: "maintainer", highAssurance: true, remoteIdempotentCreate: true, issueCreationKind: "direct", authorityScopeKind: "create_issue" },

@@ -9,6 +9,7 @@ import {
   lifecycleCommandFor,
   preflightLifecycleMutation,
   validateLifecycleMutation,
+  verifyLifecycleMutation,
 } from "../../scripts/lib/lifecycle-mutations.mjs";
 import { rewriteBaselineRef } from "../../scripts/lib/rewrite-baseline.mjs";
 
@@ -136,8 +137,8 @@ test("push_code originalLocalTip must match the broker-owned rewrite baseline", 
   );
 });
 
-test("record_rewrite_baseline captures refs/heads/branch rather than a caller SHA", () => {
-  const request = {
+function recordRequest(overrides = {}) {
+  return {
     schemaVersion: 1,
     action: "record_rewrite_baseline",
     mutationMode: "maintainer",
@@ -145,17 +146,24 @@ test("record_rewrite_baseline captures refs/heads/branch rather than a caller SH
     repo: "Wibias/github-delivery",
     remote: "origin",
     branch: "feature/safe",
+    originalLocalTip: LOCAL,
+    ...overrides,
   };
+}
+
+test("record_rewrite_baseline writes the captured SHA, not a live branch ref", () => {
+  const request = recordRequest();
   assert.equal(validateLifecycleMutation(request), true);
   assert.deepEqual(lifecycleCommandFor(request), [
     "git",
     "update-ref",
     rewriteBaselineRef("origin", "feature/safe"),
-    "refs/heads/feature/safe",
+    LOCAL,
+    "0".repeat(40),
   ]);
   const result = preflightLifecycleMutation({
     request,
-    runner: rewriteRunner({ headTip: LOCAL }),
+    runner: rewriteRunner({ headTip: LOCAL, baselineMissing: true }),
   });
   assert.equal(result.originalLocalTip, LOCAL);
   assert.deepEqual(authorityScopeForRequest(request), {
@@ -164,7 +172,63 @@ test("record_rewrite_baseline captures refs/heads/branch rather than a caller SH
     repo: "Wibias/github-delivery",
     remote: "origin",
     branch: "feature/safe",
+    originalLocalTip: LOCAL,
   });
+});
+
+test("record_rewrite_baseline rejects a request SHA that is not the live branch tip", () => {
+  assert.throws(
+    () =>
+      preflightLifecycleMutation({
+        request: recordRequest({ originalLocalTip: LOCAL }),
+        runner: rewriteRunner({ headTip: NEXT, baselineMissing: true }),
+      }),
+    /original_local_tip_baseline_head_mismatch/,
+  );
+});
+
+test("record_rewrite_baseline cannot silently replace an existing baseline", () => {
+  assert.throws(
+    () =>
+      preflightLifecycleMutation({
+        request: recordRequest(),
+        runner: rewriteRunner({ headTip: LOCAL, baselineMissing: false, baselineTip: LOCAL }),
+      }),
+    /rewrite_baseline_already_exists/,
+  );
+});
+
+test("record_rewrite_baseline command still records the preflight SHA if the branch moves later", () => {
+  const request = recordRequest({ originalLocalTip: LOCAL });
+  const command = lifecycleCommandFor(request);
+  assert.equal(command.includes("refs/heads/feature/safe"), false);
+  assert.equal(command[3], LOCAL);
+  assert.throws(
+    () =>
+      preflightLifecycleMutation({
+        request,
+        runner: rewriteRunner({ headTip: NEXT, baselineMissing: true }),
+      }),
+    /original_local_tip_baseline_head_mismatch/,
+  );
+});
+
+test("record_rewrite_baseline post-verify requires the stored ref to equal the captured SHA", () => {
+  assert.throws(
+    () =>
+      verifyLifecycleMutation({
+        request: recordRequest(),
+        runner: rewriteRunner({ baselineTip: NEXT, baselineMissing: false }),
+      }),
+    /rewrite_baseline_verification_failed/,
+  );
+  assert.equal(
+    verifyLifecycleMutation({
+      request: recordRequest(),
+      runner: rewriteRunner({ baselineTip: LOCAL, baselineMissing: false }),
+    }),
+    LOCAL,
+  );
 });
 
 test("fast-forward force-with-lease skips the tree identity check", () => {
