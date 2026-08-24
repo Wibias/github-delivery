@@ -60,6 +60,7 @@ The canonical enabled high-assurance action set is listed below. CI verifies exa
 - `create_issue`
 - `create_pr`
 - `delete_head_branch`
+- `dismiss_review`
 - `edit_own_comment`
 - `merge_pr`
 - `post_comment`

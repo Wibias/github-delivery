@@ -305,6 +305,7 @@ internal static class SelfTest
         using var botThread = JsonDocument.Parse("{\"action\":\"resolve_bot_thread\",\"mutationMode\":\"review\"}");
         using var comment = JsonDocument.Parse("{\"action\":\"post_comment\",\"mutationMode\":\"review\",\"body\":\"ordinary note\"}");
         using var review = JsonDocument.Parse("{\"action\":\"post_review\",\"mutationMode\":\"review\",\"body\":\"review note\"}");
+        using var dismiss = JsonDocument.Parse("{\"action\":\"dismiss_review\",\"mutationMode\":\"review\"}");
         using var botReply = JsonDocument.Parse("{\"action\":\"reply_bot_thread\",\"mutationMode\":\"review\",\"body\":\"addressed\"}");
         using var humanReply = JsonDocument.Parse("{\"action\":\"reply_human_thread\",\"mutationMode\":\"review\"}");
         Assert(MutationClassifier.RequiresWindowsHello(merge.RootElement), "merge must require Hello");
@@ -314,6 +315,7 @@ internal static class SelfTest
         Assert(MutationClassifier.RequiresWindowsHello(botThread.RootElement), "bot thread resolution must require Hello even in review mode");
         Assert(MutationClassifier.RequiresWindowsHello(comment.RootElement), "ordinary review comment must require independent Hello approval");
         Assert(MutationClassifier.RequiresWindowsHello(review.RootElement), "review publication must require independent Hello approval");
+        Assert(MutationClassifier.RequiresWindowsHello(dismiss.RootElement), "review dismissal must require independent Hello approval");
         Assert(MutationClassifier.RequiresWindowsHello(botReply.RootElement), "bot reply must require independent Hello approval");
         Assert(MutationClassifier.RequiresWindowsHello(humanReply.RootElement), "human reply must require Hello");
 

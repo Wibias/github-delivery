@@ -10,9 +10,11 @@ import { evaluateHeadBranchCleanup } from "./merge-branch-cleanup.mjs";
 import { classifyMergeOutcome, readMergeState } from "./merge-outcome.mjs";
 import { boundedSpawnSync } from "./subprocess-policy.mjs";
 import { graphqlCliField } from "./graphql-cli-fields.mjs";
+import { reviewEventOf } from "./review-event.mjs";
 
 const PR_ACTIONS = new Set([
   "post_review",
+  "dismiss_review",
   "post_comment",
   "edit_own_comment",
   "reply_bot_thread",
@@ -62,6 +64,13 @@ function sha256(value) {
 function required(value, name) {
   if (value === undefined || value === null || value === "") {
     throw new Error(`${name}_required`);
+  }
+  return value;
+}
+
+function requiredString(value, name) {
+  if (typeof value !== "string" || value === "") {
+    throw new Error(`${name}_invalid`);
   }
   return value;
 }
@@ -159,7 +168,9 @@ function commandFor(request) {
         "--body",
         required(request.body, "body"),
       ];
-    case "post_review":
+    case "post_review": {
+      const event = reviewEventOf(request);
+      const eventFlag = event === "request-changes" ? "--request-changes" : "--comment";
       return [
         "gh",
         "pr",
@@ -167,9 +178,22 @@ function commandFor(request) {
         String(positiveInteger(request.pr, "pr")),
         "--repo",
         repo,
-        "--comment",
+        eventFlag,
         "--body",
         required(request.body, "body"),
+      ];
+    }
+    case "dismiss_review":
+      return [
+        "gh",
+        "api",
+        "graphql",
+        "-f",
+        "query=mutation($id:ID!,$message:String!){dismissPullRequestReview(input:{pullRequestReviewId:$id,message:$message}){pullRequestReview{id state}}}",
+        "-F",
+        `id=${graphqlCliField(requiredString(request.reviewId, "review_id"), "review_id")}`,
+        "-F",
+        `message=${graphqlCliField(requiredString(request.message, "message"), "message")}`,
       ];
     case "edit_own_comment": {
       const { owner, name } = repoParts(repo);
@@ -483,6 +507,62 @@ function verifyReviewThreadTarget({ request, runner }) {
   };
 }
 
+function verifyDismissReviewTarget({ request, runner }) {
+  if (request.action !== "dismiss_review") return null;
+  const reviewId = graphqlCliField(requiredString(request.reviewId, "review_id"), "review_id");
+  const requestedActorLogin = requiredString(request.actorLogin, "actor_login").toLowerCase();
+  const viewer = parseJson(
+    runOrThrow(runner, ["gh", "api", "user"]),
+    "viewer_evidence_invalid",
+  );
+  const actorLogin = requiredString(viewer.login, "viewer_login").toLowerCase();
+  if (requestedActorLogin !== actorLogin) {
+    throw new Error("review_not_owned_by_actor");
+  }
+  const query =
+    "query($id:ID!){node(id:$id){... on PullRequestReview{id state author{login} pullRequest{number headRefOid repository{nameWithOwner}}}}}";
+  const payload = parseJson(
+    runOrThrow(runner, ["gh", "api", "graphql", "-f", `query=${query}`, "-F", `id=${reviewId}`]),
+    "review_evidence_invalid",
+  );
+  if (payload.errors?.length) {
+    throw new Error(`review_evidence_error:${JSON.stringify(payload.errors)}`);
+  }
+  const review = payload.data?.node;
+  if (!review || review.id !== reviewId) {
+    throw new Error("review_target_missing");
+  }
+  const repo = required(review.pullRequest?.repository?.nameWithOwner, "review_repo");
+  if (String(repo).toLowerCase() !== String(request.repo).toLowerCase()) {
+    throw new Error("review_target_mismatch:repo");
+  }
+  const pr = positiveInteger(review.pullRequest?.number, "review_pr");
+  if (pr !== positiveInteger(request.pr, "pr")) {
+    throw new Error("review_target_mismatch:pr");
+  }
+  const head = required(review.pullRequest?.headRefOid, "review_head");
+  if (String(head).toLowerCase() !== String(request.expectedHead).toLowerCase()) {
+    throw new Error("review_target_mismatch:head");
+  }
+  const author = String(review.author?.login || "").toLowerCase();
+  if (author !== actorLogin) {
+    throw new Error("review_not_owned_by_actor");
+  }
+  const state = String(review.state || "").toUpperCase();
+  if (state !== "CHANGES_REQUESTED" && state !== "DISMISSED") {
+    throw new Error("review_not_changes_requested");
+  }
+  return {
+    reviewId,
+    repo,
+    pr,
+    expectedHead: head,
+    author,
+    state,
+    alreadyApplied: state === "DISMISSED",
+  };
+}
+
 function verifyRetargetBase({ request, runner }) {
   if (request.action !== "retarget_pr") return null;
   const expectedBase = required(request.expectedBase, "expected_base");
@@ -565,13 +645,22 @@ function idempotencyLookupPath(request) {
   }
 }
 
+function idempotentRecordStillApplies(request, record) {
+  if (request.action !== "post_review") return true;
+  const state = String(record?.state || "").toUpperCase();
+  if (reviewEventOf(request) === "request-changes") return state === "CHANGES_REQUESTED";
+  return state !== "DISMISSED";
+}
+
 function findExistingIdempotentMutation({ request, runner }) {
   const path = idempotencyLookupPath(request);
   if (!path) return null;
   const marker = required(request.idempotencyMarker, "idempotency_marker");
   const output = runOrThrow(runner, ["gh", "api", path, "--paginate", "--slurp"]);
   const records = parseSlurpedCollection(output);
-  const existing = records.find((record) => String(record?.body || "").includes(marker));
+  const existing = records.find(
+    (record) => String(record?.body || "").includes(marker) && idempotentRecordStillApplies(request, record),
+  );
   if (!existing) return null;
   return {
     id: existing.id ?? existing.number ?? null,
@@ -746,6 +835,11 @@ export function planMutationRequest(
   if (REVIEW_THREAD_ACTIONS.has(request.action)) {
     required(request.threadId, "thread_id");
   }
+  if (request.action === "dismiss_review") {
+    graphqlCliField(requiredString(request.reviewId, "review_id"), "review_id");
+    requiredString(request.actorLogin, "actor_login");
+    graphqlCliField(requiredString(request.message, "message"), "message");
+  }
   if (request.action === "retarget_pr") {
     const expectedBase = required(request.expectedBase, "expected_base");
     const newBase = required(request.newBase, "new_base");
@@ -824,6 +918,7 @@ export function executeMutationRequest({
   verifyMergeBase({ request: plan.request, runner });
   verifyLinkedIssue({ request: plan.request, runner });
   const threadTarget = verifyReviewThreadTarget({ request: plan.request, runner });
+  let reviewTarget = verifyDismissReviewTarget({ request: plan.request, runner });
   const retargetState = verifyRetargetBase({ request: plan.request, runner });
   const commentEditTarget = verifyOwnCommentTarget({ request: plan.request, runner });
   const mergeState = readMergeState({ request: plan.request, runner });
@@ -869,11 +964,29 @@ export function executeMutationRequest({
       observedHead,
       observedBase: retargetState?.observedBase ?? null,
       threadTarget,
+      reviewTarget,
       commentEditTarget,
       existingMutation: null,
       idempotencyClaim: null,
       stdout: "",
       verification: threadTarget,
+    };
+  }
+  if (reviewTarget?.alreadyApplied) {
+    return {
+      ...plan,
+      executed: false,
+      status: "already_applied",
+      outcome: null,
+      observedHead,
+      observedBase: retargetState?.observedBase ?? null,
+      threadTarget,
+      reviewTarget,
+      commentEditTarget,
+      existingMutation: null,
+      idempotencyClaim: null,
+      stdout: "",
+      verification: reviewTarget,
     };
   }
   if (retargetState?.alreadyApplied) {
@@ -957,6 +1070,12 @@ export function executeMutationRequest({
     if (verification.isResolved !== true) {
       throw new Error("review_thread_resolution_verification_failed");
     }
+  } else if (plan.request.action === "dismiss_review") {
+    reviewTarget = verifyDismissReviewTarget({ request: plan.request, runner });
+    verification = reviewTarget;
+    if (String(reviewTarget?.state || "").toUpperCase() !== "DISMISSED") {
+      throw new Error("review_dismiss_verification_failed");
+    }
   } else {
     const verify = verificationCommand(plan.request);
     verification = verify ? runOrThrow(runner, verify) : branchDeletion;
@@ -975,6 +1094,7 @@ export function executeMutationRequest({
     observedHead,
     observedBase: retargetState?.observedBase ?? null,
     threadTarget,
+    reviewTarget,
     commentEditTarget,
     existingMutation: null,
     idempotencyClaim,

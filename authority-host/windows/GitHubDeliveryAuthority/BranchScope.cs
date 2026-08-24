@@ -7,6 +7,7 @@ internal static class BranchScope
     private static readonly HashSet<string> PrBoundActions = new(StringComparer.Ordinal)
     {
         "post_review",
+        "dismiss_review",
         "post_comment",
         "edit_own_comment",
         "reply_bot_thread",

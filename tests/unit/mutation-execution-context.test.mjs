@@ -147,6 +147,7 @@ test("high-assurance lifecycle and social actions remain intrinsically classifie
     "retarget_pr",
     "delete_head_branch",
     "post_review",
+    "dismiss_review",
     "post_comment",
     "post_issue_comment",
     "edit_own_comment",
