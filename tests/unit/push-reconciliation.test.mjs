@@ -2,9 +2,19 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { executeLifecycleMutationRequest } from "../../scripts/lib/github-lifecycle-mutation-broker.mjs";
+import { createMemoryRewriteBaselineStore } from "../../scripts/lib/rewrite-baseline-store.mjs";
 
 const OLD = "a".repeat(40);
 const NEW = "b".repeat(40);
+
+function seededStore() {
+  const store = createMemoryRewriteBaselineStore();
+  store.create(
+    { repo: "Wibias/github-delivery", remote: "origin", branch: "feature/safe" },
+    "e".repeat(40),
+  );
+  return store;
+}
 
 function pushRequest() {
   return {
@@ -59,6 +69,7 @@ function pushRunner({ pushResult, remoteAfterPush }) {
 }
 
 test("a timed-out push that already landed on newTip is reconciled", () => {
+  const store = seededStore();
   const result = executeLifecycleMutationRequest({
     request: pushRequest(),
     execute: true,
@@ -67,10 +78,15 @@ test("a timed-out push that already landed on newTip is reconciled", () => {
       pushResult: { status: null, signal: "SIGKILL", stdout: "", stderr: "subprocess_timeout:git:30000ms" },
       remoteAfterPush: NEW,
     }),
+    baselineStore: store,
   });
   assert.equal(result.status, "reconciled_after_error");
   assert.equal(result.executed, true);
   assert.equal(result.verification, NEW);
+  assert.equal(
+    store.read({ repo: "Wibias/github-delivery", remote: "origin", branch: "feature/safe" }),
+    null,
+  );
 });
 
 test("a timed-out push whose remote is still the old tip stays a failure", () => {
@@ -84,6 +100,7 @@ test("a timed-out push whose remote is still the old tip stays a failure", () =>
           pushResult: { status: null, signal: "SIGKILL", stdout: "", stderr: "subprocess_timeout:git:30000ms" },
           remoteAfterPush: OLD,
         }),
+        baselineStore: seededStore(),
       }),
     /subprocess_timeout|mutation_command_failed/,
   );
@@ -100,6 +117,7 @@ test("a timed-out push whose remote moved to a third tip is unknown", () => {
           pushResult: { status: null, signal: "SIGKILL", stdout: "", stderr: "subprocess_timeout:git:30000ms" },
           remoteAfterPush: "c".repeat(40),
         }),
+        baselineStore: seededStore(),
       }),
     /push_outcome_unknown/,
   );

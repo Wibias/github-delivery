@@ -158,3 +158,13 @@ test("host SelfTest push rewrite-exemption fixtures hash under the Node canonica
   }
   assert.equal(hashes.size, 4);
 });
+
+test("host SelfTest record_rewrite_baseline fixture hashes under the Node canonicalizer", () => {
+  const selfTest = read(`${host}/SelfTest.cs`);
+  const pinned = selfTest.match(/ExpectedRecordRewriteBaselineScope = "([0-9a-f]{64})"/)?.[1];
+  const needle =
+    '{"schemaVersion":1,"action":"record_rewrite_baseline","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","originalLocalTip":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"}';
+  assert.equal(typeof pinned, "string");
+  assert.ok(selfTest.includes(needle));
+  assert.equal(authorityScopeSha256(JSON.parse(needle)), pinned);
+});

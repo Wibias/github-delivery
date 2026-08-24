@@ -7,6 +7,7 @@ import {
   readAuthenticatedActor,
 } from "./idempotency-receipt.mjs";
 import { authorizeMutation } from "./mutation-policy.mjs";
+import { createFileRewriteBaselineStore } from "./rewrite-baseline-store.mjs";
 import {
   lifecycleCommandFor,
   preflightLifecycleMutation,
@@ -89,7 +90,7 @@ function readPushedTip(request, runner) {
   return row ? String(row.split(/\s+/)[0] || "").toLowerCase() : "absent";
 }
 
-function reconcileUncertainPush({ plan, runner, writeResult }) {
+function reconcileUncertainPush({ plan, runner, writeResult, baselineStore }) {
   const observed = readPushedTip(plan.request, runner);
   const expected = String(plan.request.newTip || "").toLowerCase();
   if (observed === expected) {
@@ -97,7 +98,11 @@ function reconcileUncertainPush({ plan, runner, writeResult }) {
       executed: true,
       status: "reconciled_after_error",
       stdout: String(writeResult?.stdout || "").trim(),
-      verification: observed,
+      verification: verifyLifecycleMutation({
+        request: plan.request,
+        runner,
+        baselineStore,
+      }),
     };
   }
   const previous = String(plan.request.expectedRemoteTip || "").toLowerCase();
@@ -260,6 +265,7 @@ export function executeLifecycleMutationRequest({
   authorityNow,
   authorityMaxTtlSeconds,
   authorityClockSkewSeconds,
+  baselineStore,
 } = {}) {
   const plan = planLifecycleMutationRequest(request, {
     authorityPublicKey,
@@ -269,6 +275,7 @@ export function executeLifecycleMutationRequest({
     authorityClockSkewSeconds,
   });
   if (!execute) return { ...plan, executed: false, status: "dry_run" };
+  const store = baselineStore || createFileRewriteBaselineStore();
 
   const observedHead = verifyHead({ request: plan.request, runner });
 
@@ -289,14 +296,14 @@ export function executeLifecycleMutationRequest({
     };
   }
 
-  const preflight = preflightLifecycleMutation({ request: plan.request, runner });
+  const preflight = preflightLifecycleMutation({ request: plan.request, runner, baselineStore: store });
   let stdout;
   let status = "succeeded";
   let verification;
   if (plan.action === "push_code") {
     const writeResult = runCommand(runner, plan.command);
     if (uncertainSpawn(writeResult)) {
-      const reconciled = reconcileUncertainPush({ plan, runner, writeResult });
+      const reconciled = reconcileUncertainPush({ plan, runner, writeResult, baselineStore: store });
       stdout = reconciled.stdout;
       status = reconciled.status;
       verification = reconciled.verification;
@@ -304,11 +311,11 @@ export function executeLifecycleMutationRequest({
       throw spawnFailure(writeResult);
     } else {
       stdout = String(writeResult.stdout || "").trim();
-      verification = verifyLifecycleMutation({ request: plan.request, runner });
+      verification = verifyLifecycleMutation({ request: plan.request, runner, baselineStore: store });
     }
   } else {
     stdout = runOrThrow(runner, plan.command);
-    verification = verifyLifecycleMutation({ request: plan.request, runner });
+    verification = verifyLifecycleMutation({ request: plan.request, runner, baselineStore: store });
   }
   if (IDEMPOTENT_CREATES.has(plan.action)) {
     verification = findExistingCreate({ request: plan.request, runner });

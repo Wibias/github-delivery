@@ -5,13 +5,14 @@ import {
   authorityScopeForRequest,
   authorityScopeSha256,
 } from "../../scripts/lib/authority-scope.mjs";
+import { executeLifecycleMutationRequest } from "../../scripts/lib/github-lifecycle-mutation-broker.mjs";
+import { createMemoryRewriteBaselineStore } from "../../scripts/lib/rewrite-baseline-store.mjs";
 import {
   lifecycleCommandFor,
   preflightLifecycleMutation,
   validateLifecycleMutation,
   verifyLifecycleMutation,
 } from "../../scripts/lib/lifecycle-mutations.mjs";
-import { rewriteBaselineRef } from "../../scripts/lib/rewrite-baseline.mjs";
 
 const OLD = "a".repeat(40);
 const NEXT = "b".repeat(40);
@@ -44,17 +45,23 @@ function identityOk() {
   };
 }
 
+function seededStore(sha = LOCAL) {
+  const store = createMemoryRewriteBaselineStore();
+  store.create(
+    { repo: "Wibias/github-delivery", remote: "origin", branch: "feature/safe" },
+    sha,
+  );
+  return store;
+}
+
 function rewriteRunner({
   ancestor = false,
   remoteTip = OLD,
   remoteTree = TREE_A,
   originalTree = TREE_A,
   newTree = TREE_A,
-  baselineTip = LOCAL,
-  baselineMissing = false,
   headTip = LOCAL,
 } = {}) {
-  const baselineRef = rewriteBaselineRef("origin", "feature/safe");
   return (command, args) => {
     if (command === "git" && args[0] === "check-ref-format") return { status: 0, stdout: "", stderr: "" };
     if (command === "git" && args[0] === "remote") {
@@ -70,14 +77,15 @@ function rewriteRunner({
       return { status: ancestor ? 0 : 1, stdout: "", stderr: "" };
     }
     if (command === "git" && args[0] === "update-ref") {
+      const ref = String(args[1] || "");
+      const oldValue = String(args[3] || "");
+      if (ref === "refs/heads/feature/safe" && oldValue && oldValue !== headTip) {
+        return { status: 1, stdout: "", stderr: "fatal: cannot lock ref" };
+      }
       return { status: 0, stdout: "", stderr: "" };
     }
     if (command === "git" && args[0] === "rev-parse") {
       const spec = args[1] === "--verify" ? String(args[2] || "") : String(args[1] || "");
-      if (spec === baselineRef || spec.startsWith("refs/github-delivery/rewrite-baseline/")) {
-        if (baselineMissing) return { status: 128, stdout: "", stderr: "missing" };
-        return { status: 0, stdout: `${baselineTip}\n`, stderr: "" };
-      }
       if (spec === "refs/heads/feature/safe") {
         return { status: 0, stdout: `${headTip}\n`, stderr: "" };
       }
@@ -94,12 +102,8 @@ test("a same-request originalLocalTip equal to newTip cannot satisfy the rewrite
     () =>
       preflightLifecycleMutation({
         request: pushRequest({ originalLocalTip: NEXT }),
-        runner: rewriteRunner({
-          ancestor: false,
-          baselineTip: NEXT,
-          originalTree: TREE_A,
-          newTree: TREE_A,
-        }),
+        runner: rewriteRunner({ ancestor: false, originalTree: TREE_A, newTree: TREE_A }),
+        baselineStore: seededStore(NEXT),
       }),
     /original_local_tip_tautological/,
   );
@@ -110,12 +114,36 @@ test("history-only rewrite without a broker rewrite baseline cannot reach push_c
     () =>
       preflightLifecycleMutation({
         request: pushRequest(),
-        runner: rewriteRunner({
-          ancestor: false,
-          baselineMissing: true,
-          originalTree: TREE_A,
-          newTree: TREE_A,
-        }),
+        runner: rewriteRunner({ ancestor: false, originalTree: TREE_A, newTree: TREE_A }),
+        baselineStore: createMemoryRewriteBaselineStore(),
+      }),
+    /original_local_tip_baseline_required/,
+  );
+});
+
+test("an unreadable rewrite baseline store is not treated as missing", () => {
+  assert.throws(
+    () =>
+      preflightLifecycleMutation({
+        request: pushRequest(),
+        runner: rewriteRunner({ ancestor: false, originalTree: TREE_A, newTree: TREE_A }),
+        baselineStore: {
+          read() {
+            throw new Error("rewrite_baseline_store_unreadable");
+          },
+        },
+      }),
+    /rewrite_baseline_store_unreadable/,
+  );
+});
+
+test("a forged git rewrite-baseline ref cannot satisfy push_code", () => {
+  assert.throws(
+    () =>
+      preflightLifecycleMutation({
+        request: pushRequest(),
+        runner: rewriteRunner({ ancestor: false, originalTree: TREE_A, newTree: TREE_A }),
+        baselineStore: createMemoryRewriteBaselineStore(),
       }),
     /original_local_tip_baseline_required/,
   );
@@ -126,12 +154,8 @@ test("push_code originalLocalTip must match the broker-owned rewrite baseline", 
     () =>
       preflightLifecycleMutation({
         request: pushRequest({ originalLocalTip: NEXT }),
-        runner: rewriteRunner({
-          ancestor: false,
-          baselineTip: LOCAL,
-          originalTree: TREE_A,
-          newTree: TREE_A,
-        }),
+        runner: rewriteRunner({ ancestor: false, originalTree: TREE_A, newTree: TREE_A }),
+        baselineStore: seededStore(LOCAL),
       }),
     /original_local_tip_baseline_mismatch/,
   );
@@ -157,13 +181,14 @@ test("record_rewrite_baseline writes the captured SHA, not a live branch ref", (
   assert.deepEqual(lifecycleCommandFor(request), [
     "git",
     "update-ref",
-    rewriteBaselineRef("origin", "feature/safe"),
+    "refs/heads/feature/safe",
     LOCAL,
-    "0".repeat(40),
+    LOCAL,
   ]);
   const result = preflightLifecycleMutation({
     request,
-    runner: rewriteRunner({ headTip: LOCAL, baselineMissing: true }),
+    runner: rewriteRunner({ headTip: LOCAL }),
+    baselineStore: createMemoryRewriteBaselineStore(),
   });
   assert.equal(result.originalLocalTip, LOCAL);
   assert.deepEqual(authorityScopeForRequest(request), {
@@ -181,7 +206,8 @@ test("record_rewrite_baseline rejects a request SHA that is not the live branch 
     () =>
       preflightLifecycleMutation({
         request: recordRequest({ originalLocalTip: LOCAL }),
-        runner: rewriteRunner({ headTip: NEXT, baselineMissing: true }),
+        runner: rewriteRunner({ headTip: NEXT }),
+        baselineStore: createMemoryRewriteBaselineStore(),
       }),
     /original_local_tip_baseline_head_mismatch/,
   );
@@ -192,42 +218,104 @@ test("record_rewrite_baseline cannot silently replace an existing baseline", () 
     () =>
       preflightLifecycleMutation({
         request: recordRequest(),
-        runner: rewriteRunner({ headTip: LOCAL, baselineMissing: false, baselineTip: LOCAL }),
+        runner: rewriteRunner({ headTip: LOCAL }),
+        baselineStore: seededStore(LOCAL),
       }),
     /rewrite_baseline_already_exists/,
   );
 });
 
-test("record_rewrite_baseline command still records the preflight SHA if the branch moves later", () => {
+test("record_rewrite_baseline refuses capture if the branch moves between preflight and mutation", () => {
   const request = recordRequest({ originalLocalTip: LOCAL });
+  const store = createMemoryRewriteBaselineStore();
   const command = lifecycleCommandFor(request);
-  assert.equal(command.includes("refs/heads/feature/safe"), false);
-  assert.equal(command[3], LOCAL);
+  assert.deepEqual(command, ["git", "update-ref", "refs/heads/feature/safe", LOCAL, LOCAL]);
+  assert.equal(
+    preflightLifecycleMutation({
+      request,
+      runner: rewriteRunner({ headTip: LOCAL }),
+      baselineStore: store,
+    }).originalLocalTip,
+    LOCAL,
+  );
   assert.throws(
     () =>
-      preflightLifecycleMutation({
+      verifyLifecycleMutation({
         request,
-        runner: rewriteRunner({ headTip: NEXT, baselineMissing: true }),
+        runner: rewriteRunner({ headTip: NEXT }),
+        baselineStore: store,
       }),
     /original_local_tip_baseline_head_mismatch/,
   );
+  assert.equal(
+    store.read({ repo: "Wibias/github-delivery", remote: "origin", branch: "feature/safe" }),
+    null,
+  );
 });
 
-test("record_rewrite_baseline post-verify requires the stored ref to equal the captured SHA", () => {
+test("record_rewrite_baseline compare-and-swap fails if the branch moves after preflight", () => {
+  const store = createMemoryRewriteBaselineStore();
+  let headTip = LOCAL;
+  const runner = (command, args) => {
+    if (command === "git" && args[0] === "check-ref-format") {
+      return { status: 0, stdout: "", stderr: "" };
+    }
+    if (command === "git" && args[0] === "rev-parse") {
+      const spec = args[1] === "--verify" ? String(args[2] || "") : String(args[1] || "");
+      if (spec === "refs/heads/feature/safe") {
+        const tip = headTip;
+        headTip = NEXT;
+        return { status: 0, stdout: `${tip}\n`, stderr: "" };
+      }
+    }
+    if (command === "git" && args[0] === "update-ref") {
+      const oldValue = String(args[3] || "");
+      if (oldValue !== headTip) {
+        return { status: 1, stdout: "", stderr: "fatal: cannot lock ref" };
+      }
+      return { status: 0, stdout: "", stderr: "" };
+    }
+    throw new Error(`unexpected command: ${command} ${args.join(" ")}`);
+  };
+  assert.throws(
+    () =>
+      executeLifecycleMutationRequest({
+        request: recordRequest(),
+        execute: true,
+        requireTrustedAuthority: false,
+        runner,
+        baselineStore: store,
+      }),
+    /cannot lock ref|mutation_command_failed/,
+  );
+  assert.equal(
+    store.read({ repo: "Wibias/github-delivery", remote: "origin", branch: "feature/safe" }),
+    null,
+  );
+});
+
+test("record_rewrite_baseline post-verify stores the captured SHA in broker state", () => {
+  const store = createMemoryRewriteBaselineStore();
+  assert.equal(
+    verifyLifecycleMutation({
+      request: recordRequest(),
+      runner: rewriteRunner({ headTip: LOCAL }),
+      baselineStore: store,
+    }),
+    LOCAL,
+  );
+  assert.equal(
+    store.read({ repo: "Wibias/github-delivery", remote: "origin", branch: "feature/safe" }),
+    LOCAL,
+  );
   assert.throws(
     () =>
       verifyLifecycleMutation({
         request: recordRequest(),
-        runner: rewriteRunner({ baselineTip: NEXT, baselineMissing: false }),
+        runner: rewriteRunner({ headTip: LOCAL }),
+        baselineStore: store,
       }),
-    /rewrite_baseline_verification_failed/,
-  );
-  assert.equal(
-    verifyLifecycleMutation({
-      request: recordRequest(),
-      runner: rewriteRunner({ baselineTip: LOCAL, baselineMissing: false }),
-    }),
-    LOCAL,
+    /rewrite_baseline_already_exists/,
   );
 });
 
@@ -244,6 +332,7 @@ test("history-only rewrite reaches push only when trees match", () => {
   const result = preflightLifecycleMutation({
     request: pushRequest(),
     runner: rewriteRunner({ ancestor: false, originalTree: TREE_A, newTree: TREE_A }),
+    baselineStore: seededStore(),
   });
   assert.equal(result.newTip, NEXT);
 });
@@ -254,6 +343,7 @@ test("changed-tree history rewrite cannot reach push_code", () => {
       preflightLifecycleMutation({
         request: pushRequest(),
         runner: rewriteRunner({ ancestor: false, originalTree: TREE_A, newTree: TREE_B }),
+        baselineStore: seededStore(),
       }),
     /content_preserving_rewrite_tree_mismatch/,
   );
@@ -268,6 +358,7 @@ test("a rewrite that keeps the original local tree is allowed when the remote tr
       originalTree: TREE_B,
       newTree: TREE_B,
     }),
+    baselineStore: seededStore(),
   });
   assert.equal(result.newTip, NEXT);
   assert.equal(result.originalLocalTip, LOCAL);
@@ -284,6 +375,7 @@ test("a rewrite that drops unpublished local commits back to the remote tree is 
           originalTree: TREE_B,
           newTree: TREE_A,
         }),
+        baselineStore: seededStore(),
       }),
     /content_preserving_rewrite_tree_mismatch/,
   );
@@ -333,6 +425,7 @@ test("restack exemption skips tree identity", () => {
       preflightLifecycleMutation({
         request: pushRequest(),
         runner: rewriteRunner({ ancestor: false, originalTree: TREE_A, newTree: TREE_B }),
+        baselineStore: seededStore(),
       }),
     /content_preserving_rewrite_tree_mismatch/,
   );

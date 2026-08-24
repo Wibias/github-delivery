@@ -11,6 +11,7 @@ internal static class SelfTest
     private const string ExpectedPushScopeRestack = "a98e603c0df482df40343d78e2b5617941430102bbbc9bd4e01b2c3ae3b230d2";
     private const string ExpectedPushScopeConflicts = "5e0e1755947ce47e871b1a6a60c22f5e4ab22a0d49477ff95016a79a6819ab21";
     private const string ExpectedPushScopeSimplifyPr = "1eb711f613caec7c21f691e24e21a5c8edd465f428d14cfcb1d02f49662ec268";
+    private const string ExpectedRecordRewriteBaselineScope = "0a17346b1b7e27c7ca08d0a51295f9d0412a3bf47538a861fcd1502e8d1fd416";
 
     public static int Run()
     {
@@ -77,6 +78,12 @@ internal static class SelfTest
         Assert(
             pushNoneHash != pushRestackHash && pushRestackHash != pushConflictsHash && pushConflictsHash != pushSimplifyHash,
             "rewrite exemptions must change the exact push authority scope");
+
+        using var recordBaseline = JsonDocument.Parse("""
+            {"schemaVersion":1,"action":"record_rewrite_baseline","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","originalLocalTip":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"}
+            """);
+        var recordBaselineHash = ScopeCanonicalizer.ScopeSha256(recordBaseline.RootElement);
+        Assert(recordBaselineHash == ExpectedRecordRewriteBaselineScope, $"record rewrite baseline fixture mismatch: {recordBaselineHash}");
 
         using var pushEmpty = JsonDocument.Parse("""
             {"schemaVersion":1,"action":"push_code","mutationMode":"maintainer","explicitInstruction":true,"repo":"Wibias/github-delivery","remote":"origin","branch":"feature/safe","expectedRemoteTip":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","originalLocalTip":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","newTip":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","forceWithLease":true,"rewriteExemption":""}

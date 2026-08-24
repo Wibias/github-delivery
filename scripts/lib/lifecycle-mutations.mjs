@@ -3,12 +3,6 @@ import { assertContentPreservingRewrite } from "./content-preserving-rewrite.mjs
 import { diffPrBodyMedia } from "./pr-body-media.mjs";
 import { assertPublishedMarkdown } from "./published-body-integrity.mjs";
 import { parseRewriteExemption } from "./rewrite-exemption.mjs";
-import {
-  consumeRewriteBaselineCommand,
-  createRewriteBaselineCommand,
-  readRewriteBaseline,
-  rewriteBaselineRef,
-} from "./rewrite-baseline.mjs";
 
 const LIFECYCLE_ACTIONS = new Set([
   "push_code",
@@ -98,7 +92,7 @@ function canonicalRemoteUrl(value) {
   }
 }
 
-function assertPushTarget(request, runner) {
+function assertPushTarget(request, runner, baselineStore) {
   const remote = String(required(request.remote, "remote"));
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(remote)) throw new Error("remote_invalid");
   const branch = String(required(request.branch, "branch"));
@@ -134,7 +128,10 @@ function assertPushTarget(request, runner) {
   if (expected !== "absent" && request.forceWithLease === true && !isAncestor(runner, expected, newTip)) {
     const exemption = rewriteExemptionOf(request);
     if (!exemption) {
-      const recorded = readRewriteBaseline(runner, remote, branch);
+      if (!baselineStore || typeof baselineStore.read !== "function") {
+        throw new Error("original_local_tip_baseline_required");
+      }
+      const recorded = baselineStore.read({ repo: request.repo, remote, branch });
       if (!recorded) throw new Error("original_local_tip_baseline_required");
       if (recorded !== originalLocalTip) {
         throw new Error(
@@ -150,13 +147,12 @@ function assertPushTarget(request, runner) {
   return { remote, branch, expectedRemoteTip: expected, originalLocalTip, newTip };
 }
 
-function assertRewriteBaselineCapture(request, runner) {
+function assertRewriteBaselineCapture(request, runner, baselineStore) {
   const remote = String(required(request.remote, "remote"));
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(remote)) throw new Error("remote_invalid");
   const branch = String(required(request.branch, "branch"));
   const originalLocalTip = exactSha(request.originalLocalTip, "original_local_tip");
   run(runner, ["git", "check-ref-format", `refs/heads/${branch}`]);
-  run(runner, ["git", "check-ref-format", rewriteBaselineRef(remote, branch)]);
   const observed = exactSha(
     run(runner, ["git", "rev-parse", "--verify", `refs/heads/${branch}`]),
     "observed_local_tip",
@@ -166,7 +162,10 @@ function assertRewriteBaselineCapture(request, runner) {
       `original_local_tip_baseline_head_mismatch: expected ${originalLocalTip}, observed ${observed}`,
     );
   }
-  if (readRewriteBaseline(runner, remote, branch)) {
+  if (!baselineStore || typeof baselineStore.read !== "function") {
+    throw new Error("rewrite_baseline_store_required");
+  }
+  if (baselineStore.read({ repo: request.repo, remote, branch })) {
     throw new Error("rewrite_baseline_already_exists");
   }
   return { remote, branch, originalLocalTip };
@@ -391,12 +390,11 @@ export function lifecycleCommandFor(request = {}) {
         `${newTip}:refs/heads/${branch}`,
       ];
     }
-    case "record_rewrite_baseline":
-      return createRewriteBaselineCommand(
-        String(required(request.remote, "remote")),
-        String(required(request.branch, "branch")),
-        exactSha(request.originalLocalTip, "original_local_tip"),
-      );
+    case "record_rewrite_baseline": {
+      const branch = String(required(request.branch, "branch"));
+      const sha = exactSha(request.originalLocalTip, "original_local_tip");
+      return ["git", "update-ref", `refs/heads/${branch}`, sha, sha];
+    }
     case "create_pr":
       return createPrCommand(request, repo);
     case "update_pr_body":
@@ -438,20 +436,36 @@ export function lifecycleCommandFor(request = {}) {
   }
 }
 
-export function preflightLifecycleMutation({ request, runner }) {
-  if (request.action === "push_code") return assertPushTarget(request, runner);
-  if (request.action === "record_rewrite_baseline") return assertRewriteBaselineCapture(request, runner);
+export function preflightLifecycleMutation({ request, runner, baselineStore }) {
+  if (request.action === "push_code") return assertPushTarget(request, runner, baselineStore);
+  if (request.action === "record_rewrite_baseline") {
+    return assertRewriteBaselineCapture(request, runner, baselineStore);
+  }
   if (request.action === "update_pr_body") return assertUpdatePrBodySafe(request, runner);
   if (request.action === "create_pr") return assertCreatePrNotDuplicate(request, runner);
   return null;
 }
 
-export function verifyLifecycleMutation({ request, runner }) {
+export function verifyLifecycleMutation({ request, runner, baselineStore }) {
   if (request.action === "record_rewrite_baseline") {
     const remote = String(required(request.remote, "remote"));
     const branch = String(required(request.branch, "branch"));
     const expected = exactSha(request.originalLocalTip, "original_local_tip");
-    const recorded = readRewriteBaseline(runner, remote, branch);
+    if (!baselineStore || typeof baselineStore.create !== "function") {
+      throw new Error("rewrite_baseline_store_required");
+    }
+    const observed = exactSha(
+      run(runner, ["git", "rev-parse", "--verify", `refs/heads/${branch}`]),
+      "observed_local_tip",
+    );
+    if (observed !== expected) {
+      throw new Error(
+        `original_local_tip_baseline_head_mismatch: expected ${expected}, observed ${observed}`,
+      );
+    }
+    const scope = { repo: request.repo, remote, branch };
+    baselineStore.create(scope, expected);
+    const recorded = baselineStore.read(scope);
     if (recorded !== expected) {
       throw new Error(
         `rewrite_baseline_verification_failed: expected ${expected}, observed ${recorded || "missing"}`,
@@ -468,8 +482,9 @@ export function verifyLifecycleMutation({ request, runner }) {
     if (observed !== expected) {
       throw new Error(`push_verification_failed: expected ${expected}, observed ${observed}`);
     }
-    const recorded = readRewriteBaseline(runner, remote, branch);
-    if (recorded) run(runner, consumeRewriteBaselineCommand(remote, branch));
+    if (baselineStore && typeof baselineStore.consume === "function") {
+      baselineStore.consume({ repo: request.repo, remote, branch });
+    }
     return observed;
   }
   if (request.action === "update_pr_body") {
