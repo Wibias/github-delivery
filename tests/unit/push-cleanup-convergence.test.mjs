@@ -152,18 +152,18 @@ test("rewrite baseline consume is compare-and-swap when an expected SHA is suppl
   assert.equal(store.read(SCOPE), null);
 });
 
-test("file baseline publication does not depend on rename-over-existing semantics", () => {
+test("file baseline CAS round trip uses native filesystem semantics", () => {
   const root = mkdtempSync(join(tmpdir(), "gd-rewrite-publish-"));
   const store = createFileRewriteBaselineStore({
     path: join(root, "rewrite-baselines.json"),
-    rename() {
-      const error = new Error("simulated Windows rename-over-existing failure");
-      error.code = "EPERM";
-      throw error;
-    },
   });
 
   assert.equal(store.create(SCOPE, BASELINE), BASELINE);
+  assert.equal(store.read(SCOPE), BASELINE);
+  assert.throws(
+    () => store.consume(SCOPE, OTHER),
+    /rewrite_baseline_consume_mismatch/,
+  );
   assert.equal(store.read(SCOPE), BASELINE);
   assert.equal(store.consume(SCOPE, BASELINE), BASELINE);
   assert.equal(store.read(SCOPE), null);
