@@ -181,10 +181,10 @@ function requestForAuthorityMode(request, options) {
   const normalized = {
     ...request,
     // Off is a user-configured opt-out of independent OS-backed approval.
-    // These policy facts are derived here from the selected route/profile,
-    // never trusted from raw request booleans.
+    // Direct lifecycle intent is derived from the selected route/profile here,
+    // not trusted from the raw request boolean. Exact-text confirmation is
+    // deliberately preserved: Off removes Windows Hello, not body confirmation.
     explicitInstruction: true,
-    exactTextConfirmed: true,
   };
   delete normalized.authorityGrant;
   return normalized;
