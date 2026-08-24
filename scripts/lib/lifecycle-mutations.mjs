@@ -164,6 +164,7 @@ function assertPushTarget(request, runner, baselineStore) {
         newTip,
         recordedTree: originalTree,
         entries: parseReflogGenerationEntries(reflog.stdout),
+        isAncestor: (sha, recordedSha) => isAncestor(runner, sha, recordedSha),
       });
     }
   }

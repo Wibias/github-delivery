@@ -87,6 +87,40 @@ test("a later local commit between the baseline and the rewrite fails closed", (
   );
 });
 
+test("a content-preserving squash through an ancestor with a different tree is accepted", () => {
+  assert.doesNotThrow(() =>
+    assertRewriteBaselineGeneration({
+      recorded: COMMIT_C,
+      newTip: COMMIT_B,
+      recordedTree: TREE_A,
+      entries: [
+        { sha: COMMIT_B, tree: TREE_A },
+        { sha: COMMIT_A, tree: TREE_B },
+        { sha: COMMIT_C, tree: TREE_A },
+      ],
+      isAncestor: (sha, recorded) => sha === COMMIT_A && recorded === COMMIT_C,
+    }),
+  );
+});
+
+test("a later local commit is still stale when it is not an ancestor of the baseline", () => {
+  assert.throws(
+    () =>
+      assertRewriteBaselineGeneration({
+        recorded: COMMIT_A,
+        newTip: COMMIT_C,
+        recordedTree: TREE_A,
+        entries: [
+          { sha: COMMIT_C, tree: TREE_A },
+          { sha: COMMIT_B, tree: TREE_B },
+          { sha: COMMIT_A, tree: TREE_A },
+        ],
+        isAncestor: () => false,
+      }),
+    /rewrite_baseline_generation_stale/,
+  );
+});
+
 test("a missing reflog cannot prove rewrite generation", () => {
   assert.throws(
     () =>

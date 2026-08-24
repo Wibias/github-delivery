@@ -62,6 +62,7 @@ const MIDDLE = "9".repeat(40);
 
 function rewriteRunner({
   ancestor = false,
+  isAncestor,
   remoteTip = OLD,
   remoteTree = TREE_A,
   originalTree = TREE_A,
@@ -97,6 +98,10 @@ function rewriteRunner({
       };
     }
     if (command === "git" && args[0] === "merge-base") {
+      if (args[1] === "--is-ancestor" && typeof isAncestor === "function") {
+        const ok = isAncestor(String(args[2] || ""), String(args[3] || ""));
+        return { status: ok ? 0 : 1, stdout: "", stderr: "" };
+      }
       return { status: ancestor ? 0 : 1, stdout: "", stderr: "" };
     }
     if (command === "git" && args[0] === "update-ref") {
@@ -487,6 +492,26 @@ test("a stale rewrite baseline cannot approve dropping a later local commit", ()
   );
 });
 
+test("a content-preserving squash through an ancestor reflog entry is allowed", () => {
+  assert.doesNotThrow(() =>
+    preflightLifecycleMutation({
+      request: pushRequest(),
+      runner: rewriteRunner({
+        ancestor: false,
+        originalTree: TREE_A,
+        newTree: TREE_A,
+        reflogEntries: [
+          { sha: NEXT, tree: TREE_A },
+          { sha: MIDDLE, tree: TREE_B },
+          { sha: LOCAL, tree: TREE_A },
+        ],
+        isAncestor: (candidate, descendant) => candidate === MIDDLE && descendant === LOCAL,
+      }),
+      baselineStore: seededStore(),
+    }),
+  );
+});
+
 test("a missing branch reflog cannot prove the rewrite started from the baseline", () => {
   assert.throws(
     () =>
@@ -660,6 +685,19 @@ function mixedGitRunner(cwd) {
       return { status: 0, stdout: `${OLD}\trefs/heads/feature/safe\n`, stderr: "" };
     }
     if (command === "git" && args[0] === "merge-base") {
+      if (args[1] === "--is-ancestor") {
+        const ancestorSha = String(args[2] || "").toLowerCase();
+        const descendantSha = String(args[3] || "").toLowerCase();
+        if (ancestorSha === OLD || descendantSha === OLD || ancestorSha === NEXT || descendantSha === NEXT) {
+          return { status: 1, stdout: "", stderr: "" };
+        }
+        const result = spawnSync(command, args, { cwd, encoding: "utf8", windowsHide: true });
+        return {
+          status: result.status ?? 1,
+          stdout: result.stdout || "",
+          stderr: result.stderr || "",
+        };
+      }
       return { status: 1, stdout: "", stderr: "" };
     }
     const result = spawnSync(command, args, { cwd, encoding: "utf8", windowsHide: true });
@@ -670,6 +708,7 @@ function mixedGitRunner(cwd) {
     };
   };
 }
+
 
 test("record A, commit B, rewrite back to tree(A), then guarded push must reject", () => {
   const cwd = mkdtempSync(join(tmpdir(), "gd-rewrite-generation-"));
@@ -710,3 +749,45 @@ test("record A, commit B, rewrite back to tree(A), then guarded push must reject
   }
 });
 
+test("record C, soft-reset to A, squash, then guarded push must accept", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "gd-rewrite-squash-"));
+  try {
+    gitAt(cwd, ["init", "-b", "feature/safe"]);
+    gitAt(cwd, ["config", "user.name", "Rewrite Baseline"]);
+    gitAt(cwd, ["config", "user.email", "rewrite@example.com"]);
+    gitAt(cwd, ["config", "core.logAllRefUpdates", "true"]);
+    writeFileSync(join(cwd, "note.txt"), "tree-one\n");
+    gitAt(cwd, ["add", "note.txt"]);
+    gitAt(cwd, ["commit", "-m", "A"]);
+    const commitA = gitAt(cwd, ["rev-parse", "HEAD"]);
+    writeFileSync(join(cwd, "note.txt"), "tree-two\n");
+    gitAt(cwd, ["add", "note.txt"]);
+    gitAt(cwd, ["commit", "-m", "B"]);
+    writeFileSync(join(cwd, "note.txt"), "tree-three\n");
+    gitAt(cwd, ["add", "note.txt"]);
+    gitAt(cwd, ["commit", "-m", "C"]);
+    const commitC = gitAt(cwd, ["rev-parse", "HEAD"]);
+    const treeC = gitAt(cwd, ["rev-parse", "HEAD^{tree}"]);
+    const store = createMemoryRewriteBaselineStore();
+    verifyLifecycleMutation({
+      request: recordRequest({ originalLocalTip: commitC }),
+      runner: mixedGitRunner(cwd),
+      baselineStore: store,
+    });
+    gitAt(cwd, ["reset", "--soft", commitA]);
+    gitAt(cwd, ["commit", "-m", "squash"]);
+    const squashed = gitAt(cwd, ["rev-parse", "HEAD"]);
+    const squashedTree = gitAt(cwd, ["rev-parse", "HEAD^{tree}"]);
+    assert.equal(squashedTree, treeC);
+    assert.notEqual(squashed, commitC);
+    assert.doesNotThrow(() =>
+      preflightLifecycleMutation({
+        request: pushRequest({ originalLocalTip: commitC, newTip: squashed }),
+        runner: mixedGitRunner(cwd),
+        baselineStore: store,
+      }),
+    );
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});

@@ -45,6 +45,7 @@ export function assertRewriteBaselineGeneration({
   newTip,
   recordedTree,
   entries,
+  isAncestor,
 } = {}) {
   const baseline = normalizeCommitSha(recorded, "recorded");
   const tip = normalizeCommitSha(newTip, "new_tip");
@@ -65,9 +66,12 @@ export function assertRewriteBaselineGeneration({
     const sha = normalizeCommitSha(entry?.sha, "reflog_sha");
     const entryTree = normalizeTreeSha(entry?.tree, "reflog_tree");
     if (entryTree !== tree) {
-      throw new Error(
-        `rewrite_baseline_generation_stale: observed ${sha} tree ${entryTree} recorded tree ${tree}`,
-      );
+      const ancestorOfBaseline = typeof isAncestor === "function" && isAncestor(sha, baseline);
+      if (!ancestorOfBaseline) {
+        throw new Error(
+          `rewrite_baseline_generation_stale: observed ${sha} tree ${entryTree} recorded tree ${tree}`,
+        );
+      }
     }
     if (sha === baseline) {
       found = true;
