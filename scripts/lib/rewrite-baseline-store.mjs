@@ -4,13 +4,14 @@ import {
   existsSync,
   mkdirSync,
   openSync,
+  readdirSync,
   readFileSync,
   renameSync,
   rmSync,
   statSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 
 import { userConfigPath } from "./user-config.mjs";
 
@@ -129,11 +130,60 @@ function reclaimStaleLock(lockPath, staleLockMs) {
   return 1;
 }
 
-function acquireLock(lockPath, { lockWaitMs, staleLockMs }) {
+function storePathFromLock(lockPath) {
+  return lockPath.endsWith(".lock") ? lockPath.slice(0, -".lock".length) : lockPath;
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function listGenerationFiles(filePath) {
+  const dir = dirname(filePath);
+  const base = basename(filePath);
+  let names = [];
+  try {
+    names = readdirSync(dir);
+  } catch {
+    return [];
+  }
+  const matchName = new RegExp(`^${escapeRegExp(base)}\\.(\\d+)$`);
+  const found = [];
+  for (const name of names) {
+    const match = name.match(matchName);
+    if (!match) continue;
+    found.push({ generation: Number(match[1]), path: join(dir, name) });
+  }
+  found.sort((a, b) => a.generation - b.generation);
+  return found;
+}
+
+function highestPublishedGeneration(filePath) {
+  return listGenerationFiles(filePath).at(-1)?.generation ?? 0;
+}
+
+function parseStorePayload(raw) {
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error("rewrite_baseline_store_unreadable");
+  }
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("rewrite_baseline_store_unreadable");
+  }
+  return parsed;
+}
+
+function acquireLock(lockPath, { lockWaitMs, staleLockMs, filePath }) {
   mkdirSync(dirname(lockPath), { recursive: true });
   const started = Date.now();
   let nextGeneration = 1;
   while (true) {
+    nextGeneration = Math.max(
+      nextGeneration,
+      highestPublishedGeneration(filePath || storePathFromLock(lockPath)) + 1,
+    );
     const lease = { generation: nextGeneration, token: createLockToken() };
     let contentionError;
     try {
@@ -146,7 +196,12 @@ function acquireLock(lockPath, { lockWaitMs, staleLockMs }) {
 
     try {
       const reclaimed = reclaimStaleLock(lockPath, staleLockMs);
-      if (reclaimed != null) nextGeneration = reclaimed;
+      if (reclaimed != null) {
+        nextGeneration = Math.max(
+          reclaimed,
+          highestPublishedGeneration(filePath || storePathFromLock(lockPath)) + 1,
+        );
+      }
     } catch (error) {
       if (error?.code !== "ENOENT") throw error;
     }
@@ -164,6 +219,7 @@ function withStoreLock(lockPath, options, fn) {
   const lease = acquireLock(lockPath, {
     lockWaitMs: options.lockWaitMs ?? DEFAULT_LOCK_WAIT_MS,
     staleLockMs: options.staleLockMs ?? DEFAULT_STALE_LOCK_MS,
+    filePath: options.filePath,
   });
   try {
     const result = fn(lease);
@@ -233,7 +289,7 @@ export function createFileRewriteBaselineStore({
 } = {}) {
   const filePath = path || rewriteBaselineStorePath();
   const lockPath = `${filePath}.lock`;
-  const lockOptions = { lockWaitMs, staleLockMs };
+  const lockOptions = { lockWaitMs, staleLockMs, filePath };
   const store = {
     read(scope) {
       const value = readAll()[rewriteBaselineScopeKey(scope)];
@@ -264,17 +320,25 @@ export function createFileRewriteBaselineStore({
     },
   };
   function readAll() {
+    const generations = listGenerationFiles(filePath);
+    for (let i = generations.length - 1; i >= 0; i--) {
+      let raw;
+      try {
+        raw = readFile(generations[i].path, "utf8");
+      } catch (error) {
+        if (error?.code === "ENOENT") continue;
+        throw error;
+      }
+      if (!String(raw).trim()) continue;
+      try {
+        return parseStorePayload(raw);
+      } catch (error) {
+        if (error?.message === "rewrite_baseline_store_unreadable") continue;
+        throw error;
+      }
+    }
     if (!exists(filePath)) return {};
-    let parsed;
-    try {
-      parsed = JSON.parse(readFile(filePath, "utf8"));
-    } catch {
-      throw new Error("rewrite_baseline_store_unreadable");
-    }
-    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-      throw new Error("rewrite_baseline_store_unreadable");
-    }
-    return parsed;
+    return parseStorePayload(readFile(filePath, "utf8"));
   }
   function writeAll(next, lease) {
     assertOwnsLock(lockPath, lease);
@@ -282,7 +346,37 @@ export function createFileRewriteBaselineStore({
     const tempPath = `${filePath}.${process.pid}-${randomBytes(6).toString("hex")}.tmp`;
     writeFile(tempPath, `${JSON.stringify(next)}\n`, { encoding: "utf8", mode: 0o600 });
     assertOwnsLock(lockPath, lease);
-    rename(tempPath, filePath);
+    const destPath = `${filePath}.${lease.generation}`;
+    try {
+      const fd = openSync(destPath, "wx", 0o600);
+      closeSync(fd);
+    } catch (error) {
+      try {
+        rmSync(tempPath, { force: true });
+      } catch {
+        // best-effort temp cleanup after a failed generation claim
+      }
+      if (error?.code === "EEXIST") {
+        throw new Error(`rewrite_baseline_store_lock_lost:${lockPath}`);
+      }
+      throw error;
+    }
+    rename(tempPath, destPath);
+    for (const older of listGenerationFiles(filePath)) {
+      if (older.generation >= lease.generation) continue;
+      try {
+        rmSync(older.path, { force: true });
+      } catch {
+        // best-effort cleanup of superseded generations
+      }
+    }
+    if (exists(filePath)) {
+      try {
+        rmSync(filePath, { force: true });
+      } catch {
+        // best-effort cleanup of the unversioned compatibility file
+      }
+    }
   }
   return store;
 }

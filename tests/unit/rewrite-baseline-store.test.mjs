@@ -220,6 +220,7 @@ function spawnStaleTakeoverWorker({
   action,
   index,
   pauseAfterRead,
+  pauseAfterOwnershipCheck,
   readyFile,
   resumeFile,
   staleLockMs,
@@ -228,8 +229,17 @@ function spawnStaleTakeoverWorker({
   const scriptPath = join(root, `stale-worker-${index}.mjs`);
   writeFileSync(
     scriptPath,
-    `import { existsSync, readFileSync, writeFileSync } from "node:fs";
+    `import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { createFileRewriteBaselineStore } from ${JSON.stringify(storeUrl)};
+
+function waitForResume() {
+  writeFileSync(${JSON.stringify(readyFile)}, "paused");
+  const started = Date.now();
+  while (!existsSync(${JSON.stringify(resumeFile)})) {
+    if (Date.now() - started > 20_000) throw new Error("resume wait timed out");
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+  }
+}
 
 const store = createFileRewriteBaselineStore({
   path: ${JSON.stringify(filePath)},
@@ -237,15 +247,12 @@ const store = createFileRewriteBaselineStore({
   staleLockMs: ${Number(staleLockMs)},
   readFile(path, encoding) {
     const text = readFileSync(path, encoding);
-    if (${pauseAfterRead ? "true" : "false"}) {
-      writeFileSync(${JSON.stringify(readyFile)}, "read");
-      const started = Date.now();
-      while (!existsSync(${JSON.stringify(resumeFile)})) {
-        if (Date.now() - started > 20_000) throw new Error("resume wait timed out");
-        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
-      }
-    }
+    if (${pauseAfterRead ? "true" : "false"}) waitForResume();
     return text;
+  },
+  rename(from, to) {
+    if (${pauseAfterOwnershipCheck ? "true" : "false"}) waitForResume();
+    renameSync(from, to);
   },
 });
 const action = ${JSON.stringify(action)};
@@ -271,7 +278,13 @@ try {
   });
 }
 
-async function runStaleTakeover({ filePath, initial, stalledAction, takeoverAction }) {
+async function runStaleTakeover({
+  filePath,
+  initial,
+  stalledAction,
+  takeoverAction,
+  pauseAfterOwnershipCheck = false,
+}) {
   const root = dirname(filePath);
   mkdirSync(root, { recursive: true });
   writeFileSync(filePath, `${JSON.stringify(initial)}\n`);
@@ -283,7 +296,8 @@ async function runStaleTakeover({ filePath, initial, stalledAction, takeoverActi
     filePath,
     action: stalledAction,
     index: "stalled",
-    pauseAfterRead: true,
+    pauseAfterRead: !pauseAfterOwnershipCheck,
+    pauseAfterOwnershipCheck,
     readyFile: stalledReady,
     resumeFile,
     staleLockMs: 80,
@@ -298,6 +312,7 @@ async function runStaleTakeover({ filePath, initial, stalledAction, takeoverActi
     action: takeoverAction,
     index: "takeover",
     pauseAfterRead: false,
+    pauseAfterOwnershipCheck: false,
     readyFile: takeoverReady,
     resumeFile: join(root, "takeover-resume"),
     staleLockMs: 80,
@@ -393,5 +408,50 @@ test("a stale truncated lock file can be reclaimed", () => {
   ageLockFile(lockPath);
   assert.equal(store.consume(SCOPE), SHA);
   assert.equal(store.read(SCOPE), null);
+});
+
+test("stale lock takeover after the last ownership check cannot drop a created baseline", async () => {
+  const root = mkdtempSync(join(tmpdir(), "gd-rewrite-stale-rename-drop-"));
+  const filePath = join(root, "rewrite-baselines.json");
+  const stalledScope = { ...SCOPE, branch: "feature/stalled" };
+  const takeoverScope = { ...SCOPE, branch: "feature/takeover" };
+  const stalledSha = "1".repeat(40);
+  const takeoverSha = "2".repeat(40);
+  const { stalledResult, takeoverResult } = await runStaleTakeover({
+    filePath,
+    initial: {},
+    stalledAction: { op: "create", scope: stalledScope, sha: stalledSha },
+    takeoverAction: { op: "create", scope: takeoverScope, sha: takeoverSha },
+    pauseAfterOwnershipCheck: true,
+  });
+  assert.equal(takeoverResult.code, 0, takeoverResult.stderr || takeoverResult.stdout);
+  assert.notEqual(stalledResult.code, 0);
+  const store = createFileRewriteBaselineStore({ path: filePath });
+  assert.equal(store.read(takeoverScope), takeoverSha);
+  assert.equal(store.read(stalledScope), null);
+});
+
+test("stale lock takeover after the last ownership check cannot resurrect a consumed baseline", async () => {
+  const root = mkdtempSync(join(tmpdir(), "gd-rewrite-stale-rename-resurrect-"));
+  const filePath = join(root, "rewrite-baselines.json");
+  const scopeA = { ...SCOPE, branch: "feature/a" };
+  const scopeB = { ...SCOPE, branch: "feature/b" };
+  const shaA = "a".repeat(40);
+  const shaB = "b".repeat(40);
+  const { stalledResult, takeoverResult } = await runStaleTakeover({
+    filePath,
+    initial: {
+      [rewriteBaselineScopeKey(scopeA)]: shaA,
+      [rewriteBaselineScopeKey(scopeB)]: shaB,
+    },
+    stalledAction: { op: "consume", scope: scopeA },
+    takeoverAction: { op: "consume", scope: scopeB },
+    pauseAfterOwnershipCheck: true,
+  });
+  assert.equal(takeoverResult.code, 0, takeoverResult.stderr || takeoverResult.stdout);
+  assert.notEqual(stalledResult.code, 0);
+  const store = createFileRewriteBaselineStore({ path: filePath });
+  assert.equal(store.read(scopeA), shaA);
+  assert.equal(store.read(scopeB), null);
 });
 
