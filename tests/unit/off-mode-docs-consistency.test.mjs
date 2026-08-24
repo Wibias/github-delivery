@@ -13,6 +13,7 @@ test("Off-mode user-facing docs preserve the independently authenticated intent 
   const configuration = read("references/configuration.md");
   const authorityReadme = read("authority-host/windows/README.md");
   const install = read("INSTALL.md");
+  const setupPrompts = read("references/setup-prompts.md");
 
   assert.doesNotMatch(controlCenter, /No Windows Hello prompts\./);
   assert.match(
@@ -27,4 +28,6 @@ test("Off-mode user-facing docs preserve the independently authenticated intent 
   assert.match(configuration, /independent(?:ly authenticated)? lifecycle intent/i);
   assert.match(authorityReadme, /independent(?:ly authenticated)? lifecycle intent/i);
   assert.match(install, /independent(?:ly authenticated)? lifecycle intent/i);
+  assert.doesNotMatch(setupPrompts, /Disable Windows Hello protection for github-delivery\./);
+  assert.match(setupPrompts, /independently authenticated lifecycle intent/i);
 });
