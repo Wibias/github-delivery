@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -205,3 +205,155 @@ test("concurrent create and consume keep the created baseline and drop the consu
   assert.equal(store.read(consumeScope), null);
   assert.equal(store.read(createScope), createdSha);
 });
+
+async function waitForPath(path, timeoutMs = 8_000) {
+  const started = Date.now();
+  while (!existsSync(path)) {
+    if (Date.now() - started > timeoutMs) throw new Error(`timed out waiting for ${path}`);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
+function spawnStaleTakeoverWorker({
+  root,
+  filePath,
+  action,
+  index,
+  pauseAfterRead,
+  readyFile,
+  resumeFile,
+  staleLockMs,
+  lockWaitMs,
+}) {
+  const scriptPath = join(root, `stale-worker-${index}.mjs`);
+  writeFileSync(
+    scriptPath,
+    `import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { createFileRewriteBaselineStore } from ${JSON.stringify(storeUrl)};
+
+const store = createFileRewriteBaselineStore({
+  path: ${JSON.stringify(filePath)},
+  lockWaitMs: ${Number(lockWaitMs)},
+  staleLockMs: ${Number(staleLockMs)},
+  readFile(path, encoding) {
+    const text = readFileSync(path, encoding);
+    if (${pauseAfterRead ? "true" : "false"}) {
+      writeFileSync(${JSON.stringify(readyFile)}, "read");
+      const started = Date.now();
+      while (!existsSync(${JSON.stringify(resumeFile)})) {
+        if (Date.now() - started > 20_000) throw new Error("resume wait timed out");
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+      }
+    }
+    return text;
+  },
+});
+const action = ${JSON.stringify(action)};
+try {
+  const value = action.op === "create"
+    ? store.create(action.scope, action.sha)
+    : store.consume(action.scope);
+  writeFileSync(${JSON.stringify(`${readyFile}.done`)}, JSON.stringify({ ok: true, value }) + "\\n");
+} catch (error) {
+  writeFileSync(${JSON.stringify(`${readyFile}.done`)}, JSON.stringify({
+    ok: false,
+    error: String(error?.message || error),
+  }) + "\\n");
+  throw error;
+}
+`,
+    "utf8",
+  );
+  return spawn(process.execPath, [scriptPath], {
+    cwd: root,
+    stdio: ["ignore", "pipe", "pipe"],
+    windowsHide: true,
+  });
+}
+
+async function runStaleTakeover({ filePath, initial, stalledAction, takeoverAction }) {
+  const root = dirname(filePath);
+  mkdirSync(root, { recursive: true });
+  writeFileSync(filePath, `${JSON.stringify(initial)}\n`);
+  const stalledReady = join(root, "stalled-ready");
+  const resumeFile = join(root, "stalled-resume");
+  const takeoverReady = join(root, "takeover-ready");
+  const stalled = spawnStaleTakeoverWorker({
+    root,
+    filePath,
+    action: stalledAction,
+    index: "stalled",
+    pauseAfterRead: true,
+    readyFile: stalledReady,
+    resumeFile,
+    staleLockMs: 80,
+    lockWaitMs: 5_000,
+  });
+  const stalledExit = waitChild(stalled);
+  await waitForPath(stalledReady);
+  await new Promise((resolve) => setTimeout(resolve, 120));
+  const takeover = spawnStaleTakeoverWorker({
+    root,
+    filePath,
+    action: takeoverAction,
+    index: "takeover",
+    pauseAfterRead: false,
+    readyFile: takeoverReady,
+    resumeFile: join(root, "takeover-resume"),
+    staleLockMs: 80,
+    lockWaitMs: 5_000,
+  });
+  const takeoverExit = waitChild(takeover);
+  const takeoverResult = await takeoverExit;
+  writeFileSync(resumeFile, "go");
+  const stalledResult = await stalledExit;
+  stalled.kill("SIGTERM");
+  takeover.kill("SIGTERM");
+  return { stalledResult, takeoverResult };
+}
+
+test("stale lock takeover cannot drop a newly created baseline", async () => {
+  const root = mkdtempSync(join(tmpdir(), "gd-rewrite-stale-drop-"));
+  const filePath = join(root, "rewrite-baselines.json");
+  const stalledScope = { ...SCOPE, branch: "feature/stalled" };
+  const takeoverScope = { ...SCOPE, branch: "feature/takeover" };
+  const stalledSha = "1".repeat(40);
+  const takeoverSha = "2".repeat(40);
+  const { stalledResult, takeoverResult } = await runStaleTakeover({
+    filePath,
+    initial: {},
+    stalledAction: { op: "create", scope: stalledScope, sha: stalledSha },
+    takeoverAction: { op: "create", scope: takeoverScope, sha: takeoverSha },
+  });
+  assert.equal(takeoverResult.code, 0, takeoverResult.stderr || takeoverResult.stdout);
+  assert.notEqual(stalledResult.code, 0);
+  assert.match(`${stalledResult.stderr}\n${stalledResult.stdout}`, /rewrite_baseline_store_lock_lost/);
+  const store = createFileRewriteBaselineStore({ path: filePath });
+  assert.equal(store.read(takeoverScope), takeoverSha);
+  assert.equal(store.read(stalledScope), null);
+});
+
+test("stale lock takeover cannot resurrect a consumed baseline", async () => {
+  const root = mkdtempSync(join(tmpdir(), "gd-rewrite-stale-resurrect-"));
+  const filePath = join(root, "rewrite-baselines.json");
+  const scopeA = { ...SCOPE, branch: "feature/a" };
+  const scopeB = { ...SCOPE, branch: "feature/b" };
+  const shaA = "a".repeat(40);
+  const shaB = "b".repeat(40);
+  const { stalledResult, takeoverResult } = await runStaleTakeover({
+    filePath,
+    initial: {
+      [rewriteBaselineScopeKey(scopeA)]: shaA,
+      [rewriteBaselineScopeKey(scopeB)]: shaB,
+    },
+    stalledAction: { op: "consume", scope: scopeA },
+    takeoverAction: { op: "consume", scope: scopeB },
+  });
+  assert.equal(takeoverResult.code, 0, takeoverResult.stderr || takeoverResult.stdout);
+  assert.notEqual(stalledResult.code, 0);
+  assert.match(`${stalledResult.stderr}\n${stalledResult.stdout}`, /rewrite_baseline_store_lock_lost/);
+  const store = createFileRewriteBaselineStore({ path: filePath });
+  assert.equal(store.read(scopeA), shaA);
+  assert.equal(store.read(scopeB), null);
+});
+

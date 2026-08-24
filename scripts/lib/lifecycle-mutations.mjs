@@ -92,12 +92,8 @@ function canonicalRemoteUrl(value) {
   }
 }
 
-function assertPushTarget(request, runner, baselineStore) {
+function assertRemoteRepoIdentity(request, runner) {
   const remote = String(required(request.remote, "remote"));
-  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(remote)) throw new Error("remote_invalid");
-  const branch = String(required(request.branch, "branch"));
-  run(runner, ["git", "check-ref-format", `refs/heads/${branch}`]);
-
   const actualUrl = run(runner, ["git", "remote", "get-url", remote]);
   const repoJson = run(runner, [
     "gh",
@@ -113,6 +109,14 @@ function assertPushTarget(request, runner, baselineStore) {
   if (!actual || !allowed.has(actual)) {
     throw new Error(`push_remote_repo_mismatch:${actual || "unreadable"}`);
   }
+}
+
+function assertPushTarget(request, runner, baselineStore) {
+  const remote = String(required(request.remote, "remote"));
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(remote)) throw new Error("remote_invalid");
+  const branch = String(required(request.branch, "branch"));
+  run(runner, ["git", "check-ref-format", `refs/heads/${branch}`]);
+  assertRemoteRepoIdentity(request, runner);
 
   const expected = exactSha(request.expectedRemoteTip, "expected_remote_tip", { absent: true });
   const originalLocalTip = exactSha(request.originalLocalTip, "original_local_tip");
@@ -153,6 +157,7 @@ function assertRewriteBaselineCapture(request, runner, baselineStore) {
   const branch = String(required(request.branch, "branch"));
   const originalLocalTip = exactSha(request.originalLocalTip, "original_local_tip");
   run(runner, ["git", "check-ref-format", `refs/heads/${branch}`]);
+  assertRemoteRepoIdentity(request, runner);
   const observed = exactSha(
     run(runner, ["git", "rev-parse", "--verify", `refs/heads/${branch}`]),
     "observed_local_tip",

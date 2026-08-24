@@ -61,11 +61,12 @@ function rewriteRunner({
   originalTree = TREE_A,
   newTree = TREE_A,
   headTip = LOCAL,
+  remoteUrl = "git@github.com:Wibias/github-delivery.git",
 } = {}) {
   return (command, args) => {
     if (command === "git" && args[0] === "check-ref-format") return { status: 0, stdout: "", stderr: "" };
     if (command === "git" && args[0] === "remote") {
-      return { status: 0, stdout: "git@github.com:Wibias/github-delivery.git\n", stderr: "" };
+      return { status: 0, stdout: `${remoteUrl}\n`, stderr: "" };
     }
     if (command === "gh" && args[0] === "repo") {
       return { status: 0, stdout: JSON.stringify(identityOk()), stderr: "" };
@@ -260,6 +261,12 @@ test("record_rewrite_baseline compare-and-swap fails if the branch moves after p
     if (command === "git" && args[0] === "check-ref-format") {
       return { status: 0, stdout: "", stderr: "" };
     }
+    if (command === "git" && args[0] === "remote") {
+      return { status: 0, stdout: "git@github.com:Wibias/github-delivery.git\n", stderr: "" };
+    }
+    if (command === "gh" && args[0] === "repo") {
+      return { status: 0, stdout: JSON.stringify(identityOk()), stderr: "" };
+    }
     if (command === "git" && args[0] === "rev-parse") {
       const spec = args[1] === "--verify" ? String(args[2] || "") : String(args[1] || "");
       if (spec === "refs/heads/feature/safe") {
@@ -317,6 +324,62 @@ test("record_rewrite_baseline post-verify stores the captured SHA in broker stat
       }),
     /rewrite_baseline_already_exists/,
   );
+});
+
+test("record_rewrite_baseline rejects a remote that resolves to another repository", () => {
+  assert.throws(
+    () =>
+      preflightLifecycleMutation({
+        request: recordRequest(),
+        runner: rewriteRunner({
+          headTip: LOCAL,
+          remoteUrl: "git@github.com:attacker/other.git",
+        }),
+        baselineStore: createMemoryRewriteBaselineStore(),
+      }),
+    /push_remote_repo_mismatch/,
+  );
+});
+
+test("record_rewrite_baseline rejects a missing remote", () => {
+  assert.throws(
+    () =>
+      preflightLifecycleMutation({
+        request: recordRequest(),
+        runner(command, args) {
+          if (command === "git" && args[0] === "check-ref-format") {
+            return { status: 0, stdout: "", stderr: "" };
+          }
+          if (command === "git" && args[0] === "remote") {
+            return { status: 1, stdout: "", stderr: "fatal: No such remote 'origin'" };
+          }
+          throw new Error(`unexpected command: ${command} ${args.join(" ")}`);
+        },
+        baselineStore: createMemoryRewriteBaselineStore(),
+      }),
+    /No such remote|mutation_preflight_failed/,
+  );
+});
+
+test("record_rewrite_baseline accepts an HTTPS remote that matches the authorized repo", () => {
+  const result = preflightLifecycleMutation({
+    request: recordRequest(),
+    runner: rewriteRunner({
+      headTip: LOCAL,
+      remoteUrl: "https://github.com/Wibias/github-delivery.git",
+    }),
+    baselineStore: createMemoryRewriteBaselineStore(),
+  });
+  assert.equal(result.originalLocalTip, LOCAL);
+});
+
+test("record_rewrite_baseline accepts an SSH remote that matches the authorized repo", () => {
+  const result = preflightLifecycleMutation({
+    request: recordRequest(),
+    runner: rewriteRunner({ headTip: LOCAL }),
+    baselineStore: createMemoryRewriteBaselineStore(),
+  });
+  assert.equal(result.originalLocalTip, LOCAL);
 });
 
 test("fast-forward force-with-lease skips the tree identity check", () => {

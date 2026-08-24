@@ -44,57 +44,84 @@ function createLockToken() {
   return `${process.pid}-${randomBytes(16).toString("hex")}`;
 }
 
-function createExclusiveLock(lockPath, token) {
+function createExclusiveLock(lockPath, lease) {
   const fd = openSync(lockPath, "wx", 0o600);
   try {
-    writeFileSync(fd, `${token}\n`);
+    writeFileSync(fd, `${JSON.stringify(lease)}\n`);
   } finally {
     closeSync(fd);
   }
 }
 
-function readLockToken(lockPath) {
+function readLease(lockPath) {
   try {
-    return readFileSync(lockPath, "utf8").trim();
+    const parsed = JSON.parse(readFileSync(lockPath, "utf8"));
+    if (
+      parsed === null ||
+      typeof parsed !== "object" ||
+      Array.isArray(parsed) ||
+      !Number.isInteger(parsed.generation) ||
+      typeof parsed.token !== "string" ||
+      !parsed.token
+    ) {
+      return null;
+    }
+    return { generation: parsed.generation, token: parsed.token };
   } catch (error) {
     if (error?.code === "ENOENT") return null;
-    throw error;
+    return null;
   }
 }
 
-function ownsLock(lockPath, token) {
-  return readLockToken(lockPath) === token;
+function ownsLock(lockPath, lease) {
+  const current = readLease(lockPath);
+  return Boolean(
+    current && lease && current.generation === lease.generation && current.token === lease.token,
+  );
 }
 
-function releaseLock(lockPath, token) {
+function releaseLock(lockPath, lease) {
   try {
-    if (!ownsLock(lockPath, token)) return;
+    if (!ownsLock(lockPath, lease)) return;
     rmSync(lockPath, { force: true });
   } catch (error) {
     if (error?.code !== "ENOENT") throw error;
   }
 }
 
+function assertOwnsLock(lockPath, lease) {
+  if (!ownsLock(lockPath, lease)) {
+    throw new Error(`rewrite_baseline_store_lock_lost:${lockPath}`);
+  }
+}
+
 function acquireLock(lockPath, { lockWaitMs, staleLockMs }) {
   mkdirSync(dirname(lockPath), { recursive: true });
-  const token = createLockToken();
   const started = Date.now();
+  let nextGeneration = 1;
   while (true) {
+    const lease = { generation: nextGeneration, token: createLockToken() };
     let contentionError;
     try {
-      createExclusiveLock(lockPath, token);
-      return token;
+      createExclusiveLock(lockPath, lease);
+      return lease;
     } catch (error) {
       if (!lockContended(error)) throw error;
       contentionError = error;
     }
 
     try {
-      const existing = readLockToken(lockPath);
+      const existing = readLease(lockPath);
       if (existing) {
         const age = Date.now() - statSync(lockPath).mtimeMs;
         if (age >= staleLockMs) {
-          if (readLockToken(lockPath) === existing) {
+          const current = readLease(lockPath);
+          if (
+            current &&
+            current.generation === existing.generation &&
+            current.token === existing.token
+          ) {
+            nextGeneration = existing.generation + 1;
             rmSync(lockPath, { force: true });
           }
         }
@@ -113,18 +140,16 @@ function acquireLock(lockPath, { lockWaitMs, staleLockMs }) {
 }
 
 function withStoreLock(lockPath, options, fn) {
-  const token = acquireLock(lockPath, {
+  const lease = acquireLock(lockPath, {
     lockWaitMs: options.lockWaitMs ?? DEFAULT_LOCK_WAIT_MS,
     staleLockMs: options.staleLockMs ?? DEFAULT_STALE_LOCK_MS,
   });
   try {
-    const result = fn(token);
-    if (!ownsLock(lockPath, token)) {
-      throw new Error(`rewrite_baseline_store_lock_lost:${lockPath}`);
-    }
+    const result = fn(lease);
+    assertOwnsLock(lockPath, lease);
     return result;
   } finally {
-    releaseLock(lockPath, token);
+    releaseLock(lockPath, lease);
   }
 }
 
@@ -187,37 +212,56 @@ export function createFileRewriteBaselineStore({
 } = {}) {
   const filePath = path || rewriteBaselineStorePath();
   const lockPath = `${filePath}.lock`;
-  const store = createStore(
-    () => {
-      if (!exists(filePath)) return {};
-      let parsed;
-      try {
-        parsed = JSON.parse(readFile(filePath, "utf8"));
-      } catch {
-        throw new Error("rewrite_baseline_store_unreadable");
-      }
-      if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-        throw new Error("rewrite_baseline_store_unreadable");
-      }
-      return parsed;
-    },
-    (next) => {
-      mkdir(dirname(filePath), { recursive: true });
-      const tempPath = `${filePath}.${process.pid}-${randomBytes(6).toString("hex")}.tmp`;
-      writeFile(tempPath, `${JSON.stringify(next)}\n`, { encoding: "utf8", mode: 0o600 });
-      rename(tempPath, filePath);
-    },
-  );
   const lockOptions = { lockWaitMs, staleLockMs };
-  return {
+  const store = {
     read(scope) {
-      return store.read(scope);
+      const value = readAll()[rewriteBaselineScopeKey(scope)];
+      if (value == null) return null;
+      return exactSha(value, "original_local_tip_baseline");
     },
     create(scope, originalLocalTip) {
-      return withStoreLock(lockPath, lockOptions, () => store.create(scope, originalLocalTip));
+      return withStoreLock(lockPath, lockOptions, (lease) => {
+        const data = readAll();
+        const key = rewriteBaselineScopeKey(scope);
+        if (data[key]) throw new Error("rewrite_baseline_already_exists");
+        data[key] = exactSha(originalLocalTip, "original_local_tip");
+        writeAll(data, lease);
+        return data[key];
+      });
     },
     consume(scope) {
-      return withStoreLock(lockPath, lockOptions, () => store.consume(scope));
+      return withStoreLock(lockPath, lockOptions, (lease) => {
+        const data = readAll();
+        const key = rewriteBaselineScopeKey(scope);
+        const value = data[key];
+        if (value == null) return null;
+        const sha = exactSha(value, "original_local_tip_baseline");
+        delete data[key];
+        writeAll(data, lease);
+        return sha;
+      });
     },
   };
+  function readAll() {
+    if (!exists(filePath)) return {};
+    let parsed;
+    try {
+      parsed = JSON.parse(readFile(filePath, "utf8"));
+    } catch {
+      throw new Error("rewrite_baseline_store_unreadable");
+    }
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("rewrite_baseline_store_unreadable");
+    }
+    return parsed;
+  }
+  function writeAll(next, lease) {
+    assertOwnsLock(lockPath, lease);
+    mkdir(dirname(filePath), { recursive: true });
+    const tempPath = `${filePath}.${process.pid}-${randomBytes(6).toString("hex")}.tmp`;
+    writeFile(tempPath, `${JSON.stringify(next)}\n`, { encoding: "utf8", mode: 0o600 });
+    assertOwnsLock(lockPath, lease);
+    rename(tempPath, filePath);
+  }
+  return store;
 }
