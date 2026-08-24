@@ -100,6 +100,7 @@ export async function runBootstrapSetup({
   const startAuthority = dependencies.startInstalledAuthorityHost || startInstalledAuthorityHost;
   const authorityHost = await reconcileAuthority({
     scriptPath: join(target, "authority-host", "windows", "install-release.ps1"),
+    installWhenDisabled: true,
   });
   const authorityUnavailable =
     authorityHost?.action === "unsupported" && authorityHost?.required === true;
