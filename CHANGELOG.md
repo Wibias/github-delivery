@@ -4,22 +4,21 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-08-24
+
 ### Added
 
 - Full-review verdicts can now submit GitHub Request changes through the mutation broker, and later passes dismiss our pending Request changes before a new request or a merge-ready comment. GitHub Approve stays off unless the user explicitly asks.
-
-## [1.0.1] - 2026-08-23
-
-### Added
-
 - History-only Git rewrites (squash, reword, reorder, commit grouping) must keep the original local `HEAD^{tree}` from a broker-owned `record_rewrite_baseline` captured before the rewrite. `push_code` `originalLocalTip` must equal that baseline (`GD-GIT-008`). The remote lease tip is only a race check. Restack onto a new parent still skips the tree check.
+- Behavioural-evaluation gating can use cryptographically attested, hash-bound transcript provenance. Self-consistent local transcripts remain diagnostic-only and cannot become trusted gating evidence by assertion alone (PR #370).
 
 ### Changed
 
-- Bumped the package version from `1.0.0` to `1.0.1`.
+- Bumped the package version from `1.0.0` to `1.1.0`.
 - Review briefs label files as core, mechanical, or other, and call out relocated blocks of three or more lines as moved code. Textually identical relocation does not prove unchanged behavior; surrounding context still requires review. PR description review notes name the core files when a diff mixes implementation with generated or lockfile changes.
 - Absence claims need a positive-control search that matches a known hit before `no residual X`.
 - Confirmation checks re-run in the same shell and PATH as the original observation so a PATH switch cannot produce a false result.
+- `authorityMode=off` now means zero Windows Hello / Authority-host approval. Direct lifecycle intent and exact-text confirmation still remain mandatory where policy requires them, but caller-controlled mutation JSON cannot mint those facts; governing workflows provide them through trusted execution context (PR #370).
 
 ### Fixed
 
@@ -29,6 +28,11 @@ All notable changes to `github-delivery` are documented here.
 - Exact moved-code classification uses raw source-line equality, so whitespace inside strings, template literals, and trailing spaces counts as a change.
 - Moved-code detection skips oversized replacement diffs when the delete×add line product or candidate-pair budget is exceeded, so a large foreign PR cannot make review-brief quadratic before output limits apply.
 - Windows Hello names a content-changing non-fast-forward rewrite and its `rewriteExemption`, and those pushes cannot reuse a branch lease or PR session.
+- Final merge execution now independently verifies non-bypassable server-side conversation-resolution enforcement plus the current unresolved-thread set at the expected head/base, closing the unresolved-review-thread TOCTOU window (PR #370).
+- Required clean probe evidence must cover the exact deterministic trigger-file set; missing, duplicate, partial, or unrelated file evidence fails closed (PR #370).
+- Classic branch-protection matching follows the proven GitHub pathname-style pattern subset and fails closed for syntax the implementation cannot establish as compatible (PR #370).
+- Attributed issue/repository text cannot grant current-user merge authority, and named GitHub GraphQL mutations must remain broker-owned and registered even inside privileged mutation files (PR #370).
+- Workflow/policy documentation is consistent with progressive disclosure: policy modules are mandatory context while `references/shared-rules.md` remains a compatibility index only (PR #370).
 
 ## [1.0.0] - 2026-08-22
 
