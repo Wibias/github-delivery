@@ -11,10 +11,19 @@ import {
   makeAuthorityRedeemer,
 } from "./authority-host-client.mjs";
 import { classifyMergeOutcome, readMergeState } from "./merge-outcome.mjs";
-import { verifyMergeStackEligibility } from "./merge-stack-policy.mjs";
+import {
+  verifyMergeConversationSafety,
+  verifyMergeStackEligibility,
+} from "./merge-stack-policy.mjs";
 import { actionDefinition } from "./mutation-action-registry.mjs";
 import { boundedSpawnSync } from "./subprocess-policy.mjs";
 import { readUserConfig, resolveAuthorityMode } from "./user-config.mjs";
+
+const AUTHORITY_DISABLED_RECEIPT = Object.freeze({
+  provenance: "authority_disabled_by_user",
+  verified: false,
+  reason: "trusted_authority_disabled_by_user_config",
+});
 
 export function authorityRuntimeEnvironment({
   env = process.env,
@@ -113,13 +122,17 @@ export function mutationAuthorityOptions({
 
   return {
     authorityMode,
-    authorityPublicKey: authorityVerifierConfiguration({
-      env,
-      readFile,
-      platform,
-      exists,
-    }),
-    requireTrustedAuthority: legacyStrict || modeRequiresAuthority,
+    authorityPublicKey: authorityMode === "off"
+      ? null
+      : authorityVerifierConfiguration({
+          env,
+          readFile,
+          platform,
+          exists,
+        }),
+    requireTrustedAuthority: authorityMode === "off"
+      ? false
+      : legacyStrict || modeRequiresAuthority,
   };
 }
 
@@ -163,10 +176,33 @@ export function assertScopedTrustedAuthority(
   return authority;
 }
 
+function requestForAuthorityMode(request, options) {
+  if (options?.authorityMode !== "off") return request;
+  const normalized = {
+    ...request,
+    // Off is a user-configured opt-out of independent OS-backed approval.
+    // These policy facts are derived here from the selected route/profile,
+    // never trusted from raw request booleans.
+    explicitInstruction: true,
+    exactTextConfirmed: true,
+  };
+  delete normalized.authorityGrant;
+  return normalized;
+}
+
+function receiptForAuthorityMode(value, options) {
+  if (options?.authorityMode !== "off") return value;
+  return {
+    ...value,
+    authority: { ...AUTHORITY_DISABLED_RECEIPT },
+  };
+}
+
 function planWithAuthorityOptions(request, options) {
-  const planned = planMutationRequest(request, options);
+  const effectiveRequest = requestForAuthorityMode(request, options);
+  const planned = planMutationRequest(effectiveRequest, options);
   assertScopedTrustedAuthority(planned.authority, options);
-  return planned;
+  return receiptForAuthorityMode(planned, options);
 }
 
 export function planMutationWithAuthority(
@@ -226,17 +262,24 @@ export function executeMutationWithAuthority({
     readFile,
     config,
   });
-  const planned = planWithAuthorityOptions(request, options);
+  const effectiveRequest = requestForAuthorityMode(request, options);
+  const planned = planWithAuthorityOptions(effectiveRequest, options);
 
-  // Merge topology is an execution invariant, not only a workflow instruction.
-  // A child whose base is another open PR head cannot reach destructive authority.
+  // Merge topology and final conversation safety are execution invariants, not
+  // only workflow instructions. Conversation safety additionally proves that
+  // GitHub itself enforces review-thread resolution without a bypass so a
+  // thread racing the client-side recapture still blocks the server-side merge.
   const stackEligibility = execute === true
     ? verifyMergeStackEligibility({ request: planned.request, runner })
     : null;
+  const conversationSafety = execute === true && planned.action === "merge_pr"
+    ? verifyMergeConversationSafety({ request: planned.request, runner })
+    : null;
 
   const pipeName = runtimeEnv.GITHUB_DELIVERY_AUTHORITY_PIPE || undefined;
-  const resolvedRedeemer =
-    redeemer === undefined
+  const resolvedRedeemer = options.authorityMode === "off"
+    ? null
+    : redeemer === undefined
       ? pipeName
         ? makeAuthorityRedeemer({ pipeName })
         : null
@@ -244,36 +287,38 @@ export function executeMutationWithAuthority({
   const execution = makeRedemptionRunner({
     plannedCommand: planned.command,
     authority: planned.authority,
-    authorityGrant: request.authorityGrant,
+    authorityGrant: effectiveRequest.authorityGrant,
     redeemer: resolvedRedeemer,
     runner,
   });
 
   try {
     const receipt = executeMutationRequest({
-      request,
+      request: effectiveRequest,
       execute,
       runner: execution.runner,
       ...options,
     });
-    return {
+    return receiptForAuthorityMode({
       ...receipt,
       stackEligibility,
+      conversationSafety,
       redemption: execution.redemption(),
-    };
+    }, options);
   } catch (error) {
-    if (execute === true && request?.action === "merge_pr" && execution.attempted()) {
+    if (execute === true && effectiveRequest?.action === "merge_pr" && execution.attempted()) {
       try {
         const reconciled = reconcileAttemptedMerge({
           planned,
           runner: execution.runner,
         });
         if (reconciled) {
-          return {
+          return receiptForAuthorityMode({
             ...reconciled,
             stackEligibility,
+            conversationSafety,
             redemption: execution.redemption(),
-          };
+          }, options);
         }
       } catch (reconciliationError) {
         throw new AggregateError(
