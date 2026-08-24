@@ -35,59 +35,93 @@ function escapeRegexCharacter(value) {
   return /[\\^$.*+?()[\]{}|]/.test(value) ? `\\${value}` : value;
 }
 
-function characterClassExpression(source) {
+function classicPatternSupported(pattern) {
+  const source = String(pattern || "");
+  if (!source || source.includes("\\")) return false;
+  for (let index = 0; index < source.length; index += 1) {
+    const character = source[index];
+    if (character === "[") {
+      const close = source.indexOf("]", index + 1);
+      if (close <= index + 1) return false;
+      const body = source.slice(index + 1, close);
+      if (body[0] === "^" || body.includes("\\")) return false;
+      index = close;
+      continue;
+    }
+    if (character === "*" && source[index + 1] === "*") {
+      const before = index === 0 ? null : source[index - 1];
+      const after = source[index + 2] ?? null;
+      if ((before !== null && before !== "/") || (after !== null && after !== "/")) {
+        return false;
+      }
+      index += 1;
+    }
+  }
+  return true;
+}
+
+function characterClassExpression(source, segmentStart) {
   if (!source) return null;
   let value = source;
   let prefix = "";
-  if (value[0] === "!" || value[0] === "^") {
+  if (value[0] === "!") {
     prefix = "^";
     value = value.slice(1);
   }
-  if (!value) return null;
-  const escaped = value
-    .replaceAll("\\", "\\\\")
-    .replaceAll("]", "\\]");
-  return `[${prefix}${escaped}]`;
+  if (!value || value[0] === "^") return null;
+  const escaped = value.replaceAll("]", "\\]");
+  return `${segmentStart ? "(?!\\.)" : ""}[${prefix}${escaped}]`;
 }
 
 export function patternMatchesBranch(pattern, branch) {
   const source = String(pattern || "");
   const target = String(branch || "");
-  if (!source) return false;
+  if (!classicPatternSupported(source)) return false;
   if (source === target) return true;
 
   let expression = "^";
+  let segmentStart = true;
   for (let index = 0; index < source.length; index += 1) {
     const character = source[index];
-    if (character === "\\" && index + 1 < source.length) {
-      expression += escapeRegexCharacter(source[++index]);
+    if (character === "/") {
+      expression += "/";
+      segmentStart = true;
       continue;
     }
     if (character === "*") {
       if (source[index + 1] === "*") {
-        while (source[index + 1] === "*") index += 1;
-        expression += ".*";
-      } else {
-        expression += "[^/]*";
+        const after = source[index + 2] ?? null;
+        if (after === "/") {
+          expression += "(?:(?!\\.)[^/]+/)*";
+          index += 2;
+          segmentStart = true;
+          continue;
+        }
+        expression += "(?:(?!\\.)[^/]+(?:/(?!\\.)[^/]+)*)?";
+        index += 1;
+        segmentStart = false;
+        continue;
       }
+      expression += `${segmentStart ? "(?!\\.)" : ""}[^/]*`;
+      segmentStart = false;
       continue;
     }
     if (character === "?") {
-      expression += "[^/]";
+      expression += `${segmentStart ? "(?!\\.)" : ""}[^/]`;
+      segmentStart = false;
       continue;
     }
     if (character === "[") {
       const close = source.indexOf("]", index + 1);
-      if (close > index + 1) {
-        const classExpression = characterClassExpression(source.slice(index + 1, close));
-        if (classExpression) {
-          expression += classExpression;
-          index = close;
-          continue;
-        }
-      }
+      const classExpression = characterClassExpression(source.slice(index + 1, close), segmentStart);
+      if (!classExpression) return false;
+      expression += classExpression;
+      index = close;
+      segmentStart = false;
+      continue;
     }
     expression += escapeRegexCharacter(character);
+    segmentStart = false;
   }
   expression += "$";
 
@@ -97,6 +131,13 @@ export function patternMatchesBranch(pattern, branch) {
     return false;
   }
 }
+
+function unsupportedClassicPatterns(snapshot) {
+  return (policyEvidence(snapshot).branchProtectionRules?.nodes || [])
+    .map((rule) => String(rule?.pattern || ""))
+    .filter((pattern) => pattern && !classicPatternSupported(pattern));
+}
+
 
 function policyEvidence(snapshot) {
   return snapshot?.evidence?.policy || {};
@@ -110,11 +151,17 @@ function matchingClassicRules(snapshot) {
   const base = protectionRefName(snapshot) || pullRequest(snapshot).baseRefName;
   return (
     policyEvidence(snapshot).branchProtectionRules?.nodes || []
-  ).filter((rule) => patternMatchesBranch(rule?.pattern, base));
+  ).filter((rule) => {
+    const pattern = String(rule?.pattern || "");
+    // Unsupported syntax is conservatively treated as potentially matching so
+    // completeness becomes unknown instead of silently selecting no rule.
+    return !classicPatternSupported(pattern) || patternMatchesBranch(pattern, base);
+  });
 }
 
 function classicProtectionReadable(snapshot, matchingRules) {
   if (!sourceReadable(snapshot, "branchProtection")) return false;
+  if (unsupportedClassicPatterns(snapshot).length > 0) return false;
   if (!matchingRules.length) return true;
   return snapshot?.evidence?.branchProtection !== null &&
     snapshot?.evidence?.branchProtection !== undefined;

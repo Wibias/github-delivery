@@ -24,6 +24,7 @@ import { combineShipGateResults } from "./lib/ship-gate-policy.mjs";
 import { mutationProfile, normalizeMutationMode } from "./lib/mutation-policy.mjs";
 import {
   executeMutationWithAuthority,
+  mutationAuthorityOptions,
   planMutationWithAuthority,
 } from "./lib/mutation-execution-context.mjs";
 import { evaluateHeadBranchCleanup } from "./lib/merge-branch-cleanup.mjs";
@@ -150,10 +151,22 @@ export function authorizeMergeRequests(
   {
     authorize = authorizeBatchSync,
     pipeName = process.env.GITHUB_DELIVERY_AUTHORITY_PIPE || undefined,
+    authorityMode = null,
   } = {},
 ) {
   if (!Array.isArray(requests) || requests.length === 0) {
     throw new Error("merge_authority_requests_required");
+  }
+  if (authorityMode === "off") {
+    return {
+      batchId: null,
+      expiresAt: null,
+      approvalMethod: "authority_disabled_by_user",
+      requests: requests.map((entry) => ({
+        ...entry,
+        request: { ...entry.request },
+      })),
+    };
   }
   const operations = requests.map(({ request }) => request);
   const authorization = authorize(operations, { pipeName });
@@ -161,6 +174,7 @@ export function authorizeMergeRequests(
   return {
     batchId: batch.batchId,
     expiresAt: batch.expiresAt,
+    approvalMethod: authorization?.approvalMethod || "trusted_authority",
     requests: requests.map((entry, index) => ({
       ...entry,
       request: batch.requests[index],
@@ -342,7 +356,14 @@ async function reconcileAlreadyMerged({ args, mode, snapshot }) {
   if (fresh.headOid !== expectedHead || fresh.evidence?.pullRequest?.state !== "MERGED") {
     throw new Error("post_merge_reconciliation_state_moved");
   }
-  const authorized = authorizeMergeRequests([{ name: "post_merge_thanks", request: thankRequest }]);
+  const authorityMode = mutationAuthorityOptions({
+    request: thankRequest,
+    enforceHighAssurance: true,
+  }).authorityMode;
+  const authorized = authorizeMergeRequests(
+    [{ name: "post_merge_thanks", request: thankRequest }],
+    { authorityMode },
+  );
   const request = authorized.requests[0]?.request;
   if (!request) throw new Error("authorized_post_merge_thanks_missing");
   const receipt = executeMutationWithAuthority({ request, execute: true });
@@ -465,7 +486,11 @@ async function main() {
   // Authorize the exact batch only after the first final-boundary recapture.
   // The transaction performs one more live boundary check immediately before
   // the merge write, after any human approval delay.
-  const authorizedBatch = authorizeMergeRequests(requests);
+  const authorityMode = mutationAuthorityOptions({
+    request: mergeRequest,
+    enforceHighAssurance: true,
+  }).authorityMode;
+  const authorizedBatch = authorizeMergeRequests(requests, { authorityMode });
   const authorizedMergeRequest = authorizedBatch.requests.find(
     (entry) => entry.name === "merge",
   )?.request;
