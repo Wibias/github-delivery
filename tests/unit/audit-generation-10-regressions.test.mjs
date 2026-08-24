@@ -1,10 +1,20 @@
 import assert from "node:assert/strict";
+import {
+  createHash,
+  generateKeyPairSync,
+  sign as signBytes,
+} from "node:crypto";
 import test from "node:test";
 
 import {
   attachTranscriptProvenance,
+  hashBehaviouralTranscripts,
   scoreBehaviouralRun,
 } from "../../scripts/lib/behavioural-evals.mjs";
+import {
+  attachAttestedTranscriptProvenance,
+  behaviouralAttestationPayload,
+} from "../../scripts/lib/behavioural-provenance.mjs";
 import {
   planMutationWithAuthority,
 } from "../../scripts/lib/mutation-execution-context.mjs";
@@ -16,6 +26,10 @@ import { authorizeMergeRequests } from "../../scripts/merge-pr-driver.mjs";
 
 const SHA_A = "a".repeat(40);
 const SHA_B = "b".repeat(40);
+
+function sha256(value) {
+  return createHash("sha256").update(String(value), "utf8").digest("hex");
+}
 
 function mergeRequest(overrides = {}) {
   return {
@@ -58,6 +72,29 @@ test("Off mode merge batching never calls the Windows Authority host", () => {
   assert.equal(calls, 0);
   assert.equal(result.approvalMethod, "authority_disabled_by_user");
   assert.equal(result.requests[0].request.authorityGrant, undefined);
+});
+
+test("Off mode still requires exact-text confirmation for human replies without Windows Hello", () => {
+  const body = "Please apply the requested change.";
+  assert.throws(
+    () => planMutationWithAuthority({
+      schemaVersion: 1,
+      action: "reply_human_thread",
+      mutationMode: "review",
+      repo: "acme/widgets",
+      pr: 42,
+      expectedHead: SHA_A,
+      commentId: 99,
+      idempotencyKey: "reply-99",
+      body,
+      exactTextSha256: sha256(body),
+      exactTextConfirmed: false,
+    }, {
+      config: { schemaVersion: 1, authorityMode: "off" },
+      env: {},
+    }),
+    /mutation_denied:exact_text_confirmation_required/,
+  );
 });
 
 test("required clean probe evidence covers every trigger file exactly once", () => {
@@ -204,7 +241,7 @@ test("merge execution exposes a final conversation-safety verifier", async () =>
   assert.ok(calls.some((args) => args[1] === "graphql"));
 });
 
-test("self-consistent local behavioural transcripts are diagnostic-only, not trusted gating evidence", () => {
+function behaviouralFixture() {
   const cases = [{
     id: "case-1",
     prompt: "review fixture",
@@ -225,13 +262,42 @@ test("self-consistent local behavioural transcripts are diagnostic-only, not tru
       mergeReady: false,
     },
   };
-  const run = attachTranscriptProvenance({
+  const run = {
     variant: "candidate",
     model: "model",
     host: "host",
+    skillVersion: "fixture",
     results: [{ caseId: "case-1" }],
-  }, transcripts);
-  const score = scoreBehaviouralRun(cases, run, transcripts);
+  };
+  return { cases, transcripts, run };
+}
+
+test("self-consistent local behavioural transcripts are diagnostic-only, not trusted gating evidence", () => {
+  const { cases, transcripts, run } = behaviouralFixture();
+  const localRun = attachTranscriptProvenance(run, transcripts);
+  const score = scoreBehaviouralRun(cases, localRun, transcripts);
   assert.equal(score.provenance?.trusted, false);
   assert.equal(score.gatingEligible, false);
+});
+
+test("cryptographically attested behavioural transcripts become trusted gating evidence", () => {
+  const { cases, transcripts, run } = behaviouralFixture();
+  const transcriptsSha256 = hashBehaviouralTranscripts(transcripts);
+  const { privateKey, publicKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
+  const signature = signBytes(
+    "sha256",
+    Buffer.from(behaviouralAttestationPayload(run, transcriptsSha256), "utf8"),
+    privateKey,
+  ).toString("base64");
+  const attestedRun = attachAttestedTranscriptProvenance(
+    run,
+    transcriptsSha256,
+    { signature, keyId: "fixture-key" },
+  );
+  const score = scoreBehaviouralRun(cases, attestedRun, transcripts, {
+    attestationPublicKey: publicKey.export({ type: "spki", format: "pem" }),
+  });
+  assert.equal(score.provenance.trusted, true);
+  assert.equal(score.provenance.keyId, "fixture-key");
+  assert.equal(score.gatingEligible, true);
 });
