@@ -6,7 +6,7 @@ This optional Windows 11 host turns a real local user approval into short-lived 
 
 - The ECDSA P-256 signing key is persisted by the Microsoft Platform Crypto Provider (TPM-backed when available) and marked non-exportable.
 - Whether a GitHub write requires this host is controlled by the global `github-delivery` protection mode: `off`, `high-assurance`, or `all`.
-- In `high-assurance`, intrinsically high-assurance and autonomous execution requests require trusted authority. In `all`, every executed GitHub mutation does. In `off`, ordinary high-assurance writes do not add a Windows Hello requirement, but independently authenticated lifecycle intent and exact-text human replies still require trusted authority; the ordinary github-delivery mutation policy also remains in force.
+- In `high-assurance`, intrinsically high-assurance and autonomous execution requests require trusted authority. In `all`, every executed GitHub mutation does. In `off`, Windows Hello is not an additional mutation requirement; the ordinary github-delivery mutation policy still applies.
 - One Hello approval can cover a finite, fully rendered batch; each mutation still receives its own exact-scope, short-lived grant.
 - Human-thread reply grants bind the exact outgoing text. The ordinary exact-text confirmation policy is not waived by Windows Hello or by a temporary branch lease.
 - Full-review verdict grants bind the exact human-visible verdict when the selected protection mode requires trusted authority.
@@ -81,8 +81,7 @@ The root `authority-host-install.json` identifies the active release. `authority
 
 Managed lifecycle rules are deliberate:
 
-- ordinary stable update with `off` + no Authority host ever installed: do not download or install the component;
-- explicit `setup` provisions the verified stable component even with stored mode `off`, so independently authenticated lifecycle intent and exact-text human replies remain available;
+- `off` + no Authority host ever installed: do not download or install the component;
 - `high-assurance` / `all` + missing host: `setup` installs the verified stable component on supported Windows x64;
 - an already-installed or legacy host can be repaired/upgraded even if the current mode is `off`;
 - a versioned host already equal to stable is unchanged;

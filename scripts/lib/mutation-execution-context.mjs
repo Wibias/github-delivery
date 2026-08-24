@@ -13,7 +13,6 @@ import {
 import { classifyMergeOutcome, readMergeState } from "./merge-outcome.mjs";
 import { verifyMergeStackEligibility } from "./merge-stack-policy.mjs";
 import { actionDefinition } from "./mutation-action-registry.mjs";
-import { mutationRequiresIndependentIntent } from "./mutation-policy.mjs";
 import { boundedSpawnSync } from "./subprocess-policy.mjs";
 import { readUserConfig, resolveAuthorityMode } from "./user-config.mjs";
 
@@ -109,7 +108,6 @@ export function mutationAuthorityOptions({
   const modeRequiresAuthority =
     enforceHighAssurance === true &&
     (authorityMode === "all" ||
-      mutationRequiresIndependentIntent(request) ||
       (authorityMode === "high-assurance" &&
         mutationRequiresTrustedAuthority(request)));
 
@@ -146,7 +144,6 @@ export function mutationAuthorityRequired(
   });
   return (
     authorityMode === "all" ||
-    mutationRequiresIndependentIntent(request) ||
     (authorityMode === "high-assurance" &&
       mutationRequiresTrustedAuthority(request))
   );
