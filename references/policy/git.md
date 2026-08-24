@@ -32,4 +32,4 @@ Do not automatically delete a merged PR head branch. GitHub's ref-delete API has
 
 ### GD-GIT-008 — Content-preserving rewrites keep the original tree
 
-Non-fast-forward force-with-lease `push_code` fails closed unless the new tip tree matches a broker `record_rewrite_baseline` (`originalLocalTip`) or `rewriteExemption` is restack, conflicts, or simplify-pr. `expectedRemoteTip` is the lease.
+Non-fast-forward force-with-lease `push_code` fails closed unless the new tip tree matches a broker `record_rewrite_baseline` (`originalLocalTip`) and branch reflog generation, or `rewriteExemption` is restack, conflicts, or simplify-pr. `expectedRemoteTip` is the lease.

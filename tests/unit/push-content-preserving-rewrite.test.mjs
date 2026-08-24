@@ -1,4 +1,8 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 
 import {
@@ -54,6 +58,8 @@ function seededStore(sha = LOCAL) {
   return store;
 }
 
+const MIDDLE = "9".repeat(40);
+
 function rewriteRunner({
   ancestor = false,
   remoteTip = OLD,
@@ -62,6 +68,8 @@ function rewriteRunner({
   newTree = TREE_A,
   headTip = LOCAL,
   remoteUrl = "git@github.com:Wibias/github-delivery.git",
+  reflogEntries,
+  reflogStatus = 0,
 } = {}) {
   return (command, args) => {
     if (command === "git" && args[0] === "check-ref-format") return { status: 0, stdout: "", stderr: "" };
@@ -73,6 +81,20 @@ function rewriteRunner({
     }
     if (command === "git" && args[0] === "ls-remote") {
       return { status: 0, stdout: `${remoteTip}\trefs/heads/feature/safe\n`, stderr: "" };
+    }
+    if (command === "git" && args[0] === "log") {
+      if (reflogStatus !== 0) {
+        return { status: reflogStatus, stdout: "", stderr: "fatal: no reflog" };
+      }
+      const entries = reflogEntries ?? [
+        { sha: NEXT, tree: newTree },
+        { sha: LOCAL, tree: originalTree },
+      ];
+      return {
+        status: 0,
+        stdout: `${entries.map((entry) => `${entry.sha} ${entry.tree}`).join("\n")}\n`,
+        stderr: "",
+      };
     }
     if (command === "git" && args[0] === "merge-base") {
       return { status: ancestor ? 0 : 1, stdout: "", stderr: "" };
@@ -444,6 +466,44 @@ test("a rewrite that drops unpublished local commits back to the remote tree is 
   );
 });
 
+test("a stale rewrite baseline cannot approve dropping a later local commit", () => {
+  assert.throws(
+    () =>
+      preflightLifecycleMutation({
+        request: pushRequest(),
+        runner: rewriteRunner({
+          ancestor: false,
+          originalTree: TREE_A,
+          newTree: TREE_A,
+          reflogEntries: [
+            { sha: NEXT, tree: TREE_A },
+            { sha: MIDDLE, tree: TREE_B },
+            { sha: LOCAL, tree: TREE_A },
+          ],
+        }),
+        baselineStore: seededStore(),
+      }),
+    /rewrite_baseline_generation_stale/,
+  );
+});
+
+test("a missing branch reflog cannot prove the rewrite started from the baseline", () => {
+  assert.throws(
+    () =>
+      preflightLifecycleMutation({
+        request: pushRequest(),
+        runner: rewriteRunner({
+          ancestor: false,
+          originalTree: TREE_A,
+          newTree: TREE_A,
+          reflogStatus: 128,
+        }),
+        baselineStore: seededStore(),
+      }),
+    /rewrite_baseline_generation_unproven/,
+  );
+});
+
 test("rewrite exemptions skip only tree identity and still require the exact remote lease", () => {
   const request = pushRequest({ rewriteExemption: "restack" });
   assert.doesNotThrow(() =>
@@ -563,6 +623,90 @@ test("non-string rewrite exemptions cannot bypass tree identity", () => {
       /rewrite_exemption_invalid/,
       `preflight ${JSON.stringify(rewriteExemption)}`,
     );
+  }
+});
+
+function gitAt(cwd, args) {
+  const result = spawnSync("git", args, {
+    cwd,
+    encoding: "utf8",
+    windowsHide: true,
+    env: {
+      ...process.env,
+      GIT_AUTHOR_NAME: "Rewrite Baseline",
+      GIT_AUTHOR_EMAIL: "rewrite@example.com",
+      GIT_COMMITTER_NAME: "Rewrite Baseline",
+      GIT_COMMITTER_EMAIL: "rewrite@example.com",
+    },
+  });
+  if (result.status !== 0) {
+    throw new Error(String(result.stderr || result.stdout || `git ${args.join(" ")} failed`));
+  }
+  return String(result.stdout || "").trim();
+}
+
+function mixedGitRunner(cwd) {
+  return (command, args) => {
+    if (command === "gh" && args[0] === "repo") {
+      return { status: 0, stdout: JSON.stringify(identityOk()), stderr: "" };
+    }
+    if (command === "git" && args[0] === "remote") {
+      return { status: 0, stdout: "git@github.com:Wibias/github-delivery.git\n", stderr: "" };
+    }
+    if (command === "git" && args[0] === "check-ref-format") {
+      return { status: 0, stdout: "", stderr: "" };
+    }
+    if (command === "git" && args[0] === "ls-remote") {
+      return { status: 0, stdout: `${OLD}\trefs/heads/feature/safe\n`, stderr: "" };
+    }
+    if (command === "git" && args[0] === "merge-base") {
+      return { status: 1, stdout: "", stderr: "" };
+    }
+    const result = spawnSync(command, args, { cwd, encoding: "utf8", windowsHide: true });
+    return {
+      status: result.status ?? 1,
+      stdout: result.stdout || "",
+      stderr: result.stderr || "",
+    };
+  };
+}
+
+test("record A, commit B, rewrite back to tree(A), then guarded push must reject", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "gd-rewrite-generation-"));
+  try {
+    gitAt(cwd, ["init", "-b", "feature/safe"]);
+    gitAt(cwd, ["config", "user.name", "Rewrite Baseline"]);
+    gitAt(cwd, ["config", "user.email", "rewrite@example.com"]);
+    gitAt(cwd, ["config", "core.logAllRefUpdates", "true"]);
+    writeFileSync(join(cwd, "note.txt"), "tree-one\n");
+    gitAt(cwd, ["add", "note.txt"]);
+    gitAt(cwd, ["commit", "-m", "A"]);
+    const commitA = gitAt(cwd, ["rev-parse", "HEAD"]);
+    const store = createMemoryRewriteBaselineStore();
+    verifyLifecycleMutation({
+      request: recordRequest({ originalLocalTip: commitA }),
+      runner: mixedGitRunner(cwd),
+      baselineStore: store,
+    });
+    writeFileSync(join(cwd, "note.txt"), "tree-two\n");
+    gitAt(cwd, ["add", "note.txt"]);
+    gitAt(cwd, ["commit", "-m", "B"]);
+    writeFileSync(join(cwd, "note.txt"), "tree-one\n");
+    gitAt(cwd, ["add", "note.txt"]);
+    gitAt(cwd, ["commit", "-m", "C"]);
+    const commitC = gitAt(cwd, ["rev-parse", "HEAD"]);
+    assert.notEqual(commitC, commitA);
+    assert.throws(
+      () =>
+        preflightLifecycleMutation({
+          request: pushRequest({ originalLocalTip: commitA, newTip: commitC }),
+          runner: mixedGitRunner(cwd),
+          baselineStore: store,
+        }),
+      /rewrite_baseline_generation_stale/,
+    );
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
   }
 });
 

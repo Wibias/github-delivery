@@ -14,7 +14,9 @@ test("git policy binds content-preserving rewrites to the original tree", () => 
   assert.match(git, /originalLocalTip/);
   assert.match(git, /tree matches/);
   assert.match(git, /rewriteExemption/);
+  assert.match(git, /reflog/);
   assert.match(stacks, /GD-GIT-008/);
+  assert.match(stacks, /reflog/);
   assert.match(stacks, /record_rewrite_baseline/);
   assert.match(stacks, /originalLocalTip/);
   assert.match(stacks, /rewriteExemption/);

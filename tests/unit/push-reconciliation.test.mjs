@@ -61,6 +61,14 @@ function pushRunner({ pushResult, remoteAfterPush }) {
     if (command === "git" && args[0] === "rev-parse") {
       return { status: 0, stdout: `${"e".repeat(40)}\n`, stderr: "" };
     }
+    if (command === "git" && args[0] === "log") {
+      const local = "e".repeat(40);
+      return {
+        status: 0,
+        stdout: `${NEW} ${local}\n${local} ${local}\n`,
+        stderr: "",
+      };
+    }
     if (command === "git" && args[0] === "push") {
       return pushResult;
     }

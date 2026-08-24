@@ -1,5 +1,9 @@
 import { classifyCoveringPullRequests, normalizeCoveringPullPages } from "./covering-pr.mjs";
-import { assertContentPreservingRewrite } from "./content-preserving-rewrite.mjs";
+import {
+  assertContentPreservingRewrite,
+  assertRewriteBaselineGeneration,
+  parseReflogGenerationEntries,
+} from "./content-preserving-rewrite.mjs";
 import { diffPrBodyMedia } from "./pr-body-media.mjs";
 import { assertPublishedMarkdown } from "./published-body-integrity.mjs";
 import { parseRewriteExemption } from "./rewrite-exemption.mjs";
@@ -146,6 +150,21 @@ function assertPushTarget(request, runner, baselineStore) {
       const originalTree = run(runner, ["git", "rev-parse", `${recorded}^{tree}`]);
       const nextTree = run(runner, ["git", "rev-parse", `${newTip}^{tree}`]);
       assertContentPreservingRewrite({ originalTree, newTree: nextTree });
+      const reflog = spawnGitStatus(runner, "git", [
+        "log",
+        "-g",
+        "--format=%H %T",
+        `refs/heads/${branch}`,
+      ]);
+      if (reflog.status !== 0) {
+        throw new Error("rewrite_baseline_generation_unproven");
+      }
+      assertRewriteBaselineGeneration({
+        recorded,
+        newTip,
+        recordedTree: originalTree,
+        entries: parseReflogGenerationEntries(reflog.stdout),
+      });
     }
   }
   return { remote, branch, expectedRemoteTip: expected, originalLocalTip, newTip };
