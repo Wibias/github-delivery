@@ -210,7 +210,7 @@ git update-ref $BackupRef $LocalTip
 
 Plan must identify branch, old local tip, expected remote tip, new parent, backup ref, and lease-pinned brokered push. Create a backup ref for every branch whose tip may be lost.
 
-If the rewrite is history-only (squash, reword, reorder, or commit grouping), run `record_rewrite_baseline` before rewriting so the broker owns the pre-rewrite tip, then send that same SHA as `originalLocalTip`. `push_code` compares the broker baseline tree to `newTip^{tree}` (`GD-GIT-008`). Restack onto a new parent sets `rewriteExemption: restack`.
+If the rewrite is history-only (squash, reword, reorder, or commit grouping), run `record_rewrite_baseline` with the live `originalLocalTip` SHA before rewriting. `push_code` then requires that same SHA to equal the stored broker baseline and compares that baseline tree to `newTip^{tree}` (`GD-GIT-008`). Restack onto a new parent sets `rewriteExemption: restack` and does **not** use the baseline/tree check.
 
 ## 5. Restack execution
 
@@ -263,8 +263,8 @@ Plan and execute it through `scripts/github-mutate.mjs`. The broker:
 
 - verifies the named Git remote resolves to the authorized GitHub repository;
 - re-reads the exact remote branch generation;
-- requires `originalLocalTip` to equal the broker-owned rewrite baseline captured before the rewrite;
-- binds that baseline, the new tip, rewrite flag, and a non-empty `rewriteExemption` into the trusted grant scope;
+- skips baseline and tree identity because `rewriteExemption: restack` is an intentional content-changing rewrite onto a new parent;
+- still binds `originalLocalTip`, the new tip, rewrite flag, and `rewriteExemption` into the trusted grant scope, and still requires the exact remote lease;
 - redeems the grant immediately before the exact push command;
 - uses an exact `--force-with-lease` expectation;
 - verifies the remote branch equals `newTip` after the push.

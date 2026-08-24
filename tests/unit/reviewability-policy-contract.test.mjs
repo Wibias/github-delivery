@@ -18,6 +18,7 @@ test("git policy binds content-preserving rewrites to the original tree", () => 
   assert.match(stacks, /record_rewrite_baseline/);
   assert.match(stacks, /originalLocalTip/);
   assert.match(stacks, /rewriteExemption/);
+  assert.match(stacks, /skips baseline and tree identity/);
   assert.match(stacks, /"rewriteExemption": "restack"/);
 });
 
