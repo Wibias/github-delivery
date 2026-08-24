@@ -52,6 +52,17 @@ function flakyCleanupStore() {
   };
 }
 
+function repoIdentityResult() {
+  return {
+    status: 0,
+    stdout: JSON.stringify({
+      url: "https://github.com/Wibias/github-delivery",
+      sshUrl: "git@github.com:Wibias/github-delivery.git",
+    }),
+    stderr: "",
+  };
+}
+
 function statefulPushRunner() {
   let remoteTip = OLD;
   let pushCount = 0;
@@ -63,16 +74,7 @@ function statefulPushRunner() {
       if (command === "git" && args[0] === "remote") {
         return { status: 0, stdout: "git@github.com:Wibias/github-delivery.git\n", stderr: "" };
       }
-      if (command === "gh" && args[0] === "repo") {
-        return {
-          status: 0,
-          stdout: JSON.stringify({
-            url: "https://github.com/Wibias/github-delivery",
-            sshUrl: "git@github.com:Wibias/github-delivery.git",
-          }),
-          stderr: "",
-        };
-      }
+      if (command === "gh" && args[0] === "repo") return repoIdentityResult();
       if (command === "git" && args[0] === "ls-remote") {
         return {
           status: 0,
@@ -103,6 +105,33 @@ function statefulPushRunner() {
     pushCount() {
       return pushCount;
     },
+  };
+}
+
+function alreadyAppliedContentChangingRunner() {
+  return (command, args) => {
+    if (command === "git" && args[0] === "check-ref-format") {
+      return { status: 0, stdout: "", stderr: "" };
+    }
+    if (command === "git" && args[0] === "remote") {
+      return { status: 0, stdout: "git@github.com:Wibias/github-delivery.git\n", stderr: "" };
+    }
+    if (command === "gh" && args[0] === "repo") return repoIdentityResult();
+    if (command === "git" && args[0] === "ls-remote") {
+      return {
+        status: 0,
+        stdout: `${NEW}\trefs/heads/${SCOPE.branch}\n`,
+        stderr: "",
+      };
+    }
+    if (command === "git" && args[0] === "merge-base") {
+      return { status: 1, stdout: "", stderr: "" };
+    }
+    if (command === "git" && args[0] === "rev-parse") {
+      const tree = String(args[1] || "").startsWith(NEW) ? OTHER : BASELINE;
+      return { status: 0, stdout: `${tree}\n`, stderr: "" };
+    }
+    throw new Error(`unexpected command: ${command} ${args.join(" ")}`);
   };
 }
 
@@ -137,6 +166,24 @@ test("a successful push whose cleanup fails converges on exact retry without pus
   assert.equal(retry.verification, NEW);
   assert.equal(stateful.pushCount(), 1);
   assert.equal(store.read(SCOPE), null);
+});
+
+test("already-applied recovery re-runs rewrite safety instead of bypassing it", () => {
+  const store = createMemoryRewriteBaselineStore();
+  store.create(SCOPE, BASELINE);
+
+  assert.throws(
+    () =>
+      executeLifecycleMutationRequest({
+        request: pushRequest(),
+        execute: true,
+        requireTrustedAuthority: false,
+        runner: alreadyAppliedContentChangingRunner(),
+        baselineStore: store,
+      }),
+    /content_preserving_rewrite_tree_mismatch/,
+  );
+  assert.equal(store.read(SCOPE), BASELINE);
 });
 
 test("rewrite baseline consume is compare-and-swap when an expected SHA is supplied", () => {
