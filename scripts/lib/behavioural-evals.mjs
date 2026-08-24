@@ -1,6 +1,10 @@
 import { createHash } from "node:crypto";
 
 import { canonicalJson } from "./authority-scope.mjs";
+import {
+  behaviouralProvenanceStatus,
+  LOCAL_BEHAVIOURAL_PROVENANCE,
+} from "./behavioural-provenance.mjs";
 
 function asArray(value, field) {
   if (!Array.isArray(value)) throw new TypeError(`${field} must be an array`);
@@ -51,7 +55,7 @@ export function attachTranscriptProvenance(run, transcripts) {
   return {
     ...run,
     provenance: {
-      kind: "github-delivery/behavioural-transcript",
+      kind: LOCAL_BEHAVIOURAL_PROVENANCE,
       transcriptsSha256: hashBehaviouralTranscripts(transcripts),
     },
   };
@@ -95,6 +99,10 @@ function sameSet(left, right) {
   return true;
 }
 
+function findingIds(findings) {
+  return unique((findings ?? []).map((finding) => typeof finding === "string" ? finding : finding?.id).filter(Boolean));
+}
+
 function assertSummaryMatchesTrace(result, observed) {
   if (result.findings !== undefined) {
     const claimed = asSet(findingIds(result.findings));
@@ -131,7 +139,7 @@ export function observedBehaviouralEvidence(result, transcripts) {
   return observed;
 }
 
-export function validateBehaviouralRun(run, casesById, transcripts) {
+export function validateBehaviouralRun(run, casesById, transcripts, options = {}) {
   if (!run || typeof run !== "object" || Array.isArray(run)) throw new TypeError("behavioural run must be an object");
   if (!run.model || typeof run.model !== "string") throw new TypeError("behavioural run requires model");
   if (!run.host || typeof run.host !== "string") throw new TypeError("behavioural run requires host");
@@ -140,13 +148,8 @@ export function validateBehaviouralRun(run, casesById, transcripts) {
   if (!transcripts || typeof transcripts !== "object" || Array.isArray(transcripts)) {
     throw new TypeError("behavioural transcripts required");
   }
-  if (run.provenance?.kind !== "github-delivery/behavioural-transcript") {
-    throw new TypeError("behavioural run provenance required");
-  }
   const expectedHash = hashBehaviouralTranscripts(transcripts);
-  if (run.provenance.transcriptsSha256 !== expectedHash) {
-    throw new TypeError("behavioural_transcript_hash_mismatch");
-  }
+  behaviouralProvenanceStatus(run, expectedHash, options);
   const seen = new Set();
   for (const result of run.results) {
     if (!result?.caseId || typeof result.caseId !== "string") throw new TypeError("run result requires caseId");
@@ -161,17 +164,18 @@ export function validateBehaviouralRun(run, casesById, transcripts) {
   return true;
 }
 
-function findingIds(findings) {
-  return unique((findings ?? []).map((finding) => typeof finding === "string" ? finding : finding?.id).filter(Boolean));
-}
-
-export function scoreBehaviouralRun(cases, run, transcripts) {
+export function scoreBehaviouralRun(cases, run, transcripts, options = {}) {
   const casesById = new Map(cases.map((item) => {
     validateBehaviouralCase(item);
     return [item.id, item];
   }));
   if (casesById.size !== cases.length) throw new TypeError("behavioural case ids must be unique");
-  validateBehaviouralRun(run, casesById, transcripts);
+  validateBehaviouralRun(run, casesById, transcripts, options);
+  const provenance = behaviouralProvenanceStatus(
+    run,
+    hashBehaviouralTranscripts(transcripts),
+    options,
+  );
 
   const resultsByCase = new Map(run.results.map((result) => [result.caseId, result]));
   const perCase = [];
@@ -265,6 +269,8 @@ export function scoreBehaviouralRun(cases, run, transcripts) {
     model: run.model,
     host: run.host,
     skillVersion: run.skillVersion ?? null,
+    provenance,
+    gatingEligible: provenance.trusted === true,
     caseCount: cases.length,
     completedCases: cases.length - missingCases,
     passedCases: perCase.filter((item) => item.pass).length,
@@ -308,6 +314,8 @@ export function compareBehaviouralScores(baseline, current, candidate) {
       .filter((metric) => candidate.metrics[metric] > current.metrics[metric])
       .map((metric) => ({ metric, direction: "lower-is-better", current: current.metrics[metric], candidate: candidate.metrics[metric] })),
   ];
+  const trustedGatingEligible = [baseline, current, candidate]
+    .every((score) => score.gatingEligible === true);
 
   return {
     schemaVersion: 1,
@@ -322,6 +330,7 @@ export function compareBehaviouralScores(baseline, current, candidate) {
     ]),
     candidateRegressions,
     candidateImprovesOrMatchesCurrent: candidateRegressions.length === 0,
+    trustedGatingEligible,
     scores: { baseline, current, candidate },
   };
 }
