@@ -135,6 +135,14 @@ const MERGE_GRAPH = Object.freeze({
   ...TERMINAL,
 });
 
+const APPROVE_GRAPH = Object.freeze({
+  ROUTE: ["PREFLIGHT"],
+  PREFLIGHT: ["APPROVE", "DONE"],
+  APPROVE: ["VERIFY"],
+  VERIFY: ["DONE"],
+  ...TERMINAL,
+});
+
 const CHANGE_GRAPH = Object.freeze({
   ROUTE: ["PREFLIGHT"],
   PREFLIGHT: ["PREPARE", "DONE"],
@@ -198,6 +206,7 @@ const PROFILE_DEFINITIONS = Object.freeze({
   "simplify-pr": { graph: REVIEW_GRAPH, mutation: "maintainer" },
   "security-review": { graph: REVIEW_GRAPH, mutation: "review" },
   status: { graph: STATUS_GRAPH, mutation: "read-only" },
+  "approve-pr": { graph: APPROVE_GRAPH, mutation: "review" },
   "merge-pr": { graph: MERGE_GRAPH, mutation: "maintainer" },
   "supersede-pr": { graph: CHANGE_GRAPH, mutation: "maintainer" },
   "overtake-pr": { graph: CHANGE_GRAPH, mutation: "maintainer" },
