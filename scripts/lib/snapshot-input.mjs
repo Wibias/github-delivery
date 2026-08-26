@@ -18,6 +18,7 @@ export function parseSnapshotGateArgs(
 ) {
   const positionals = [];
   let snapshotPath = null;
+  let checkpointPath = null;
   let expectedHead = null;
   let maxAgeSeconds = 300;
   let resolveId = null;
@@ -34,6 +35,11 @@ export function parseSnapshotGateArgs(
     if (value === "--snapshot") {
       snapshotPath = argv[++index];
       if (!snapshotPath) throw new Error("--snapshot requires a file path");
+      continue;
+    }
+    if (value === "--checkpoint") {
+      checkpointPath = argv[++index];
+      if (!checkpointPath) throw new Error("--checkpoint requires a file path");
       continue;
     }
     if (value === "--expected-head") {
@@ -62,14 +68,22 @@ export function parseSnapshotGateArgs(
     positionals.push(value);
   }
 
-  const [repo, prRaw] = positionals;
-  const pr = Number(prRaw);
-  if (
-    positionals.length !== 2 ||
-    !repo?.includes("/") ||
-    !Number.isInteger(pr) ||
-    pr <= 0
-  ) {
+  let repo = null;
+  let pr = null;
+  if (positionals.length > 0) {
+    const [repoRaw, prRaw] = positionals;
+    const parsedPr = Number(prRaw);
+    if (
+      positionals.length !== 2 ||
+      !repoRaw?.includes("/") ||
+      !Number.isInteger(parsedPr) ||
+      parsedPr <= 0
+    ) {
+      throw new Error(usage || "Usage: OWNER/REPO PR_NUMBER [--snapshot FILE]");
+    }
+    repo = repoRaw;
+    pr = parsedPr;
+  } else if (!checkpointPath) {
     throw new Error(usage || "Usage: OWNER/REPO PR_NUMBER [--snapshot FILE]");
   }
   if (resolveId && resolveBot) {
@@ -80,11 +94,36 @@ export function parseSnapshotGateArgs(
     repo,
     pr,
     snapshotPath,
+    checkpointPath,
     expectedHead,
     maxAgeSeconds,
     resolveId,
     resolveBot,
     workflow,
+  };
+}
+
+export function bindSnapshotGateToController({ gate = {}, controller } = {}) {
+  if (
+    !controller ||
+    controller.schemaVersion !== 1 ||
+    controller.kind !== "github-delivery/workflow-controller"
+  ) {
+    throw new Error("invalid_workflow_controller_checkpoint");
+  }
+  if (gate.repo && gate.repo !== controller.repo) throw new Error("controller_repo_conflict");
+  if (gate.pr && gate.pr !== controller.pr) throw new Error("controller_pr_conflict");
+  if (gate.expectedHead && controller.headSha && gate.expectedHead !== controller.headSha) {
+    throw new Error("controller_head_conflict");
+  }
+  const repo = gate.repo || controller.repo || null;
+  const pr = gate.pr || controller.pr || null;
+  if (!repo?.includes("/")) throw new Error("controller_repo_missing");
+  if (!Number.isInteger(pr) || pr <= 0) throw new Error("controller_pr_missing");
+  return {
+    repo,
+    pr,
+    expectedHead: gate.expectedHead || controller.headSha || null,
   };
 }
 
