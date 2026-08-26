@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { resolve } from "node:path";
 
-import { buildWorkflowPacket } from "./lib/delivery-workflow-profiles.mjs";
+import { buildExecutionWorkflowPacket } from "./lib/workflow-execution-contract.mjs";
 
 const USAGE =
   "Usage: node scripts/workflow-brief.mjs WORKFLOW [--root ROOT] [--conditional MODULE ...]";
@@ -29,7 +29,7 @@ function parseArgs(argv) {
 
 try {
   const args = parseArgs(process.argv.slice(2));
-  const packet = buildWorkflowPacket(args);
+  const packet = buildExecutionWorkflowPacket(args);
   process.stdout.write(`${JSON.stringify(packet, null, 2)}\n`);
 } catch (error) {
   console.error(String(error?.message || error));
