@@ -170,7 +170,12 @@ function commandFor(request) {
       ];
     case "post_review": {
       const event = reviewEventOf(request);
-      const eventFlag = event === "request-changes" ? "--request-changes" : "--comment";
+      const eventFlag =
+        event === "approve"
+          ? "--approve"
+          : event === "request-changes"
+            ? "--request-changes"
+            : "--comment";
       return [
         "gh",
         "pr",
@@ -648,7 +653,9 @@ function idempotencyLookupPath(request) {
 function idempotentRecordStillApplies(request, record) {
   if (request.action !== "post_review") return true;
   const state = String(record?.state || "").toUpperCase();
-  if (reviewEventOf(request) === "request-changes") return state === "CHANGES_REQUESTED";
+  const event = reviewEventOf(request);
+  if (event === "request-changes") return state === "CHANGES_REQUESTED";
+  if (event === "approve") return state === "APPROVED";
   return state !== "DISMISSED";
 }
 
@@ -1075,6 +1082,11 @@ export function executeMutationRequest({
     verification = reviewTarget;
     if (String(reviewTarget?.state || "").toUpperCase() !== "DISMISSED") {
       throw new Error("review_dismiss_verification_failed");
+    }
+  } else if (plan.request.action === "post_review" && reviewEventOf(plan.request) === "approve") {
+    verification = findExistingIdempotentMutation({ request: plan.request, runner });
+    if (!verification) {
+      throw new Error("approve_review_verification_failed");
     }
   } else {
     const verify = verificationCommand(plan.request);
