@@ -71,7 +71,7 @@ function viewerPayload(login = "reviewer") {
   return JSON.stringify({ login });
 }
 
-test("post_review defaults to a comment event and rejects approve", () => {
+test("post_review supports comment, request-changes, and native approve", () => {
   const commentPlan = planMutationRequest(reviewRequest());
   assert.ok(commentPlan.command.includes("--comment"));
   assert.equal(commentPlan.command.includes("--request-changes"), false);
@@ -84,10 +84,12 @@ test("post_review defaults to a comment event and rejects approve", () => {
   assert.equal(requestPlan.command.includes("--comment"), false);
   assert.equal(requestPlan.command.includes("--approve"), false);
 
-  assert.throws(
-    () => planMutationRequest(reviewRequest({ event: "approve" })),
-    /review_event_approve_forbidden/,
+  const approvePlan = planMutationRequest(
+    reviewRequest({ event: "approve", idempotencyKey: "native-review-32-approve" }),
   );
+  assert.ok(approvePlan.command.includes("--approve"));
+  assert.equal(approvePlan.command.includes("--comment"), false);
+  assert.equal(approvePlan.command.includes("--request-changes"), false);
 });
 
 test("native review fields reject non-string values instead of coercing them", () => {
