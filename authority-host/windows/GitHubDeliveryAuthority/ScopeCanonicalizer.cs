@@ -307,8 +307,7 @@ internal static partial class ScopeCanonicalizer
         if (value.ValueKind != JsonValueKind.String) throw new AuthorityException("review_event_invalid");
         var eventName = value.GetString();
         if (string.IsNullOrEmpty(eventName)) return "comment";
-        if (eventName == "approve") throw new AuthorityException("review_event_approve_forbidden");
-        if (eventName is not ("comment" or "request-changes"))
+        if (eventName is not ("approve" or "comment" or "request-changes"))
         {
             throw new AuthorityException("review_event_invalid");
         }
