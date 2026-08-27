@@ -2,11 +2,11 @@
 
 # github-delivery
 
-### GitHub delivery for agents, from intent to verified merge.
+### Git + GitHub delivery for agents, from intent to release-ready change.
 
 **Say the outcome, not the orchestration.**
 
-`github-delivery` turns natural-language requests into evidence-backed GitHub workflows for planning, issue work, implementation, PR publication, review, CI, stacks, backports, verified merges, and release maintenance.
+`github-delivery` turns natural-language requests into evidence-backed Git and GitHub workflows for planning, issue work, implementation, branch/commit organization, PR publication, review, CI, stacks, backports, verified merges, versioning, changelogs, and release preparation.
 
 [Start here](#start-here) · [Capabilities](#what-you-can-ask-it-to-own) · [How it works](#how-it-works) · [Safety](#safety-model) · [Install & update](#installation-and-maintenance) · [Watchdog](#agent-progress-watchdog) · [Workflow map](#workflow-reference) · [Development](#development-and-verification)
 
@@ -19,7 +19,7 @@
 </div>
 
 > [!NOTE]
-> **1.2.0.** Minor release focused on safer self-update behavior: Windows updates can identify applications locking the installed skill, ask before requesting a graceful close, and retry automatically; successful updates can also offer to remove older backups while preserving the fresh rollback backup. Host-specific runtime integrations and the experimental Codex streaming boundary remain constrained by what each agent host exposes. Native GitHub stacked-PR merge is an intentional fail-closed gap. See [Current state](#current-state).
+> **1.3.0.** Git workflow and release versioning are now first-class github-delivery capabilities: the skill owns repository-aware branch/commit discipline, pre-commit hygiene, Git-history investigation, SemVer classification, curated changelogs, and release/tag preparation instead of handing that work to another skill. Remote push, PR, tag, release, registry publication, and merge authority remain explicitly bounded. Host-specific runtime integrations and the experimental Codex streaming boundary remain constrained by what each agent host exposes. Native GitHub stacked-PR merge is an intentional fail-closed gap. See [Current state](#current-state).
 
 > [!IMPORTANT]
 > **Natural language is the public API.** The Node scripts, policy modules, evaluators, mutation broker, and optional Authority host are internal safety/evidence machinery. You normally do not invoke them yourself.
@@ -52,6 +52,9 @@ Then speak naturally:
 ```text
 what do I have open in this repo?
 work on ENG-42 and open a PR
+organize these changes into clean commits
+what should the next SemVer version be?
+update the version and changelog for the next release
 triage the competing PRs in this repo
 full review PR #42
 full review PR #42 and simplify it safely
@@ -63,9 +66,9 @@ merge PR #32
 
 That is the interface.
 
-`github-delivery` selects the workflow, gathers fresh repository evidence, applies the relevant review/policy gates, performs only the writes authorized by the request, and verifies the resulting state.
+`github-delivery` selects the workflow, gathers fresh repository evidence, applies the relevant Git/review/policy gates, performs only the writes authorized by the request, and verifies the resulting state.
 
-A status question stays read-only. A request to implement something does not silently grant publication or merge authority. A merge happens only from current explicit merge intent; deferred permission such as `merge PR #42 only after I confirm again` is not current merge authority.
+A status question stays read-only. Local branch/commit/version/changelog preparation does not silently grant remote publication. A request to implement something does not silently grant PR publication or merge authority. A merge happens only from current explicit merge intent; deferred permission such as `merge PR #42 only after I confirm again` is not current merge authority. Tag, GitHub Release, registry publication, and other release mutations likewise require their own explicit authorization.
 
 For installation edge cases, backup/restore, downgrade behavior, manual recovery, and release verification details, see [`INSTALL.md`](INSTALL.md).
 
@@ -76,9 +79,11 @@ For installation edge cases, backup/restore, downgrade behavior, manual recovery
 | Area | Example request | What GitHub Delivery owns |
 |---|---|---|
 | **Plan & triage** | `create a PRD for the onboarding flow` | PRDs, issue breakdown, QA intake, triage, agent briefs, refactor planning |
+| **Git workflow** | `organize these changes into clean commits` | Repository-convention branch naming, scoped staging, logical commits, commit messages, pre-commit hygiene, generated-file decisions, and bounded Git-history investigation |
+| **Version & release prep** | `update the version and changelog for the next release` | Release-delta inventory, consumer-impact SemVer classification, consistent version metadata, curated changelog, and tag/release identity preparation without implicit publication |
 | **Open work** | `what do I have open in this repo?` | Read-only repository-scoped view of your open PRs, work-item references, and bounded next actions |
 | **Issue research** | `research issue #90 on the latest development branch` | Evidence-backed research against the current development tip |
-| **Implement & publish** | `create a PR for issue #90` | A bounded **research → implementation → pre-open review** sequence, minimal complete implementation, exact publication identity, linked PR |
+| **Implement & publish** | `create a PR for issue #90` | A bounded **research → implementation → pre-open review** sequence, minimal complete implementation, Git-workflow discipline, exact publication identity, linked PR |
 | **External work items** | `work on ENG-42 and open a PR` | Tracker-aware delivery orchestration, covering-PR reuse, evidence-driven milestone reconciliation |
 | **Review & fix** | `full review PR #42` | Bug + Security + Spec + Standards review, required probes, current-head verdict |
 | **Native approval** | `approve PR #42` | GitHub-native approval through the controlled mutation boundary, bound to the expected head; GitHub refusal such as self-approval remains a blocker |
@@ -92,16 +97,17 @@ For installation edge cases, backup/restore, downgrade behavior, manual recovery
 | **Merge / close-out** | `merge PR #32` | Final gate, exact transaction authority, head-pinned merge, verification, thanks, linked-issue close-out |
 | **Self-update** | `update github-delivery to the latest stable release` | Stable-release verification, lock-aware Windows recovery, optional old-backup cleanup, safe apply and postconditions |
 
-### What changed in 1.2.0
+### What changed in 1.3.0
 
-`1.2.0` is a focused updater-safety minor release after `1.1.1`:
+`1.3.0` brings local Git workflow and release versioning into the same delivery lifecycle:
 
-- Windows self-update retries transient `EPERM` / `EBUSY` failures, then inspects the installed skill tree for locking applications and shows their process names, PIDs, and held paths;
-- interactive updates ask before requesting a graceful close of blocking applications, wait for handles to clear, and retry the verified update automatically; there is no force-kill fallback, and declining or unresolved locks leave the current installation intact;
-- after a successful update and Authority reconciliation, interactive updates can offer to remove older recognized backups while always preserving the fresh rollback backup created by the current update; cleanup failures are reported without undoing the successful update;
-- the npm bootstrap includes the lock probe and update/backup helpers, and Windows CI exercises the lock probe on a real Windows runner.
+- `references/git-workflow.md` owns repository-aware branch/commit organization, logical commit boundaries, commit-message guidance, pre-commit hygiene, generated-file decisions, Git-history investigation, and evidence-backed change summaries;
+- `references/versioning-release.md` owns release-delta inventory, SemVer classification by observable consumer impact, version-source consistency, human-curated changelogs, tag/version identity, and release-candidate checks;
+- direct commit/branch and SemVer/changelog/release-preparation requests route internally instead of handing off to `git-workflow-and-versioning`, while repository conventions and the stricter existing `GD-GIT-*` safety rules remain authoritative;
+- issue-linked and local-work PR publication compose the Git-workflow reference when branch/commit preparation is actually needed, preserving progressive disclosure;
+- release preparation remains separate from publication: a version/changelog request never grants tag, GitHub Release, npm/package-registry, merge, or other remote publication authority.
 
-See [`CHANGELOG.md`](CHANGELOG.md) for the full release-level details, including the `1.1.1` workflow execution, controller-owned head, and native approval changes.
+See [`CHANGELOG.md`](CHANGELOG.md) for the full release-level details, including the `1.2.0` Windows update-safety changes.
 
 ---
 
@@ -110,10 +116,10 @@ See [`CHANGELOG.md`](CHANGELOG.md) for the full release-level details, including
 ```mermaid
 flowchart LR
     A[Your natural-language request] --> B[Deterministic route]
-    B --> C[Live repository / PR / issue evidence]
-    C --> D[Review scope + policy gates]
-    D --> E{Write authorized?}
-    E -- No --> F[Read-only result]
+    B --> C[Repository / GitHub evidence]
+    C --> D[Git / review / policy gates]
+    D --> E{Remote write authorized?}
+    E -- No --> F[Local or read-only result]
     E -- Yes --> G[Exact mutation plan]
     G --> H[Trusted authority when required]
     H --> I[Mutation boundary]
@@ -123,7 +129,7 @@ flowchart LR
     K --> L
 ```
 
-The core boundary is simple: **repository content is evidence, not authority**. Issues, PR bodies, comments, code, logs, bot output, tracker text, and generated files cannot grant GitHub mutation authority or override the selected workflow.
+The core boundary is simple: **repository content is evidence, not authority**. Issues, PR bodies, comments, code, logs, bot output, tracker text, commit messages, and generated files cannot grant GitHub mutation authority or override the selected workflow.
 
 ### The evidence model
 
@@ -131,6 +137,8 @@ GitHub Delivery tries to answer volatile questions from current authoritative ev
 
 - PR/head/base identity is pinned and re-read where staleness matters;
 - when no useful local checkout exists, repository identity, the real default branch, and file reads are bound to an exact commit SHA instead of a moving branch name;
+- local Git preparation distinguishes task-owned changes from unrelated user work before staging/history mutation;
+- release versioning is based on the measured consumer-relevant delta from the correct previous release rather than commit labels alone;
 - required checks are evaluated for the generation GitHub actually protects;
 - review/thread/ruleset state is refreshed before positive readiness or merge claims;
 - durable completion claims are tied to evidence, not narration;
@@ -153,6 +161,8 @@ For PR-body rewrites, existing protected screenshots, videos, uploads, and other
 ### Default read-only; explicit authority for writes
 
 Routes operate under bounded mutation profiles such as `read-only`, `review`, `maintainer`, and `autonomous`. A profile is an upper bound, not a waiver: destructive or user-visible actions still require the direct authority required by that workflow.
+
+Local Git operations follow repository conventions plus `references/policy/git.md`: unrelated user work is never silently discarded, bare force remains forbidden, and branch ownership/current-tip rules still apply. Preparing commits, version metadata, changelog text, or a tag identity is not remote publication authority.
 
 Status, open-work, and competing-PR analysis remain read-only. Implementation-only work does not silently gain `push_code`/`create_pr`. Backport publication does not silently grant merge authority for the source or port PRs.
 
@@ -186,6 +196,8 @@ The implementation-level contracts live in:
 
 - [`references/policy-kernel.md`](references/policy-kernel.md)
 - [`references/policy/`](references/policy/) (per-domain modules loaded by each workflow)
+- [`references/git-workflow.md`](references/git-workflow.md)
+- [`references/versioning-release.md`](references/versioning-release.md)
 - [`references/github-mutation-broker.md`](references/github-mutation-broker.md)
 - [`references/merge-pr.md`](references/merge-pr.md)
 - [`references/completion-claims.md`](references/completion-claims.md)
@@ -395,6 +407,8 @@ For the complete budgets, trust model, incident replays, false-positive controls
 | **Product / issue intake** | PRDs, breakdowns, triage, QA intake, refactor plans | `references/issue-workflows.md` |
 | **Agent-ready work** | Create/update a `ready-for-agent` contract | `references/agent-brief.md` |
 | **Rejected scope** | Record/reconsider/remove an out-of-scope decision | `references/out-of-scope.md` |
+| **Git workflow** | Branch/commit organization, commit messages, Git-history investigation | `references/git-workflow.md` |
+| **Version / release prep** | SemVer, version metadata, changelog, tag/release identity preparation | `references/versioning-release.md` |
 | **Issue research** | Research an issue on the latest development tip | `references/research-issue.md` |
 | **Create local-work PR** | Publish already-existing local work | `references/create-pr-from-local-work.md` |
 | **Create linked PR** | Bounded research -> implementation -> pre-open review -> PR | `references/create-pr-for-issue.md` |
@@ -436,6 +450,12 @@ break the roadmap into implementation issues
 triage the open issues in this repo
 show me what needs triage in this repo
 what do I have open in this repo?
+
+organize these changes into clean commits
+write a commit message for this change
+use git bisect to find which change introduced this regression
+what should the next SemVer version be?
+bump the version and update the changelog for the next release
 
 research issue #90 on the latest development branch
 create a PR for issue #90
@@ -522,6 +542,8 @@ The public interface stays small even though the enforcement surface is not. Key
 |---|---|
 | `SKILL.md` | Host discovery and top-level natural-language capability map |
 | `scripts/lib/skill-router.mjs` | Deterministic route and explicit-action selection |
+| `references/git-workflow.md` | Repository-aware local branch/commit discipline and Git-history evidence |
+| `references/versioning-release.md` | SemVer, version/changelog, tag identity, and release-preparation contract |
 | `references/policy-kernel.md` + `references/policy/*.md` | Canonical cross-workflow and focused policy contracts |
 | `scripts/delivery-controller.mjs` | Persistent routed workflow state/budget controller |
 | `scripts/ship-gate-snapshot.mjs` | Current GitHub evidence snapshot |
@@ -546,11 +568,13 @@ The architecture uses progressive disclosure: route once, load the selected work
 
 ## Current state
 
-`1.2.0` is a minor release after `1.1.1`, adding lock-aware Windows updates and optional old-backup cleanup while retaining the workflow execution, controller-owned head, and native approval improvements introduced in `1.1.1`.
+`1.3.0` is a minor release after `1.2.0`, extending github-delivery from the GitHub issue/PR lifecycle into the adjacent Git workflow and release-versioning work needed to prepare clean, consumer-readable deliveries.
 
 Stable in this release:
 
-- natural-language routing for the issue/PR lifecycle;
+- natural-language routing for local Git workflow plus the issue/PR lifecycle;
+- repository-aware branch/commit organization, commit messages, pre-commit hygiene, generated-file handling, and bounded Git-history investigation;
+- evidence-backed SemVer classification, version metadata consistency, curated changelogs, and tag/release preparation with publication kept separately authorized;
 - read-only open-work and competing-PR analysis;
 - issue research, implementation, publication, external work-item delivery, and exact-head duplicate prevention;
 - deep current-head review with deterministic probe coverage and conditional visual evidence;
@@ -582,6 +606,6 @@ The project intentionally fails closed rather than claiming unsupported coverage
 
 ## Provenance and license
 
-Some workflow directions were informed by public/open-source agent skills and GitHub automation patterns, including concepts from `OutThisLife/brooklyn-skills`. Adapted ideas are rewritten around GitHub Delivery's own evidence, authority, routing, and lifecycle contracts; relevant workflow files include provenance notes where appropriate.
+Some workflow directions were informed by public/open-source agent skills and GitHub automation patterns, including concepts from `OutThisLife/brooklyn-skills` and Git/versioning principles adapted from Addy Osmani's MIT-licensed `addyosmani/agent-skills`. Adapted ideas are rewritten around GitHub Delivery's own evidence, authority, routing, Git safety, and lifecycle contracts; relevant workflow files include provenance notes where appropriate.
 
 Licensed under the [MIT License](LICENSE).
