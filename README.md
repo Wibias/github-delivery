@@ -19,7 +19,7 @@
 </div>
 
 > [!NOTE]
-> **1.1.1.** Patch release after `1.1.0`, adding execution-ready workflow packets, controller-owned PR head freshness, and explicit GitHub-native PR approval. Host-specific runtime integrations and the experimental Codex streaming boundary remain constrained by what each agent host exposes. Native GitHub stacked-PR merge is an intentional fail-closed gap. See [Current state](#current-state).
+> **1.2.0.** Minor release focused on safer self-update behavior: Windows updates can identify applications locking the installed skill, ask before requesting a graceful close, and retry automatically; successful updates can also offer to remove older backups while preserving the fresh rollback backup. Host-specific runtime integrations and the experimental Codex streaming boundary remain constrained by what each agent host exposes. Native GitHub stacked-PR merge is an intentional fail-closed gap. See [Current state](#current-state).
 
 > [!IMPORTANT]
 > **Natural language is the public API.** The Node scripts, policy modules, evaluators, mutation broker, and optional Authority host are internal safety/evidence machinery. You normally do not invoke them yourself.
@@ -90,17 +90,18 @@ For installation edge cases, backup/restore, downgrade behavior, manual recovery
 | **Backports / ports** | `backport PR #42 to release/1.x and release/2.x` | One independent head-bound port per target base, with deterministic provenance and completion tracking |
 | **Supersede / overtake** | `supersede PR #12 with PR #45` | Explicit replacement or maintainer-takeover workflows with bounded mutation authority |
 | **Merge / close-out** | `merge PR #32` | Final gate, exact transaction authority, head-pinned merge, verification, thanks, linked-issue close-out |
-| **Self-update** | `update github-delivery to the latest stable release` | Stable-release discovery, checksums/manifest/tag/attestation verification, safe apply and postconditions |
+| **Self-update** | `update github-delivery to the latest stable release` | Stable-release verification, lock-aware Windows recovery, optional old-backup cleanup, safe apply and postconditions |
 
-### What changed in 1.1.1
+### What changed in 1.2.0
 
-`1.1.1` is a focused patch release after `1.1.0`:
+`1.2.0` is a focused updater-safety minor release after `1.1.1`:
 
-- workflow packets declare the normal helper entrypoints and broker actions needed to execute the selected workflow, while github-delivery source discovery is diagnostic-only during normal execution (PR #372);
-- successful branch mutations reconcile the new tip into controller-owned PR head state, and `ship-gate` can bind repository, PR, and expected head directly from the workflow checkpoint instead of model-copied SHA values (PR #374);
-- explicit `approve PR #N` requests perform GitHub-native approval through the controlled mutation boundary, verify the expected-head review state, and surface GitHub refusal instead of substituting a comment or `[GD]` verdict; deferred wording such as `merge PR #42 when I approve it later` remains read-only (PR #373).
+- Windows self-update retries transient `EPERM` / `EBUSY` failures, then inspects the installed skill tree for locking applications and shows their process names, PIDs, and held paths;
+- interactive updates ask before requesting a graceful close of blocking applications, wait for handles to clear, and retry the verified update automatically; there is no force-kill fallback, and declining or unresolved locks leave the current installation intact;
+- after a successful update and Authority reconciliation, interactive updates can offer to remove older recognized backups while always preserving the fresh rollback backup created by the current update; cleanup failures are reported without undoing the successful update;
+- the npm bootstrap includes the lock probe and update/backup helpers, and Windows CI exercises the lock probe on a real Windows runner.
 
-See [`CHANGELOG.md`](CHANGELOG.md) for the full release-level details, including the `1.1.0` notes.
+See [`CHANGELOG.md`](CHANGELOG.md) for the full release-level details, including the `1.1.1` workflow execution, controller-owned head, and native approval changes.
 
 ---
 
@@ -307,6 +308,10 @@ npx github-delivery update --apply
 
 Self-update accepts only the fixed upstream's latest stable `vX.Y.Z` GitHub Release and replaces nothing until release assets, checksums, distribution manifest, tag/source binding, constrained GitHub artifact attestation, and bounded ZIP extraction verify. Local tracked modifications block replacement even with `--force`; update does not silently downgrade an ahead install.
 
+On Windows, if the install displacement hits `EPERM` or `EBUSY`, the updater first performs bounded transient retries. If the target is still locked, it inspects handles inside the installed skill tree and reports the blocking application(s), PIDs, and held paths. Interactive runs ask `Close the listed application(s) gracefully and continue the update? [y/N]`. `y` requests a graceful close, waits for the handles to clear, and retries the verified update; it never force-kills a process. `n`, non-interactive execution, an unavailable lock probe, or a lock that remains unresolved fails with structured `install_target_locked` diagnostics and leaves the existing installation intact.
+
+After the update and any required Authority reconciliation have succeeded, interactive runs check for older recognized GitHub Delivery backups. When older backups exist, the updater lists them, shows the fresh rollback backup that will be kept, and asks `Remove the older backups? [y/N]`. `y` removes only the recognized older backups; `n` keeps them. The fresh backup from the current update is always preserved, unrelated directories are ignored, and cleanup failures are reported without rolling back the successful update.
+
 ### Setup and doctor
 
 ```bash
@@ -360,7 +365,7 @@ GitHub Delivery treats convergence as a runtime + workflow problem rather than a
 | **Policy** | Universal bounded-progress/evidence-economy fallback when the host exposes no trusted interception surface |
 | **Codex lifecycle hooks** | Turn-scoped duplicate/poll/evidence limits and bounded narration recovery at supported tool boundaries |
 | **Protected Codex stream** | Launch-controlled App Server stream that can interrupt in-flight no-progress/tool-emission/protocol stalls |
-| **Workflow controller** | Route/phase locking, checkpointed progress, bounded retries/evidence/actions/tokens/steps/wall time |
+| **Workflow controller** | Route/phase locking, checkpointed progress, bounded retries/evidence/actions/tokens/steps/wall time budgets |
 
 Key defaults include:
 
@@ -541,7 +546,7 @@ The architecture uses progressive disclosure: route once, load the selected work
 
 ## Current state
 
-`1.1.1` is a patch release after `1.1.0`, tightening workflow execution/freshness and adding explicit GitHub-native PR approval.
+`1.2.0` is a minor release after `1.1.1`, adding lock-aware Windows updates and optional old-backup cleanup while retaining the workflow execution, controller-owned head, and native approval improvements introduced in `1.1.1`.
 
 Stable in this release:
 
@@ -554,7 +559,7 @@ Stable in this release:
 - optional Windows Authority Hello grants, push-only branch leases, and PR sessions for later exact-scope push and merge on one PR and approved merge base;
 - inferred-stack restacking/merge-order safety and independent multi-base delivery;
 - SHA-bound remote repository context when a useful local checkout is not already available;
-- verified stable install/update;
+- verified stable install/update with Windows lock recovery, graceful-close prompting, and optional older-backup cleanup that preserves the fresh rollback backup;
 - progress watchdog/runtime convergence controls;
 - deterministic bundles, repository security checks, CodeQL, Dependency Review, live-fixture contracts, and release preparation.
 
