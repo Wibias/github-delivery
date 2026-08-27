@@ -17,6 +17,10 @@ import {
   compareInstalledManifest,
   readInstalledManifest,
 } from "./lib/stable-release-update.mjs";
+import {
+  installWithWindowsLockRecovery,
+  offerBackupCleanup,
+} from "./lib/update-user-experience.mjs";
 import { readUserConfig, resolveAuthorityMode } from "./lib/user-config.mjs";
 import {
   readActivationReceipt,
@@ -352,7 +356,7 @@ export async function runInstallCommand(options, dependencies = {}) {
       currentVersion: candidate.plan.currentVersion,
       targetVersion: candidate.release.version,
     });
-    installation = install({
+    const installOptions = {
       ...options,
       source: candidate.source,
       update: false,
@@ -360,6 +364,12 @@ export async function runInstallCommand(options, dependencies = {}) {
       allowDowngrade: false,
       force: false,
       legacyManifestlessMigration: legacyMigration,
+    };
+    installation = await installWithWindowsLockRecovery({
+      install,
+      installOptions,
+      target: options.target,
+      dependencies,
     });
     progress({ stage: "skill_installed", backupPath: installation?.backupPath || null });
 
@@ -399,6 +409,20 @@ export async function runInstallCommand(options, dependencies = {}) {
       progress({ stage: "authority_updated", version: authorityHost?.installed?.version || candidate.release.version });
     }
 
+    const backupCleanup = await offerBackupCleanup({
+      target: options.target,
+      backupRoot: options.backupRoot,
+      keepBackup: installation?.backupPath || null,
+      dependencies,
+    });
+    if (backupCleanup.accepted) {
+      progress({
+        stage: "old_backups_removed",
+        removed: backupCleanup.removed.length,
+        failed: backupCleanup.failed.length,
+      });
+    }
+
     return {
       action: legacyMigration ? "migrate_legacy" : "update",
       apply: true,
@@ -408,6 +432,7 @@ export async function runInstallCommand(options, dependencies = {}) {
       sourceVersion: candidate.release.version,
       target: options.target,
       backupPath: installation?.backupPath || null,
+      backupCleanup,
       release: candidate.release,
       watchdog: installation?.watchdog || null,
       authorityHost,
@@ -434,6 +459,8 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
     process.stderr.write(`${JSON.stringify({
       error: String(error?.message || error),
       ...(error?.backupPath ? { backupPath: error.backupPath } : {}),
+      ...(Array.isArray(error?.blockers) ? { blockers: error.blockers } : {}),
+      ...(error?.probeError ? { probeError: error.probeError } : {}),
     }, null, 2)}\n`);
     process.exitCode = 1;
   });
