@@ -214,17 +214,18 @@ export function routeShippingGithubPrompt(prompt, context = {}) {
   if (DELIVERY_NAME.test(text) && DELIVERY_CONFIG.test(text)) {
     return result("references/configuration.md", "read-only", []);
   }
-  if (VERSIONING_RELEASE_REQUEST.test(text)) {
+  const trustedRoutingText = stripAttributedUntrustedText(text);
+  if (!FULL_REVIEW_REQUEST.test(text) && VERSIONING_RELEASE_REQUEST.test(trustedRoutingText)) {
     return result(
       "references/versioning-release.md",
-      VERSIONING_RELEASE_MUTATION_REQUEST.test(text) ? "maintainer" : "read-only",
+      VERSIONING_RELEASE_MUTATION_REQUEST.test(trustedRoutingText) ? "maintainer" : "read-only",
       [],
     );
   }
-  if (GIT_WORKFLOW_REQUEST.test(text)) {
+  if (!FULL_REVIEW_REQUEST.test(text) && GIT_WORKFLOW_REQUEST.test(trustedRoutingText)) {
     return result(
       "references/git-workflow.md",
-      GIT_WORKFLOW_MUTATION_REQUEST.test(text) ? "maintainer" : "read-only",
+      GIT_WORKFLOW_MUTATION_REQUEST.test(trustedRoutingText) ? "maintainer" : "read-only",
       [],
     );
   }
