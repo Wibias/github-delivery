@@ -2,7 +2,10 @@
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
 
 import { runGitHubCommandWithRetry } from "./lib/github-retry.mjs";
-import { executeMutationDocument } from "./lib/mutation-document-execution.mjs";
+import {
+  executeMutationDocument,
+  mutationReceiptCompleted,
+} from "./lib/mutation-document-execution.mjs";
 import { reconcileMutationCheckpoint } from "./lib/mutation-checkpoint.mjs";
 import { boundedSpawnSync } from "./lib/subprocess-policy.mjs";
 import { makeGitHubBodyTransportRunner } from "./lib/github-body-transport.mjs";
@@ -53,10 +56,7 @@ function completedKeysFromAudit(auditPath) {
     if (!line.trim()) continue;
     try {
       const receipt = JSON.parse(line);
-      if (
-        receipt?.operationKey &&
-        (receipt.status === "succeeded" || receipt.status === "already_applied")
-      ) {
+      if (receipt?.operationKey && mutationReceiptCompleted(receipt)) {
         keys.push(String(receipt.operationKey));
       }
     } catch {
