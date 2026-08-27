@@ -9,7 +9,7 @@ description: >
 
 # GitHub Delivery
 
-Own GitHub work from product intake through release-ready change. Natural language is the public API.
+Own GitHub work from product intake through release-ready change. Natural language is the public API; internals enforce bounded progress and evidence/context economy.
 
 ## Route
 
