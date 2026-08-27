@@ -1,6 +1,6 @@
 {
   "name": "github-delivery",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "Guided installer and safety tooling for GitHub Delivery workflows",
   "type": "module",
   "engines": {
@@ -13,6 +13,7 @@
     "scripts/github-delivery-cli.mjs",
     "scripts/install-codex-watchdog-hooks.mjs",
     "scripts/install-skill.mjs",
+    "scripts/windows-install-locks.ps1",
     "scripts/lib/authority-host-client.mjs",
     "scripts/lib/authority-host-install.mjs",
     "scripts/lib/authority-host-release.mjs",
@@ -22,13 +23,16 @@
     "scripts/lib/bootstrap-maintenance.mjs",
     "scripts/lib/distribution.mjs",
     "scripts/lib/install-lock.mjs",
+    "scripts/lib/installation-backups.mjs",
     "scripts/lib/release-path-identity.mjs",
     "scripts/lib/release-self-update.mjs",
     "scripts/lib/subprocess-policy.mjs",
     "scripts/lib/release-zip.mjs",
     "scripts/lib/stable-release-update.mjs",
+    "scripts/lib/update-user-experience.mjs",
     "scripts/lib/user-config.mjs",
-    "scripts/lib/watchdog-activation.mjs"
+    "scripts/lib/watchdog-activation.mjs",
+    "scripts/lib/windows-install-locks.mjs"
   ],
   "license": "MIT",
   "repository": {
