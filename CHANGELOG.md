@@ -4,6 +4,22 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-08-27
+
+### Added
+
+- Explicit `approve PR #N` requests now route to GitHub-native approval through the controlled mutation boundary, verify an `APPROVED` review on the expected head, and surface GitHub refusal (including self-approval) instead of substituting a `[GD]` verdict comment. `approve and merge PR #N` keeps approval ordered before merge, and Node/Windows authority canonicalization agrees on native approval scope (PR #373).
+
+### Changed
+
+- Bumped the package version from `1.1.0` to `1.1.1`.
+- Workflow packets now carry an execution-ready contract with declared helper entrypoints and broker actions, while github-delivery source discovery is diagnostic-only during normal execution. Common workflows can consume one packet instead of repeatedly reading/grepping the skill implementation to rediscover their own execution surface (PR #372).
+- PR head identity is controller-owned across mutations: successful `push_code` reconciliation advances controller head state, `ship-gate` can bind repository/PR/head from the workflow checkpoint, and stale explicit head values fail immediately instead of being retried from remembered state (PR #374).
+
+### Fixed
+
+- Deferred merge authority such as `merge PR #42 when I approve it later` remains read-only and is not misrouted as an immediate native approval request (PR #373).
+
 ## [1.1.0] - 2026-08-24
 
 ### Added
@@ -85,8 +101,8 @@ All notable changes to `github-delivery` are documented here.
 - Bound GitHub, Git, PowerShell, and registry subprocess helpers now copy argv and force a direct spawn (`shell: false`), so library-provided arguments cannot be reconstructed as a shell command (PR #294).
 - Prevented unusual valid Git filenames from hiding sensitive path changes from scoped CI/CodeQL detection, and made required scoped lanes fail closed when their scope producer fails (PR #296).
 - Fail closed when classic branch protection may apply but cannot be proved absent, added GitHub-style classic branch-pattern coverage, restored contextual `make this green` routing, and strengthened dynamic mutation-command boundary checks (PR #297).
-- Redeem trusted authority before the first mutating GitHub command, including autonomous idempotency tag/ref coordination, so a rejected grant cannot leave coordination state behind before the requested mutation (PR #299).
-- Preserve rename/copy source and destination paths with NUL-delimited local branch diff parsing, keep both path generations in review classification, and make every deterministic required probe a first-class pre-open blocker until its canonical structured probe evidence validates against the deterministic trigger files (PR #299).
+- Redeem trusted authority before the first mutating GitHub command, including autonomous idempotency tag/ref coordination, so a rejected grant cannot leave a coordination write behind before the requested mutation (PR #299).
+- Preserve rename/copy source and destination paths with NUL-delimited local branch diff parsing, keep both path generations in review classification, and make every deterministic required probe a first-class pre-open blocker until its canonical structured probe-evidence record validates against the deterministic trigger files (PR #299).
 - Enforce open stack-parent ordering at the mutation execution boundary before merge authority, and abort orphan-workflow cleanup before deletion when the default-branch generation changed during preflight (PR #299).
 - Protected Codex streaming now bounds repetitive interleaved tool micro-narration separately from tool-emission stalls: three future-action narration intents without execution/state/workflow progress trigger an interrupt, and evidence/read tool starts do not reset that budget (PR #299).
 
