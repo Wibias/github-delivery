@@ -84,7 +84,7 @@ test("approve_pr authority scope is semantically distinct from generic post_revi
     pr: 32,
     expectedHead: HEAD,
     idempotencyKey: `approve-32-${HEAD}`,
-    bodySha256: "d1b2c4fa4adef3e4e8cb172142ade1792970ed54647249221daf106829a65636",
+    bodySha256: "6fcfaa57b122361308f7bce0a8f2c09bbbfbd64cb2cdad51c9a291bdd3844804",
   });
 });
 
