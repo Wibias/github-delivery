@@ -4,7 +4,7 @@ import test from "node:test";
 import {
   executeMutationRequest,
   planMutationRequest,
-} from "../../scripts/lib/github-mutation-broker.mjs";
+} from "../../scripts/lib/github-mutation-router.mjs";
 import { authorityScopeForRequest } from "../../scripts/lib/authority-scope.mjs";
 import { actionDefinition } from "../../scripts/lib/mutation-action-registry.mjs";
 import { authorizeMutation } from "../../scripts/lib/mutation-policy.mjs";
