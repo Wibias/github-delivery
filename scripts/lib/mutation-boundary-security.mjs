@@ -12,6 +12,8 @@ const APPROVED_MUTATION_FILES = new Set([
   "scripts/lib/live-fixture-cleanup.mjs",
 ]);
 
+const APPROVAL_MUTATION_FILE = "scripts/lib/github-approval-mutation-broker.mjs";
+
 const DETECTOR_FILES = new Set(["scripts/lib/mutation-boundary-security.mjs"]);
 
 const FIXTURE_FILES = new Set([
@@ -310,6 +312,9 @@ export function validateMutationBoundarySource(path, source) {
 }
 
 function isAllowedBoundaryWrite(path, item) {
+  if (path === APPROVAL_MUTATION_FILE) {
+    return item.code === "direct_gh_mutation" && item.group === "pr" && item.verb === "review";
+  }
   if (!APPROVED_MUTATION_FILES.has(path)) return false;
   if (item.code === "direct_gh_mutation") return BOUNDARY_GH_GROUPS.has(item.group);
   if (item.code === "direct_git_push") return path === "scripts/lib/lifecycle-mutations.mjs";
@@ -327,7 +332,7 @@ export function validateMutationBoundaryTree(root = process.cwd()) {
   return {
     valid: errors.length === 0,
     files,
-    approvedMutationFiles: [...APPROVED_MUTATION_FILES].sort(),
+    approvedMutationFiles: [...APPROVED_MUTATION_FILES, APPROVAL_MUTATION_FILE].sort(),
     errors,
   };
 }
