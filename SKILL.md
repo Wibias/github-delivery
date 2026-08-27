@@ -1,24 +1,22 @@
 ---
 name: github-delivery
 description: >
-  GitHub issue/PR lifecycle skill: PRDs, triage/QA, research, linked/open-work
-  PRs, external tracker delivery, competing PR analysis, backports/ports, stacks,
-  review/fix/simplify/security, conflicts, watch/status, supersede/overtake,
-  merge/closure. Watch MUST run scripts/ship-gate.mjs every wake. Default mode is
-  read-only. Not for local pre-PR debugging, non-GitHub planning, or skill authoring.
+  Git/GitHub delivery: commits, version/changelog prep, PRDs, triage/QA,
+  research, PRs, trackers, stacks, backports, reviews, conflicts, watch/status,
+  merge/closure. Watch MUST run scripts/ship-gate.mjs every wake. Default mode
+  is read-only. Not for general local debugging, non-GitHub planning, or skill authoring.
 ---
 
 # GitHub Delivery
 
-Own GitHub work from product intake through merged PR. Natural language is the
-public API; internals enforce bounded progress and evidence/context economy.
+Own GitHub work from product intake through release-ready change. Natural language is the public API. Bounded progress; evidence/context economy.
 
 ## Route
 
 Match the request, then load **only** the selected workflow plus the policy
 modules declared at the top of that workflow. Do **not** load
 `references/shared-rules.md` as mandatory context; it is now a compatibility
-index. Each route includes `policy-kernel` plus only needed domains.
+index.
 
 **Full-review routing is explicit:** when the user asks for a full review, route
 to `references/full-review-pr.md`; bot-fix, CodeRabbit, Codex, security, or
@@ -37,6 +35,8 @@ simplify preparation first, then enter the merge workflow.
 | Create a refactor request, RFC, or verified tiny-commit plan                                          | `references/issue-workflows.md` → Refactor Plan    |
 | Write or update a `ready-for-agent` issue contract                                                    | `references/agent-brief.md`                        |
 | Record, match, reconsider, or remove a rejected enhancement decision                                  | `references/out-of-scope.md`                       |
+| Branch/commit work or Git history                                                                     | `references/git-workflow.md`                       |
+| SemVer, changelog, release/tag prep                                                                   | `references/versioning-release.md`                 |
 | Fix humans/bots on PR #N; own bug+security+spec; merge-ready                                          | `references/fix-pr-bots.md`                        |
 | Watch / monitor PR #N (CI + new reviews until merged/closed/blocker)                                  | `references/watch-pr.md`                           |
 | Re-review PR #N from human review + commits + new rabbit/Codex                                        | `references/re-review-pr.md`                       |
@@ -59,7 +59,6 @@ simplify preparation first, then enter the merge workflow.
 | Inspect / restack / retarget / recover / merge existing stacked PRs                                   | `references/stacked-prs.md`                        |
 | Split oversized change into reviewable PRs                                                            | Hand off to skill `split-to-prs`                   |
 | Finish branch / worktree cleanup after ship                                                           | Hand off to skill `finishing-a-development-branch` |
-| Commit / semver / changelog authoring / release tag                                                   | Hand off to skill `git-workflow-and-versioning`    |
 
 <!-- assertion-anchors -->
 <!-- assertion: full-review-loaded -->

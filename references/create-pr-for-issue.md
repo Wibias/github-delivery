@@ -61,7 +61,7 @@ Default to one cohesive PR. Split only when independently shippable concerns nee
 
 ## C. Implement locally
 
-1. Start from the exact base/development tip captured in A. Use a task branch/worktree that preserves unrelated local work.
+1. Start from the exact base/development tip captured in A. Use a task branch/worktree that preserves unrelated local work. Apply `references/git-workflow.md`; repository rules and `GD-GIT-*` remain authoritative.
 2. For non-trivial implementation, apply `references/minimal-solution.md`, then make the smallest complete change that satisfies the issue contract without weakening required safeguards.
 3. Follow required consumers as dependencies appear; for broad migrations or deterministic sweeps apply `references/change-execution.md`.
 4. Run focused validation appropriate to the changed code: tests, typecheck, build, repro, and repository-local checks as available.

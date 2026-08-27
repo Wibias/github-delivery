@@ -4,6 +4,19 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-08-27
+
+### Added
+
+- Git workflow is now a first-class github-delivery capability through `references/git-workflow.md`: repository conventions drive branch naming and commit style, task-owned work is separated from unrelated user changes, logical/atomic commit boundaries avoid arbitrary size targets, pre-commit verification uses repository-native checks, generated files follow repository evidence, and `git log` / `blame` / `bisect` are available as bounded delivery evidence (PR #377).
+- Versioning and release preparation are now first-class through `references/versioning-release.md`: the workflow inventories the actual delta from the previous release, classifies MAJOR/MINOR/PATCH by observable consumer impact, keeps version sources consistent, curates a human changelog, verifies tag/version identity, and keeps tag/Release/registry publication separately authorized (PR #377).
+
+### Changed
+
+- Bumped the package version from `1.2.0` to `1.3.0`.
+- Removed the public handoff to `git-workflow-and-versioning`. Explicit branch/commit and SemVer/changelog/release-preparation requests now route inside github-delivery, while the existing stricter `GD-GIT-*` safety rules and repository-local conventions remain authoritative (PR #377).
+- Issue-linked and local-work PR publication now compose the Git-workflow reference when branch/commit preparation is needed, preserving progressive disclosure instead of loading Git/versioning guidance into unrelated GitHub reads (PR #377).
+
 ## [1.2.0] - 2026-08-27
 
 ### Added
