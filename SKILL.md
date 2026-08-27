@@ -1,24 +1,22 @@
 ---
 name: github-delivery
 description: >
-  Git/GitHub delivery: branch/commit workflow, version/changelog prep, PRDs,
-  triage/QA, research, PRs, trackers, stacks, backports, review/fix/security,
-  conflicts, watch/status, merge/closure. Watch MUST run scripts/ship-gate.mjs
-  every wake. Default mode is read-only. Not for general local debugging,
-  non-GitHub planning, or skill authoring.
+  Git/GitHub delivery: commits, version/changelog prep, PRDs, triage/QA,
+  research, PRs, trackers, stacks, backports, reviews, conflicts, watch/status,
+  merge/closure. Watch MUST run scripts/ship-gate.mjs every wake. Default mode
+  is read-only. Not for general local debugging, non-GitHub planning, or skill authoring.
 ---
 
 # GitHub Delivery
 
-Own GitHub work from product intake through release-ready change. Natural language
-is the public API; internals enforce bounded progress and evidence/context economy.
+Own GitHub work from product intake through release-ready change. Natural language is the public API.
 
 ## Route
 
 Match the request, then load **only** the selected workflow plus the policy
 modules declared at the top of that workflow. Do **not** load
 `references/shared-rules.md` as mandatory context; it is now a compatibility
-index. Each route includes `policy-kernel` plus only needed domains.
+index.
 
 **Full-review routing is explicit:** when the user asks for a full review, route
 to `references/full-review-pr.md`; bot-fix, CodeRabbit, Codex, security, or
