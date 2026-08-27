@@ -16,6 +16,9 @@ const ASSISTANT_MERGE_REQUEST = /^(?:please\s+)?(?:merge|ship)\b|\b(?:and|then)\
 const AUTONOMOUS_WATCH_WORDING = /\bautonomous(ly)?\b|\bauto[- ]?fix\b|\bfix and merge without asking\b/;
 const PR_REFERENCE = /\b(?:pr|pull request)\s*#?\d+\b/;
 const PR_WORD = /\b(?:pr|pull request)\b/;
+const APPROVE_PR_INTENT = /\bapprove\b/;
+const NEGATED_APPROVE_INTENT = /\b(?:do not|don't|dont|never|without)\s+approv(?:e|ing)\b/;
+const DELIBERATIVE_APPROVE = /\b(?:should|can|could|would)\s+(?:i|we)\b[\s\S]*\bapprove\b|\b(?:why can't|why can’t|when should)\s+(?:i|we)\b[\s\S]*\bapprove\b/;
 const FULL_REVIEW_REQUEST = /\b(full review|review .* for real bugs|usefulness verdict)\b/;
 const REVIEW_PREPARATION_REQUEST = /\b(review|re-review|review again|look over|look through)\b/;
 const FIX_REVIEW_REQUEST = /\b(fix|address)\b[\s\S]*(review|coderabbit|codex|comment|feedback)/;
@@ -62,6 +65,7 @@ export const ROUTABLE_WORKFLOWS = Object.freeze([
   "references/work-item-delivery.md",
   "references/stacked-prs.md",
   "references/prepare-and-merge-pr.md",
+  "references/approve-pr.md",
   "references/merge-pr.md",
   "references/status.md",
   "references/supersede-pr.md",
@@ -120,6 +124,16 @@ function hasActivePullRequestContext(context) {
   return context?.activePullRequest === true ||
     Number.isInteger(context?.activePrNumber) ||
     Number.isInteger(context?.activePullRequest?.number);
+}
+
+function hasExplicitApproveIntent(text, context) {
+  const candidate = stripAttributedUntrustedText(text);
+  if (!APPROVE_PR_INTENT.test(candidate)) return false;
+  if (!(PR_REFERENCE.test(candidate) || (PR_WORD.test(candidate) && hasActivePullRequestContext(context)))) return false;
+  if (NEGATED_APPROVE_INTENT.test(candidate)) return false;
+  if (DELIBERATIVE_APPROVE.test(candidate)) return false;
+  if (DEFERRED_MERGE_AUTHORITY.test(candidate)) return false;
+  return true;
 }
 
 export function hasExplicitMergeIntent(prompt) {
@@ -221,6 +235,20 @@ export function routeShippingGithubPrompt(prompt, context = {}) {
       hasExplicitMergeIntent(text) ? "maintainer" : "read-only",
       hasExplicitMergeIntent(text) ? ["merge_pr", "post_comment"] : [],
     );
+  }
+
+  const approveRequested = hasExplicitApproveIntent(text, context);
+  if (approveRequested && hasExplicitMergeIntent(text)) {
+    return result("references/merge-pr.md", "maintainer", [
+      "approve_pr",
+      "merge_pr",
+      "post_comment",
+      "post_issue_comment",
+      "close_linked_issue",
+    ]);
+  }
+  if (approveRequested) {
+    return result("references/approve-pr.md", "review", ["approve_pr"]);
   }
 
   if (isAutonomousWatchMergeRequest(text)) {
