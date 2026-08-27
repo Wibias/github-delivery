@@ -9,6 +9,7 @@ const DEFINITIONS = [
   { action: "read_evidence", enabled: true, mutation: false, route: "local", minimumMode: "read-only", authorityScopeKind: null },
   { action: "draft_text", enabled: true, mutation: false, route: "local", minimumMode: "read-only", authorityScopeKind: null },
   { action: "post_review", enabled: true, mutation: true, route: "legacy", minimumMode: "review", prBound: true, social: true, highAssurance: true, remoteIdempotentCreate: true, authorityScopeKind: "pr_body_social" },
+  { action: "approve_pr", enabled: true, mutation: true, route: "approval", minimumMode: "review", prBound: true, social: true, highAssurance: true, remoteIdempotentCreate: true, authorityScopeKind: "approve_pr" },
   { action: "dismiss_review", enabled: true, mutation: true, route: "legacy", minimumMode: "review", prBound: true, highAssurance: true, authorityScopeKind: "dismiss_review" },
   { action: "post_comment", enabled: true, mutation: true, route: "legacy", minimumMode: "review", prBound: true, social: true, highAssurance: true, remoteIdempotentCreate: true, authorityScopeKind: "pr_body_social" },
   { action: "post_issue_comment", enabled: true, mutation: true, route: "legacy", minimumMode: "review", social: true, highAssurance: true, remoteIdempotentCreate: true, authorityScopeKind: "issue_comment" },
@@ -29,7 +30,7 @@ const DEFINITIONS = [
   { action: "close_pr", enabled: true, mutation: true, route: "legacy", minimumMode: "maintainer", prBound: true, destructive: true, highAssurance: true, authorityScopeKind: "close_pr" },
   { action: "merge_pr", enabled: true, mutation: true, route: "legacy", minimumMode: "maintainer", prBound: true, destructive: true, highAssurance: true, authorityScopeKind: "merge_pr" },
   { action: "retarget_pr", enabled: true, mutation: true, route: "legacy", minimumMode: "maintainer", prBound: true, highAssurance: true, authorityScopeKind: "retarget_pr" },
-  { action: "delete_head_branch", enabled: true, mutation: true, route: "legacy", minimumMode: "maintainer", cleanup: true, destructive: true, highAssurance: true, authorityScopeKind: "delete_head_branch" },
+  { action: "delete_head_branch", enabled: true, mutation: true, route: "legacy", minimumMode: "maintainer", prBound: true, cleanup: true, destructive: true, highAssurance: true, authorityScopeKind: "delete_head_branch" },
   { action: "create_follow_up_issue", enabled: true, mutation: true, route: "legacy", minimumMode: "maintainer", social: true, highAssurance: true, remoteIdempotentCreate: true, issueCreationKind: "follow_up", authorityScopeKind: "create_issue" },
   { action: "post_resolution_record", enabled: true, mutation: true, route: "legacy", minimumMode: "maintainer", prBound: true, social: true, highAssurance: true, remoteIdempotentCreate: true, authorityScopeKind: "pr_body_social" },
   {
@@ -121,7 +122,7 @@ export function validateMutationActionRegistry() {
     if (!(definition.minimumMode in MODE_RANK)) {
       errors.push(`minimum_mode_invalid:${definition.action}`);
     }
-    if (!["local", "lifecycle", "legacy"].includes(definition.route)) {
+    if (!["local", "lifecycle", "legacy", "approval"].includes(definition.route)) {
       errors.push(`route_invalid:${definition.action}`);
     }
     if (definition.mutation && !definition.authorityScopeKind) {
