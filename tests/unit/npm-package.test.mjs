@@ -14,6 +14,7 @@ const REQUIRED_RUNTIME = new Set([
   "scripts/github-delivery-cli.mjs",
   "scripts/install-codex-watchdog-hooks.mjs",
   "scripts/install-skill.mjs",
+  "scripts/windows-install-locks.ps1",
   "scripts/lib/authority-host-client.mjs",
   "scripts/lib/authority-host-install.mjs",
   "scripts/lib/authority-host-release.mjs",
@@ -23,13 +24,16 @@ const REQUIRED_RUNTIME = new Set([
   "scripts/lib/bootstrap-maintenance.mjs",
   "scripts/lib/distribution.mjs",
   "scripts/lib/install-lock.mjs",
+  "scripts/lib/installation-backups.mjs",
   "scripts/lib/release-path-identity.mjs",
   "scripts/lib/release-self-update.mjs",
   "scripts/lib/subprocess-policy.mjs",
   "scripts/lib/release-zip.mjs",
   "scripts/lib/stable-release-update.mjs",
+  "scripts/lib/update-user-experience.mjs",
   "scripts/lib/user-config.mjs",
   "scripts/lib/watchdog-activation.mjs",
+  "scripts/lib/windows-install-locks.mjs",
 ]);
 
 const ALWAYS_ALLOWED = new Set([
