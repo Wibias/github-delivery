@@ -9,6 +9,7 @@ const ACTIONS = [
   "read_evidence",
   "draft_text",
   "post_review",
+  "approve_pr",
   "dismiss_review",
   "post_comment",
   "post_issue_comment",
@@ -68,8 +69,7 @@ function buildProfile(mode) {
       "reply_bot_thread",
       "resolve_bot_thread",
     ]);
-    // Human replies may be planned in review mode, but execution is a trusted
-    // high-assurance action bound to the exact approved body.
+    allow(profile, ["approve_pr"], { explicit: true });
     allow(profile, ["reply_human_thread"], { exactText: true });
   }
   if (["maintainer", "autonomous"].includes(mode)) {
