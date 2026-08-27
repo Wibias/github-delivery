@@ -19,7 +19,7 @@
 </div>
 
 > [!NOTE]
-> **1.1.0.** First minor release after `1.0.0`, rolling up rewrite safety, review/evidence hardening, and the generation-10 adversarial-audit remediation. Host-specific runtime integrations and the experimental Codex streaming boundary remain constrained by what each agent host exposes. Native GitHub stacked-PR merge is an intentional fail-closed gap. See [Current state](#current-state).
+> **1.1.1.** Patch release after `1.1.0`, adding execution-ready workflow packets, controller-owned PR head freshness, and explicit GitHub-native PR approval. Host-specific runtime integrations and the experimental Codex streaming boundary remain constrained by what each agent host exposes. Native GitHub stacked-PR merge is an intentional fail-closed gap. See [Current state](#current-state).
 
 > [!IMPORTANT]
 > **Natural language is the public API.** The Node scripts, policy modules, evaluators, mutation broker, and optional Authority host are internal safety/evidence machinery. You normally do not invoke them yourself.
@@ -57,6 +57,7 @@ full review PR #42
 full review PR #42 and simplify it safely
 fix the review comments on PR #18 and make it merge ready
 backport PR #42 to release/1.x and release/2.x
+approve PR #42
 merge PR #32
 ```
 
@@ -80,6 +81,7 @@ For installation edge cases, backup/restore, downgrade behavior, manual recovery
 | **Implement & publish** | `create a PR for issue #90` | A bounded **research → implementation → pre-open review** sequence, minimal complete implementation, exact publication identity, linked PR |
 | **External work items** | `work on ENG-42 and open a PR` | Tracker-aware delivery orchestration, covering-PR reuse, evidence-driven milestone reconciliation |
 | **Review & fix** | `full review PR #42` | Bug + Security + Spec + Standards review, required probes, current-head verdict |
+| **Native approval** | `approve PR #42` | GitHub-native approval through the controlled mutation boundary, bound to the expected head; GitHub refusal such as self-approval remains a blocker |
 | **Merge readiness** | `fix the review comments on PR #18 and make it merge ready` | Feedback triage, code fixes, validation, publication, refreshed readiness |
 | **Competing PRs** | `triage the competing PRs in this repo` | Read-only deterministic clustering and evidence for potentially overlapping implementations |
 | **Visual changes** | `full review PR #42` on a UI diff | Conditional screenshot/video/render evidence bound to the exact reviewed head |
@@ -90,21 +92,15 @@ For installation edge cases, backup/restore, downgrade behavior, manual recovery
 | **Merge / close-out** | `merge PR #32` | Final gate, exact transaction authority, head-pinned merge, verification, thanks, linked-issue close-out |
 | **Self-update** | `update github-delivery to the latest stable release` | Stable-release discovery, checksums/manifest/tag/attestation verification, safe apply and postconditions |
 
-### What changed in 1.1.0
+### What changed in 1.1.1
 
-`1.1.0` is a minor release after `1.0.0`, rolling up the rewrite-safety work and the generation-10 adversarial-audit remediation:
+`1.1.1` is a focused patch release after `1.1.0`:
 
-- history-only Git rewrites must keep the original `HEAD^{tree}` before a force-with-lease push (`GD-GIT-008`);
-- full-review verdicts can publish GitHub Request changes through the mutation broker, with later passes dismissing our stale pending Request changes before a new request or merge-ready verdict;
-- `authorityMode=off` now means zero Windows Hello prompts while caller-controlled mutation JSON cannot self-attest direct user intent or exact-text confirmation; governing workflows supply those facts out of band;
-- merge execution adds final conversation-safety verification so unresolved review-thread races still fail closed at the destructive boundary;
-- required clean probe evidence must cover the exact deterministic trigger-file set;
-- classic branch-protection matching follows the supported GitHub pathname-style pattern subset and fails closed on syntax the implementation cannot prove compatible;
-- attributed issue/repository text cannot become current-user merge authority, and named GitHub GraphQL mutations remain broker-owned and registered;
-- behavioural-evaluation gating requires trusted hash-bound transcript provenance instead of accepting self-consistent local summaries as gating evidence;
-- review briefs distinguish core/mechanical files, require positive controls for absence claims, preserve shell/PATH identity for confirmation checks, and moved-code hints distinguish exact raw-text relocations from modified moves while keeping surrounding context in review.
+- workflow packets declare the normal helper entrypoints and broker actions needed to execute the selected workflow, while github-delivery source discovery is diagnostic-only during normal execution (PR #372);
+- successful branch mutations reconcile the new tip into controller-owned PR head state, and `ship-gate` can bind repository, PR, and expected head directly from the workflow checkpoint instead of model-copied SHA values (PR #374);
+- explicit `approve PR #N` requests perform GitHub-native approval through the controlled mutation boundary, verify the expected-head review state, and surface GitHub refusal instead of substituting a comment or `[GD]` verdict; deferred wording such as `merge PR #42 when I approve it later` remains read-only (PR #373).
 
-See [`CHANGELOG.md`](CHANGELOG.md) for the full release-level details, including the `1.0.0` notes.
+See [`CHANGELOG.md`](CHANGELOG.md) for the full release-level details, including the `1.1.0` notes.
 
 ---
 
@@ -212,7 +208,7 @@ A full review can combine:
 - proactive contract verification appropriate to the changed behavior;
 - conditional **visual evidence** for rendered/UI surfaces.
 
-The pre-open gate treats those deterministic probes as first-class obligations alongside required bug lenses and security surfaces. A probe detected from the branch diff remains blocking until its canonical structured probe-evidence record validates against the deterministic trigger files. Local branch review uses NUL-delimited Git records so renames and unusual valid paths retain both source and destination identity.
+The pre-open gate treats those deterministic probes as first-class obligations alongside required bug lenses and security surfaces. A probe detected from the branch diff remains blocking until its canonical structured probe-evidence record validates against the deterministic trigger files. Local branch review uses NUL-delimited Git records so renames and unusual valid paths retain both source and destination identity. Review briefs distinguish exact raw-text relocations from modified moves while keeping surrounding context in review.
 
 ### Safe simplification
 
@@ -417,6 +413,7 @@ For the complete budgets, trust model, incident replays, false-positive controls
 | **Completion evidence** | Prove durable completion/count/coverage claims | `references/completion-claims.md` |
 | **Safe simplification** | Behavior-preserving cleanup + mandatory re-review | `references/simplify-pr.md` |
 | **Prepare + merge** | Compound review/fix/simplify request with explicit merge | `references/prepare-and-merge-pr.md` |
+| **Approve** | Explicit GitHub-native PR approval | `references/approve-pr.md` |
 | **Merge** | Settle, final live gate, exact head-pinned merge | `references/merge-pr.md` |
 | **Supersede** | Replace an obsolete PR with a canonical PR | `references/supersede-pr.md` |
 | **Maintainer overtake** | Take over an unresponsive author's PR | `references/overtake-pr.md` |
@@ -449,6 +446,7 @@ watch PR #77 until it merges or needs me
 watch and autonomously merge PR #32
 simplify PR #42 without changing behavior
 review PR #42, fix it, and merge it when green
+approve PR #42
 merge PR #32
 
 triage the competing PRs in this repo
@@ -543,7 +541,7 @@ The architecture uses progressive disclosure: route once, load the selected work
 
 ## Current state
 
-`1.1.0` is the first minor release after `1.0.0`, expanding the safety/evidence architecture and incorporating the generation-10 adversarial-audit remediation.
+`1.1.1` is a patch release after `1.1.0`, tightening workflow execution/freshness and adding explicit GitHub-native PR approval.
 
 Stable in this release:
 
@@ -551,7 +549,8 @@ Stable in this release:
 - read-only open-work and competing-PR analysis;
 - issue research, implementation, publication, external work-item delivery, and exact-head duplicate prevention;
 - deep current-head review with deterministic probe coverage and conditional visual evidence;
-- mutation authority, exact-effect receipts, stale-head protection, and head-pinned merge execution;
+- explicit GitHub-native PR approval with expected-head verification and no comment/verdict substitution;
+- mutation authority, exact-effect receipts, controller-owned stale-head protection, and head-pinned merge execution;
 - optional Windows Authority Hello grants, push-only branch leases, and PR sessions for later exact-scope push and merge on one PR and approved merge base;
 - inferred-stack restacking/merge-order safety and independent multi-base delivery;
 - SHA-bound remote repository context when a useful local checkout is not already available;
