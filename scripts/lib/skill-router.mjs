@@ -49,16 +49,21 @@ const QA_INTAKE_REQUEST = /\bqa intake\b|\bfile\b[\s\S]{0,80}\breproducible\b[\s
 const CONFLICT_REQUEST = /\b(?:merge conflicts?|git conflicts?|resolve(?:\s+the)?(?:\s+merge)?\s+conflicts?)\b/;
 const OUT_OF_SCOPE_REQUEST = /\b(?:out of scope|rejected enhancement|not now)\b/;
 const SKILL_AUTHORING_REQUEST = /\b(?:create|author|write|edit|update|modify|change|fix|harden|extend|refactor|test|validate|debug|repair|audit)\b[\s\S]{0,160}\b(?:agent\s+)?skill\b|\b(?:agent\s+)?skill\b[\s\S]{0,160}\b(?:create|author|write|edit|update|modify|change|fix|harden|extend|refactor|test|validate|debug|repair|audit)\b/;
+const GIT_WORKFLOW_REQUEST = /\b(?:commit message|commit these changes|commit the changes|organize(?: the)? commits?|organise(?: the)? commits?|split(?: the)? commits?|squash(?: the)? commits?|reword(?: the)? commits?|reorder(?: the)? commits?|branch naming|create (?:a )?(?:git )?branch|git hygiene|git bisect|git blame|git log)\b/;
+const GIT_WORKFLOW_MUTATION_REQUEST = /\b(?:commit these changes|commit the changes|organize(?: the)? commits?|organise(?: the)? commits?|split(?: the)? commits?|squash(?: the)? commits?|reword(?: the)? commits?|reorder(?: the)? commits?|create (?:a )?(?:git )?branch)\b/;
+const VERSIONING_RELEASE_REQUEST = /\b(?:semver|semantic version(?:ing)?|version bump|bump (?:the )?version|next (?:release )?version|update (?:the )?changelog|write (?:the )?changelog|prepare (?:a |the )?release|release prep(?:aration)?|tag planning|release tag)\b/;
+const VERSIONING_RELEASE_MUTATION_REQUEST = /\b(?:version bump|bump (?:the )?version|update (?:the )?changelog|write (?:the )?changelog|prepare (?:a |the )?release)\b/;
 
 export const PUBLIC_ROUTE_HANDOFFS = Object.freeze([
   "split-to-prs",
   "finishing-a-development-branch",
-  "git-workflow-and-versioning",
 ]);
 
 export const ROUTABLE_WORKFLOWS = Object.freeze([
   "references/update.md",
   "references/configuration.md",
+  "references/git-workflow.md",
+  "references/versioning-release.md",
   "references/open-work-status.md",
   "references/consolidate-prs.md",
   "references/multi-base-delivery.md",
@@ -208,6 +213,20 @@ export function routeShippingGithubPrompt(prompt, context = {}) {
   }
   if (DELIVERY_NAME.test(text) && DELIVERY_CONFIG.test(text)) {
     return result("references/configuration.md", "read-only", []);
+  }
+  if (VERSIONING_RELEASE_REQUEST.test(text)) {
+    return result(
+      "references/versioning-release.md",
+      VERSIONING_RELEASE_MUTATION_REQUEST.test(text) ? "maintainer" : "read-only",
+      [],
+    );
+  }
+  if (GIT_WORKFLOW_REQUEST.test(text)) {
+    return result(
+      "references/git-workflow.md",
+      GIT_WORKFLOW_MUTATION_REQUEST.test(text) ? "maintainer" : "read-only",
+      [],
+    );
   }
   if (isOpenWorkRequest(text)) {
     return result("references/open-work-status.md", "read-only", []);
