@@ -30,7 +30,7 @@ const DEFINITIONS = [
   { action: "close_pr", enabled: true, mutation: true, route: "legacy", minimumMode: "maintainer", prBound: true, destructive: true, highAssurance: true, authorityScopeKind: "close_pr" },
   { action: "merge_pr", enabled: true, mutation: true, route: "legacy", minimumMode: "maintainer", prBound: true, destructive: true, highAssurance: true, authorityScopeKind: "merge_pr" },
   { action: "retarget_pr", enabled: true, mutation: true, route: "legacy", minimumMode: "maintainer", prBound: true, highAssurance: true, authorityScopeKind: "retarget_pr" },
-  { action: "delete_head_branch", enabled: true, mutation: true, route: "legacy", minimumMode: "maintainer", prBound: true, cleanup: true, destructive: true, highAssurance: true, authorityScopeKind: "delete_head_branch" },
+  { action: "delete_head_branch", enabled: true, mutation: true, route: "legacy", minimumMode: "maintainer", cleanup: true, destructive: true, highAssurance: true, authorityScopeKind: "delete_head_branch" },
   { action: "create_follow_up_issue", enabled: true, mutation: true, route: "legacy", minimumMode: "maintainer", social: true, highAssurance: true, remoteIdempotentCreate: true, issueCreationKind: "follow_up", authorityScopeKind: "create_issue" },
   { action: "post_resolution_record", enabled: true, mutation: true, route: "legacy", minimumMode: "maintainer", prBound: true, social: true, highAssurance: true, remoteIdempotentCreate: true, authorityScopeKind: "pr_body_social" },
   {
