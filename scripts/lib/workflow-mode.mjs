@@ -8,6 +8,7 @@ const WORKFLOW_MUTATION_MODES = Object.freeze({
   "references/create-pr-from-local-work.md": ["maintainer"],
   "references/fix-pr-bots.md": ["maintainer"],
   "references/full-review-pr.md": ["review", "maintainer"],
+  "references/git-workflow.md": ["read-only", "maintainer"],
   "references/merge-pr.md": ["maintainer"],
   "references/multi-base-delivery.md": ["maintainer"],
   "references/open-work-status.md": ["read-only"],
@@ -18,6 +19,7 @@ const WORKFLOW_MUTATION_MODES = Object.freeze({
   "references/simplify-pr.md": ["maintainer"],
   "references/status.md": ["read-only"],
   "references/supersede-pr.md": ["maintainer"],
+  "references/versioning-release.md": ["read-only", "maintainer"],
   "references/watch-pr.md": ["read-only", "autonomous"],
   "references/work-item-delivery.md": ["read-only", "maintainer"],
 });
