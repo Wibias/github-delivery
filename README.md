@@ -365,7 +365,7 @@ GitHub Delivery treats convergence as a runtime + workflow problem rather than a
 | **Policy** | Universal bounded-progress/evidence-economy fallback when the host exposes no trusted interception surface |
 | **Codex lifecycle hooks** | Turn-scoped duplicate/poll/evidence limits and bounded narration recovery at supported tool boundaries |
 | **Protected Codex stream** | Launch-controlled App Server stream that can interrupt in-flight no-progress/tool-emission/protocol stalls |
-| **Workflow controller** | Route/phase locking, checkpointed progress, bounded retries/evidence/actions/tokens/steps/wall time budgets |
+| **Workflow controller** | Route/phase locking, checkpointed progress, bounded retries/evidence/actions/tokens/steps/wall time |
 
 Key defaults include:
 
