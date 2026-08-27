@@ -4,6 +4,17 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-08-28
+
+### Changed
+
+- Bumped the package version from `1.3.0` to `1.3.1`.
+
+### Fixed
+
+- Exclusive skill and Windows Authority install locks now recover after a hard-crashed github-delivery process leaves a stale owned lock behind. Recovery is limited to the exact github-delivery PID + nonce token format and only proceeds when that PID is provably gone; live, malformed, permission-uncertain, and raced locks remain fail-closed as `install_lock_held` (PR #383).
+- Installed `policy-bundle.mjs` and `workflow-brief.mjs` helpers now resolve github-delivery's own installed skill root by default instead of treating the caller repository's current working directory as the workflow root. Explicit root overrides remain supported, so agents can load `git-workflow` and other workflow packets without changing out of the repository they are operating on (PR #383).
+
 ## [1.3.0] - 2026-08-27
 
 ### Added
