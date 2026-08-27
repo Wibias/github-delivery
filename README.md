@@ -19,7 +19,7 @@
 </div>
 
 > [!NOTE]
-> **1.3.0.** Git workflow and release versioning are now first-class github-delivery capabilities: the skill owns repository-aware branch/commit discipline, pre-commit hygiene, Git-history investigation, SemVer classification, curated changelogs, and release/tag preparation instead of handing that work to another skill. Remote push, PR, tag, release, registry publication, and merge authority remain explicitly bounded. Host-specific runtime integrations and the experimental Codex streaming boundary remain constrained by what each agent host exposes. Native GitHub stacked-PR merge is an intentional fail-closed gap. See [Current state](#current-state).
+> **1.3.0.** Git workflow and release versioning are now first-class github-delivery capabilities: the skill owns repository-aware branch/commit discipline, pre-commit hygiene, Git-history investigation, SemVer classification, curated changelogs, and release/tag preparation instead of handing that work to another skill. The release also hardens native approval, Git/versioning workflow-packet execution, controller recovery after ambiguous pushes, and Windows update recovery against PID reuse. Remote push, PR, tag, release, registry publication, and merge authority remain explicitly bounded. Host-specific runtime integrations and the experimental Codex streaming boundary remain constrained by what each agent host exposes. Native GitHub stacked-PR merge is an intentional fail-closed gap. See [Current state](#current-state).
 
 > [!IMPORTANT]
 > **Natural language is the public API.** The Node scripts, policy modules, evaluators, mutation broker, and optional Authority host are internal safety/evidence machinery. You normally do not invoke them yourself.
@@ -105,7 +105,11 @@ For installation edge cases, backup/restore, downgrade behavior, manual recovery
 - `references/versioning-release.md` owns release-delta inventory, SemVer classification by observable consumer impact, version-source consistency, human-curated changelogs, tag/version identity, and release-candidate checks;
 - direct commit/branch and SemVer/changelog/release-preparation requests route internally instead of handing off to `git-workflow-and-versioning`, while repository conventions and the stricter existing `GD-GIT-*` safety rules remain authoritative;
 - issue-linked and local-work PR publication compose the Git-workflow reference when branch/commit preparation is actually needed, preserving progressive disclosure;
-- release preparation remains separate from publication: a version/changelog request never grants tag, GitHub Release, npm/package-registry, merge, or other remote publication authority.
+- release preparation remains separate from publication: a version/changelog request never grants tag, GitHub Release, npm/package-registry, merge, or other remote publication authority;
+- native approval is a dedicated `approve_pr` authority action: generic `post_review` cannot encode approval, explicit approval intent remains mandatory, Windows Authority binds the semantic approval action, and self-approval is rejected before the GitHub approval write;
+- Git/versioning requests now enter the mandatory one-shot workflow-packet/controller runtime, full-review intent keeps precedence over broad Git/version keywords in attributed repository text, and execution packets advertise only actions present in the mutation registry;
+- verified uncertain pushes (`reconciled_after_error`) count as completed controller progress, and resumed `already_applied` receipts retain the original request including `newTip` so head checkpoints can recover after a crash;
+- Windows update graceful-close consent is bound to the inspected PID plus process start identity and re-verified immediately before `CloseMainWindow()`, so PID reuse fails closed instead of closing a different process.
 
 See [`CHANGELOG.md`](CHANGELOG.md) for the full release-level details, including the `1.2.0` Windows update-safety changes.
 
