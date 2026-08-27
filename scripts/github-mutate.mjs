@@ -3,15 +3,17 @@ import { appendFileSync, existsSync, readFileSync } from "node:fs";
 
 import { runGitHubCommandWithRetry } from "./lib/github-retry.mjs";
 import { executeMutationDocument } from "./lib/mutation-document-execution.mjs";
+import { reconcileMutationCheckpoint } from "./lib/mutation-checkpoint.mjs";
 import { boundedSpawnSync } from "./lib/subprocess-policy.mjs";
 import { makeGitHubBodyTransportRunner } from "./lib/github-body-transport.mjs";
 
 const usage =
-  "Usage: node scripts/github-mutate.mjs --request FILE [--execute] [--audit FILE]";
+  "Usage: node scripts/github-mutate.mjs --request FILE [--execute] [--audit FILE] [--checkpoint FILE]";
 
 function parseArgs(argv) {
   let requestPath = null;
   let auditPath = null;
+  let checkpointPath = null;
   let execute = false;
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];
@@ -21,6 +23,9 @@ function parseArgs(argv) {
     } else if (value === "--audit") {
       auditPath = argv[++index];
       if (!auditPath) throw new Error("--audit requires a file path");
+    } else if (value === "--checkpoint") {
+      checkpointPath = argv[++index];
+      if (!checkpointPath) throw new Error("--checkpoint requires a file path");
     } else if (value === "--execute") {
       execute = true;
     } else {
@@ -28,7 +33,7 @@ function parseArgs(argv) {
     }
   }
   if (!requestPath) throw new Error(usage);
-  return { requestPath, auditPath, execute };
+  return { requestPath, auditPath, checkpointPath, execute };
 }
 
 export function mutationRunner(command, argv, options) {
@@ -76,6 +81,9 @@ try {
       },
     },
   });
+  if (args.execute && args.checkpointPath) {
+    reconcileMutationCheckpoint({ path: args.checkpointPath, output });
+  }
   process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
   if (output?.partialFailure) process.exitCode = 2;
 } catch (error) {
