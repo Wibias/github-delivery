@@ -1,18 +1,16 @@
 ---
 name: github-delivery
 description: >
-  Git/GitHub delivery skill: branch/commit workflow, version/changelog prep,
-  PRDs, triage/QA, research, linked/open-work PRs, tracker delivery, competing
-  PRs, backports/ports, stacks, review/fix/simplify/security, conflicts,
-  watch/status, supersede/overtake, merge/closure. Watch MUST run
-  scripts/ship-gate.mjs every wake. Default mode is read-only. Not for general
-  local debugging, non-GitHub planning, or skill authoring.
+  Git/GitHub delivery: branch/commit workflow, version/changelog prep, PRDs,
+  triage/QA, research, PRs, trackers, stacks, backports, review/fix/security,
+  conflicts, watch/status, merge/closure. Watch MUST run scripts/ship-gate.mjs
+  every wake. Default mode is read-only. Not for general local debugging,
+  non-GitHub planning, or skill authoring.
 ---
 
 # GitHub Delivery
 
-Own Git/GitHub delivery from product intake through clean branch/commit history,
-PR lifecycle, verified merge, and version/changelog preparation. Natural language
+Own GitHub work from product intake through release-ready change. Natural language
 is the public API; internals enforce bounded progress and evidence/context economy.
 
 ## Route
@@ -39,8 +37,8 @@ simplify preparation first, then enter the merge workflow.
 | Create a refactor request, RFC, or verified tiny-commit plan                                          | `references/issue-workflows.md` → Refactor Plan    |
 | Write or update a `ready-for-agent` issue contract                                                    | `references/agent-brief.md`                        |
 | Record, match, reconsider, or remove a rejected enhancement decision                                  | `references/out-of-scope.md`                       |
-| Branch/commit organization or Git-history investigation                                              | `references/git-workflow.md`                       |
-| SemVer, version/changelog, or release/tag preparation                                                | `references/versioning-release.md`                 |
+| Branch/commit work or Git history                                                                     | `references/git-workflow.md`                       |
+| SemVer, changelog, release/tag prep                                                                   | `references/versioning-release.md`                 |
 | Fix humans/bots on PR #N; own bug+security+spec; merge-ready                                          | `references/fix-pr-bots.md`                        |
 | Watch / monitor PR #N (CI + new reviews until merged/closed/blocker)                                  | `references/watch-pr.md`                           |
 | Re-review PR #N from human review + commits + new rabbit/Codex                                        | `references/re-review-pr.md`                       |
@@ -85,10 +83,6 @@ development-tip / issue-state evidence directly into `references/create-pr-for-i
 and begin implementation. Do not repeat unchanged research. The create-PR
 pre-open bug/security gate is **post-implementation and pre-publication**.
 Triage may compose `agent-brief`; confirmed rejection may compose `out-of-scope`.
-
-Git workflow and versioning are focused companions; load them only when that
-work is in scope. Their local preparation never grants push, PR, tag, Release,
-registry-publication, or merge authority.
 
 Simplification is explicit-only; line count is never a goal or success metric.
 
