@@ -299,7 +299,7 @@ export function createDeliveryWorkflowController(options = {}) {
     const results = Array.isArray(result?.results) ? result.results : [result];
     const pushes = results.filter((entry) =>
       entry?.action === "push_code" &&
-      (entry?.status === "succeeded" || entry?.status === "already_applied") &&
+      ["succeeded", "already_applied", "reconciled_after_error"].includes(entry?.status) &&
       entry?.request?.newTip,
     );
     if (pushes.length === 0) {
