@@ -30,6 +30,10 @@ export function mutationOperationKey(request = {}) {
   return `payload:${sha256(canonicalJson(payload))}`;
 }
 
+export function mutationReceiptCompleted(receipt = {}) {
+  return ["succeeded", "already_applied", "reconciled_after_error"].includes(receipt?.status);
+}
+
 function cloneRequests(requests) {
   if (!Array.isArray(requests) || requests.length === 0) {
     throw new Error("mutation_document_requests_required");
@@ -94,9 +98,6 @@ function resolvedDependencies(overrides = {}) {
     ...overrides,
   };
 
-  // Older focused tests and integrations may replace the intrinsic classifier.
-  // Preserve that injection point unless they explicitly provide the new
-  // effective-mode decision as well.
   if (
     Object.hasOwn(overrides, "mutationRequiresTrustedAuthority") &&
     !Object.hasOwn(overrides, "mutationAuthorityRequired")
@@ -171,6 +172,7 @@ export function executeMutationDocument({
     if (completedKeys.has(operationKey)) {
       const skipped = {
         action: request.action,
+        request: structuredClone(request),
         status: "already_applied",
         outcome: "already_completed",
         skipped: true,
@@ -192,9 +194,7 @@ export function executeMutationDocument({
       const receipt = { ...result, operationKey };
       results.push(receipt);
       deps.onReceipt?.(receipt);
-      if (receipt?.status === "succeeded" || receipt?.status === "already_applied") {
-        completedKeys.add(operationKey);
-      }
+      if (mutationReceiptCompleted(receipt)) completedKeys.add(operationKey);
     } catch (error) {
       partialFailure = true;
       const failed = {
