@@ -5,6 +5,7 @@
  * never produce an authoritative ready result.
  * Usage: node scripts/ship-gate.mjs OWNER/REPO PR_NUMBER [--snapshot FILE]
  */
+import { readDeliveryWorkflowCheckpoint } from "./lib/delivery-workflow-controller.mjs";
 import { captureLiveSnapshot } from "./lib/live-snapshot.mjs";
 import { evaluateBaseHealthSnapshot } from "./lib/base-health-policy.mjs";
 import {
@@ -19,6 +20,7 @@ import {
   evaluateWakeSnapshot,
 } from "./lib/snapshot-evaluators.mjs";
 import {
+  bindSnapshotGateToController,
   parseSnapshotGateArgs,
   readValidatedSnapshot,
 } from "./lib/snapshot-input.mjs";
@@ -27,11 +29,20 @@ import { validateWorkflowMutationMode } from "./lib/workflow-mode.mjs";
 import { ownedHelperEffect } from "./lib/watchdog-evidence-registry.mjs";
 
 const usage =
-  "Usage: node scripts/ship-gate.mjs OWNER/REPO PR_NUMBER [--snapshot FILE] [--expected-head SHA] [--max-age-seconds N] [--mutation-mode MODE] [--workflow WORKFLOW]";
+  "Usage: node scripts/ship-gate.mjs [OWNER/REPO PR_NUMBER] [--checkpoint FILE] [--snapshot FILE] [--expected-head SHA] [--max-age-seconds N] [--mutation-mode MODE] [--workflow WORKFLOW]";
 
 try {
   const mutationArgs = extractMutationModeArgs(process.argv.slice(2));
-  const args = parseSnapshotGateArgs(mutationArgs.argv, { usage });
+  let args = parseSnapshotGateArgs(mutationArgs.argv, { usage });
+  if (args.checkpointPath) {
+    const controller = readDeliveryWorkflowCheckpoint(args.checkpointPath);
+    const bound = bindSnapshotGateToController({ gate: args, controller });
+    args = {
+      ...args,
+      ...bound,
+      workflow: args.workflow || controller.workflow || null,
+    };
+  }
   if (args.workflow) {
     const compatibility = validateWorkflowMutationMode({
       workflow: args.workflow,

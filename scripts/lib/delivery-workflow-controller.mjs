@@ -295,6 +295,30 @@ export function createDeliveryWorkflowController(options = {}) {
     return { changed, stateGeneration };
   }
 
+  function reconcileMutationResult(result = {}) {
+    const results = Array.isArray(result?.results) ? result.results : [result];
+    const pushes = results.filter((entry) =>
+      entry?.action === "push_code" &&
+      (entry?.status === "succeeded" || entry?.status === "already_applied") &&
+      entry?.request?.newTip,
+    );
+    if (pushes.length === 0) {
+      return { changed: false, stateGeneration, headSha };
+    }
+    const applicable = pushes.filter(
+      (entry) => String(entry.request?.repo || "").toLowerCase() === repo.toLowerCase(),
+    );
+    if (applicable.length !== pushes.length) {
+      throw new Error("mutation_result_repo_mismatch");
+    }
+    const tips = [...new Set(applicable.map((entry) => String(entry.request.newTip)))];
+    if (tips.length !== 1) {
+      throw new Error("mutation_result_head_ambiguous");
+    }
+    const updated = updateRefs({ headSha: tips[0] });
+    return { ...updated, headSha };
+  }
+
   function recordEvidence(entry) {
     const result = evidenceRegistry.record({
       ...entry,
@@ -321,6 +345,7 @@ export function createDeliveryWorkflowController(options = {}) {
     addBlocker,
     removeBlocker,
     updateRefs,
+    reconcileMutationResult,
     recordEvidence,
     decideEvidence,
     snapshot: snapshotState,
