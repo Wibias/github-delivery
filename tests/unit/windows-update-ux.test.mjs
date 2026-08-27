@@ -264,9 +264,9 @@ test("backup cleanup failures do not roll back an otherwise verified update", as
 }));
 
 test("default backup cleanup removes only recognized old backups and never the fresh rollback backup", async () => withFixture(async ({ root, target }) => {
-  const distribution = await import("../../scripts/lib/distribution.mjs");
-  assert.equal(typeof distribution.listInstallationBackups, "function");
-  assert.equal(typeof distribution.removeOldInstallationBackups, "function");
+  const backups = await import("../../scripts/lib/installation-backups.mjs");
+  assert.equal(typeof backups.listInstallationBackups, "function");
+  assert.equal(typeof backups.removeOldInstallationBackups, "function");
 
   const backupRoot = join(dirname(target), ".github-delivery-backups");
   const oldBackup = join(backupRoot, "github-delivery-100-1.0.0");
@@ -274,8 +274,8 @@ test("default backup cleanup removes only recognized old backups and never the f
   const unrelated = join(backupRoot, "do-not-delete");
   for (const path of [oldBackup, freshBackup, unrelated]) mkdirSync(path, { recursive: true });
 
-  assert.deepEqual(distribution.listInstallationBackups({ target }), [oldBackup, freshBackup]);
-  const cleanup = distribution.removeOldInstallationBackups({
+  assert.deepEqual(backups.listInstallationBackups({ target }), [oldBackup, freshBackup]);
+  const cleanup = backups.removeOldInstallationBackups({
     target,
     backups: [oldBackup],
     keepBackup: freshBackup,
