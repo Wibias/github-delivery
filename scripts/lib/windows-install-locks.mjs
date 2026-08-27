@@ -1,4 +1,4 @@
-import { join, resolve } from "node:path";
+import { join, resolve, win32 } from "node:path";
 
 import { boundedSpawnSync } from "./subprocess-policy.mjs";
 
@@ -36,7 +36,7 @@ export function inspectWindowsInstallLocks(target, {
   spawn = boundedSpawnSync,
 } = {}) {
   if (platform !== "win32") return [];
-  const resolvedTarget = resolve(target);
+  const resolvedTarget = win32.resolve(target);
   const result = spawn("powershell.exe", [
     "-NoProfile",
     "-NonInteractive",
