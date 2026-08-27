@@ -6,10 +6,14 @@ import test from "node:test";
 
 import { withExclusiveInstallLock } from "../../scripts/lib/install-lock.mjs";
 
+function lockToken(pid, hex = "a") {
+  return `${pid}-${hex.repeat(32)}\n`;
+}
+
 test("exclusive install lock reclaims a lock owned by a process that no longer exists", () => {
   const root = mkdtempSync(join(tmpdir(), "gd-install-lock-stale-"));
   const lockPath = join(root, "install.lock");
-  writeFileSync(lockPath, "424242-dead-owner\n");
+  writeFileSync(lockPath, lockToken(424242));
 
   const result = withExclusiveInstallLock(
     lockPath,
@@ -24,7 +28,7 @@ test("exclusive install lock reclaims a lock owned by a process that no longer e
 test("exclusive install lock keeps a lock whose owner process is still alive", () => {
   const root = mkdtempSync(join(tmpdir(), "gd-install-lock-live-"));
   const lockPath = join(root, "install.lock");
-  const token = "424242-live-owner\n";
+  const token = lockToken(424242, "b");
   writeFileSync(lockPath, token);
 
   assert.throws(
@@ -32,4 +36,16 @@ test("exclusive install lock keeps a lock whose owner process is still alive", (
     /install_lock_held/,
   );
   assert.equal(readFileSync(lockPath, "utf8"), token);
+});
+
+test("exclusive install lock never reclaims an unrecognized lock token", () => {
+  const root = mkdtempSync(join(tmpdir(), "gd-install-lock-unknown-"));
+  const lockPath = join(root, "install.lock");
+  writeFileSync(lockPath, "foreign-holder\n");
+
+  assert.throws(
+    () => withExclusiveInstallLock(lockPath, () => "must not run", { processExists: () => false }),
+    /install_lock_held/,
+  );
+  assert.equal(readFileSync(lockPath, "utf8"), "foreign-holder\n");
 });
