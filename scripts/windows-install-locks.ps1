@@ -5,7 +5,9 @@ param(
 
   [string]$Target,
 
-  [int]$ProcessId = 0
+  [int]$ProcessId = 0,
+
+  [string]$ExpectedStartTimeUtc
 )
 
 $ErrorActionPreference = 'Stop'
@@ -13,6 +15,10 @@ $ErrorActionPreference = 'Stop'
 if ($Mode -eq 'Close') {
   if ($ProcessId -le 0) {
     throw 'ProcessId is required for Close mode.'
+  }
+  if ([string]::IsNullOrWhiteSpace($ExpectedStartTimeUtc)) {
+    @{ requested = $false; reason = 'process_identity_missing' } | ConvertTo-Json -Compress
+    exit 0
   }
 
   try {
@@ -24,6 +30,17 @@ if ($Mode -eq 'Close') {
 
   if ($process.Id -eq $PID) {
     @{ requested = $false; reason = 'current_process' } | ConvertTo-Json -Compress
+    exit 0
+  }
+
+  try {
+    $actualStartTimeUtc = $process.StartTime.ToUniversalTime().ToString('O')
+  } catch {
+    @{ requested = $false; reason = 'process_identity_unavailable' } | ConvertTo-Json -Compress
+    exit 0
+  }
+  if (-not [string]::Equals($actualStartTimeUtc, $ExpectedStartTimeUtc, [System.StringComparison]::Ordinal)) {
+    @{ requested = $false; reason = 'process_identity_changed' } | ConvertTo-Json -Compress
     exit 0
   }
 
@@ -47,6 +64,7 @@ public sealed class GitHubDeliveryLockRecord
 {
     public int pid { get; set; }
     public string name { get; set; }
+    public string startTimeUtc { get; set; }
     public string[] paths { get; set; }
 }
 
@@ -228,9 +246,12 @@ public static class GitHubDeliveryHandleInspector
         foreach (KeyValuePair<int, HashSet<string>> pair in matches)
         {
             string processName;
+            string startTimeUtc = null;
             try
             {
-                processName = Process.GetProcessById(pair.Key).ProcessName;
+                Process process = Process.GetProcessById(pair.Key);
+                processName = process.ProcessName;
+                startTimeUtc = process.StartTime.ToUniversalTime().ToString("O");
                 if (!processName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) processName += ".exe";
             }
             catch
@@ -240,7 +261,7 @@ public static class GitHubDeliveryHandleInspector
             string[] paths = new string[pair.Value.Count];
             pair.Value.CopyTo(paths);
             Array.Sort(paths, StringComparer.OrdinalIgnoreCase);
-            result.Add(new GitHubDeliveryLockRecord { pid = pair.Key, name = processName, paths = paths });
+            result.Add(new GitHubDeliveryLockRecord { pid = pair.Key, name = processName, startTimeUtc = startTimeUtc, paths = paths });
         }
         result.Sort(delegate(GitHubDeliveryLockRecord left, GitHubDeliveryLockRecord right) { return left.pid.CompareTo(right.pid); });
         return result.ToArray();

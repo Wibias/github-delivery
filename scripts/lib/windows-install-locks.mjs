@@ -8,10 +8,16 @@ function normalizeBlocker(value) {
   if (!Number.isInteger(pid) || pid <= 0) return null;
   const rawName = String(value.name || `PID ${pid}`).trim();
   const name = rawName && rawName.includes(".") ? rawName : `${rawName || `PID ${pid}`}.exe`;
+  const startTimeUtc = String(value.startTimeUtc || "").trim();
   const paths = Array.isArray(value.paths)
     ? [...new Set(value.paths.map((path) => String(path || "").trim()).filter(Boolean))]
     : [];
-  return { pid, name, paths };
+  return {
+    pid,
+    name,
+    ...(startTimeUtc ? { startTimeUtc } : {}),
+    paths,
+  };
 }
 
 function parseJsonOutput(stdout) {
@@ -72,6 +78,8 @@ export function requestGracefulProcessClose(processInfo, {
   const pid = Number(processInfo?.pid);
   if (!Number.isInteger(pid) || pid <= 0) return { requested: false, reason: "invalid_pid" };
   if (pid === process.pid) return { requested: false, pid, reason: "current_process" };
+  const startTimeUtc = String(processInfo?.startTimeUtc || "").trim();
+  if (!startTimeUtc) return { requested: false, pid, reason: "process_identity_missing" };
   const result = spawn("powershell.exe", [
     "-NoProfile",
     "-NonInteractive",
@@ -83,6 +91,8 @@ export function requestGracefulProcessClose(processInfo, {
     "Close",
     "-ProcessId",
     String(pid),
+    "-ExpectedStartTimeUtc",
+    startTimeUtc,
   ], {
     encoding: "utf8",
     windowsHide: true,
@@ -108,6 +118,6 @@ export function requestGracefulProcessClose(processInfo, {
       reason: parsed?.reason || null,
     };
   } catch {
-    return { requested: true, pid };
+    return { requested: false, pid, reason: "close_response_invalid" };
   }
 }
