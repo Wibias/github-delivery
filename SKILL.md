@@ -1,17 +1,19 @@
 ---
 name: github-delivery
 description: >
-  GitHub issue/PR lifecycle skill: PRDs, triage/QA, research, linked/open-work
-  PRs, external tracker delivery, competing PR analysis, backports/ports, stacks,
-  review/fix/simplify/security, conflicts, watch/status, supersede/overtake,
-  merge/closure. Watch MUST run scripts/ship-gate.mjs every wake. Default mode is
-  read-only. Not for local pre-PR debugging, non-GitHub planning, or skill authoring.
+  Git and GitHub delivery lifecycle skill: branches/commits, versioning/changelog
+  preparation, PRDs, triage/QA, research, linked/open-work PRs, external tracker
+  delivery, competing PR analysis, backports/ports, stacks, review/fix/simplify/
+  security, conflicts, watch/status, supersede/overtake, merge/closure. Watch MUST
+  run scripts/ship-gate.mjs every wake. Default mode is read-only. Not for general
+  local application debugging, non-GitHub planning, or skill authoring.
 ---
 
 # GitHub Delivery
 
-Own GitHub work from product intake through merged PR. Natural language is the
-public API; internals enforce bounded progress and evidence/context economy.
+Own Git and GitHub delivery from product intake through branch/commit organization,
+PR lifecycle, verified merge, version/changelog preparation, and release handoff.
+Natural language is the public API; internals enforce bounded progress and evidence/context economy.
 
 ## Route
 
@@ -37,6 +39,8 @@ simplify preparation first, then enter the merge workflow.
 | Create a refactor request, RFC, or verified tiny-commit plan                                          | `references/issue-workflows.md` → Refactor Plan    |
 | Write or update a `ready-for-agent` issue contract                                                    | `references/agent-brief.md`                        |
 | Record, match, reconsider, or remove a rejected enhancement decision                                  | `references/out-of-scope.md`                       |
+| Organize branches/commits, write commit messages, or inspect Git history for delivery work            | `references/git-workflow.md`                       |
+| Choose SemVer, update version/changelog, or prepare release/tag identity                              | `references/versioning-release.md`                 |
 | Fix humans/bots on PR #N; own bug+security+spec; merge-ready                                          | `references/fix-pr-bots.md`                        |
 | Watch / monitor PR #N (CI + new reviews until merged/closed/blocker)                                  | `references/watch-pr.md`                           |
 | Re-review PR #N from human review + commits + new rabbit/Codex                                        | `references/re-review-pr.md`                       |
@@ -59,7 +63,6 @@ simplify preparation first, then enter the merge workflow.
 | Inspect / restack / retarget / recover / merge existing stacked PRs                                   | `references/stacked-prs.md`                        |
 | Split oversized change into reviewable PRs                                                            | Hand off to skill `split-to-prs`                   |
 | Finish branch / worktree cleanup after ship                                                           | Hand off to skill `finishing-a-development-branch` |
-| Commit / semver / changelog authoring / release tag                                                   | Hand off to skill `git-workflow-and-versioning`    |
 
 <!-- assertion-anchors -->
 <!-- assertion: full-review-loaded -->
@@ -82,6 +85,12 @@ development-tip / issue-state evidence directly into `references/create-pr-for-i
 and begin implementation. Do not repeat unchanged research. The create-PR
 pre-open bug/security gate is **post-implementation and pre-publication**.
 Triage may compose `agent-brief`; confirmed rejection may compose `out-of-scope`.
+
+Use `references/git-workflow.md` as a focused companion when an implementation or
+publication workflow needs branch/commit organization; do not reload it for every
+GitHub read. Use `references/versioning-release.md` when a release/version decision
+is actually in scope. Version/changelog preparation never implies tag, merge,
+GitHub Release, asset-upload, or package-publication authority.
 
 Simplification is explicit-only; line count is never a goal or success metric.
 
@@ -113,6 +122,11 @@ no GitHub write authority. Run routine deterministic tooling quietly; narrate on
   **Human replies always require exact-text confirmation.** Public GitHub text
   must keep notifying mentions bare: never wrap GitHub `@login` mentions in backticks.
   Detailed rules: `references/policy/mutation.md` and `references/mutation-modes.md`.
+- **Local Git discipline is owned here, but local work is not remote authority.**
+  Branch creation, commits, history inspection, version metadata, and changelog
+  preparation follow `references/git-workflow.md` / `references/versioning-release.md`.
+  Push, PR, tag, release, registry publication, and merge retain their own explicit
+  workflow/authority boundaries.
 - **Issue-linked create-PR forward progress is explicit:** bounded need-to-fix research decides
   whether work is needed, then implementation begins. `pre-open-gate.mjs` reviews
   the resulting non-empty candidate diff before publication; it must never be
