@@ -143,6 +143,14 @@ const APPROVE_GRAPH = Object.freeze({
   ...TERMINAL,
 });
 
+const LOCAL_PREP_GRAPH = Object.freeze({
+  ROUTE: ["PREFLIGHT"],
+  PREFLIGHT: ["PREPARE", "DONE"],
+  PREPARE: ["VERIFY"],
+  VERIFY: ["DONE"],
+  ...TERMINAL,
+});
+
 const CHANGE_GRAPH = Object.freeze({
   ROUTE: ["PREFLIGHT"],
   PREFLIGHT: ["PREPARE", "DONE"],
@@ -191,6 +199,8 @@ const PROFILE_DEFINITIONS = Object.freeze({
   "issue-workflows": { graph: ISSUE_GRAPH, mutation: "profile-dependent" },
   "agent-brief": { graph: ISSUE_GRAPH, mutation: "profile-dependent" },
   "out-of-scope": { graph: ISSUE_GRAPH, mutation: "profile-dependent" },
+  "git-workflow": { graph: LOCAL_PREP_GRAPH, mutation: "profile-dependent" },
+  "versioning-release": { graph: LOCAL_PREP_GRAPH, mutation: "profile-dependent" },
   "fix-pr-bots": { graph: REVIEW_GRAPH, mutation: "review" },
   "watch-pr": { graph: WATCH_GRAPH, mutation: "read-mostly" },
   "re-review-pr": { graph: REVIEW_GRAPH, mutation: "review" },
