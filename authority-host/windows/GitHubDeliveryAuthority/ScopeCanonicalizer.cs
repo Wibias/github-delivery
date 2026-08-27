@@ -126,6 +126,12 @@ internal static partial class ScopeCanonicalizer
                 scope["event"] = ReviewEvent(request);
                 break;
 
+            case "approve_pr":
+                AddPrScope(scope, request);
+                scope["idempotencyKey"] = RequiredString(request, "idempotencyKey");
+                scope["bodySha256"] = Sha256(VisibleBody(OptionalString(request, "body") ?? string.Empty));
+                break;
+
             case "post_issue_comment":
                 scope["issue"] = PositiveInt(request, "issue");
                 scope["idempotencyKey"] = RequiredString(request, "idempotencyKey");
@@ -307,7 +313,7 @@ internal static partial class ScopeCanonicalizer
         if (value.ValueKind != JsonValueKind.String) throw new AuthorityException("review_event_invalid");
         var eventName = value.GetString();
         if (string.IsNullOrEmpty(eventName)) return "comment";
-        if (eventName is not ("approve" or "comment" or "request-changes"))
+        if (eventName is not ("comment" or "request-changes"))
         {
             throw new AuthorityException("review_event_invalid");
         }

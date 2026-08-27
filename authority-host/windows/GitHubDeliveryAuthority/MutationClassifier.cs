@@ -25,6 +25,7 @@ internal static class MutationClassifier
     private static readonly HashSet<string> SocialActions = new(StringComparer.Ordinal)
     {
         "post_review",
+        "approve_pr",
         "post_comment",
         "post_issue_comment",
         "edit_own_comment",

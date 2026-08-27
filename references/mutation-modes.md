@@ -54,6 +54,7 @@ A **PR session** is an opt-in Hello grant, distinct from a branch lease. After W
 The canonical enabled high-assurance action set is listed below. CI verifies exact set equality against the executable registry. The list remains an intrinsic risk classification even when a user explicitly selects `off`.
 
 <!-- high-assurance-actions:start -->
+- `approve_pr`
 - `assign_issue`
 - `change_draft_state`
 - `close_linked_issue`

@@ -1,4 +1,8 @@
 import {
+  executeApprovalMutationRequest,
+  planApprovalMutationRequest,
+} from "./github-approval-mutation-broker.mjs";
+import {
   executeMutationRequest as executeLegacyMutationRequest,
   planMutationRequest as planLegacyMutationRequest,
 } from "./github-mutation-broker.mjs";
@@ -13,6 +17,9 @@ import { verifyLegacyMutationPostcondition } from "./mutation-postconditions.mjs
 import { boundedSpawnSync } from "./subprocess-policy.mjs";
 
 export function planMutationRequest(request = {}, options = {}) {
+  if (request.action === "approve_pr") {
+    return planApprovalMutationRequest(request, options);
+  }
   return isLifecycleMutationAction(request.action)
     ? planLifecycleMutationRequest(request, options)
     : planLegacyMutationRequest(request, options);
@@ -23,6 +30,13 @@ export function executeMutationRequest(options = {}) {
     typeof options.runner === "function" ? options.runner : boundedSpawnSync;
   const bodySafeRunner = makeGitHubBodyTransportRunner(baseRunner);
 
+  if (options?.request?.action === "approve_pr") {
+    return executeApprovalMutationRequest({
+      ...options,
+      runner: bodySafeRunner,
+    });
+  }
+
   if (isLifecycleMutationAction(options?.request?.action)) {
     return executeLifecycleMutationRequest({
       ...options,
@@ -30,9 +44,6 @@ export function executeMutationRequest(options = {}) {
     });
   }
 
-  // Plan once to obtain the exact normalized idempotency marker/body that the
-  // legacy broker will use. The wrapped runner then removes forged marker hits
-  // from the broker's remote read-before-write evidence.
   const planned = planLegacyMutationRequest(options?.request || {}, options);
   const runner = makeIdempotencyReceiptRunner({
     request: planned.request,

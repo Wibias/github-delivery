@@ -1,4 +1,4 @@
-const ALLOWED_REVIEW_EVENTS = new Set(["approve", "comment", "request-changes"]);
+const ALLOWED_REVIEW_EVENTS = new Set(["comment", "request-changes"]);
 
 export function reviewEventOf(request = {}) {
   const raw = request.event;

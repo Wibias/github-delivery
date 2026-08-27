@@ -232,11 +232,17 @@ export function authorityScopeForRequest(request = {}) {
         idempotencyKey: exactString(request.idempotencyKey, "idempotency_key"),
         bodySha256: bodyHash(request.body),
       };
-      if (scope.action === "post_review") {
-        social.event = reviewEventOf(request);
-      }
+      if (scope.action === "post_review") social.event = reviewEventOf(request);
       return social;
     }
+
+    case "approve_pr":
+      return {
+        ...scope,
+        ...prScope(request),
+        idempotencyKey: exactString(request.idempotencyKey, "idempotency_key"),
+        bodySha256: sha256(visibleBody(request.body)),
+      };
 
     case "issue_comment":
       return {

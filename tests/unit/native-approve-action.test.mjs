@@ -4,7 +4,7 @@ import test from "node:test";
 import {
   executeMutationRequest,
   planMutationRequest,
-} from "../../scripts/lib/github-mutation-broker.mjs";
+} from "../../scripts/lib/github-mutation-router.mjs";
 import { routeShippingGithubPrompt } from "../../scripts/lib/skill-router.mjs";
 
 const HEAD = "abcdef1234567890abcdef1234567890abcdef12";
@@ -12,8 +12,7 @@ const HEAD = "abcdef1234567890abcdef1234567890abcdef12";
 function approvalRequest(overrides = {}) {
   return {
     schemaVersion: 1,
-    action: "post_review",
-    event: "approve",
+    action: "approve_pr",
     mutationMode: "review",
     explicitInstruction: true,
     repo: "acme/widgets",
@@ -38,7 +37,7 @@ test("explicit approve intent routes to a native approve_pr action", () => {
   assert.deepEqual(merged.explicitActions.slice(0, 2), ["approve_pr", "merge_pr"]);
 });
 
-test("brokered approve review plans the native GitHub approval command", () => {
+test("first-class approve action plans the native GitHub approval command", () => {
   const plan = planMutationRequest(approvalRequest());
   assert.deepEqual(plan.command.slice(0, 7), [
     "gh",
@@ -54,7 +53,7 @@ test("brokered approve review plans the native GitHub approval command", () => {
   assert.match(plan.request.body, /github-delivery:idempotency/);
 });
 
-test("GitHub self-approval rejection is surfaced instead of substituting a comment", () => {
+test("self approval is rejected before attempting the native review write", () => {
   const calls = [];
   assert.throws(
     () => executeMutationRequest({
@@ -65,21 +64,17 @@ test("GitHub self-approval rejection is surfaced instead of substituting a comme
         if (args[0] === "pr" && args[1] === "view" && args.includes("headRefOid")) {
           return { status: 0, stdout: `${HEAD}\n`, stderr: "" };
         }
-        if (args[0] === "api" && args[1].includes("pulls/32/reviews")) {
-          return { status: 0, stdout: "[]", stderr: "" };
+        if (args[0] === "api" && args[1] === "user") {
+          return { status: 0, stdout: JSON.stringify({ login: "alice" }), stderr: "" };
         }
-        if (args[0] === "pr" && args[1] === "review" && args.includes("--approve")) {
-          return {
-            status: 1,
-            stdout: "",
-            stderr: "Review Can not approve your own pull request",
-          };
+        if (args[0] === "pr" && args[1] === "view" && args.includes("author")) {
+          return { status: 0, stdout: "alice\n", stderr: "" };
         }
         throw new Error(`unexpected command: ${command} ${args.join(" ")}`);
       },
     }),
-    /Review Can not approve your own pull request/,
+    /approve_pr_self_approval_forbidden/,
   );
-  assert.equal(calls.some((call) => call.includes("--approve")), true);
+  assert.equal(calls.some((call) => call.includes("--approve")), false);
   assert.equal(calls.some((call) => call.includes("--comment")), false);
 });
