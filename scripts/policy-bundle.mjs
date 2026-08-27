@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   resolvePolicyBundle,
@@ -7,11 +8,12 @@ import {
 } from "./lib/policy-bundle.mjs";
 
 const USAGE = "Usage: node scripts/policy-bundle.mjs <workflow> [ROOT] | --validate [ROOT]";
+const DEFAULT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 try {
   const [first, second, ...rest] = process.argv.slice(2);
   if (!first || rest.length) throw new Error(USAGE);
-  const root = resolve(second || process.cwd());
+  const root = resolve(second || DEFAULT_ROOT);
   const result =
     first === "--validate"
       ? validatePolicyArchitecture({ root })
