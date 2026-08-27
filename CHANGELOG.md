@@ -16,6 +16,16 @@ All notable changes to `github-delivery` are documented here.
 - Bumped the package version from `1.2.0` to `1.3.0`.
 - Removed the public handoff to `git-workflow-and-versioning`. Explicit branch/commit and SemVer/changelog/release-preparation requests now route inside github-delivery, while the existing stricter `GD-GIT-*` safety rules and repository-local conventions remain authoritative (PR #377).
 - Issue-linked and local-work PR publication now compose the Git-workflow reference when branch/commit preparation is needed, preserving progressive disclosure instead of loading Git/versioning guidance into unrelated GitHub reads (PR #377).
+- Git/versioning routes now resolve through the mandatory workflow-packet/controller runtime. Explicit full-review intent keeps precedence over broad Git/version keywords in attributed repository text, and workflow execution packets advertise only actions that exist in the public mutation registry (PR #379).
+
+### Fixed
+
+- Controller head reconciliation now treats verified `reconciled_after_error` pushes as completed and preserves the original request, including `newTip`, across crash/resume `already_applied` receipts so checkpoint recovery can restore the authoritative head without repeating a completed push (PR #380).
+
+### Security
+
+- Native PR approval is now a dedicated first-class `approve_pr` authority action. Generic `post_review` cannot encode approval, explicit approval intent remains required, Windows Authority binds the semantic approval action, and self-approval is rejected before a GitHub approval write is attempted (PR #378).
+- Windows update lock recovery now binds graceful-close consent to the inspected PID plus process start identity and re-verifies that identity immediately before `CloseMainWindow()`. PID reuse therefore fails closed instead of redirecting an approved close to a different process (PR #381).
 
 ## [1.2.0] - 2026-08-27
 
