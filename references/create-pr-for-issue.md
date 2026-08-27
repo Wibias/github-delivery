@@ -61,12 +61,11 @@ Default to one cohesive PR. Split only when independently shippable concerns nee
 
 ## C. Implement locally
 
-1. Start from the exact base/development tip captured in A. Use a task branch/worktree that preserves unrelated local work. Apply `references/git-workflow.md` when branch/commit organization is needed; repository conventions and `GD-GIT-*` safety rules remain authoritative.
+1. Start from the exact base/development tip captured in A. Use a task branch/worktree that preserves unrelated local work. Apply `references/git-workflow.md`; repository rules and `GD-GIT-*` remain authoritative.
 2. For non-trivial implementation, apply `references/minimal-solution.md`, then make the smallest complete change that satisfies the issue contract without weakening required safeguards.
 3. Follow required consumers as dependencies appear; for broad migrations or deterministic sweeps apply `references/change-execution.md`.
-4. Run focused validation appropriate to the changed code: tests, typecheck, build, repro, and repository-local checks as available. Organize verified checkpoints into logical commits when useful; do not manufacture commit count or hide unrelated work.
+4. Run focused validation appropriate to the changed code: tests, typecheck, build, repro, and repository-local checks as available.
 5. Require a non-empty base-to-head candidate diff. If no change is needed, return to the matching preflight outcome; do not open an empty PR.
-6. Before publication, use `references/git-workflow.md` to inspect the candidate branch/history and summarize changes made, intentionally untouched related surfaces, material concerns, and checks actually run.
 
 ## D. Pre-open bug + security gate
 
