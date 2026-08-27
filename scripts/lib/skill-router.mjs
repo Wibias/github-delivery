@@ -132,6 +132,7 @@ function hasExplicitApproveIntent(text, context) {
   if (!(PR_REFERENCE.test(candidate) || (PR_WORD.test(candidate) && hasActivePullRequestContext(context)))) return false;
   if (NEGATED_APPROVE_INTENT.test(candidate)) return false;
   if (DELIBERATIVE_APPROVE.test(candidate)) return false;
+  if (DEFERRED_MERGE_AUTHORITY.test(candidate)) return false;
   return true;
 }
 
