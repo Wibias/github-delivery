@@ -4,6 +4,22 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-08-27
+
+### Added
+
+- Windows self-update now recovers from transient `EPERM` / `EBUSY` install-directory locks. After bounded retries, interactive updates inspect the installed skill tree for locking processes, show the blocking applications and PIDs, and ask before requesting a graceful close. Approved closes are never force-killed; the updater waits for the handles to clear and retries the same verified transactional update. Declining the prompt, running non-interactively, an unresolvable probe, or a process that remains locked returns structured `install_target_locked` diagnostics while preserving the existing installation (PR #376).
+- Successful interactive updates can now offer to remove older recognized GitHub Delivery backups. The fresh rollback backup created by the current update is always preserved, unrelated directories are ignored, and cleanup failures are reported without rolling back an otherwise successful verified update (PR #376).
+
+### Changed
+
+- Bumped the package version from `1.1.1` to `1.2.0`.
+- The npm bootstrap now ships the Windows install-lock probe and the lock-recovery / backup-management helpers required by the updater. Pull-request Windows CI exercises the packaged lock probe on a real Windows runner (PR #376).
+
+### Fixed
+
+- Updating on Windows no longer surfaces the raw directory-rename `EPERM` as the only recovery path when applications such as editors hold handles inside the installed `github-delivery` tree (PR #376).
+
 ## [1.1.1] - 2026-08-27
 
 ### Added

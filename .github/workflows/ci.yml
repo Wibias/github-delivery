@@ -137,6 +137,24 @@ jobs:
           [void][scriptblock]::Create($Installer)
           $ReleaseInstaller = Get-Content authority-host/windows/install-release.ps1 -Raw
           [void][scriptblock]::Create($ReleaseInstaller)
+          $LockProbe = Get-Content scripts/windows-install-locks.ps1 -Raw
+          [void][scriptblock]::Create($LockProbe)
+
+      - name: Exercise Windows update lock probe
+        shell: pwsh
+        run: |
+          $ProbeTarget = Join-Path $env:RUNNER_TEMP 'github-delivery-lock-probe'
+          New-Item -ItemType Directory -Path $ProbeTarget -Force | Out-Null
+          $ProbeJson = & powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass `
+            -File scripts/windows-install-locks.ps1 `
+            -Mode Inspect `
+            -Target $ProbeTarget
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $ProbeText = ($ProbeJson -join "`n").Trim()
+          if (-not $ProbeText.StartsWith('[')) {
+            throw "Windows update lock probe returned unexpected output: $ProbeText"
+          }
+          [void]($ProbeText | ConvertFrom-Json)
 
       - name: Restore Windows authority host in locked mode
         shell: pwsh
