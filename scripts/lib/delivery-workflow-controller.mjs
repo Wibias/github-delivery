@@ -15,6 +15,8 @@ const DEFAULT_BUDGETS = Object.freeze({
   maxWallTimeMs: 30 * 60 * 1_000,
 });
 
+const MUTATION_OPERATION_KEY_RE = /^(?:payload:[0-9a-f]{64}|idempotency:[0-9a-f]{64}:payload:[0-9a-f]{64})$/i;
+
 function nonNegativeInteger(value, fallback = 0) {
   return Number.isInteger(value) && value >= 0 ? value : fallback;
 }
@@ -83,6 +85,25 @@ function measurableProgress(signal = {}) {
   );
 }
 
+function normalizeMutationAuthorizations(value = []) {
+  const authorizations = new Map();
+  if (!Array.isArray(value)) return authorizations;
+  for (const entry of value) {
+    const operationKey = String(entry?.operationKey || "").trim();
+    if (!MUTATION_OPERATION_KEY_RE.test(operationKey)) continue;
+    const trustedWorkflowIntent = entry?.trustedWorkflowIntent === true;
+    const trustedExactTextConfirmation = entry?.trustedExactTextConfirmation === true;
+    if (!trustedWorkflowIntent && !trustedExactTextConfirmation) continue;
+    authorizations.set(operationKey, {
+      operationKey,
+      trustedWorkflowIntent,
+      trustedExactTextConfirmation,
+      authorizedAt: Number.isFinite(entry?.authorizedAt) ? entry.authorizedAt : null,
+    });
+  }
+  return authorizations;
+}
+
 export function createDeliveryWorkflowController(options = {}) {
   const snapshot = options.snapshot || null;
   const graph = normalizeGraph(options.graph || snapshot?.graph);
@@ -120,6 +141,9 @@ export function createDeliveryWorkflowController(options = {}) {
     phaseTokens: nonNegativeInteger(snapshot?.usage?.phaseTokens),
   };
   const evidenceRegistry = createEvidenceRegistry(snapshot?.evidenceRegistry || null);
+  const mutationAuthorizations = normalizeMutationAuthorizations(
+    snapshot?.mutationAuthorizations || options.mutationAuthorizations,
+  );
 
   function touch() {
     updatedAt = now();
@@ -144,6 +168,9 @@ export function createDeliveryWorkflowController(options = {}) {
       usage: { ...usage },
       budgets: { ...budgets },
       evidenceRegistry: evidenceRegistry.snapshot(),
+      mutationAuthorizations: [...mutationAuthorizations.values()]
+        .map((entry) => structuredClone(entry))
+        .sort((left, right) => left.operationKey.localeCompare(right.operationKey)),
       startedAt,
       updatedAt,
     };
@@ -269,6 +296,31 @@ export function createDeliveryWorkflowController(options = {}) {
     return removed;
   }
 
+  function authorizeMutation({
+    operationKey,
+    trustedWorkflowIntent = false,
+    trustedExactTextConfirmation = false,
+  } = {}) {
+    const key = String(operationKey || "").trim();
+    if (!MUTATION_OPERATION_KEY_RE.test(key)) {
+      throw new Error("mutation_operation_key_invalid");
+    }
+    const workflowIntent = trustedWorkflowIntent === true;
+    const exactTextConfirmation = trustedExactTextConfirmation === true;
+    if (!workflowIntent && !exactTextConfirmation) {
+      throw new Error("mutation_authorization_context_required");
+    }
+    const authorization = {
+      operationKey: key,
+      trustedWorkflowIntent: workflowIntent,
+      trustedExactTextConfirmation: exactTextConfirmation,
+      authorizedAt: now(),
+    };
+    mutationAuthorizations.set(key, authorization);
+    touch();
+    return structuredClone(authorization);
+  }
+
   function updateRefs(next = {}) {
     let changed = false;
     if (Object.hasOwn(next, "baseSha") && next.baseSha !== baseSha) {
@@ -344,6 +396,7 @@ export function createDeliveryWorkflowController(options = {}) {
     observeResourceUsage,
     addBlocker,
     removeBlocker,
+    authorizeMutation,
     updateRefs,
     reconcileMutationResult,
     recordEvidence,
