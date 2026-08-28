@@ -29,6 +29,7 @@ test("direct spawn rejects a reconstructed shell and copies argv off the caller 
   const calls = [];
   const args = ["--repo", "Wibias/github-delivery"];
   boundedSpawnSync("gh", args, { shell: true, encoding: "utf8" }, {
+    platform: "linux",
     spawn(command, argv, options) {
       calls.push({ command, argv, options });
       return { status: 0, stdout: "", stderr: "" };
@@ -41,7 +42,7 @@ test("direct spawn rejects a reconstructed shell and copies argv off the caller 
   assert.notEqual(calls[0].argv, args);
   assert.equal(calls[0].options.shell, false);
   assert.throws(
-    () => boundedSpawnSync("gh", ["ok", 1], {}, { spawn() { throw new Error("must not spawn"); } }),
+    () => boundedSpawnSync("gh", ["ok", 1], {}, { platform: "linux", spawn() { throw new Error("must not spawn"); } }),
     /subprocess_arg_invalid:1/,
   );
 });
