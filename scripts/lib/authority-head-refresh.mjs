@@ -18,6 +18,7 @@ function positiveInteger(value, name) {
  */
 const PR_HEAD_SCOPED_ACTIONS = new Set([
   "post_review",
+  "approve_pr",
   "dismiss_review",
   "post_comment",
   "edit_own_comment",
