@@ -7,6 +7,7 @@ function result(workflow, mutationMode = "read-only", explicitActions = []) {
 }
 
 const SIMPLIFY_REQUEST = /\b(simplify|simplification|cleanup|clean up|deduplicate|dedupe|reduce duplication)\b/;
+const SKIP_SIMPLIFY_REQUEST = /\b(?:without|skip|don't|dont|do not)\s+simplify\b/;
 const NO_COMMENTS_REQUEST = /\b(no-comments|strip comments|comment sicko|comment inspector)\b/;
 const SKIP_NO_COMMENTS_REQUEST = /\b(?:skip|without)\s+no-comments\b|\bkeep source comments\b|\bdon'?t strip comments\b|\bdo not strip comments\b/;
 const MERGE_INTENT = /\b(merge|ship)\b/;
@@ -94,9 +95,13 @@ export const ROUTABLE_WORKFLOWS = Object.freeze([
   "references/fix-pr-bots.md",
 ]);
 
+function hasExplicitSimplifyIntent(text) {
+  return SIMPLIFY_REQUEST.test(text) && !SKIP_SIMPLIFY_REQUEST.test(text);
+}
+
 function prepareAndMergeActions(text) {
   const actions = ["merge_pr", "post_comment", "post_issue_comment", "close_linked_issue"];
-  if (FIX_REVIEW_REQUEST.test(text) || SIMPLIFY_REQUEST.test(text) || EXPLICIT_GREEN_REQUEST.test(text)) {
+  if (FIX_REVIEW_REQUEST.test(text) || hasExplicitSimplifyIntent(text) || EXPLICIT_GREEN_REQUEST.test(text)) {
     actions.unshift("push_code");
   }
   return actions;
@@ -170,7 +175,7 @@ function isPrepareAndMergeRequest(text) {
     FULL_REVIEW_REQUEST.test(text)
     || REVIEW_PREPARATION_REQUEST.test(text)
     || FIX_REVIEW_REQUEST.test(text)
-    || SIMPLIFY_REQUEST.test(text)
+    || hasExplicitSimplifyIntent(text)
     || EXPLICIT_GREEN_REQUEST.test(text)
     || WATCH_PR_REQUEST.test(text)
   );
@@ -180,7 +185,7 @@ function isRequestedPreparation(text) {
   return (
     FULL_REVIEW_REQUEST.test(text)
     || FIX_REVIEW_REQUEST.test(text)
-    || (SIMPLIFY_REQUEST.test(text) && PR_REFERENCE.test(text))
+    || (hasExplicitSimplifyIntent(text) && PR_REFERENCE.test(text))
     || EXPLICIT_GREEN_REQUEST.test(text)
     || WATCH_PR_REQUEST.test(text)
   );
@@ -295,7 +300,7 @@ export function routeShippingGithubPrompt(prompt, context = {}) {
     return result("references/spec-standards-review.md", "review");
   }
   if (FULL_REVIEW_REQUEST.test(text)) {
-    const simplifyRequested = SIMPLIFY_REQUEST.test(text);
+    const simplifyRequested = hasExplicitSimplifyIntent(text);
     return result("references/full-review-pr.md", /\bfix\b/.test(text) || simplifyRequested ? "maintainer" : "review", simplifyRequested ? ["push_code"] : []);
   }
   if (
@@ -305,7 +310,7 @@ export function routeShippingGithubPrompt(prompt, context = {}) {
   ) {
     return result("references/no-comments.md", "maintainer", ["push_code"]);
   }
-  if (SIMPLIFY_REQUEST.test(text) && PR_REFERENCE.test(text)) return result("references/simplify-pr.md", "maintainer", ["push_code"]);
+  if (hasExplicitSimplifyIntent(text) && PR_REFERENCE.test(text)) return result("references/simplify-pr.md", "maintainer", ["push_code"]);
   if (/\b(?:security review|review security)\b/.test(text)) return result("references/security-review.md", "review");
   if (/\b(re-review|review again|recheck .*review)\b/.test(text)) return result("references/re-review-pr.md", "review");
   if (WATCH_PR_REQUEST.test(text)) {
