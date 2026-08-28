@@ -37,16 +37,18 @@ test("explicit approve intent routes to a native approve_pr action", () => {
   assert.deepEqual(merged.explicitActions.slice(0, 2), ["approve_pr", "merge_pr"]);
 });
 
-test("first-class approve action plans the native GitHub approval command", () => {
+test("first-class approve action plans the commit-bound native GitHub approval command", () => {
   const plan = planMutationRequest(approvalRequest());
-  assert.deepEqual(plan.command.slice(0, 7), [
+  assert.deepEqual(plan.command.slice(0, 9), [
     "gh",
-    "pr",
-    "review",
-    "32",
-    "--repo",
-    "acme/widgets",
-    "--approve",
+    "api",
+    "repos/acme/widgets/pulls/32/reviews",
+    "--method",
+    "POST",
+    "-f",
+    `commit_id=${HEAD}`,
+    "-f",
+    "event=APPROVE",
   ]);
   assert.equal(plan.command.includes("--comment"), false);
   assert.equal(plan.command.includes("--request-changes"), false);
@@ -75,6 +77,13 @@ test("self approval is rejected before attempting the native review write", () =
     }),
     /approve_pr_self_approval_forbidden/,
   );
-  assert.equal(calls.some((call) => call.includes("--approve")), false);
+  assert.equal(
+    calls.some((call) =>
+      call[1] === "api" &&
+      call[2] === "repos/acme/widgets/pulls/32/reviews" &&
+      call.includes("--method"),
+    ),
+    false,
+  );
   assert.equal(calls.some((call) => call.includes("--comment")), false);
 });
