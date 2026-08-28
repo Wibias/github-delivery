@@ -122,7 +122,11 @@ try {
   process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
   process.exitCode = output.ready ? 0 : output.blocked ? 1 : 2;
 } catch (error) {
-  const output = shipGateFailureOutput(error, { stage: failureStage });
-  process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
+  if (failureStage === "live_snapshot_capture") {
+    const output = shipGateFailureOutput(error, { stage: failureStage });
+    process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
+  } else {
+    console.error(String(error?.message || error));
+  }
   process.exitCode = 2;
 }
