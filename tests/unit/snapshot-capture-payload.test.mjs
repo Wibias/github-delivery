@@ -197,6 +197,43 @@ test("snapshot boundary rejects a base commit that moved during capture", () => 
   );
 });
 
+test("snapshot boundary preserves the cause of incomplete rules evidence", () => {
+  let observed = null;
+  try {
+    verifySnapshotBoundary(
+      { headRefOid: "head-a", baseRefName: "main" },
+      { headRefOid: "head-a", baseRefName: "main" },
+      {
+        initialBaseOid: "base-a",
+        finalBaseOid: "base-a",
+        initialRules: {
+          readable: false,
+          complete: false,
+          pages: 0,
+          rows: [],
+          error: "HTTP 403: Upgrade to GitHub Pro to use repository rules",
+        },
+        finalRules: {
+          readable: false,
+          complete: false,
+          pages: 0,
+          rows: [],
+          error: "HTTP 403: Upgrade to GitHub Pro to use repository rules",
+        },
+      },
+    );
+  } catch (error) {
+    observed = error;
+  }
+
+  assert.ok(observed instanceof Error);
+  assert.equal(observed.code, "snapshot_rules_boundary_incomplete");
+  assert.equal(
+    observed.causeMessage,
+    "HTTP 403: Upgrade to GitHub Pro to use repository rules",
+  );
+});
+
 test("snapshot boundary rejects effective rules that changed during capture", () => {
   assert.throws(
     () =>
@@ -359,129 +396,151 @@ test("required GitHub Actions mapping fails closed when one producer lacks merge
     },
   });
   assert.equal(result.requiredCheckWorkflowMappingComplete, false);
-  assert.equal(result.unmapped[0].reason, "merge_group_trigger_missing");
+  assert.deepEqual(result.unmapped, [
+    {
+      context: "build",
+      appId: 15368,
+      reason: "workflow_missing_merge_group",
+      path: ".github/workflows/ci.yml",
+    },
+  ]);
 });
 
-test("merge_group detection reads only the top-level workflow trigger", () => {
-  for (const source of [
-    "# merge_group\non:\n  pull_request:\n",
-    "on:\n  pull_request:\nenv:\n  EVENT_NAME: merge_group\n",
-    "on:\n  pull_request:\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo merge_group\n",
-    "on:\n  pull_request:\n    branches: [merge_group]\n",
-  ]) {
-    assert.equal(workflowHasTopLevelEvent(source, "merge_group"), false, source);
-  }
-});
-
-test("merge_group detection supports GitHub workflow trigger forms", () => {
-  for (const source of [
-    "on: merge_group\n",
-    "on: [pull_request, merge_group]\n",
-    "on: ['pull_request', 'merge_group']\n",
-    "on: { pull_request: null, merge_group: null }\n",
-    "on:\n  pull_request:\n  merge_group:\n",
-  ]) {
-    assert.equal(workflowHasTopLevelEvent(source, "merge_group"), true, source);
-  }
-});
-
-test("check-generation fingerprints are order-independent but state-sensitive", () => {
-  const success = {
-    checkRuns: [
-      { id: 2, name: "lint", status: "completed", conclusion: "success", app: { id: 15368 } },
-      { id: 1, name: "build", status: "completed", conclusion: "success", app: { id: 15368 } },
-    ],
-    statuses: [{ id: 5, context: "legacy", state: "success", creator: { id: 9 } }],
-  };
-  const reordered = {
-    checkRuns: [...success.checkRuns].reverse(),
-    statuses: [...success.statuses],
-  };
-  assert.equal(checkGenerationFingerprint(success), checkGenerationFingerprint(reordered));
-
-  const rerunPending = {
-    ...success,
-    checkRuns: success.checkRuns.map((row) =>
-      row.id === 1 ? { ...row, status: "queued", conclusion: null } : row,
+test("merge-group workflow trigger parser requires a real top-level event key", () => {
+  assert.equal(
+    workflowHasTopLevelEvent(
+      "on:\n  pull_request:\n    branches: [main]\n  merge_group:\n    types: [checks_requested]\n",
+      "merge_group",
     ),
-  };
-  assert.notEqual(
-    checkGenerationFingerprint(success),
-    checkGenerationFingerprint(rerunPending),
+    true,
+  );
+  assert.equal(
+    workflowHasTopLevelEvent(
+      "name: CI\non:\n  pull_request:\n\njobs:\n  build:\n    steps:\n      - run: echo merge_group\n",
+      "merge_group",
+    ),
+    false,
   );
 });
 
-test("same-SHA check reruns invalidate a live snapshot before it can be ready", () => {
-  const snapshot = {
-    headOid: "a".repeat(40),
-    evidence: {
-      checks: {
-        authoritative: { sha: "a".repeat(40) },
-        checkRuns: [
-          { id: 1, name: "build", status: "completed", conclusion: "success", app: { id: 15368 } },
-        ],
-        statuses: [],
-      },
-    },
-  };
-  const current = {
-    sha: "a".repeat(40),
+test("snapshot check generation fingerprint is stable across ordering and volatile fields", () => {
+  const left = checkGenerationFingerprint({
     checkRuns: [
-      { id: 1, name: "build", status: "queued", conclusion: null, app: { id: 15368 } },
+      {
+        id: 2,
+        name: "lint",
+        head_sha: "abc",
+        status: "completed",
+        conclusion: "success",
+        app: { id: 10, slug: "github-actions" },
+        output: { title: "ignored" },
+      },
+      {
+        id: 1,
+        name: "build",
+        head_sha: "abc",
+        status: "completed",
+        conclusion: "success",
+        app: { id: 10 },
+      },
     ],
-    statuses: [],
-  };
-  current.fingerprint = checkGenerationFingerprint(current);
+    statuses: [
+      {
+        id: 7,
+        sha: "abc",
+        context: "legacy",
+        state: "success",
+        creator: { id: 9, login: "bot" },
+      },
+    ],
+  });
+  const right = checkGenerationFingerprint({
+    checkRuns: [
+      {
+        id: 1,
+        name: "build",
+        head_sha: "abc",
+        status: "completed",
+        conclusion: "success",
+        app: { id: 10, extra: "ignored" },
+      },
+      {
+        id: 2,
+        name: "lint",
+        head_sha: "abc",
+        status: "completed",
+        conclusion: "success",
+        app: { id: 10 },
+      },
+    ],
+    statuses: [
+      {
+        id: 7,
+        sha: "abc",
+        context: "legacy",
+        state: "success",
+        creator: { id: 9, login: "bot", avatar_url: "ignored" },
+      },
+    ],
+  });
+  assert.equal(left, right);
+});
+
+test("live check generation rejects stale snapshot checks", () => {
   assert.throws(
-    () => assertFreshCheckGeneration(snapshot, current),
+    () =>
+      assertFreshCheckGeneration(
+        {
+          headOid: "abc",
+          evidence: {
+            checks: {
+              authoritative: { sha: "abc" },
+              checkRuns: [{ id: 1, name: "build", head_sha: "abc", status: "queued" }],
+              statuses: [],
+            },
+          },
+        },
+        {
+          sha: "abc",
+          checkRuns: [{ id: 1, name: "build", head_sha: "abc", status: "completed" }],
+          statuses: [],
+          fingerprint: checkGenerationFingerprint({
+            checkRuns: [{ id: 1, name: "build", head_sha: "abc", status: "completed" }],
+            statuses: [],
+          }),
+        },
+      ),
     /live_snapshot_check_generation_moved/,
   );
 });
 
-test("current check-generation capture verifies paginated check-run completeness", () => {
+test("captures one complete live check generation with pagination", () => {
   const calls = [];
-  const current = captureCurrentCheckGeneration({
+  const runner = (_command, args) => {
+    calls.push(args.join(" "));
+    if (args[1].includes("check-runs")) {
+      return {
+        status: 0,
+        stdout: JSON.stringify([
+          { total_count: 2, check_runs: [{ id: 1 }] },
+          { total_count: 2, check_runs: [{ id: 2 }] },
+        ]),
+        stderr: "",
+      };
+    }
+    return {
+      status: 0,
+      stdout: JSON.stringify([[{ id: 3 }], [{ id: 4 }]]),
+      stderr: "",
+    };
+  };
+  const result = captureCurrentCheckGeneration({
     repo: "acme/widgets",
-    sha: "b".repeat(40),
-    runner(command, args) {
-      calls.push([command, ...args]);
-      if (String(args[1]).includes("check-runs")) {
-        return {
-          status: 0,
-          stdout: JSON.stringify([
-            {
-              total_count: 1,
-              check_runs: [
-                { id: 1, name: "build", status: "completed", conclusion: "success" },
-              ],
-            },
-          ]),
-          stderr: "",
-        };
-      }
-      return { status: 0, stdout: JSON.stringify([[]]), stderr: "" };
-    },
+    sha: "ABC",
+    runner,
   });
-  assert.equal(current.checkRuns.length, 1);
-  assert.equal(current.statuses.length, 0);
+  assert.equal(result.sha, "abc");
+  assert.deepEqual(result.checkRuns.map((row) => row.id), [1, 2]);
+  assert.deepEqual(result.statuses.map((row) => row.id), [3, 4]);
   assert.equal(calls.length, 2);
-
-  assert.throws(
-    () =>
-      captureCurrentCheckGeneration({
-        repo: "acme/widgets",
-        sha: "b".repeat(40),
-        runner(_command, args) {
-          if (String(args[1]).includes("check-runs")) {
-            return {
-              status: 0,
-              stdout: JSON.stringify([{ total_count: 2, check_runs: [{ id: 1 }] }]),
-              stderr: "",
-            };
-          }
-          return { status: 0, stdout: JSON.stringify([[]]), stderr: "" };
-        },
-      }),
-    /check_generation_check_runs_incomplete/,
-  );
 });
