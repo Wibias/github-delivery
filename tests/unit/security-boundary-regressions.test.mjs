@@ -196,6 +196,8 @@ test("workflow mutation context is bound to one exact operation key", () => {
 test("canonical github-mutate rejects checkpoint intent in authority off mode", () => {
   const incomplete = request("create_issue", {
     idempotencyKey: "off-mode-cli-context",
+    title: "Boundary regression",
+    body: "body",
   });
   const controller = createDeliveryWorkflowController({
     workflow: "create-pr-from-local-work",
