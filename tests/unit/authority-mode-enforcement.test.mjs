@@ -5,7 +5,10 @@ import {
   mutationAuthorityOptions,
   mutationAuthorityRequired,
 } from "../../scripts/lib/mutation-execution-context.mjs";
-import { executeMutationDocument } from "../../scripts/lib/mutation-document-execution.mjs";
+import {
+  executeMutationDocument,
+  mutationOperationKey,
+} from "../../scripts/lib/mutation-document-execution.mjs";
 
 function request(action = "merge_pr", extra = {}) {
   return {
@@ -111,8 +114,9 @@ test("legacy strict env still forces all mode", () => {
 test("mutation document does not prompt in off mode even when the action is intrinsically high assurance", () => {
   let authorized = false;
   let executed = false;
+  const document = request("post_comment", { body: "hello", idempotencyKey: "test-key" });
   const result = executeMutationDocument({
-    document: request("post_comment", { body: "hello", idempotencyKey: "test-key" }),
+    document,
     execute: true,
     env: {},
     dependencies: {
@@ -135,7 +139,7 @@ test("mutation document does not prompt in off mode even when the action is intr
   assert.equal(executed, true);
   assert.equal(result.action, "post_comment");
   assert.equal(result.executed, true);
-  assert.equal(result.operationKey, "test-key");
+  assert.equal(result.operationKey, mutationOperationKey(document));
 });
 
 test("mutation document still batches authority in high-assurance mode", () => {
