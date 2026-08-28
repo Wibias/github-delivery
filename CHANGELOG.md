@@ -4,6 +4,17 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.3.3] - 2026-08-28
+
+### Changed
+
+- Bumped the package version from `1.3.2` to `1.3.3`.
+
+### Fixed
+
+- Operational process, job, and worktree status probes such as `Get-Process`, `Get-CimInstance Win32_Process`, `tasklist`, `ps`, `pgrep`, and `git worktree list` now count as volatile watchdog evidence instead of neutral activity. Repeated polling therefore consumes the protected evidence budget rather than bypassing delivery-convergence limits (PR #386).
+- Authoritative live `ship-gate` snapshot failures now preserve a bounded upstream cause and return a structured fail-closed `unknown` result with retryability classification. Deterministic GitHub capability or permission failures such as 401/403 stop equivalent retries, transient upstream failures remain distinguishable, and established replay/workflow/argument stderr contracts are unchanged (PR #387).
+
 ## [1.3.2] - 2026-08-28
 
 ### Added

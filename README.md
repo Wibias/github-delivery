@@ -19,7 +19,7 @@
 </div>
 
 > [!NOTE]
-> **1.3.2.** This patch tightens review hygiene and the GitHub mutation boundary. No-comments and simplify now compose independently by default in the relevant review/publication workflows, Windows `gh`/`git` execution is resolved away from worktree-controlled paths (including junction/symlink escapes), `authorityMode=off` receives direct workflow intent through an operation-bound trusted checkpoint, and mutation-document idempotency is bound to the exact payload. See [Current state](#current-state).
+> **1.3.3.** This patch hardens agent convergence around two incident paths: operational process/worktree polling now counts as volatile watchdog evidence instead of neutral activity, and authoritative live `ship-gate` capture failures preserve their GitHub cause in a structured fail-closed result so terminal capability or permission errors stop retry/probe loops. See [Current state](#current-state).
 
 > [!IMPORTANT]
 > **Natural language is the public API.** The Node scripts, policy modules, evaluators, mutation broker, and optional Authority host are internal safety/evidence machinery. You normally do not invoke them yourself.
@@ -99,6 +99,15 @@ For installation edge cases, backup/restore, downgrade behavior, manual recovery
 | **Supersede / overtake** | `supersede PR #12 with PR #45` | Explicit replacement or maintainer-takeover workflows with bounded mutation authority |
 | **Merge / close-out** | `merge PR #32` | Final gate, exact transaction authority, head-pinned merge, verification, thanks, linked-issue close-out |
 | **Self-update** | `update github-delivery to the latest stable release` | Stable-release verification, lock-aware Windows recovery, optional old-backup cleanup, safe apply and postconditions |
+
+### What changed in 1.3.3
+
+`1.3.3` is a convergence and terminal-failure hardening patch:
+
+- operational process, job, and worktree probes such as `Get-Process`, `Get-CimInstance Win32_Process`, `tasklist`, `ps`, `pgrep`, and `git worktree list` are volatile watchdog evidence, so repeated polling consumes the protected evidence budget instead of masquerading as neutral progress;
+- authoritative live `ship-gate` capture failures preserve a bounded upstream cause and return a machine-readable fail-closed `unknown` result rather than collapsing the incident into generic stderr;
+- deterministic GitHub capability/permission failures such as 401/403 are classified non-retryable, transient upstream failures remain distinguishable as retryable, and unknown causes remain fail-closed;
+- established replay-integrity, workflow, and argument-error CLI stderr contracts are unchanged.
 
 ### What changed in 1.3.2
 
@@ -412,6 +421,7 @@ GitHub Delivery treats convergence as a runtime + workflow problem rather than a
 Key defaults include:
 
 - evidence warning/block at **8 / 12** consecutive attempts without execution/state progress;
+- operational process/job/worktree polling counts as **volatile evidence**, so repeating those probes cannot reset or bypass the evidence budget;
 - protected-stream active-work warning/hard bounds of **4k / 8k generated characters** and **1,024 / 2,048 generated output tokens** since real progress;
 - larger completed-plan finalization allowance of **40k / 64k characters** and **12k / 16k output tokens**;
 - bounded lifecycle-hook narration recovery with up to **three** corrective continuations by default;
@@ -602,7 +612,7 @@ The architecture uses progressive disclosure: route once, load the selected work
 
 ## Current state
 
-`1.3.2` is a hardening patch on top of `1.3.1`: it keeps the first-class Git workflow, release-versioning, recovery, and concurrency capabilities while adding independent review-hygiene passes and tightening subprocess, trusted-intent, and idempotency boundaries.
+`1.3.3` is a convergence and terminal-failure hardening patch on top of `1.3.2`: it preserves the existing Git/release/review safety model while closing two incident paths that could waste agent work after progress had effectively stopped.
 
 Stable in this release:
 
@@ -622,7 +632,8 @@ Stable in this release:
 - verified stable install/update with stale owned install-lock recovery, Windows lock recovery, graceful-close prompting, and optional older-backup cleanup that preserves the fresh rollback backup;
 - installed workflow helpers that resolve their own skill root while retaining explicit root overrides;
 - generation-fenced rewrite-baseline storage with generation allocation finalized under the acquired lock;
-- progress watchdog/runtime convergence controls;
+- progress watchdog/runtime convergence controls that charge operational process/job/worktree polling as volatile evidence rather than neutral progress;
+- live `ship-gate` capture failures that preserve bounded upstream causes, remain fail-closed, and expose retryability so deterministic GitHub capability/permission failures can terminate equivalent probing;
 - deterministic bundles, repository security checks, CodeQL, Dependency Review, live-fixture contracts, and release preparation.
 
 Known limits, documented and fail-closed:
