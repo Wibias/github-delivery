@@ -132,9 +132,10 @@ for (const scenario of LIVE_BODY_SCENARIOS) {
       calls.push([command, ...args]);
       assert.equal(command, "gh");
       if (args[0] === "api" && args[1] === "user") {
+        assert.deepEqual(args.slice(2), ["--jq", ".login"]);
         return {
           status: 0,
-          stdout: JSON.stringify({ login: "octocat" }),
+          stdout: "octocat\n",
           stderr: "",
         };
       }
