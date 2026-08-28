@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import {
@@ -7,6 +8,12 @@ import {
   writeDeliveryWorkflowCheckpoint,
 } from "./lib/delivery-workflow-controller.mjs";
 import { resolveDeliveryWorkflowProfile } from "./lib/delivery-workflow-profiles.mjs";
+import {
+  mutationOperationKey,
+  requestsFromMutationDocument,
+} from "./lib/mutation-document-execution.mjs";
+import { mutationRequiresIndependentIntent } from "./lib/mutation-policy.mjs";
+import { allowedMutationModes } from "./lib/workflow-mode.mjs";
 
 const USAGE = `Usage:
   node scripts/delivery-controller.mjs start WORKFLOW --repo OWNER/REPO --checkpoint FILE [--issue N] [--pr N] [--base SHA] [--head SHA]
@@ -16,6 +23,7 @@ const USAGE = `Usage:
   node scripts/delivery-controller.mjs evidence-action CHECKPOINT
   node scripts/delivery-controller.mjs usage CHECKPOINT --workflow-tokens N --phase-tokens N
   node scripts/delivery-controller.mjs refs CHECKPOINT [--base SHA] [--head SHA]
+  node scripts/delivery-controller.mjs authorize-mutation CHECKPOINT --request FILE [--workflow-intent] [--exact-text-confirmed]
   node scripts/delivery-controller.mjs blocker-add CHECKPOINT BLOCKER
   node scripts/delivery-controller.mjs blocker-remove CHECKPOINT BLOCKER
   node scripts/delivery-controller.mjs show CHECKPOINT`;
@@ -73,6 +81,52 @@ function persist(loaded) {
 
 function print(payload) {
   process.stdout.write(`${JSON.stringify(payload, null, 2)}\n`);
+}
+
+function authorizeMutationRequest(loaded, request, context) {
+  const snapshot = loaded.controller.snapshot();
+  if (String(request?.repo || "").toLowerCase() !== String(snapshot.repo || "").toLowerCase()) {
+    throw new Error("mutation_checkpoint_repo_mismatch");
+  }
+  if (
+    snapshot.pr !== null &&
+    snapshot.pr !== undefined &&
+    request?.pr !== null &&
+    request?.pr !== undefined &&
+    Number(request.pr) !== Number(snapshot.pr)
+  ) {
+    throw new Error("mutation_checkpoint_pr_mismatch");
+  }
+  if (
+    snapshot.headSha &&
+    request?.expectedHead &&
+    String(request.expectedHead).toLowerCase() !== String(snapshot.headSha).toLowerCase()
+  ) {
+    throw new Error("mutation_checkpoint_head_mismatch");
+  }
+
+  const workflowPath = `references/${snapshot.workflow}.md`;
+  const workflowModes = allowedMutationModes(workflowPath);
+  if (
+    workflowModes &&
+    !workflowModes.includes(String(request?.mutationMode || "read-only").toLowerCase())
+  ) {
+    throw new Error("mutation_checkpoint_mode_mismatch");
+  }
+  if (context.trustedWorkflowIntent && !mutationRequiresIndependentIntent(request)) {
+    throw new Error("mutation_workflow_intent_not_required");
+  }
+  if (
+    context.trustedExactTextConfirmation &&
+    String(request?.action || "") !== "reply_human_thread"
+  ) {
+    throw new Error("mutation_exact_text_context_invalid");
+  }
+
+  return loaded.controller.authorizeMutation({
+    operationKey: mutationOperationKey(request),
+    ...context,
+  });
 }
 
 try {
@@ -152,6 +206,21 @@ try {
       result = loaded.controller.updateRefs({
         ...(baseSha !== null ? { baseSha } : {}),
         ...(headSha !== null ? { headSha } : {}),
+      });
+    } else if (command === "authorize-mutation") {
+      const requestPath = takeOption(argv, "--request");
+      const trustedWorkflowIntent = takeFlag(argv, "--workflow-intent");
+      const trustedExactTextConfirmation = takeFlag(argv, "--exact-text-confirmed");
+      assertEmpty(argv);
+      if (!requestPath) throw new Error("authorize-mutation requires --request");
+      const document = JSON.parse(readFileSync(resolve(requestPath), "utf8"));
+      const normalized = requestsFromMutationDocument(document);
+      if (normalized.requests.length !== 1) {
+        throw new Error("authorize-mutation requires exactly one mutation request");
+      }
+      result = authorizeMutationRequest(loaded, normalized.requests[0], {
+        trustedWorkflowIntent,
+        trustedExactTextConfirmation,
       });
     } else if (command === "blocker-add") {
       const blocker = argv.shift();
