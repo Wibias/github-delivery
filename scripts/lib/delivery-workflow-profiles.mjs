@@ -212,6 +212,7 @@ const PROFILE_DEFINITIONS = Object.freeze({
   "consolidate-prs": { graph: CONSOLIDATE_GRAPH, mutation: "read-only" },
   "multi-base-delivery": { graph: MULTI_BASE_GRAPH, mutation: "maintainer" },
   "full-review-pr": { graph: REVIEW_GRAPH, mutation: "review" },
+  "no-comments": { graph: REVIEW_GRAPH, mutation: "maintainer" },
   "spec-standards-review": { graph: REVIEW_GRAPH, mutation: "review" },
   "simplify-pr": { graph: REVIEW_GRAPH, mutation: "maintainer" },
   "security-review": { graph: REVIEW_GRAPH, mutation: "review" },

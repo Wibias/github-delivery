@@ -108,7 +108,7 @@ Canonical: `GD-GIT-004`.
 Resolve the authenticated viewer login before deciding whether the PR branch is
 owned by the current operator. For a foreign PR, never update the branch from base
 and never apply simplification changes; provide owner-directed instructions
-instead. Applies to: `fix-pr-bots`, `full-review-pr`, `simplify-pr`.
+instead. Applies to: `fix-pr-bots`, `full-review-pr`, `simplify-pr`, `no-comments`.
 
 ### Proactive contract verification
 

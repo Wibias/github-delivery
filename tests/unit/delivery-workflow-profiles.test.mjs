@@ -19,6 +19,7 @@ const ROUTED_WORKFLOWS = [
   "create-pr-for-issue",
   "open-work-status",
   "full-review-pr",
+  "no-comments",
   "spec-standards-review",
   "simplify-pr",
   "security-review",

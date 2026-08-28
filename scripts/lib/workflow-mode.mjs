@@ -12,6 +12,7 @@ const WORKFLOW_MUTATION_MODES = Object.freeze({
   "references/git-workflow.md": ["read-only", "maintainer"],
   "references/merge-pr.md": ["maintainer"],
   "references/multi-base-delivery.md": ["maintainer"],
+  "references/no-comments.md": ["maintainer"],
   "references/open-work-status.md": ["read-only"],
   "references/overtake-pr.md": ["maintainer"],
   "references/re-review-pr.md": ["review"],

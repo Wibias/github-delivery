@@ -27,15 +27,19 @@ verdict has actually been delivered for the currently reviewed PR head.
 The required plan must include, at minimum:
 
 1. Resolve repository, PR, base, and current head.
-2. Review usefulness and claimed behavior.
-3. Complete the semantic propagation audit.
-4. Complete bug review.
-5. Complete security review.
-6. Complete Spec and Standards review.
-7. Triage human and bot feedback. **After pushing fixes for a human (owner/maintainer) comment, post the `[GD] Addressed feedback` resolution record** referencing that comment's exact key plus the fix commit — the wake gate only credits a human comment as addressed via such a record, and a bare push leaves it `unaddressed` so the gate re-flags it on every run (the PR #1068 loop). Use `addressedFeedbackPlan` from `watch-wake-gate.mjs` (or `scripts/lib/addressed-feedback-dedup.mjs`) for the edit-vs-post decision, and `--resolve-bot` for bot threads.
-8. Validate the current head and required CI.
-9. Refresh the authoritative ship gate.
-10. Publish final verdict.
+2. Run `references/no-comments.md` unless this request opts out (`skip no-comments`, `without no-comments`, `keep source comments`, `don't strip comments`). A failed pass blocks the verdict.
+3. Review usefulness and claimed behavior.
+4. Complete the semantic propagation audit.
+5. Complete bug review.
+6. Complete security review.
+7. Complete Spec and Standards review.
+8. Triage human and bot feedback. **After pushing fixes for a human (owner/maintainer) comment, post the `[GD] Addressed feedback` resolution record** referencing that comment's exact key plus the fix commit — the wake gate only credits a human comment as addressed via such a record, and a bare push leaves it `unaddressed` so the gate re-flags it on every run (the PR #1068 loop). Use `addressedFeedbackPlan` from `watch-wake-gate.mjs` (or `scripts/lib/addressed-feedback-dedup.mjs`) for the edit-vs-post decision, and `--resolve-bot` for bot threads.
+9. Run `references/simplify-pr.md` unless this request opts out (`without simplify`, `skip simplify`, `don't simplify`). Nothing worth simplifying is valid. Auto-apply eligible contract-card candidates only on our PR when `push_code` is already allowed; foreign and read-only stay report-only.
+10. Validate the current head and required CI.
+11. Refresh the authoritative ship gate.
+12. Publish final verdict.
+
+If no-comments or simplify changed the head, re-run the remaining review on that head with both passes disabled. There is no recursive hygiene pass.
 
 The run **MUST NOT stop, return, hand off, emit a final response, or report
 completion** while `Publish final verdict` or any required prerequisite is
@@ -348,7 +352,7 @@ Same babysit bar as **make merge-ready**: clear useful human + bot comments, own
 
 Skip 0.1% nits. No follow-up PR for in-scope fixes.
 
-A normal full review does not simplify code merely because an opportunity is visible. Run the optional simplify phase only when the user **explicitly asks** for simplify, cleanup, deduplication, or equivalent behavior-preserving refactoring.
+A normal full review runs **no-comments** then, after correctness work, **simplify**, unless this request opts out. Bare full review still does not gain `push_code`; those passes are report-only until the request already allows a code push. Line count is never a goal.
 
 ## Targets
 
@@ -391,15 +395,14 @@ A normal full review does not simplify code merely because an opportunity is vis
 
  Push scoped fixes under the existing fork-head/push rules; **verify compile/tests against tip**; **wait and recheck** until useful threads quiet **and** required CI green on that tip SHA, or a hard blocker. Use **rate-limit backoff** (Composio → gh) on dense polls. **Doomed-run guard:** if a bot review (CodeRabbit/Codex) is still in progress or an actionable human thread is open, finish triage and patch/push **before** settling into the CI poll; if a bot review lands during the wait with findings on this diff, stop waiting, fix + push, and restart the CI wait on the new SHA.
 6. Changelog nudge if user-facing.
-7. **Optional simplify phase:** only when the user explicitly asks, run `references/simplify-pr.md` after the concrete bug, security, spec, review, base, and CI work above is clean but before posting the verdict.
-   - **Foreign PRs (not ours):** run the candidate pass, then **do not edit or push**; include the complete bounded candidate list in the verdict for the PR owner and skip the approval-to-apply, validation, push, and re-review flow.
+7. **Hygiene simplify:** unless this request opts out (`without simplify`, `skip simplify`, `don't simplify`), run `references/simplify-pr.md` after the concrete bug, security, spec, review, base, and CI work above is clean but before posting the verdict. No-comments already ran at plan item 2 unless skipped.
+   - **Foreign PRs (not ours):** run the candidate pass, then **do not edit or push**; include the complete bounded candidate list in the verdict for the PR owner and skip the apply, validation, push, and re-review flow.
    - Keep simplification findings separate from required review findings.
    - If the simplify pass reports **nothing worth simplifying**, continue to the normal verdict without changing code.
-   - If it reports candidates on **our own PR**, present the complete bounded list and wait for **explicit approval** before changing code. Hold the verdict while approval is pending.
-   - Approval automatically resumes application of only the approved candidates, focused validation, required repository gates, push, and the **complete full-review workflow** on the new head. There is **no second continuation prompt**.
-   - Rerun this complete workflow on the exact **post-simplification head** with simplification disabled. Re-run usefulness, bug, security, Spec/Standards, comments, base synchronization, compile/tests, required CI, thin settle, and `ship-gate.mjs`; do not merely review the cleanup diff.
-   - Publish the final verdict only from that post-simplification head. Any regression introduced by simplification is a blocker and must be fixed or the responsible candidate rolled back.
-   - There is **no recursive simplification** pass during the mandatory re-review.
+   - If it reports eligible contract-card candidates on **our own PR** and `push_code` is already allowed, apply them without a second yes. Bare full review stays report-only.
+   - After a head-changing apply, run the remaining review on the exact **post-simplification head** with no-comments and simplify disabled. Re-run usefulness, bug, security, Spec/Standards, comments, base synchronization, compile/tests, required CI, thin settle, and `ship-gate.mjs`; do not merely review the cleanup diff.
+   - Publish the final verdict only from that post-hygiene head. Any regression is a blocker and must be fixed or the responsible candidate rolled back.
+   - There is **no recursive simplification** pass during the mandatory re-review. There is **no second continuation prompt**.
 8. If concrete necessary issues remain: GitHub **changes requested** with those blockers only.
 9. Before `approve-comment` (or merge-ready notify): **thin settle** (`references/policy/ci.md`) — ~3–5 min quiet + recheck; activity resets; two-window cap. Skip settle for `changes-requested` / `not-useful` / draft `gated`. **Docs-only fast path:** a docs/markdown-only head uses the **~30–60s** settle in `references/policy/ci.md`. **Doomed-run abort:** if a bot review lands during the settle with findings on this diff (or an actionable human thread appears), fix + push and re-enter the settle on the new head instead of burning the old window.
 10. Post a **detailed** verdict comment **only after** CI+comments are handled (and settle, when approving) or a real hard blocker / `not-useful` / draft `gated` applies. Use the **Full-review / re-review verdict** template in `references/comment-depth.md` — lead with the **TLDR** (decision, every axis outcome, blockers, owner actions, bottom line) and keep the complete verdict in a `<details>` dropdown. Fill Usefulness, Bugs, Security, Spec, Reviews, Base/CI, Gate, Bottom line with paths/SHAs/checks; the TLDR never drops a blocker, owner action, or required next step. Do not post a bullet stub of “bots: addressed / CI: green.” When simplification ran, include the approved candidates, rollback status, validation evidence, and exact post-simplification head. When the PR is not ours, also fill the **Base sync (for the PR owner)** line and **Simplification (for the PR owner)** section with the owner actions. The publication verifier rejects a verdict missing the TLDR or `<details>` structure — repair the current-run comment and re-verify; a format failure never counts as published.
@@ -417,7 +420,7 @@ For **every** targeted PR:
 - Bundled Spec + Standards method completed on the recorded base/head comparison, with sources and both axis results preserved
 - Useful bots/humans handled or declined with rationale
 - Required CI green **or** hard-blocker reported (flake budget exhausted / permissions / etc.) — **never** “done” with unexplained red CI
-- When simplification was explicitly requested: candidates were reported, explicit approval preceded every simplification mutation, approved changes passed focused and repository validation, and the complete full-review workflow reran on the post-simplification head with simplification disabled and no recursive simplification
+- When no-comments or simplify ran: findings were reported or applied per ownership/`push_code`, validation passed, and the remaining review reran on the post-hygiene head with both passes disabled and no recursive hygiene
 - Foreign PRs: no base-sync push and no simplification edits; the verdict delivered the owner actions (update from latest base / apply the listed simplification candidates)
 - Thin settle completed before `approve-comment` / merge-ready (not for reject/gated labels)
 - Verdict posted with a **valid** label (see table)

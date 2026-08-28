@@ -14,7 +14,7 @@ test("routes standalone simplify while keeping combined full review authoritativ
   assert.equal(combined.mutationMode, "maintainer");
 });
 
-test("simplification is explicit, behavior-preserving, and followed by full re-review", () => {
+test("simplification is composed by default, behavior-preserving, and followed by full re-review", () => {
   const skill = readFileSync(new URL("../../SKILL.md", import.meta.url), "utf8");
   const fullReview = readFileSync(new URL("../../references/full-review-pr.md", import.meta.url), "utf8");
   const simplifyUrl = new URL("../../references/simplify-pr.md", import.meta.url);
@@ -23,15 +23,17 @@ test("simplification is explicit, behavior-preserving, and followed by full re-r
   const simplify = readFileSync(simplifyUrl, "utf8");
 
   assert.match(skill, /references\/simplify-pr\.md/);
-  assert.match(skill, /explicit[- ]only/i);
+  assert.match(skill, /references\/no-comments\.md/);
+  assert.match(skill, /unless the request opts out/i);
   assert.match(skill, /line count.*never/i);
+  assert.doesNotMatch(skill, /Simplification is explicit-only/);
 
-  assert.match(fullReview, /explicitly asks/i);
-  assert.match(fullReview, /explicit approval/i);
-  assert.match(fullReview, /complete full-review workflow/i);
-  assert.match(fullReview, /post-simplification head/i);
-  assert.match(fullReview, /no recursive simplification/i);
-  assert.match(fullReview, /no second continuation prompt/i);
+  assert.match(fullReview, /references\/no-comments\.md/);
+  assert.match(fullReview, /skip no-comments/);
+  assert.match(fullReview, /without simplify/);
+  assert.match(fullReview, /complete full-review workflow|remaining review/i);
+  assert.match(fullReview, /no recursive/i);
+  assert.doesNotMatch(fullReview, /Optional simplify phase/);
 
   assert.match(simplify, /line count is never/i);
   assert.match(simplify, /nothing worth simplifying/i);
@@ -40,7 +42,7 @@ test("simplification is explicit, behavior-preserving, and followed by full re-r
   assert.match(simplify, /focused validation/i);
   assert.match(simplify, /required.*gates/i);
   assert.match(simplify, /security/i);
-  assert.match(simplify, /explicit approval/i);
+  assert.match(simplify, /push_code/);
   assert.match(simplify, /complete full-review workflow/i);
   assert.match(simplify, /simplification disabled/i);
 });
@@ -78,7 +80,7 @@ test("foreign PRs receive owner instructions instead of base-sync pushes or simp
   assert.match(shared, /authenticated viewer login/);
   assert.match(shared, /never update the branch from base/);
   assert.match(shared, /never apply simplification changes/);
-  assert.match(shared, /Applies to: `fix-pr-bots`, `full-review-pr`, `simplify-pr`/);
+  assert.match(shared, /Applies to: `fix-pr-bots`, `full-review-pr`, `simplify-pr`, `no-comments`/);
 
   assert.match(fullReview, /PR ownership boundary/);
   assert.match(fullReview, /do not edit or push/);
@@ -94,8 +96,10 @@ test("README documents the current public workflows and safety model", () => {
 
   assert.match(readme, /simplify PR #42 without changing behavior/i);
   assert.match(readme, /full review PR #42 and simplify it safely/i);
+  assert.match(readme, /full review PR #42 without simplify/i);
+  assert.match(readme, /no-comments PR #42/i);
   assert.match(readme, /references\/simplify-pr\.md/);
-  assert.match(readme, /explicit approval/i);
+  assert.match(readme, /references\/no-comments\.md/);
   assert.match(readme, /complete full review/i);
   assert.match(readme, /line count is never/i);
   assert.match(readme, /nothing worth simplifying/i);

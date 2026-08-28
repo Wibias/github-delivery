@@ -1,5 +1,7 @@
 # Comment depth (public GitHub posts)
 
+This file is about **GitHub posts**, not source comments. Source-comment alibis belong to `references/no-comments.md`.
+
 Load with any workflow that posts research, security, verdict, merge-ready, status, or re-review comments.
 
 Vague posts are a bug. Prefer **structured detail** over one-liners — still scannable, not essays.

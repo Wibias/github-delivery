@@ -37,6 +37,7 @@ const RUNTIME_DIRS = [
   "references",
   "scripts",
   "overrides",
+  "agents",
   "tests/evals",
   "authority-host/windows",
 ];

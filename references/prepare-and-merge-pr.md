@@ -26,13 +26,13 @@ Capture the starting PR head and base. All preparation workflows and the final m
 
 ## 2. Run every requested preparation phase
 
-Interpret only preparation actions explicitly present in the user request:
+Interpret review/fix/merge actions explicitly present in the user request. **No-comments and simplify are default-on** for this composed path unless the request opts out (`skip no-comments`, `without no-comments`, `keep source comments`, `don't strip comments`, `without simplify`, `skip simplify`, `don't simplify`):
 
-- **Review requested:** run `references/full-review-pr.md`. Generic review wording and focused review wording such as security review still enter the complete merge-preparation review bar, because the final merge requires current Bug + Security + Spec/Standards evidence on the same head. Do not silently drop a requested review phase merely because the request also asks to merge.
-- **Fix/address review feedback requested:** run `references/fix-pr-bots.md` through its merge-ready completion bar. Pushes are allowed only because this preparation action was explicitly requested and only within that workflow's ownership/scope rules.
-- **Simplification requested:** run `references/simplify-pr.md`, including its bounded-candidate approval rules and mandatory complete post-simplification re-review. A no-op simplification is valid; a failed or non-approved re-review blocks merge.
+- **Review requested:** run `references/full-review-pr.md`. Generic review wording and focused review wording such as security review still enter the complete merge-preparation review bar, because the final merge requires current Bug + Security + Spec/Standards evidence on the same head. Do not silently drop a requested review phase merely because the request also asks to merge. Full review already composes `references/no-comments.md` and `references/simplify-pr.md` unless opted out.
+- **Fix/address review feedback requested:** run `references/fix-pr-bots.md` through its merge-ready completion bar. Pushes are allowed only because this preparation action was explicitly requested and only within that workflow's ownership/scope rules. That workflow also composes no-comments and simplify unless opted out.
+- **Simplification-only requested:** run `references/no-comments.md` unless opted out, then `references/simplify-pr.md`, including contract-card apply rules and mandatory complete post-simplification re-review. A no-op simplification is valid; a failed no-comments pass or failed re-review blocks merge.
 
-If several phases were requested, run all of them. Do not treat one successful phase as a substitute for another.
+If several phases were requested, run all of them. Do not treat one successful phase as a substitute for another. Do not double-run hygiene when a composed review or fix-pr-bots pass already ran it for this head.
 
 ## 3. Rebind evidence after mutations
 

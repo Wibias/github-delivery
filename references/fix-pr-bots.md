@@ -20,6 +20,15 @@ Necessary/useful **human** (esp. owners/maintainers) + CodeRabbit/Codex comments
 
 **Keep going until merge-ready** (or a hard blocker). Do **not** stop after an arbitrary round count or wall-clock budget.
 
+## Hygiene passes
+
+Unless this request opts out (`skip no-comments`, `without no-comments`, `keep source comments`, `don't strip comments`, `without simplify`, `skip simplify`, `don't simplify`):
+
+1. Run `references/no-comments.md` before remaining bug/security/spec work. A failed pass blocks merge-ready.
+2. After correctness work, run `references/simplify-pr.md`. Nothing worth simplifying is valid.
+3. If either pass changed the head, re-validate with both passes disabled.
+4. Name skipped passes in the merge-ready summary.
+
 ## Targets
 
 - Default: one PR (`#N`).

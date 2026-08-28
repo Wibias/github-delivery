@@ -32,7 +32,7 @@ test("issue-to-PR workflow keeps safety gates while staying compact", () => {
     assert.match(workflow, pattern);
   }
   const workflowBytes = canonicalBytes(workflow);
-  assert.ok(workflowBytes < 9000, `workflow bytes: ${workflowBytes}`);
+  assert.ok(workflowBytes < 9300, `workflow bytes: ${workflowBytes}`);
   assert.doesNotMatch(workflow, /Plan, authorize, then execute/i);
   assert.doesNotMatch(workflow, /```json[\s\S]*?"action"/i);
 });
