@@ -56,7 +56,7 @@ export function executeMutationRequest(options = {}) {
   const postcondition = verifyLegacyMutationPostcondition({
     request: planned.request,
     receipt,
-    runner,
+    runner: bodySafeRunner,
   });
   return postcondition ? { ...receipt, postcondition } : receipt;
 }
