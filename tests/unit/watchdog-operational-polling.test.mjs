@@ -32,6 +32,16 @@ test("operational process and worktree polling is volatile evidence", () => {
   }
 });
 
+test("CIM reads outside process polling keep their prior neutral classification", () => {
+  assert.deepEqual(
+    classifyHookTool({
+      tool_name: "Bash",
+      tool_input: { command: "Get-CimInstance Win32_OperatingSystem" },
+    }),
+    { kind: "neutral" },
+  );
+});
+
 test("protected stream charges repeated process polling against the evidence budget", () => {
   const watchdog = createProgressWatchdog({
     evidenceSoftLimit: 1,
