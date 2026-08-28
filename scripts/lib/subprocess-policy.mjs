@@ -61,8 +61,18 @@ function windowsWorktreeRoot(cwd, exists) {
   }
 }
 
+function stripTrailingWindowsSeparators(value) {
+  let end = value.length;
+  while (end > 0) {
+    const char = value[end - 1];
+    if (char !== "\\" && char !== "/") break;
+    end -= 1;
+  }
+  return value.slice(0, end);
+}
+
 function windowsPathInside(root, candidate) {
-  const normalizedRoot = win32Path.resolve(root).replace(/[\\/]+$/, "").toLowerCase();
+  const normalizedRoot = stripTrailingWindowsSeparators(win32Path.resolve(root)).toLowerCase();
   const normalizedCandidate = win32Path.resolve(candidate).toLowerCase();
   return (
     normalizedCandidate === normalizedRoot ||
