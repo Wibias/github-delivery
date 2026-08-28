@@ -14,6 +14,18 @@ test("permanent GitHub capability failures are not retryable", () => {
   );
 });
 
+test("rules boundary failures use their preserved source cause for retryability", () => {
+  const error = new Error("snapshot_rules_boundary_incomplete");
+  error.code = "snapshot_rules_boundary_incomplete";
+  error.causeMessage = "HTTP 403: Upgrade to GitHub Pro to use repository rules";
+
+  assert.deepEqual(classifyShipGateFailure(error), {
+    classification: "github_capability_or_permission_error",
+    retryable: false,
+    message: "snapshot_rules_boundary_incomplete",
+  });
+});
+
 test("transient upstream failures remain retryable", () => {
   assert.deepEqual(classifyShipGateFailure(new Error("HTTP 503: temporarily unavailable")), {
     classification: "transient_upstream_error",
