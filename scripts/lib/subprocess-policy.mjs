@@ -88,20 +88,22 @@ function resolveWindowsProtectedCommand(
   if (win32Path.basename(command) !== command) return command;
   if (!WINDOWS_PROTECTED_COMMANDS.has(command.toLowerCase())) return command;
 
-  const worktreeRoot = canonicalizePath(windowsWorktreeRoot(cwd, exists));
+  const lexicalWorktreeRoot = windowsWorktreeRoot(cwd, exists);
+  const canonicalWorktreeRoot = canonicalizePath(lexicalWorktreeRoot);
   for (const entry of windowsPathValue(env).split(";")) {
     const directory = stripOuterQuotes(entry);
     if (!directory || !win32Path.isAbsolute(directory)) continue;
     for (const name of windowsExecutableNames(command)) {
       const candidate = win32Path.join(directory, name);
       if (!exists(candidate)) continue;
+      if (windowsPathInside(lexicalWorktreeRoot, candidate)) continue;
       let resolved;
       try {
         resolved = canonicalizePath(candidate);
       } catch {
         continue;
       }
-      if (windowsPathInside(worktreeRoot, resolved)) continue;
+      if (windowsPathInside(canonicalWorktreeRoot, resolved)) continue;
       return resolved;
     }
   }
