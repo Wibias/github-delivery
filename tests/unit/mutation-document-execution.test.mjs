@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   executeMutationDocument,
+  mutationOperationKey,
   requestsFromMutationDocument,
 } from "../../scripts/lib/mutation-document-execution.mjs";
 
@@ -221,11 +222,13 @@ test("multi-request execution stops at the first failed operation", () => {
 
 test("retries skip operations that already completed", () => {
   const executed = [];
+  const first = request("one", { idempotencyKey: "k-one" });
+  const second = request("two", { idempotencyKey: "k-two" });
   const result = executeMutationDocument({
-    document: [request("one", { idempotencyKey: "k-one" }), request("two", { idempotencyKey: "k-two" })],
+    document: [first, second],
     execute: false,
     dependencies: {
-      completedOperationKeys: ["k-one"],
+      completedOperationKeys: [mutationOperationKey(first)],
       mutationRequiresTrustedAuthority: () => false,
       executeMutationWithAuthority({ request: current }) {
         executed.push(current.action);

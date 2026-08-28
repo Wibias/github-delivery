@@ -4,13 +4,27 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-08-28
+
 ### Added
 
-- Added a `no-comments` workflow that strips source-comment alibis via an independent comment inspector, keeps the closed innocent list, and treats leftover workarounds as merge-ready blockers before review, merge-ready, and create-PR publication.
+- Added a `no-comments` workflow that strips source-comment alibis via an independent comment inspector, keeps the closed innocent list, and treats leftover workarounds as merge-ready blockers before review, merge-ready, and create-PR publication (PR #384).
 
 ### Changed
 
-- No-comments and simplify now run by default on full review, re-review, merge-ready/fix, and create-PR pre-open unless the request opts out. A bare full review still does not gain `push_code`. Eligible simplify candidates auto-apply on our own PRs when `push_code` is already allowed.
+- No-comments and simplify now run by default on full review, re-review, merge-ready/fix, and create-PR pre-open unless the request opts out. Their opt-outs are independent, and a bare full review still does not gain `push_code`. Eligible simplify candidates auto-apply on our own PRs only when `push_code` is already allowed (PR #384).
+- Bumped the package version from `1.3.1` to `1.3.2`.
+
+### Fixed
+
+- Simplify opt-outs such as `without simplify`, `skip simplify`, and `don't simplify` no longer count as positive simplify intent in full-review or prepare-and-merge routing, so they cannot accidentally promote a read-only review into a `push_code`-capable workflow (PR #384).
+- `authorityMode=off` now carries trusted workflow intent through the canonical `github-mutate` controller path using operation-scoped checkpoint evidence instead of caller-controlled mutation JSON. The trusted fact is bound to the exact mutation identity, so changing the target or payload invalidates the context (PR #385).
+- Mutation-document idempotency and resume identities now bind the canonical request payload instead of a reusable bare label, preventing two different operations with the same human `idempotencyKey` from being collapsed into `already_applied` (PR #385).
+- Replaced the input-dependent trailing Windows-separator regular expression in subprocess path normalization with a linear character scan after GitHub Advanced Security flagged it as potentially polynomial (PR #385).
+
+### Security
+
+- Protected Windows `gh` and `git` launches now resolve only from absolute PATH entries outside the target worktree. Both lexical candidates and canonicalized targets are checked, closing current-working-directory executable hijacking as well as worktree junction/symlink escape paths before the broker spawns a security-sensitive executable (PR #385).
 
 ## [1.3.1] - 2026-08-28
 

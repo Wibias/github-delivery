@@ -23,11 +23,14 @@ function sha256(value) {
 }
 
 export function mutationOperationKey(request = {}) {
-  const idempotencyKey = String(request?.idempotencyKey || "").trim();
-  if (idempotencyKey) return idempotencyKey;
   const payload = plainObject(request) ? { ...request } : {};
   delete payload.authorityGrant;
-  return `payload:${sha256(canonicalJson(payload))}`;
+  const payloadHash = sha256(canonicalJson(payload));
+  const idempotencyKey = String(request?.idempotencyKey || "").trim();
+  if (idempotencyKey) {
+    return `idempotency:${sha256(idempotencyKey)}:payload:${payloadHash}`;
+  }
+  return `payload:${payloadHash}`;
 }
 
 export function mutationReceiptCompleted(receipt = {}) {
@@ -91,6 +94,7 @@ function resolvedDependencies(overrides = {}) {
     authorizeBatchSync,
     authorityRuntimeEnvironment,
     executeMutationWithAuthority,
+    executionContextForRequest: () => ({}),
     mutationAuthorityRequired,
     mutationRequiresTrustedAuthority,
     planMutationWithAuthority,
@@ -106,6 +110,14 @@ function resolvedDependencies(overrides = {}) {
       execute === true && overrides.mutationRequiresTrustedAuthority(request);
   }
   return resolved;
+}
+
+function executionContext(deps, request) {
+  const value = deps.executionContextForRequest(request) || {};
+  return {
+    trustedWorkflowIntent: value.trustedWorkflowIntent === true,
+    trustedExactTextConfirmation: value.trustedExactTextConfirmation === true,
+  };
 }
 
 export function executeMutationDocument({
@@ -127,6 +139,7 @@ export function executeMutationDocument({
       deps.planMutationWithAuthority(request, {
         env: effectiveEnv,
         readFile,
+        ...executionContext(deps, request),
       });
     }
 
@@ -190,6 +203,7 @@ export function executeMutationDocument({
         runner,
         env: effectiveEnv,
         readFile,
+        ...executionContext(deps, request),
       });
       const receipt = { ...result, operationKey };
       results.push(receipt);

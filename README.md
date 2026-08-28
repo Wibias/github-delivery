@@ -19,7 +19,7 @@
 </div>
 
 > [!NOTE]
-> **1.3.1.** This patch fixes runtime recovery and concurrency problems found after 1.3.0: a hard-crashed github-delivery process can no longer leave an owned stale install lock permanently blocking a later skill or Windows Authority update, installed workflow helpers now resolve github-delivery's own skill root instead of treating the caller repository's current working directory as the workflow root, and rewrite-baseline generations are finalized while the store lock is held so concurrent writers cannot collide on an already-published generation. The 1.3 line keeps Git workflow and release versioning as first-class capabilities, with remote push, PR, tag, release, registry publication, and merge authority explicitly bounded. See [Current state](#current-state).
+> **1.3.2.** This patch tightens review hygiene and the GitHub mutation boundary. No-comments and simplify now compose independently by default in the relevant review/publication workflows, Windows `gh`/`git` execution is resolved away from worktree-controlled paths (including junction/symlink escapes), `authorityMode=off` receives direct workflow intent through an operation-bound trusted checkpoint, and mutation-document idempotency is bound to the exact payload. See [Current state](#current-state).
 
 > [!IMPORTANT]
 > **Natural language is the public API.** The Node scripts, policy modules, evaluators, mutation broker, and optional Authority host are internal safety/evidence machinery. You normally do not invoke them yourself.
@@ -99,6 +99,17 @@ For installation edge cases, backup/restore, downgrade behavior, manual recovery
 | **Supersede / overtake** | `supersede PR #12 with PR #45` | Explicit replacement or maintainer-takeover workflows with bounded mutation authority |
 | **Merge / close-out** | `merge PR #32` | Final gate, exact transaction authority, head-pinned merge, verification, thanks, linked-issue close-out |
 | **Self-update** | `update github-delivery to the latest stable release` | Stable-release verification, lock-aware Windows recovery, optional old-backup cleanup, safe apply and postconditions |
+
+### What changed in 1.3.2
+
+`1.3.2` is a review-hygiene and mutation-boundary hardening patch:
+
+- `no-comments` is a first-class hygiene pass with an independent comment inspector; no-comments and simplify run independently by default on full review, re-review, merge-ready/fix, and create-PR pre-open, and opting out of one pass does not disable or authorize the other;
+- negated simplify requests such as `without simplify` and `skip simplify` remain read-only and cannot accidentally grant `push_code`;
+- on Windows, protected `gh` and `git` subprocesses resolve only from absolute PATH entries outside the lexical and canonical worktree, closing current-directory executable hijacking plus junction/symlink escape paths;
+- `authorityMode=off` can consume trusted workflow intent through the canonical mutation controller without trusting caller-supplied booleans; the checkpoint evidence is bound to the exact operation identity;
+- mutation-document idempotency and resume identities bind the full canonical payload, so reusing a human label cannot silently suppress a different operation;
+- path normalization no longer uses the input-dependent trailing-separator regular expression flagged by GitHub Advanced Security.
 
 ### What changed in 1.3.1
 
@@ -187,17 +198,19 @@ Routine network-visible issue/PR writes pass through the typed GitHub mutation b
 
 For trusted high-assurance operations, authority redemption happens before the first mutating GitHub command, including autonomous idempotency coordination refs/tags. A rejected grant therefore cannot leave a coordination write behind before the requested mutation.
 
+On Windows, security-sensitive `gh` and `git` launches are resolved from absolute PATH entries outside the target worktree before spawning. Both lexical worktree paths and canonicalized targets are checked, so a repository-local executable or a worktree junction/symlink cannot substitute the broker binary.
+
 **Merge is deliberately stricter.** `scripts/merge-pr-driver.mjs` owns settle, final current-head/base/rules/feedback/review-evidence recapture, trusted destructive authority, head-pinned merge execution, and post-merge reconciliation. GitHub `UNKNOWN` mergeability is not treated as ready. The lower mutation execution boundary also rechecks open-PR stack topology and rejects a child merge while its parent PR is still open. Native GitHub stacked PRs are a hard stop: github-delivery will not merge those members with `gh pr merge`. Generic hand-built merge mutation documents are rejected.
 
 ### Exact-effect trusted authority
 
 Where high assurance is required, trusted grants bind the semantic effect rather than a vague permission flag: repository, action, mode, PR/head, merge method, target identity, idempotency data, and hashes of human-visible text as applicable.
 
-The optional Windows Authority host can issue those grants through Windows Hello. Missing persistent user configuration defaults the effective preference to **Sensitive actions** (`high-assurance`); an explicitly stored `off` or `all` preference remains supported. After Hello, the approval UI can start a **PR session** (5 / 15 / 30 / 60 minutes) for later exact-scope push and merge on one PR and the approved merge base, or a **branch lease** (1–10 minutes) for repeated `push_code` only. Mixed-action batches, comments, human replies, close, and delete still need Hello. `off` means no Windows Hello or Authority-host approval; it does not trust caller-supplied lifecycle or exact-text booleans as provenance. Governing workflows must supply direct intent and exact-text confirmation through trusted execution context when those facts are required.
+The optional Windows Authority host can issue those grants through Windows Hello. Missing persistent user configuration defaults the effective preference to **Sensitive actions** (`high-assurance`); an explicitly stored `off` or `all` preference remains supported. After Hello, the approval UI can start a **PR session** (5 / 15 / 30 / 60 minutes) for later exact-scope push and merge on one PR and the approved merge base, or a **branch lease** (1–10 minutes) for repeated `push_code` only. Mixed-action batches, comments, human replies, close, and delete still need Hello. `off` means no Windows Hello or Authority-host approval; it does not trust caller-supplied lifecycle or exact-text booleans as provenance. Governing workflows supply required direct intent and exact-text confirmation through trusted execution context bound to the exact operation.
 
 ### Safe retries and idempotency
 
-Durable creates/social writes use authenticated exact-effect receipts and read-before-write checks. A hidden marker alone is not proof of ownership or successful prior execution.
+Durable creates/social writes use authenticated exact-effect receipts and read-before-write checks. A hidden marker alone is not proof of ownership or successful prior execution. Mutation-document resume keys include the canonical operation payload, so the same human idempotency label cannot make a different target/body/action look already applied.
 
 Only proven read-only GitHub operations may use bounded rate-limit retry behavior. Ambiguous writes are never blindly retried. An uncertain merge outcome is reconciled through read-only exact-head state instead of issuing a second merge.
 
@@ -240,7 +253,7 @@ The pre-open gate treats those deterministic probes as first-class obligations a
 
 ### Safe simplification
 
-No-comments and simplify run by default on full review, re-review, merge-ready/fix, and create-PR pre-open unless the request opts out (`without simplify`, `skip no-comments`, `keep source comments`). Their goal is lower cognitive load and fewer workaround alibis. An independent comment inspector hunts comments; leftover workarounds after a deleted alibi block merge-ready. **Line count is never the goal**; fewer lines are acceptable only when behavior and clarity improve.
+No-comments and simplify run by default on full review, re-review, merge-ready/fix, and create-PR pre-open unless the request opts out (`without simplify`, `skip no-comments`, `keep source comments`). Their opt-outs are independent: skipping no-comments does not skip simplify, and skipping simplify does not grant mutation authority or disable no-comments. Their goal is lower cognitive load and fewer workaround alibis. An independent comment inspector hunts comments; leftover workarounds after a deleted alibi block merge-ready. **Line count is never the goal**; fewer lines are acceptable only when behavior and clarity improve.
 
 A simplification pass may validly conclude that there is **nothing worth simplifying**. On our own PRs, eligible contract-card candidates apply when the current mode already allows `push_code`. A bare full review stays report-only. After applied candidates are validated, GitHub Delivery automatically runs the **complete full review** again on the changed head with both hygiene passes disabled before publishing the final verdict. See [`references/no-comments.md`](references/no-comments.md) and [`references/simplify-pr.md`](references/simplify-pr.md).
 
@@ -589,7 +602,7 @@ The architecture uses progressive disclosure: route once, load the selected work
 
 ## Current state
 
-`1.3.1` is a patch release on top of `1.3.0`: it keeps the first-class Git workflow and release-versioning capabilities while fixing stale owned installer-lock recovery, installed workflow-helper root resolution, and concurrent rewrite-baseline generation allocation.
+`1.3.2` is a hardening patch on top of `1.3.1`: it keeps the first-class Git workflow, release-versioning, recovery, and concurrency capabilities while adding independent review-hygiene passes and tightening subprocess, trusted-intent, and idempotency boundaries.
 
 Stable in this release:
 
@@ -598,9 +611,11 @@ Stable in this release:
 - evidence-backed SemVer classification, version metadata consistency, curated changelogs, and tag/release preparation with publication kept separately authorized;
 - read-only open-work and competing-PR analysis;
 - issue research, implementation, publication, external work-item delivery, and exact-head duplicate prevention;
-- deep current-head review with deterministic probe coverage and conditional visual evidence;
+- deep current-head review with deterministic probe coverage, conditional visual evidence, and independently opt-outable no-comments/simplify hygiene passes;
 - explicit GitHub-native PR approval with expected-head verification and no comment/verdict substitution;
-- mutation authority, exact-effect receipts, controller-owned stale-head protection, and head-pinned merge execution;
+- mutation authority, exact-effect receipts, payload-bound operation idempotency, controller-owned stale-head protection, and head-pinned merge execution;
+- Windows protected-command resolution that rejects worktree-controlled `gh`/`git` executables and lexical/canonical alias escapes;
+- `authorityMode=off` trusted workflow intent carried through operation-bound controller checkpoints instead of caller-supplied authority booleans;
 - optional Windows Authority Hello grants, push-only branch leases, and PR sessions for later exact-scope push and merge on one PR and approved merge base;
 - inferred-stack restacking/merge-order safety and independent multi-base delivery;
 - SHA-bound remote repository context when a useful local checkout is not already available;
