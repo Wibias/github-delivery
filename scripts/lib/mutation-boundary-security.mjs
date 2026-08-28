@@ -196,8 +196,19 @@ function pushMutatingApiWindow(path, window, errors) {
 function pushGraphqlWindow(path, window, errors) {
   if (!GRAPHQL_MUTATION_RE.test(window)) return;
   const names = graphqlMutationNames(window);
+  if (APPROVED_MUTATION_FILES.has(path) && names.length === 0) {
+    errors.push(
+      error(
+        path,
+        "unregistered_graphql_mutation",
+        "GraphQL mutations in privileged files must expose a statically registered root mutation.",
+        { names: [], reason: "mutation_root_unresolved" },
+      ),
+    );
+    return;
+  }
   const unregistered = names.filter((name) => !REGISTERED_GRAPHQL_MUTATIONS.has(name));
-  if (APPROVED_MUTATION_FILES.has(path) && names.length > 0 && unregistered.length > 0) {
+  if (APPROVED_MUTATION_FILES.has(path) && unregistered.length > 0) {
     errors.push(
       error(
         path,
