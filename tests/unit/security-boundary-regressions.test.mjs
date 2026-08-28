@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import {
@@ -28,38 +30,41 @@ function request(action, extra = {}) {
   };
 }
 
-test("Windows protected subprocesses never resolve gh from the current worktree", () => {
+test("Windows protected subprocesses never resolve gh or git from the current worktree", () => {
   const spawned = [];
   const present = new Set([
     "C:\\repo\\.git",
     "C:\\repo\\gh.exe",
+    "C:\\repo\\git.exe",
     "C:\\Tools\\GitHub CLI\\gh.exe",
+    "C:\\Program Files\\Git\\cmd\\git.exe",
   ]);
-
-  boundedSpawnSync(
-    "gh",
-    ["--version"],
-    { encoding: "utf8" },
-    {
-      platform: "win32",
-      cwd: "C:\\repo",
-      env: { PATH: "C:\\repo;C:\\Tools\\GitHub CLI" },
-      exists(path) {
-        return present.has(path);
-      },
-      canonicalizePath(path) {
-        return path;
-      },
-      spawn(command, argv, options) {
-        spawned.push({ command, argv, options });
-        return { status: 0, stdout: "", stderr: "" };
-      },
+  const dependencies = {
+    platform: "win32",
+    cwd: "C:\\repo",
+    env: {
+      PATH: "C:\\repo;C:\\Tools\\GitHub CLI;C:\\Program Files\\Git\\cmd",
     },
-  );
+    exists(path) {
+      return present.has(path);
+    },
+    canonicalizePath(path) {
+      return path;
+    },
+    spawn(command, argv, options) {
+      spawned.push({ command, argv, options });
+      return { status: 0, stdout: "", stderr: "" };
+    },
+  };
 
-  assert.equal(spawned.length, 1);
+  boundedSpawnSync("gh", ["--version"], { encoding: "utf8" }, dependencies);
+  boundedSpawnSync("git", ["--version"], { encoding: "utf8" }, dependencies);
+
+  assert.equal(spawned.length, 2);
   assert.equal(spawned[0].command, "C:\\Tools\\GitHub CLI\\gh.exe");
+  assert.equal(spawned[1].command, "C:\\Program Files\\Git\\cmd\\git.exe");
   assert.deepEqual(spawned[0].argv, ["--version"]);
+  assert.deepEqual(spawned[1].argv, ["--version"]);
 });
 
 test("mutation documents propagate governing workflow context to planning and execution", () => {
@@ -150,6 +155,53 @@ test("workflow mutation context is bound to one exact operation key", () => {
         trustedExactTextConfirmation: false,
       },
     );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("canonical github-mutate consumes checkpoint intent in authority off mode", () => {
+  const incomplete = request("create_issue", {
+    idempotencyKey: "off-mode-cli-context",
+  });
+  const controller = createDeliveryWorkflowController({
+    workflow: "create-pr-from-local-work",
+    repo: "acme/widgets",
+    startPhase: "ROUTE",
+    graph: { ROUTE: ["DONE"], DONE: [] },
+  });
+  controller.authorizeMutation({
+    operationKey: mutationOperationKey(incomplete),
+    trustedWorkflowIntent: true,
+  });
+
+  const directory = mkdtempSync(join(tmpdir(), "github-delivery-off-mode-cli-"));
+  const checkpoint = join(directory, "controller.json");
+  const requestPath = join(directory, "request.json");
+  try {
+    writeDeliveryWorkflowCheckpoint(checkpoint, controller.snapshot());
+    writeFileSync(requestPath, `${JSON.stringify(incomplete)}\n`, "utf8");
+    const result = spawnSync(
+      process.execPath,
+      [
+        fileURLToPath(new URL("../../scripts/github-mutate.mjs", import.meta.url)),
+        "--request",
+        requestPath,
+        "--checkpoint",
+        checkpoint,
+        "--execute",
+      ],
+      {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          GITHUB_DELIVERY_AUTHORITY_MODE: "off",
+        },
+      },
+    );
+    assert.equal(result.status, 2);
+    assert.doesNotMatch(String(result.stderr || ""), /explicit_instruction_required/);
+    assert.match(String(result.stderr || ""), /title_required/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
