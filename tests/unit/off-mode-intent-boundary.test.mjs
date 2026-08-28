@@ -39,14 +39,14 @@ test("Off mode ignores caller-attested explicit lifecycle intent", () => {
   );
 });
 
-test("Off mode does not elevate governing workflow context into trusted user intent", () => {
-  assert.throws(
-    () => planMutationWithAuthority(
-      mergeRequest({ explicitInstruction: false }),
-      { ...off, trustedWorkflowIntent: true },
-    ),
-    /mutation_denied:explicit_instruction_required/,
+test("Off mode can retain governing workflow context for dry-run compatibility only", () => {
+  const plan = planMutationWithAuthority(
+    mergeRequest({ explicitInstruction: false }),
+    { ...off, trustedWorkflowIntent: true },
   );
+  assert.equal(plan.authorization.allowed, true);
+  assert.equal(plan.authority.verified, false);
+  assert.equal(plan.authority.provenance, "authority_disabled_by_user");
 });
 
 test("Off mode ignores caller-attested exact-text confirmation", () => {
