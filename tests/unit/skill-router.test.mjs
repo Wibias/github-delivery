@@ -404,6 +404,30 @@ test("routes agent brief, out-of-scope, conflict, and issue-lifecycle requests",
   );
 });
 
+test("routes explicit no-comments to the no-comments workflow", () => {
+  assert.deepEqual(routeShippingGithubPrompt("no-comments PR #42"), {
+    skill: "github-delivery",
+    workflow: "references/no-comments.md",
+    mutationMode: "maintainer",
+    explicitActions: ["push_code"],
+  });
+  assert.equal(routeShippingGithubPrompt("strip comments on PR #42").workflow, "references/no-comments.md");
+  assert.equal(routeShippingGithubPrompt("comment sicko PR #42").workflow, "references/no-comments.md");
+  assert.equal(routeShippingGithubPrompt("comment inspector PR #42").workflow, "references/no-comments.md");
+});
+
+test("full review plus no-comments or opt-out stays on full review without granting push_code", () => {
+  const combined = routeShippingGithubPrompt("full review PR #42 skip no-comments");
+  assert.equal(combined.workflow, "references/full-review-pr.md");
+  assert.deepEqual(combined.explicitActions, []);
+  const bare = routeShippingGithubPrompt("full review PR #42");
+  assert.equal(bare.workflow, "references/full-review-pr.md");
+  assert.deepEqual(bare.explicitActions, []);
+  const withSimplify = routeShippingGithubPrompt("full review PR #42 and simplify it safely");
+  assert.equal(withSimplify.workflow, "references/full-review-pr.md");
+  assert.equal(withSimplify.mutationMode, "maintainer");
+});
+
 test("stacked merge requests stay on stacked-prs with merge authority", () => {
   const mergeStack = routeShippingGithubPrompt("merge the bottom PR in my stack first");
   assert.equal(mergeStack.workflow, "references/stacked-prs.md");

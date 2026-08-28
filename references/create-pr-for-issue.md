@@ -66,6 +66,7 @@ Default to one cohesive PR. Split only when independently shippable concerns nee
 3. Follow required consumers as dependencies appear; for broad migrations or deterministic sweeps apply `references/change-execution.md`.
 4. Run focused validation appropriate to the changed code: tests, typecheck, build, repro, and repository-local checks as available.
 5. Require a non-empty base-to-head candidate diff. If no change is needed, return to the matching preflight outcome; do not open an empty PR.
+6. Hygiene: resolve passes independently. Run `references/no-comments.md` unless its pass is opted out, then `references/simplify-pr.md` unless its pass is opted out. The no-comments and simplify opt-outs are independent. A failed no-comments pass blocks publication.
 
 ## D. Pre-open bug + security gate
 

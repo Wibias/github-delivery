@@ -4,6 +4,14 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Added a `no-comments` workflow that strips source-comment alibis via an independent comment inspector, keeps the closed innocent list, and treats leftover workarounds as merge-ready blockers before review, merge-ready, and create-PR publication.
+
+### Changed
+
+- No-comments and simplify now run by default on full review, re-review, merge-ready/fix, and create-PR pre-open unless the request opts out. A bare full review still does not gain `push_code`. Eligible simplify candidates auto-apply on our own PRs when `push_code` is already allowed.
+
 ## [1.3.1] - 2026-08-28
 
 ### Changed

@@ -49,7 +49,7 @@ simplify preparation first, then enter the merge workflow.
 | Backport / port PR #N to one or more target base branches                                             | `references/multi-base-delivery.md`                |
 | Full review on PR #N (or a list); babysit to green + verdict                                          | `references/full-review-pr.md`                     |
 | Spec and Standards review on PR #N                                                                    | `references/spec-standards-review.md`              |
-| Simplify / clean up / deduplicate PR #N without behavior changes                                      | `references/simplify-pr.md`                        |
+| Simplify / no-comments PR #N                                                                          | `references/simplify-pr.md` `references/no-comments.md` |
 | Security review on PR #N                                                                              | `references/security-review.md`                    |
 | Status / what’s left / is PR #N merge ready? (read-only; same bar)                                    | `references/status.md`                             |
 | Merge PR #N; why-good + thanks; issue thank + close                                                   | `references/merge-pr.md`                           |
@@ -82,7 +82,7 @@ and begin implementation. Do not repeat unchanged research. The create-PR
 pre-open bug/security gate is **post-implementation and pre-publication**.
 Triage may compose `agent-brief`; confirmed rejection may compose `out-of-scope`.
 
-Simplification is explicit-only; line count is never a goal or success metric.
+Hygiene passes default on unless the request opts out; line count is never a goal.
 
 If a PR is stacked, load the `stacks` conditional module and
 `references/stacked-prs.md` before mutation/readiness/merge decisions. Stack

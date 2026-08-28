@@ -58,6 +58,9 @@ update the version and changelog for the next release
 triage the competing PRs in this repo
 full review PR #42
 full review PR #42 and simplify it safely
+full review PR #42 without simplify
+full review PR #42 skip no-comments
+no-comments PR #42
 fix the review comments on PR #18 and make it merge ready
 backport PR #42 to release/1.x and release/2.x
 approve PR #42
@@ -237,9 +240,9 @@ The pre-open gate treats those deterministic probes as first-class obligations a
 
 ### Safe simplification
 
-Simplification is **explicit-only**. Its goal is lower cognitive load and safer maintenance. **Line count is never the goal**; fewer lines are acceptable only when behavior and clarity improve.
+No-comments and simplify run by default on full review, re-review, merge-ready/fix, and create-PR pre-open unless the request opts out (`without simplify`, `skip no-comments`, `keep source comments`). Their goal is lower cognitive load and fewer workaround alibis. An independent comment inspector hunts comments; leftover workarounds after a deleted alibi block merge-ready. **Line count is never the goal**; fewer lines are acceptable only when behavior and clarity improve.
 
-A simplification pass may validly conclude that there is **nothing worth simplifying**. Any proposed mutation still requires **explicit approval**. After approved candidates are applied and validated, GitHub Delivery automatically runs the **complete full review** again on the changed head with simplification disabled before publishing the final verdict. See [`references/simplify-pr.md`](references/simplify-pr.md).
+A simplification pass may validly conclude that there is **nothing worth simplifying**. On our own PRs, eligible contract-card candidates apply when the current mode already allows `push_code`. A bare full review stays report-only. After applied candidates are validated, GitHub Delivery automatically runs the **complete full review** again on the changed head with both hygiene passes disabled before publishing the final verdict. See [`references/no-comments.md`](references/no-comments.md) and [`references/simplify-pr.md`](references/simplify-pr.md).
 
 Security-sensitive findings follow [`SECURITY.md`](SECURITY.md). Undisclosed vulnerabilities belong in **private vulnerability reporting**, not a public issue or review thread.
 
@@ -445,6 +448,7 @@ For the complete budgets, trust model, incident replays, false-positive controls
 | **Change execution** | Safe migrations, mechanical sweeps, expand-contract | `references/change-execution.md` |
 | **Completion evidence** | Prove durable completion/count/coverage claims | `references/completion-claims.md` |
 | **Safe simplification** | Behavior-preserving cleanup + mandatory re-review | `references/simplify-pr.md` |
+| **No-comments** | Independent inspector strips alibis; leftover workarounds block merge-ready | `references/no-comments.md` |
 | **Prepare + merge** | Compound review/fix/simplify request with explicit merge | `references/prepare-and-merge-pr.md` |
 | **Approve** | Explicit GitHub-native PR approval | `references/approve-pr.md` |
 | **Merge** | Settle, final live gate, exact head-pinned merge | `references/merge-pr.md` |
@@ -480,6 +484,9 @@ what's left on ENG-42?
 what is left on PR #41?
 is PR #42 safe to merge?
 full review PR #42
+full review PR #42 without simplify
+full review PR #42 skip no-comments
+no-comments PR #42
 fix the review comments on PR #18 and make it merge ready
 watch PR #77 until it merges or needs me
 watch and autonomously merge PR #32

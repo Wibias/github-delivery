@@ -122,7 +122,7 @@ Use `none` when no material design-quality issue exists. Do not pad a clean Stan
 - `references/minimal-solution.md` helps choose a solution shape before implementation; this file reviews the design cost of the result.
 - `references/semantic-propagation-review.md` maps changed concepts across the system. Domain/source-of-truth concerns found here can trigger that deeper propagation check.
 - `references/safety-invariant.md` proves the material fact a positive verdict depends on when design risk is non-local.
-- `references/simplify-pr.md` remains explicit-only for edits. A Standards reviewer may report a material design issue, but must not silently perform optional simplification.
+- `references/simplify-pr.md` is default-on when composed into review, merge-ready, and create-PR paths unless the request opts out. A Standards reviewer may report a material design issue, but must not silently perform optional simplification outside that composed pass.
 
 ## Provenance
 

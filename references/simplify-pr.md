@@ -10,7 +10,7 @@ Policy modules:
 
 # Simplify PR
 
-**Trigger:** An explicit request to simplify, clean up, deduplicate, or reduce unnecessary complexity in PR #N without changing behavior. This workflow is **explicit-only**. Do not activate it for an ordinary full review, a generic merge-ready request, or because the reviewer happens to notice code that could be shorter.
+**Trigger:** An explicit request to simplify, clean up, deduplicate, or reduce unnecessary complexity in PR #N without changing behavior. Also composed into full review, re-review, merge-ready/fix, create-PR pre-open, and prepare-and-merge **unless this request opts out** (`without simplify`, `skip simplify`, `don't simplify`). Do not activate it because a reviewer happens to notice code that could be shorter outside those paths.
 
 ## Goal
 
@@ -26,8 +26,8 @@ Prefer reporting **nothing worth simplifying** over manufacturing edits.
 - Inspect the PR comparison plus only the directly necessary adjacent code needed to prove equivalence.
 - Do not expand into unrelated refactors, repository-wide cleanup, formatting churn, dependency changes, or architectural redesign.
 - Simplification cannot overrule bug, security, Spec/Standards, review, CI, base-health, mutation-policy, or `ship-gate.mjs` authority.
-- Code changes require a mutation mode that permits `push_code`, but the selected mode does not replace the explicit approval required below.
-- **PR ownership (shared rules):** only PRs authored by the authenticated user may be edited and pushed. On a foreign PR, run the candidate pass but apply nothing; deliver the complete bounded candidate list to the PR owner (verdict for full-review composition; comment or chat for standalone) and skip the approval-to-apply, validation, push, and re-review flow.
+- Code changes require a mutation mode that permits `push_code`. Own PRs with `push_code` already allowed auto-apply eligible contract-card candidates; foreign and read-only stay report-only.
+- **PR ownership (shared rules):** only PRs authored by the authenticated user may be edited and pushed. On a foreign PR, run the candidate pass but apply nothing; deliver the complete bounded candidate list to the PR owner (verdict for full-review composition; comment or chat for standalone) and skip the apply, validation, push, and re-review flow.
 
 ## Candidate pass
 
@@ -108,21 +108,22 @@ When uncertain, leave the code unchanged and explain why the candidate was skipp
 
 If no worthwhile candidates remain, report **nothing worth simplifying** and return control to the calling workflow.
 
-If candidates remain:
+If candidates remain on **our own PR** and the current mutation mode already allows `push_code`, apply every eligible contract-card candidate without a second yes. A bare full review does not grant `push_code`.
 
-1. Present the complete bounded candidate list before editing, including each eligible contract-card summary.
-2. Wait for **explicit approval** of all or selected candidates.
-3. Do not interpret approval of the original full review, permission to fix bugs, or a broad maintainer mutation mode as approval to simplify.
-4. Record which candidates were approved and apply only those candidates.
+If candidates remain and apply is not allowed (foreign PR, or read-only / no `push_code`):
 
-On a foreign PR this gate is skipped: candidates are delivered to the PR owner instead of being applied.
+1. Present the complete bounded candidate list, including each eligible contract-card summary.
+2. Do not apply.
+3. On a foreign PR, deliver the list to the PR owner instead of waiting.
 
-For a combined full-review request, this approval is the only continuation gate. Once approval is given, automatically continue through implementation, validation, full re-review, and final verdict. Do not ask a second continuation question.
+On a foreign PR this apply path is skipped: candidates are delivered to the PR owner instead of being applied.
+
+For a combined full-review request, there is no continuation gate after eligible own-PR apply. Continue through implementation, validation, full re-review with hygiene disabled, and final verdict. Do not ask a continuation question.
 
 ## Application and rollback
 
 - Foreign PRs: nothing is applied or pushed; the bounded candidate list goes to the PR owner.
-- Apply approved candidates in small, independently attributable changes.
+- Apply eligible candidates in small, independently attributable changes.
 - Preserve existing tests and add or strengthen tests when equivalence is not already directly covered.
 - Run the candidate's focused validation immediately after applying it.
 - If focused validation fails, reveals changed behavior, or shows that a claimed test was vacuous, revert that candidate individually before continuing. Do not keep a weaker approximation merely because it removes more code.
@@ -130,7 +131,7 @@ For a combined full-review request, this approval is the only continuation gate.
 
 ## Validation
 
-After all approved candidates pass focused validation:
+After all applied candidates pass focused validation:
 
 1. run the repository's relevant formatter, lint, type-check, build, test, security, distribution, and other required gates
 2. compare the resulting behavior and interfaces against every preserved contract-card dimension
@@ -147,21 +148,21 @@ After simplification changes produce a new head, automatically run the **complet
 - The final verdict must be based only on the post-simplification head.
 - Any regression, vulnerability, spec violation, review blocker, or failed gate introduced by simplification blocks completion and must be fixed or rolled back.
 - There is no recursive simplification pass during this mandatory re-review.
-- There is no second continuation prompt after the user approves the candidate list.
+- There is no second continuation prompt after eligible own-PR apply or a report-only candidate list.
 
 ## Standalone completion
 
-For a standalone simplify request, candidate approval and application are followed by the same validation and complete full-review workflow. Do not claim the PR is improved, safe, or merge-ready solely because the simplification diff looks cleaner.
+For a standalone simplify request, eligible own-PR apply (when `push_code` is already allowed) is followed by the same validation and complete full-review workflow. Do not claim the PR is improved, safe, or merge-ready solely because the simplification diff looks cleaner.
 
 ## Done when
 
-- activation was explicit
-- candidates were either rejected with rationale, reported as nothing worth simplifying, or explicitly approved
+- activation was an explicit simplify request or a composed path that did not opt out
+- candidates were either rejected with rationale, reported as nothing worth simplifying, auto-applied on an own PR with `push_code`, or reported to the owner
 - every non-trivial applied candidate had an eligible contract card with no unresolved equivalence unknowns
 - relied-on tests/checks were shown to fail when their protected behavior is broken, or were strengthened before use
 - important poorly documented behavior had characterization evidence before restructuring
 - on foreign PRs: the bounded candidate list was delivered to the PR owner and nothing was edited or pushed
-- only approved behavior-preserving changes were applied
+- only eligible behavior-preserving changes were applied
 - failed candidates were reverted individually
 - focused validation and all required repository gates passed
 - the complete full-review workflow passed on the post-simplification head with simplification disabled

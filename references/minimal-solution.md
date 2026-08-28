@@ -75,7 +75,7 @@ Do not manufacture alternatives solely to fill this record.
 ## Relationship to other companions
 
 - `references/design-quality.md` reviews whether a changed design imposes avoidable complexity after a solution exists. This file helps choose the solution shape before or during implementation.
-- `references/simplify-pr.md` is explicit-only and behavior-preserving. It may use this ladder to identify an equivalent repository/stdlib/native replacement, but line count is never success evidence.
+- `references/simplify-pr.md` is behavior-preserving and default-on when composed unless the request opts out. It may use this ladder to identify an equivalent repository/stdlib/native replacement, but line count is never success evidence.
 - `references/change-execution.md` governs broad migrations after a solution shape is selected.
 - `references/regression-first.md` and `references/verification-boundaries.md` govern bug-fix evidence and the stable surface used to prove the result.
 
