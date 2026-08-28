@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 
+const MAX_BOUNDARY_FAILURE_CHARS = 2_000;
+
 function collectionSource(collection, required = true) {
   return {
     required,
@@ -12,6 +14,21 @@ function collectionSource(collection, required = true) {
 
 function isExplicitNotFound(error) {
   return /(?:HTTP\s+404|\b404\b|Not Found)/i.test(String(error || ""));
+}
+
+function collectionFailureMessage(...collections) {
+  const messages = [
+    ...new Set(
+      collections
+        .map((collection) => String(collection?.error || "").replace(/\s+/g, " ").trim())
+        .filter(Boolean),
+    ),
+  ];
+  if (!messages.length) return null;
+  const combined = messages.join("; ");
+  return combined.length <= MAX_BOUNDARY_FAILURE_CHARS
+    ? combined
+    : `${combined.slice(0, MAX_BOUNDARY_FAILURE_CHARS)}...[truncated]`;
 }
 
 function canonicalJson(value) {
@@ -139,7 +156,15 @@ export function verifySnapshotBoundary(
   let rulesFingerprint = null;
   if (initialRules !== null || finalRules !== null) {
     if (initialRules?.complete !== true || finalRules?.complete !== true) {
-      throw new Error("snapshot_rules_boundary_incomplete");
+      const causeMessage = collectionFailureMessage(initialRules, finalRules);
+      const error = new Error(
+        causeMessage
+          ? `snapshot_rules_boundary_incomplete: ${causeMessage}`
+          : "snapshot_rules_boundary_incomplete",
+      );
+      error.code = "snapshot_rules_boundary_incomplete";
+      if (causeMessage) error.causeMessage = causeMessage;
+      throw error;
     }
     const before = snapshotBoundaryFingerprint(initialRules.rows || []);
     const after = snapshotBoundaryFingerprint(finalRules.rows || []);
