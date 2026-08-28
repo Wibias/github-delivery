@@ -1,3 +1,4 @@
+import { readAuthenticatedActor } from "./idempotency-receipt.mjs";
 import { assertPublishedMarkdown } from "./published-body-integrity.mjs";
 
 const LIVE_BODY_ACTIONS = new Set([
@@ -143,10 +144,7 @@ function findPublishedBody(request, receipt, runner) {
   if (!collection) throw new Error("published_body_postcondition_failed:target_unavailable");
   const marker = String(request.idempotencyMarker || "");
   if (!marker) throw new Error("published_body_postcondition_failed:idempotency_marker_required");
-  const actor = String(
-    runJson(runner, ["gh", "api", "user"], "published_body_actor_failed").login || "",
-  ).toLowerCase();
-  if (!actor) throw new Error("published_body_actor_failed:login_missing");
+  const actor = String(readAuthenticatedActor(runner)).toLowerCase();
 
   const candidates = runCollection(
     runner,
