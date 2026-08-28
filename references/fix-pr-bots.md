@@ -22,12 +22,13 @@ Necessary/useful **human** (esp. owners/maintainers) + CodeRabbit/Codex comments
 
 ## Hygiene passes
 
-Unless this request opts out (`skip no-comments`, `without no-comments`, `keep source comments`, `don't strip comments`, `without simplify`, `skip simplify`, `don't simplify`):
+Resolve the two passes independently:
 
-1. Run `references/no-comments.md` before remaining bug/security/spec work. A failed pass blocks merge-ready.
-2. After correctness work, run `references/simplify-pr.md`. Nothing worth simplifying is valid.
-3. If either pass changed the head, re-validate with both passes disabled.
-4. Name skipped passes in the merge-ready summary.
+1. Run `references/no-comments.md` before remaining bug/security/spec work unless no-comments is specifically opted out (`skip no-comments`, `without no-comments`, `keep source comments`, `don't strip comments`). A failed pass blocks merge-ready.
+2. After correctness work, run `references/simplify-pr.md` unless simplify is specifically opted out (`without simplify`, `skip simplify`, `don't simplify`). Nothing worth simplifying is valid.
+3. A no-comments opt-out skips only no-comments. A simplify opt-out skips only simplify.
+4. If either pass changed the head, re-validate with both passes disabled.
+5. Name skipped passes in the merge-ready summary.
 
 ## Targets
 
