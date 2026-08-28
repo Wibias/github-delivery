@@ -67,6 +67,39 @@ test("Windows protected subprocesses never resolve gh or git from the current wo
   assert.deepEqual(spawned[1].argv, ["--version"]);
 });
 
+test("Windows protected subprocesses reject worktree-controlled junction paths", () => {
+  const spawned = [];
+  const present = new Set([
+    "C:\\repo\\.git",
+    "C:\\repo\\tools\\gh.exe",
+    "C:\\Trusted\\gh.exe",
+  ]);
+  boundedSpawnSync(
+    "gh",
+    ["--version"],
+    { encoding: "utf8" },
+    {
+      platform: "win32",
+      cwd: "C:\\repo",
+      env: { PATH: "C:\\repo\\tools;C:\\Trusted" },
+      exists(path) {
+        return present.has(path);
+      },
+      canonicalizePath(path) {
+        if (path === "C:\\repo\\tools\\gh.exe") return "C:\\outside\\gh.exe";
+        return path;
+      },
+      spawn(command, argv, options) {
+        spawned.push({ command, argv, options });
+        return { status: 0, stdout: "", stderr: "" };
+      },
+    },
+  );
+
+  assert.equal(spawned.length, 1);
+  assert.equal(spawned[0].command, "C:\\Trusted\\gh.exe");
+});
+
 test("mutation documents propagate governing workflow context to planning and execution", () => {
   const contexts = [];
   const operation = request("create_issue", {
