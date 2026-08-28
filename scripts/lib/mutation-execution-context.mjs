@@ -180,15 +180,16 @@ function requestForAuthorityMode(request, options) {
   if (options?.authorityMode !== "off") return request;
   const normalized = {
     ...request,
-    // Off removes the independent user-attestation boundary. No model-callable
-    // execution helper can replace that provenance with a trusted boolean.
-    explicitInstruction: false,
+    // Compatibility planning may still carry workflow context, but Off mode
+    // cannot execute any mutation. These booleans therefore never cross the
+    // actual write boundary as user authority.
+    explicitInstruction: options?.trustedWorkflowIntent === true,
   };
   if (
     Object.prototype.hasOwnProperty.call(normalized, "exactTextConfirmed") ||
     options?.trustedExactTextConfirmation === true
   ) {
-    normalized.exactTextConfirmed = false;
+    normalized.exactTextConfirmed = options?.trustedExactTextConfirmation === true;
   }
   delete normalized.authorityGrant;
   return normalized;
