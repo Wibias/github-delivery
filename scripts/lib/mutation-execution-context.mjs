@@ -180,18 +180,15 @@ function requestForAuthorityMode(request, options) {
   if (options?.authorityMode !== "off") return request;
   const normalized = {
     ...request,
-    // Off is a user-configured opt-out of independent OS-backed approval, not
-    // permission for a mutation document to mint direct user intent. Governing
-    // workflows provide that fact out-of-band through execution context.
-    explicitInstruction: options?.trustedWorkflowIntent === true,
+    // Off removes the independent user-attestation boundary. No model-callable
+    // execution helper can replace that provenance with a trusted boolean.
+    explicitInstruction: false,
   };
   if (
     Object.prototype.hasOwnProperty.call(normalized, "exactTextConfirmed") ||
     options?.trustedExactTextConfirmation === true
   ) {
-    // Exact-text confirmation is likewise execution context, never a trusted
-    // fact merely because caller-controlled JSON set a boolean.
-    normalized.exactTextConfirmed = options?.trustedExactTextConfirmation === true;
+    normalized.exactTextConfirmed = false;
   }
   delete normalized.authorityGrant;
   return normalized;
@@ -283,6 +280,13 @@ export function executeMutationWithAuthority({
     trustedWorkflowIntent: trustedWorkflowIntent === true,
     trustedExactTextConfirmation: trustedExactTextConfirmation === true,
   };
+  if (
+    execute === true &&
+    options.authorityMode === "off" &&
+    actionDefinition(request?.action)?.mutation === true
+  ) {
+    throw new Error("mutation_execution_denied:authority_mode_off");
+  }
   const effectiveRequest = requestForAuthorityMode(request, options);
   const planned = planWithAuthorityOptions(request, options);
 
