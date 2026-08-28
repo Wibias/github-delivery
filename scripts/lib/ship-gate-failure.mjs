@@ -1,11 +1,19 @@
+const MAX_FAILURE_MESSAGE_CHARS = 2_000;
 const LOCAL_INPUT_ERROR = /(?:\bENOENT\b|no such file|snapshot_(?:integrity|repo|pr|head|age)|invalid snapshot|usage: node scripts\/ship-gate\.mjs)/i;
 const GITHUB_CAPABILITY_OR_PERMISSION_ERROR = /(?:\b(?:401|403)\b|forbidden|resource not accessible|requires? github pro|upgrade to github pro|must have admin(?:istrator)? rights?|insufficient permission)/i;
 const TRANSIENT_UPSTREAM_ERROR = /(?:\b(?:408|429|500|502|503|504)\b|rate[ -]?limit|timed? ?out|\bETIMEDOUT\b|\bECONNRESET\b|\bEAI_AGAIN\b|\bENETUNREACH\b|socket hang up|temporar(?:y|ily) unavailable)/i;
 
+function boundedFailureMessage(value) {
+  const compact = String(value || "ship_gate_failed").replace(/\s+/g, " ").trim();
+  if (compact.length <= MAX_FAILURE_MESSAGE_CHARS) return compact;
+  return `${compact.slice(0, MAX_FAILURE_MESSAGE_CHARS)}...[truncated]`;
+}
+
 export function classifyShipGateFailure(error) {
-  const message = String(error?.message || error || "ship_gate_failed");
+  const rawMessage = String(error?.message || error || "ship_gate_failed");
+  const message = boundedFailureMessage(rawMessage);
   const code = String(error?.code || "");
-  const haystack = `${code} ${message}`;
+  const haystack = `${code} ${rawMessage}`;
 
   if (LOCAL_INPUT_ERROR.test(haystack)) {
     return { classification: "local_input_error", retryable: false, message };
@@ -34,8 +42,15 @@ export function shipGateFailureOutput(error, { stage = "execution" } = {}) {
     unknown: true,
     complete: false,
     authoritative: false,
-    evidenceMode: stage === "snapshot_replay" ? "snapshot_replay" : stage === "live_snapshot_capture" ? "live_capture" : null,
-    unknowns: [evidenceFailure ? "ship_gate_evidence_capture_failed" : "ship_gate_execution_failed"],
+    evidenceMode:
+      stage === "snapshot_replay"
+        ? "snapshot_replay"
+        : stage === "live_snapshot_capture"
+          ? "live_capture"
+          : null,
+    unknowns: [
+      evidenceFailure ? "ship_gate_evidence_capture_failed" : "ship_gate_execution_failed",
+    ],
     failure: {
       stage,
       ...classifyShipGateFailure(error),
