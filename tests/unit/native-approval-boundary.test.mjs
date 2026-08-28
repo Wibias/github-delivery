@@ -54,16 +54,18 @@ test("approve_pr is a first-class high-assurance review mutation with explicit i
   );
 });
 
-test("approve_pr plans native approval while post_review cannot smuggle approval", () => {
+test("approve_pr plans a commit-bound native approval while post_review cannot smuggle approval", () => {
   const plan = planMutationRequest(approvalRequest());
-  assert.deepEqual(plan.command.slice(0, 7), [
+  assert.deepEqual(plan.command.slice(0, 9), [
     "gh",
-    "pr",
-    "review",
-    "32",
-    "--repo",
-    "acme/widgets",
-    "--approve",
+    "api",
+    "repos/acme/widgets/pulls/32/reviews",
+    "--method",
+    "POST",
+    "-f",
+    `commit_id=${HEAD}`,
+    "-f",
+    "event=APPROVE",
   ]);
   assert.equal(plan.request.action, "approve_pr");
 
@@ -111,7 +113,10 @@ test("self approval is rejected before the approval write is attempted", () => {
     }),
     /self_approval|approve_pr_self_approval_forbidden/,
   );
-  assert.equal(calls.some((call) => call.includes("--approve")), false);
+  assert.equal(
+    calls.some((call) => call[0] === "gh" && call[1] === "api" && call.includes("--method") && call.includes("POST")),
+    false,
+  );
 });
 
 test("approve workflow accepts review mutation mode", () => {

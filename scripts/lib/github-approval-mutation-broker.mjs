@@ -54,8 +54,8 @@ function run(runner, command, args) {
   return String(result?.stdout || "").trim();
 }
 
-function observedHead(request, runner) {
-  const value = run(runner, "gh", [
+function readHead(request, runner) {
+  return run(runner, "gh", [
     "pr",
     "view",
     String(request.pr),
@@ -66,7 +66,11 @@ function observedHead(request, runner) {
     "--jq",
     ".headRefOid",
   ]);
-  if (value !== request.expectedHead) {
+}
+
+function observedHead(request, runner) {
+  const value = readHead(request, runner);
+  if (String(value).toLowerCase() !== String(request.expectedHead).toLowerCase()) {
     throw new Error(`pr_head_mismatch: expected ${request.expectedHead}, observed ${value || "missing"}`);
   }
   return value;
@@ -113,10 +117,14 @@ function reviews(request, runner) {
   return Array.isArray(parsed) ? parsed : [];
 }
 
-function matchingApproval(request, runner) {
+function matchingApproval(request, runner, actor) {
+  const expectedHead = String(request.expectedHead || "").toLowerCase();
+  const expectedActor = String(actor || "").toLowerCase();
   return reviews(request, runner).find((review) =>
     String(review?.state || "").toUpperCase() === "APPROVED" &&
-    String(review?.body || "").includes(request.idempotencyMarker),
+    String(review?.body || "").includes(request.idempotencyMarker) &&
+    String(review?.commit_id || "").toLowerCase() === expectedHead &&
+    String(review?.user?.login || "").toLowerCase() === expectedActor,
   ) || null;
 }
 
@@ -176,14 +184,16 @@ export function planApprovalMutationRequest(
     authorization,
     command: [
       "gh",
-      "pr",
-      "review",
-      String(normalized.pr),
-      "--repo",
-      normalized.repo,
-      "--approve",
-      "--body",
-      normalized.body,
+      "api",
+      `repos/${normalized.repo}/pulls/${normalized.pr}/reviews`,
+      "--method",
+      "POST",
+      "-f",
+      `commit_id=${normalized.expectedHead}`,
+      "-f",
+      "event=APPROVE",
+      "-f",
+      `body=${normalized.body}`,
     ],
   };
 }
@@ -215,7 +225,7 @@ export function executeApprovalMutationRequest({
     throw new Error(`approve_pr_self_approval_forbidden:${actor}`);
   }
 
-  const existing = matchingApproval(plan.request, runner);
+  const existing = matchingApproval(plan.request, runner, actor);
   if (existing) {
     return {
       ...plan,
@@ -230,7 +240,13 @@ export function executeApprovalMutationRequest({
   }
 
   const stdout = run(runner, plan.command[0], plan.command.slice(1));
-  const verification = matchingApproval(plan.request, runner);
+  const postWriteHead = readHead(plan.request, runner);
+  if (String(postWriteHead).toLowerCase() !== String(plan.request.expectedHead).toLowerCase()) {
+    throw new Error(
+      `approve_pr_head_changed_after_write: expected ${plan.request.expectedHead}, observed ${postWriteHead || "missing"}`,
+    );
+  }
+  const verification = matchingApproval(plan.request, runner, actor);
   if (!verification) throw new Error("approve_review_verification_failed");
 
   return {
@@ -238,7 +254,7 @@ export function executeApprovalMutationRequest({
     executed: true,
     status: "succeeded",
     outcome: null,
-    observedHead: head,
+    observedHead: postWriteHead,
     existingMutation: null,
     stdout,
     verification,

@@ -54,6 +54,7 @@ const API_PATH_KEEP = new Set([
   "issues",
   "comments",
   "replies",
+  "reviews",
   "git",
   "refs",
   "tags",
@@ -324,7 +325,10 @@ export function validateMutationBoundarySource(path, source) {
 
 function isAllowedBoundaryWrite(path, item) {
   if (path === APPROVAL_MUTATION_FILE) {
-    return item.code === "direct_gh_mutation" && item.group === "pr" && item.verb === "review";
+    return (
+      item.code === "direct_gh_api_mutation" &&
+      generalizeApiPath(item.apiPath) === "repos/x/pulls/x/reviews"
+    );
   }
   if (!APPROVED_MUTATION_FILES.has(path)) return false;
   if (item.code === "direct_gh_mutation") return BOUNDARY_GH_GROUPS.has(item.group);
