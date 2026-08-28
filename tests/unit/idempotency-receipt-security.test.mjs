@@ -284,15 +284,21 @@ test("social mutation ignores a forged marker from another GitHub actor", () => 
         return { status: 0, stdout: `${HEAD}\n`, stderr: "" };
       }
       if (command === "gh" && args[0] === "api" && String(args[1]).includes("/issues/32/comments")) {
-        return {
-          status: 0,
-          stdout: JSON.stringify([[
-            {
+        const record = visibleEffects === 0
+          ? {
               id: 55,
               user: { login: "attacker" },
               body: `Status update\n\n${marker}`,
-            },
-          ]]),
+            }
+          : {
+              id: 56,
+              user: { login: "agent" },
+              body: `Status update\n\n${marker}`,
+              html_url: "https://github.test/acme/widgets/pull/32#issuecomment-56",
+            };
+        return {
+          status: 0,
+          stdout: JSON.stringify([[record]]),
           stderr: "",
         };
       }
@@ -310,6 +316,7 @@ test("social mutation ignores a forged marker from another GitHub actor", () => 
   assert.equal(visibleEffects, 1);
   assert.equal(result.status, "succeeded");
   assert.equal(result.existingMutation, null);
+  assert.equal(result.postcondition.body, `Status update\n\n${marker}`);
 });
 
 test("social mutation reuses an exact same-actor receipt", () => {

@@ -19,7 +19,7 @@
 </div>
 
 > [!NOTE]
-> **1.3.3.** This patch hardens agent convergence around two incident paths: operational process/worktree polling now counts as volatile watchdog evidence instead of neutral activity, and authoritative live `ship-gate` capture failures preserve their GitHub cause in a structured fail-closed result so terminal capability or permission errors stop retry/probe loops. See [Current state](#current-state).
+> **1.3.4.** This patch tightens the GitHub mutation trust boundary: `authorityMode=off` is planning-only for remote writes, unresolved GraphQL mutation roots fail closed, native approval is commit- and actor-bound, and body-bearing social mutations verify the authoritative live GitHub body after publication. See [Current state](#current-state).
 
 > [!IMPORTANT]
 > **Natural language is the public API.** The Node scripts, policy modules, evaluators, mutation broker, and optional Authority host are internal safety/evidence machinery. You normally do not invoke them yourself.
@@ -89,7 +89,7 @@ For installation edge cases, backup/restore, downgrade behavior, manual recovery
 | **Implement & publish** | `create a PR for issue #90` | A bounded **research → implementation → pre-open review** sequence, minimal complete implementation, Git-workflow discipline, exact publication identity, linked PR |
 | **External work items** | `work on ENG-42 and open a PR` | Tracker-aware delivery orchestration, covering-PR reuse, evidence-driven milestone reconciliation |
 | **Review & fix** | `full review PR #42` | Bug + Security + Spec + Standards review, required probes, current-head verdict |
-| **Native approval** | `approve PR #42` | GitHub-native approval through the controlled mutation boundary, bound to the expected head; GitHub refusal such as self-approval remains a blocker |
+| **Native approval** | `approve PR #42` | GitHub-native approval through the controlled mutation boundary, bound to the exact expected head commit and authenticated actor; GitHub refusal such as self-approval remains a blocker |
 | **Merge readiness** | `fix the review comments on PR #18 and make it merge ready` | Feedback triage, code fixes, validation, publication, refreshed readiness |
 | **Competing PRs** | `triage the competing PRs in this repo` | Read-only deterministic clustering and evidence for potentially overlapping implementations |
 | **Visual changes** | `full review PR #42` on a UI diff | Conditional screenshot/video/render evidence bound to the exact reviewed head |
@@ -99,6 +99,15 @@ For installation edge cases, backup/restore, downgrade behavior, manual recovery
 | **Supersede / overtake** | `supersede PR #12 with PR #45` | Explicit replacement or maintainer-takeover workflows with bounded mutation authority |
 | **Merge / close-out** | `merge PR #32` | Final gate, exact transaction authority, head-pinned merge, verification, thanks, linked-issue close-out |
 | **Self-update** | `update github-delivery to the latest stable release` | Stable-release verification, lock-aware Windows recovery, optional old-backup cleanup, safe apply and postconditions |
+
+### What changed in 1.3.4
+
+`1.3.4` is a mutation-boundary and post-publication verification hardening patch:
+
+- `authorityMode=off` is planning-only for GitHub writes; model-callable controller flags and helper invocation are no longer accepted as trusted current-user intent for remote mutation;
+- GraphQL mutation documents fail closed when their root mutation fields cannot be completely resolved, including fragment spreads and inline fragments;
+- native PR approval is created against the exact `expectedHead` commit and accepted only when the live review matches the authenticated actor, commit, approval state, and idempotency marker, with a post-write head re-read;
+- body-bearing review/comment mutations re-read the authoritative GitHub object after publication and require its live body to match the exact intended markdown, with fallback receipt lookup bound to the authenticated actor, idempotency marker, and reply parent where applicable.
 
 ### What changed in 1.3.3
 
@@ -215,11 +224,11 @@ On Windows, security-sensitive `gh` and `git` launches are resolved from absolut
 
 Where high assurance is required, trusted grants bind the semantic effect rather than a vague permission flag: repository, action, mode, PR/head, merge method, target identity, idempotency data, and hashes of human-visible text as applicable.
 
-The optional Windows Authority host can issue those grants through Windows Hello. Missing persistent user configuration defaults the effective preference to **Sensitive actions** (`high-assurance`); an explicitly stored `off` or `all` preference remains supported. After Hello, the approval UI can start a **PR session** (5 / 15 / 30 / 60 minutes) for later exact-scope push and merge on one PR and the approved merge base, or a **branch lease** (1–10 minutes) for repeated `push_code` only. Mixed-action batches, comments, human replies, close, and delete still need Hello. `off` means no Windows Hello or Authority-host approval; it does not trust caller-supplied lifecycle or exact-text booleans as provenance. Governing workflows supply required direct intent and exact-text confirmation through trusted execution context bound to the exact operation.
+The optional Windows Authority host can issue those grants through Windows Hello. Missing persistent user configuration defaults the effective preference to **Sensitive actions** (`high-assurance`); an explicitly stored `off` or `all` preference remains supported. After Hello, the approval UI can start a **PR session** (5 / 15 / 30 / 60 minutes) for later exact-scope push and merge on one PR and the approved merge base, or a **branch lease** (1–10 minutes) for repeated `push_code` only. Mixed-action batches, comments, human replies, close, and delete still need Hello. `off` means no Windows Hello or Authority-host approval and is planning-only for GitHub writes; it cannot turn model-callable workflow flags, helper invocation, mutation JSON, or ordinary checkpoint state into trusted current-user intent for a remote mutation.
 
 ### Safe retries and idempotency
 
-Durable creates/social writes use authenticated exact-effect receipts and read-before-write checks. A hidden marker alone is not proof of ownership or successful prior execution. Mutation-document resume keys include the canonical operation payload, so the same human idempotency label cannot make a different target/body/action look already applied.
+Durable creates/social writes use authenticated exact-effect receipts and read-before-write checks. A hidden marker alone is not proof of ownership or successful prior execution. Mutation-document resume keys include the canonical operation payload, so the same human idempotency label cannot make a different target/body/action look already applied. Body-bearing social writes also re-read the authoritative GitHub object after publication and require the live body to match the exact intended markdown before success is reported.
 
 Only proven read-only GitHub operations may use bounded rate-limit retry behavior. Ambiguous writes are never blindly retried. An uncertain merge outcome is reconciled through read-only exact-head state instead of issuing a second merge.
 
@@ -612,7 +621,7 @@ The architecture uses progressive disclosure: route once, load the selected work
 
 ## Current state
 
-`1.3.3` is a convergence and terminal-failure hardening patch on top of `1.3.2`: it preserves the existing Git/release/review safety model while closing two incident paths that could waste agent work after progress had effectively stopped.
+`1.3.4` is a mutation-boundary and post-publication verification hardening patch on top of `1.3.3`: it closes the remaining audited trust paths around off-mode intent, GraphQL root resolution, native approval head binding, and live body verification while preserving the existing Git/release/review safety model.
 
 Stable in this release:
 
@@ -622,10 +631,12 @@ Stable in this release:
 - read-only open-work and competing-PR analysis;
 - issue research, implementation, publication, external work-item delivery, and exact-head duplicate prevention;
 - deep current-head review with deterministic probe coverage, conditional visual evidence, and independently opt-outable no-comments/simplify hygiene passes;
-- explicit GitHub-native PR approval with expected-head verification and no comment/verdict substitution;
+- explicit GitHub-native PR approval created against the exact expected head and verified against the authenticated actor, commit, approval state, and idempotency marker before success;
 - mutation authority, exact-effect receipts, payload-bound operation idempotency, controller-owned stale-head protection, and head-pinned merge execution;
 - Windows protected-command resolution that rejects worktree-controlled `gh`/`git` executables and lexical/canonical alias escapes;
-- `authorityMode=off` trusted workflow intent carried through operation-bound controller checkpoints instead of caller-supplied authority booleans;
+- `authorityMode=off` as a planning-only mode for GitHub writes, with model-callable flags, helper invocation, mutation JSON, and ordinary checkpoint state unable to mint trusted current-user intent;
+- fail-closed GraphQL mutation-root resolution for direct selections, fragment spreads, and inline fragments at the broker boundary;
+- authoritative post-publication body verification for review/comment mutations, bound to authenticated actor and exact idempotency identity where collection lookup is required;
 - optional Windows Authority Hello grants, push-only branch leases, and PR sessions for later exact-scope push and merge on one PR and approved merge base;
 - inferred-stack restacking/merge-order safety and independent multi-base delivery;
 - SHA-bound remote repository context when a useful local checkout is not already available;

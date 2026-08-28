@@ -15,6 +15,11 @@ import {
 const BACKSLASH = String.fromCharCode(92);
 const ESCAPED = ["## Summary", "", "- added a check"].join(BACKSLASH + "n");
 const REAL = "## Summary\n\n- added a check";
+const MARKER = `<!-- github-delivery:idempotency ${"a".repeat(64)} -->`;
+const REAL_WITH_MARKER = `${REAL}\n\n${MARKER}`;
+const ESCAPED_WITH_MARKER = ["## Summary", "", "- added a check", "", MARKER].join(
+  BACKSLASH + "n",
+);
 
 test("detects literal escape sequences that collapse published markdown", () => {
   const inspection = inspectPublishedMarkdown(ESCAPED);
@@ -84,3 +89,97 @@ test("comment postcondition re-reads the live comment and rejects escaped markdo
     /published_markdown_malformed/,
   );
 });
+
+const LIVE_BODY_SCENARIOS = [
+  {
+    action: "post_comment",
+    request: { pr: 42 },
+    collection: "repos/acme/widgets/issues/42/comments?per_page=100",
+  },
+  {
+    action: "post_resolution_record",
+    request: { pr: 42 },
+    collection: "repos/acme/widgets/issues/42/comments?per_page=100",
+  },
+  {
+    action: "post_issue_comment",
+    request: { issue: 77 },
+    collection: "repos/acme/widgets/issues/77/comments?per_page=100",
+  },
+  {
+    action: "reply_bot_thread",
+    request: { pr: 42, commentId: 7 },
+    collection: "repos/acme/widgets/pulls/42/comments?per_page=100",
+    inReplyToId: 7,
+  },
+  {
+    action: "reply_human_thread",
+    request: { pr: 42, commentId: 7 },
+    collection: "repos/acme/widgets/pulls/42/comments?per_page=100",
+    inReplyToId: 7,
+  },
+  {
+    action: "post_review",
+    request: { pr: 42 },
+    collection: "repos/acme/widgets/pulls/42/reviews?per_page=100",
+  },
+];
+
+for (const scenario of LIVE_BODY_SCENARIOS) {
+  test(`${scenario.action} postcondition re-reads authoritative body when the write receipt has no object id`, () => {
+    const calls = [];
+    const runner = (command, args) => {
+      calls.push([command, ...args]);
+      assert.equal(command, "gh");
+      if (args[0] === "api" && args[1] === "user") {
+        assert.deepEqual(args.slice(2), ["--jq", ".login"]);
+        return {
+          status: 0,
+          stdout: "octocat\n",
+          stderr: "",
+        };
+      }
+      if (
+        args[0] === "api" &&
+        args[1] === scenario.collection &&
+        args.includes("--paginate") &&
+        args.includes("--slurp")
+      ) {
+        return {
+          status: 0,
+          stdout: JSON.stringify([
+            [
+              {
+                id: 9,
+                body: ESCAPED_WITH_MARKER,
+                user: { login: "octocat" },
+                ...(scenario.inReplyToId ? { in_reply_to_id: scenario.inReplyToId } : {}),
+              },
+            ],
+          ]),
+          stderr: "",
+        };
+      }
+      throw new Error(`unexpected command: ${command} ${args.join(" ")}`);
+    };
+
+    assert.throws(
+      () => verifyLegacyMutationPostcondition({
+        request: {
+          action: scenario.action,
+          repo: "acme/widgets",
+          body: REAL_WITH_MARKER,
+          idempotencyMarker: MARKER,
+          ...scenario.request,
+        },
+        receipt: { executed: true, status: "succeeded", stdout: "" },
+        runner,
+      }),
+      /published_markdown_malformed/,
+    );
+    assert.ok(
+      calls.some((call) => call[0] === "gh" && call[1] === "api" && call[2] === scenario.collection),
+      JSON.stringify(calls),
+    );
+  });
+}

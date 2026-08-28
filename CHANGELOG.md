@@ -4,6 +4,22 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.3.4] - 2026-08-29
+
+### Changed
+
+- Bumped the package version from `1.3.3` to `1.3.4`.
+
+### Fixed
+
+- Body-bearing review/comment mutations now re-read the authoritative GitHub object after publication and require the live body to match the exact intended markdown. Receipt fallback lookup stays bound to the authenticated actor, exact idempotency marker, and reply parent where applicable, so a forged marker from another actor cannot satisfy post-publication verification (PR #392).
+
+### Security
+
+- `authorityMode=off` is planning-only for GitHub writes instead of allowing model-callable controller flags or helper invocation to manufacture trusted workflow intent. Remote mutations now fail closed unless their required intent provenance comes from the trusted authority boundary (PR #389).
+- GitHub GraphQL mutation scanning now fails closed when the root mutation field set cannot be resolved, including fragment spreads and inline fragments, preventing unregistered mutation roots from bypassing the broker-owned registry through selection indirection (PR #390).
+- Native PR approval is bound to the exact expected head at the GitHub write boundary. Approval creation supplies `commit_id`, post-verification requires the authenticated actor, exact commit, state, and idempotency marker, and the PR head is re-read after the write before success is reported (PR #391).
+
 ## [1.3.3] - 2026-08-28
 
 ### Changed
