@@ -193,7 +193,7 @@ test("workflow mutation context is bound to one exact operation key", () => {
   }
 });
 
-test("canonical github-mutate consumes checkpoint intent in authority off mode", () => {
+test("canonical github-mutate rejects checkpoint intent in authority off mode", () => {
   const incomplete = request("create_issue", {
     idempotencyKey: "off-mode-cli-context",
   });
@@ -233,8 +233,7 @@ test("canonical github-mutate consumes checkpoint intent in authority off mode",
       },
     );
     assert.equal(result.status, 2);
-    assert.doesNotMatch(String(result.stderr || ""), /explicit_instruction_required/);
-    assert.match(String(result.stderr || ""), /title_required/);
+    assert.match(String(result.stderr || ""), /mutation_execution_denied:authority_mode_off/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
