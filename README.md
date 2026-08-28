@@ -19,7 +19,7 @@
 </div>
 
 > [!NOTE]
-> **1.3.0.** Git workflow and release versioning are now first-class github-delivery capabilities: the skill owns repository-aware branch/commit discipline, pre-commit hygiene, Git-history investigation, SemVer classification, curated changelogs, and release/tag preparation instead of handing that work to another skill. The release also hardens native approval, Git/versioning workflow-packet execution, controller recovery after ambiguous pushes, and Windows update recovery against PID reuse. Remote push, PR, tag, release, registry publication, and merge authority remain explicitly bounded. Host-specific runtime integrations and the experimental Codex streaming boundary remain constrained by what each agent host exposes. Native GitHub stacked-PR merge is an intentional fail-closed gap. See [Current state](#current-state).
+> **1.3.1.** This patch fixes runtime recovery and concurrency problems found after 1.3.0: a hard-crashed github-delivery process can no longer leave an owned stale install lock permanently blocking a later skill or Windows Authority update, installed workflow helpers now resolve github-delivery's own skill root instead of treating the caller repository's current working directory as the workflow root, and rewrite-baseline generations are finalized while the store lock is held so concurrent writers cannot collide on an already-published generation. The 1.3 line keeps Git workflow and release versioning as first-class capabilities, with remote push, PR, tag, release, registry publication, and merge authority explicitly bounded. See [Current state](#current-state).
 
 > [!IMPORTANT]
 > **Natural language is the public API.** The Node scripts, policy modules, evaluators, mutation broker, and optional Authority host are internal safety/evidence machinery. You normally do not invoke them yourself.
@@ -96,6 +96,14 @@ For installation edge cases, backup/restore, downgrade behavior, manual recovery
 | **Supersede / overtake** | `supersede PR #12 with PR #45` | Explicit replacement or maintainer-takeover workflows with bounded mutation authority |
 | **Merge / close-out** | `merge PR #32` | Final gate, exact transaction authority, head-pinned merge, verification, thanks, linked-issue close-out |
 | **Self-update** | `update github-delivery to the latest stable release` | Stable-release verification, lock-aware Windows recovery, optional old-backup cleanup, safe apply and postconditions |
+
+### What changed in 1.3.1
+
+`1.3.1` is a focused recovery and concurrency patch for the 1.3.0 runtime:
+
+- exclusive skill and Windows Authority install locks can reclaim only a github-delivery-owned PID + nonce lock whose recorded process is provably gone; live, malformed, and permission-uncertain locks remain fail-closed;
+- `scripts/policy-bundle.mjs` and `scripts/workflow-brief.mjs` default to the installed skill root derived from their own location, so agents can load workflow packets while remaining in the target repository; explicit root overrides are unchanged;
+- rewrite-baseline generation allocation is finalized after the exclusive store lock is acquired, closing the window where a waiting writer could reuse a generation that another writer published immediately before releasing the lock while preserving the existing stale-takeover generation fence.
 
 ### What changed in 1.3.0
 
@@ -323,6 +331,8 @@ npx github-delivery update --apply
 ```
 
 Self-update accepts only the fixed upstream's latest stable `vX.Y.Z` GitHub Release and replaces nothing until release assets, checksums, distribution manifest, tag/source binding, constrained GitHub artifact attestation, and bounded ZIP extraction verify. Local tracked modifications block replacement even with `--force`; update does not silently downgrade an ahead install.
+
+Exclusive skill and Windows Authority install locks record a github-delivery process identity. If that process exits hard and leaves its lock file behind, a later run reclaims the lock only when it has the exact github-delivery PID + nonce format and the recorded PID is provably gone. Live, malformed, or permission-uncertain locks stay fail-closed as `install_lock_held` rather than risking concurrent installers.
 
 On Windows, if the install displacement hits `EPERM` or `EBUSY`, the updater first performs bounded transient retries. If the target is still locked, it inspects handles inside the installed skill tree and reports the blocking application(s), PIDs, and held paths. Interactive runs ask `Close the listed application(s) gracefully and continue the update? [y/N]`. `y` requests a graceful close, waits for the handles to clear, and retries the verified update; it never force-kills a process. `n`, non-interactive execution, an unavailable lock probe, or a lock that remains unresolved fails with structured `install_target_locked` diagnostics and leaves the existing installation intact.
 
@@ -572,7 +582,7 @@ The architecture uses progressive disclosure: route once, load the selected work
 
 ## Current state
 
-`1.3.0` is a minor release after `1.2.0`, extending github-delivery from the GitHub issue/PR lifecycle into the adjacent Git workflow and release-versioning work needed to prepare clean, consumer-readable deliveries.
+`1.3.1` is a patch release on top of `1.3.0`: it keeps the first-class Git workflow and release-versioning capabilities while fixing stale owned installer-lock recovery, installed workflow-helper root resolution, and concurrent rewrite-baseline generation allocation.
 
 Stable in this release:
 
@@ -587,7 +597,9 @@ Stable in this release:
 - optional Windows Authority Hello grants, push-only branch leases, and PR sessions for later exact-scope push and merge on one PR and approved merge base;
 - inferred-stack restacking/merge-order safety and independent multi-base delivery;
 - SHA-bound remote repository context when a useful local checkout is not already available;
-- verified stable install/update with Windows lock recovery, graceful-close prompting, and optional older-backup cleanup that preserves the fresh rollback backup;
+- verified stable install/update with stale owned install-lock recovery, Windows lock recovery, graceful-close prompting, and optional older-backup cleanup that preserves the fresh rollback backup;
+- installed workflow helpers that resolve their own skill root while retaining explicit root overrides;
+- generation-fenced rewrite-baseline storage with generation allocation finalized under the acquired lock;
 - progress watchdog/runtime convergence controls;
 - deterministic bundles, repository security checks, CodeQL, Dependency Review, live-fixture contracts, and release preparation.
 

@@ -55,9 +55,13 @@ function createLockToken() {
   return `${process.pid}-${randomBytes(16).toString("hex")}`;
 }
 
-function createExclusiveLock(lockPath, lease) {
+function createExclusiveLock(lockPath, lease, filePath) {
   const fd = openSync(lockPath, "wx", 0o600);
   try {
+    lease.generation = Math.max(
+      lease.generation,
+      highestPublishedGeneration(filePath || storePathFromLock(lockPath)) + 1,
+    );
     writeFileSync(fd, `${JSON.stringify(lease)}\n`);
   } finally {
     closeSync(fd);
@@ -197,7 +201,7 @@ function acquireLock(lockPath, { lockWaitMs, staleLockMs, filePath }) {
     const lease = { generation: nextGeneration, token: createLockToken() };
     let contentionError;
     try {
-      createExclusiveLock(lockPath, lease);
+      createExclusiveLock(lockPath, lease, filePath);
       return lease;
     } catch (error) {
       if (!lockContended(error)) throw error;

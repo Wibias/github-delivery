@@ -1,15 +1,17 @@
 #!/usr/bin/env node
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { buildExecutionWorkflowPacket } from "./lib/workflow-execution-contract.mjs";
 
 const USAGE =
   "Usage: node scripts/workflow-brief.mjs WORKFLOW [--root ROOT] [--conditional MODULE ...]";
+const DEFAULT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 function parseArgs(argv) {
   const workflow = argv[0];
   if (!workflow) throw new Error(USAGE);
-  let root = process.cwd();
+  let root = DEFAULT_ROOT;
   const activeConditionalModules = [];
   for (let index = 1; index < argv.length; index += 1) {
     const value = argv[index];
