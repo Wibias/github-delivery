@@ -24,6 +24,7 @@ import {
   parseSnapshotGateArgs,
   readValidatedSnapshot,
 } from "./lib/snapshot-input.mjs";
+import { shipGateFailureOutput } from "./lib/ship-gate-failure.mjs";
 import { combineShipGateResults } from "./lib/ship-gate-policy.mjs";
 import { validateWorkflowMutationMode } from "./lib/workflow-mode.mjs";
 import { ownedHelperEffect } from "./lib/watchdog-evidence-registry.mjs";
@@ -31,10 +32,13 @@ import { ownedHelperEffect } from "./lib/watchdog-evidence-registry.mjs";
 const usage =
   "Usage: node scripts/ship-gate.mjs [OWNER/REPO PR_NUMBER] [--checkpoint FILE] [--snapshot FILE] [--expected-head SHA] [--max-age-seconds N] [--mutation-mode MODE] [--workflow WORKFLOW]";
 
+let failureStage = "argument_validation";
+
 try {
   const mutationArgs = extractMutationModeArgs(process.argv.slice(2));
   let args = parseSnapshotGateArgs(mutationArgs.argv, { usage });
   if (args.checkpointPath) {
+    failureStage = "checkpoint_read";
     const controller = readDeliveryWorkflowCheckpoint(args.checkpointPath);
     const bound = bindSnapshotGateToController({ gate: args, controller });
     args = {
@@ -43,6 +47,7 @@ try {
       workflow: args.workflow || controller.workflow || null,
     };
   }
+  failureStage = "argument_validation";
   if (args.workflow) {
     const compatibility = validateWorkflowMutationMode({
       workflow: args.workflow,
@@ -55,6 +60,7 @@ try {
     }
   }
   const replay = Boolean(args.snapshotPath);
+  failureStage = replay ? "snapshot_replay" : "live_snapshot_capture";
   const snapshot = replay
     ? readValidatedSnapshot({
         path: args.snapshotPath,
@@ -71,6 +77,7 @@ try {
         maxAgeSeconds: args.maxAgeSeconds,
       });
 
+  failureStage = "evaluation";
   const requiredChecks = evaluateRequiredChecksSnapshot(snapshot);
   const authoritativeChecks = snapshot.evidence?.checks?.authoritative || null;
   if (authoritativeChecks?.sha) {
@@ -115,6 +122,7 @@ try {
   process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
   process.exitCode = output.ready ? 0 : output.blocked ? 1 : 2;
 } catch (error) {
-  console.error(String(error?.message || error));
-  process.exit(2);
+  const output = shipGateFailureOutput(error, { stage: failureStage });
+  process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
+  process.exitCode = 2;
 }
