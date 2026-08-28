@@ -1,5 +1,6 @@
 const MAX_FAILURE_MESSAGE_CHARS = 2_000;
-const LOCAL_INPUT_ERROR = /(?:\bENOENT\b|no such file|snapshot_(?:integrity|repo|pr|head|age)|invalid snapshot|usage: node scripts\/ship-gate\.mjs)/i;
+const MAX_FAILURE_CHAIN_DEPTH = 4;
+const LOCAL_INPUT_ERROR = /(?:\bENOENT\b|no such file|snapshot_(?:integrity|repo|pr|head|age)|invalid snapshot|usage: node scripts\/ship-gate(?:-snapshot)?\.mjs)/i;
 const GITHUB_CAPABILITY_OR_PERMISSION_ERROR = /(?:\b(?:401|403)\b|forbidden|resource not accessible|requires? github pro|upgrade to github pro|must have admin(?:istrator)? rights?|insufficient permission)/i;
 const TRANSIENT_UPSTREAM_ERROR = /(?:\b(?:408|429|500|502|503|504)\b|rate[ -]?limit|timed? ?out|\bETIMEDOUT\b|\bECONNRESET\b|\bEAI_AGAIN\b|\bENETUNREACH\b|socket hang up|temporar(?:y|ily) unavailable)/i;
 
@@ -9,11 +10,20 @@ function boundedFailureMessage(value) {
   return `${compact.slice(0, MAX_FAILURE_MESSAGE_CHARS)}...[truncated]`;
 }
 
+function failureEvidence(error) {
+  const parts = [];
+  let current = error;
+  for (let depth = 0; current && depth < MAX_FAILURE_CHAIN_DEPTH; depth += 1) {
+    parts.push(current?.code, current?.message || current, current?.causeMessage);
+    current = current?.cause;
+  }
+  return parts.filter(Boolean).map(String).join(" ");
+}
+
 export function classifyShipGateFailure(error) {
   const rawMessage = String(error?.message || error || "ship_gate_failed");
   const message = boundedFailureMessage(rawMessage);
-  const code = String(error?.code || "");
-  const haystack = `${code} ${rawMessage}`;
+  const haystack = failureEvidence(error);
 
   if (LOCAL_INPUT_ERROR.test(haystack)) {
     return { classification: "local_input_error", retryable: false, message };
