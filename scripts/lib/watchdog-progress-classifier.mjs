@@ -9,7 +9,9 @@ const GIT_WRITE = /\bgit(?:\.exe)?(?:\s+-C\s+(?:"[^"]+"|'[^']+'|\S+))?\s+(?:comm
 const GIT_VOLATILE_READ = /(?:^|[;|&(]\s*|\s)git(?:\.exe)?(?:\s+-C\s+(?:"[^"]+"|'[^']+'|\S+))?\s+worktree\s+list\b/i;
 const GIT_READ = /(?:^|[;|&(]\s*|\s)git(?:\.exe)?(?:\s+-C\s+(?:"[^"]+"|'[^']+'|\S+))?\s+(?:status|diff|log|show|branch|rev-parse)\b/i;
 const OPERATIONAL_VOLATILE_READ =
-  /(?:^|[;|&(]\s*|\$[A-Za-z_][\w:]*\s*=\s*)(?:get-process|get-ciminstance|get-wmiobject|get-job|tasklist|ps|pgrep|jobs)\b/i;
+  /(?:^|[;|&(]\s*|\$[A-Za-z_][\w:]*\s*=\s*)(?:get-process|get-job|tasklist|ps|pgrep|jobs)\b/i;
+const CIM_PROCESS_VOLATILE_READ =
+  /(?:^|[;|&(]\s*|\$[A-Za-z_][\w:]*\s*=\s*)(?:get-ciminstance|get-wmiobject)\b[^;&|\n]*\bwin32_process\b/i;
 const POWERSHELL_READ =
   /(?:^|[;|&(]\s*|\$[A-Za-z_][\w:]*\s*=\s*)(?:get-content|get-childitem|select-string|rg|grep|cat|head|tail|findstr|type|ls|dir|pwd)\b/i;
 
@@ -75,7 +77,11 @@ function classifyCommand(command) {
     return { kind: "evidence", volatility: volatile ? "volatile" : "stable" };
   }
 
-  if (OPERATIONAL_VOLATILE_READ.test(value) || GIT_VOLATILE_READ.test(value)) {
+  if (
+    OPERATIONAL_VOLATILE_READ.test(value) ||
+    CIM_PROCESS_VOLATILE_READ.test(value) ||
+    GIT_VOLATILE_READ.test(value)
+  ) {
     if (hasOutputRedirection(value)) return { kind: "neutral" };
     return { kind: "evidence", volatility: "volatile" };
   }
