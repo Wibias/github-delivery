@@ -4,6 +4,16 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.3.6] - 2026-08-29
+
+### Changed
+
+- Bumped the package version from `1.3.5` to `1.3.6`.
+
+### Fixed
+
+- Codex lifecycle `Stop` finalization now recognizes the structured completed-recommendation outcome used by real read-only reviews and gives only those explicit finalization candidates the dedicated completed-answer allowance. Ordinary hook-mode `Stop` messages keep the stricter active-work budget; selected-next-action and explicit authorization blockers can close an active recovery; a newly announced tool action, malformed tool-protocol output, or output above the completed-answer hard bound remains fail-closed (PR #395).
+
 ## [1.3.5] - 2026-08-29
 
 ### Changed
