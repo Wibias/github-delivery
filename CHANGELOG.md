@@ -4,6 +4,16 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.3.7] - 2026-08-30
+
+### Changed
+
+- Bumped the package version from `1.3.6` to `1.3.7`.
+
+### Fixed
+
+- Stable self-update release-asset downloads now retry transient HTTP `502`, `503`, and `504` responses up to two times with bounded 250 ms / 750 ms delays, discarding each failed response body before retrying. Deterministic client errors such as `404` still fail immediately, and the existing HTTPS redirect, byte-limit, checksum/digest, tag/source-binding, and GitHub attestation verification chain remains fail-closed (PR #397).
+
 ## [1.3.6] - 2026-08-29
 
 ### Changed
