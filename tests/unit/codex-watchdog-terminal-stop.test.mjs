@@ -166,3 +166,43 @@ test("a reported blocker does not end recovery when the same response announces 
   assert.match(mixed.output.reason, /recovery 2\/3/i);
   assert.equal(mixed.state.narrationRecoveryAttempts, 2);
 });
+
+test("terminal wording cannot bypass the completed-answer hard generation bound", () => {
+  const report = [
+    "# Final report",
+    "No further action is authorized.",
+    "x".repeat(65_000),
+  ].join("\n");
+
+  const result = evaluateCodexHook(
+    {
+      hook_event_name: "Stop",
+      session_id: "s6",
+      turn_id: "t6",
+      stop_hook_active: false,
+      last_assistant_message: report,
+    },
+    {},
+  );
+
+  assert.equal(result.output.decision, "block");
+  assert.match(result.output.reason, /recovery 1\/3/i);
+});
+
+test("completed-answer allowance does not hide a genuine repeated tool-intent stall", () => {
+  const report = `${"Let me read the reference.\n".repeat(4)}${"x".repeat(20_000)}`;
+
+  const result = evaluateCodexHook(
+    {
+      hook_event_name: "Stop",
+      session_id: "s7",
+      turn_id: "t7",
+      stop_hook_active: false,
+      last_assistant_message: report,
+    },
+    {},
+  );
+
+  assert.equal(result.output.decision, "block");
+  assert.match(result.output.reason, /recovery 1\/3/i);
+});
