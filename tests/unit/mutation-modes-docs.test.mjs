@@ -39,7 +39,8 @@ test("mutation mode reference separates normal policy from secure-by-default tru
     assert.match(reference, new RegExp(`\\b${authorityMode}\\b`));
   }
   assert.match(reference, /persistent user config defaults to `high-assurance`/i);
-  assert.match(reference, /`off` is an explicit opt-out[\s\S]*no GitHub mutation execution/i);
+  assert.match(reference, /`off` is an explicit opt-out[\s\S]*no Windows Hello \/ trusted-authority prompt/i);
+  assert.match(reference, /does not convert an authorized workflow into read-only or planning-only work/i);
   assert.match(reference, /profile is an upper bound[\s\S]*exact-text confirmation[\s\S]*expected-head checks/i);
   assert.match(reference, /profile is an upper bound, not a waiver/);
   assert.match(reference, /generic `post_comment`[\s\S]*never satisfies merge review evidence/i);
@@ -60,9 +61,9 @@ test("bare full review selects review mode and follows configured authority prot
   const reference = read("references/mutation-modes.md");
   assert.match(reference, /full review PR #32/);
   assert.match(reference, /full review PR #32[\s\S]*→ `review`/);
-  assert.match(reference, /full-review workflow publishes its verdict comment in the default protection mode/i);
-  assert.match(reference, /When `authorityMode` is explicitly `off`[\s\S]*does not publish the verdict to GitHub/i);
-  assert.match(reference, /mutation boundary fails closed before the comment write/i);
+  assert.match(reference, /full-review workflow publishes its verdict comment when its normal publication policy is satisfied/i);
+  assert.match(reference, /When `authorityMode` is explicitly `off`[\s\S]*may publish its verdict/i);
+  assert.match(reference, /without obtaining a Windows Hello grant/i);
 });
 
 test("gate helper invocation carries the active mutation mode", () => {
