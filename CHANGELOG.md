@@ -4,6 +4,16 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.3.5] - 2026-08-29
+
+### Changed
+
+- Bumped the package version from `1.3.4` to `1.3.5`.
+
+### Fixed
+
+- Codex lifecycle `Stop` handling now recognizes explicit terminal dispositions after completed work and clears narration recovery instead of injecting spurious `recovery 1/3` or persisted `recovery 2/3` feedback. The guard remains fail-closed when the same response announces another tool action, and malformed tool-protocol stalls keep their existing hard-stop behavior (PR #393).
+
 ## [1.3.4] - 2026-08-29
 
 ### Changed
@@ -496,7 +506,6 @@ All notable changes to `github-delivery` are documented here.
   class must route to, and verify every probe is tagged in a doc that also
   carries its assertion markers. A trigger that stops firing, a dropped
   probe tag, or an assertion moved off its probe's doc is now a CI break.
-
 - Regression-assertion → probe-anchor binding: `scripts/validate-evals.mjs`
   now requires every `regression-cases.jsonl` assertion id to carry a
   `<!-- assertion: <id> -->` marker inside one of the case's expected
