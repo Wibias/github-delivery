@@ -17,6 +17,8 @@ const API_ROOT = "https://api.github.com";
 const API_VERSION = "2022-11-28";
 const MAX_REDIRECTS = 5;
 const MAX_TAG_PEELS = 8;
+const DOWNLOAD_RETRYABLE_STATUSES = new Set([502, 503, 504]);
+const DOWNLOAD_RETRY_DELAYS_MS = Object.freeze([250, 750]);
 const DOWNLOAD_LIMITS = Object.freeze({
   archive: 32 * 1024 * 1024,
   manifest: 4 * 1024 * 1024,
@@ -58,6 +60,20 @@ function parseHttpsUrl(value) {
 
 function isRedirectStatus(status) {
   return status === 301 || status === 302 || status === 303 || status === 307 || status === 308;
+}
+
+function isRetryableDownloadStatus(status) {
+  return DOWNLOAD_RETRYABLE_STATUSES.has(status);
+}
+
+function defaultSleep(delayMs) {
+  return new Promise((resolveDelay) => setTimeout(resolveDelay, delayMs));
+}
+
+async function discardResponseBody(response) {
+  try {
+    await response?.body?.cancel();
+  } catch {}
 }
 
 async function readLimitedBody(response, limit) {
@@ -163,9 +179,11 @@ function parseManifestBytes(bytes, version) {
 export function createGitHubReleaseClient({
   fetchImpl = globalThis.fetch,
   repository = DEFAULT_REPOSITORY,
+  sleepImpl = defaultSleep,
 } = {}) {
   if (typeof fetchImpl !== "function") fail("stable_release_network_client_unavailable");
   if (repository !== DEFAULT_REPOSITORY) fail("stable_release_repository_invalid");
+  if (typeof sleepImpl !== "function") fail("stable_release_retry_sleep_invalid");
 
   async function latestRelease() {
     const release = await fetchJson(
@@ -194,17 +212,25 @@ export function createGitHubReleaseClient({
     let current = parseHttpsUrl(asset.browser_download_url);
     for (let redirects = 0; redirects <= MAX_REDIRECTS; redirects += 1) {
       let response;
-      try {
-        response = await fetchImpl(current, {
-          method: "GET",
-          redirect: "manual",
-          headers: {
-            Accept: "application/octet-stream",
-            "User-Agent": "github-delivery-release-self-update",
-          },
-        });
-      } catch (error) {
-        fail("stable_release_download_failed", error?.message || "request failed");
+      for (let attempt = 0; attempt <= DOWNLOAD_RETRY_DELAYS_MS.length; attempt += 1) {
+        try {
+          response = await fetchImpl(current, {
+            method: "GET",
+            redirect: "manual",
+            headers: {
+              Accept: "application/octet-stream",
+              "User-Agent": "github-delivery-release-self-update",
+            },
+          });
+        } catch (error) {
+          fail("stable_release_download_failed", error?.message || "request failed");
+        }
+
+        if (!isRetryableDownloadStatus(response.status) || attempt === DOWNLOAD_RETRY_DELAYS_MS.length) {
+          break;
+        }
+        await discardResponseBody(response);
+        await sleepImpl(DOWNLOAD_RETRY_DELAYS_MS[attempt]);
       }
 
       if (isRedirectStatus(response.status)) {
