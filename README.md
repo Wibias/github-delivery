@@ -19,7 +19,7 @@
 </div>
 
 > [!NOTE]
-> **1.3.4.** This patch tightens the GitHub mutation trust boundary: `authorityMode=off` is planning-only for remote writes, unresolved GraphQL mutation roots fail closed, native approval is commit- and actor-bound, and body-bearing social mutations verify the authoritative live GitHub body after publication. See [Current state](#current-state).
+> **1.3.5.** This patch fixes a Codex watchdog false positive after completed terminal reviews: explicit terminal dispositions can end lifecycle-hook narration recovery without allowing terminal wording to bypass a newly announced tool action or malformed tool-protocol protection. See [Current state](#current-state).
 
 > [!IMPORTANT]
 > **Natural language is the public API.** The Node scripts, policy modules, evaluators, mutation broker, and optional Authority host are internal safety/evidence machinery. You normally do not invoke them yourself.
@@ -99,6 +99,14 @@ For installation edge cases, backup/restore, downgrade behavior, manual recovery
 | **Supersede / overtake** | `supersede PR #12 with PR #45` | Explicit replacement or maintainer-takeover workflows with bounded mutation authority |
 | **Merge / close-out** | `merge PR #32` | Final gate, exact transaction authority, head-pinned merge, verification, thanks, linked-issue close-out |
 | **Self-update** | `update github-delivery to the latest stable release` | Stable-release verification, lock-aware Windows recovery, optional old-backup cleanup, safe apply and postconditions |
+
+### What changed in 1.3.5
+
+`1.3.5` is a focused watchdog false-positive correction patch:
+
+- the Codex lifecycle `Stop` hook recognizes explicit terminal dispositions after completed work and clears narration recovery instead of injecting another corrective continuation;
+- a completed terminal review can therefore finish without spurious `recovery 1/3` or persisted `recovery 2/3` feedback;
+- terminal wording does not end recovery when the same response announces another tool action, and malformed tool-protocol stalls keep their existing hard-stop behavior.
 
 ### What changed in 1.3.4
 
@@ -621,7 +629,7 @@ The architecture uses progressive disclosure: route once, load the selected work
 
 ## Current state
 
-`1.3.4` is a mutation-boundary and post-publication verification hardening patch on top of `1.3.3`: it closes the remaining audited trust paths around off-mode intent, GraphQL root resolution, native approval head binding, and live body verification while preserving the existing Git/release/review safety model.
+`1.3.5` is a focused watchdog false-positive correction patch on top of `1.3.4`: completed terminal reviews can finish without spurious lifecycle-hook recovery while the existing tool-intent and malformed-protocol safeguards stay fail-closed.
 
 Stable in this release:
 
@@ -644,6 +652,7 @@ Stable in this release:
 - installed workflow helpers that resolve their own skill root while retaining explicit root overrides;
 - generation-fenced rewrite-baseline storage with generation allocation finalized under the acquired lock;
 - progress watchdog/runtime convergence controls that charge operational process/job/worktree polling as volatile evidence rather than neutral progress;
+- lifecycle-hook narration recovery that can close on explicit terminal dispositions after completed work without treating the same response as terminal when it announces a new tool action;
 - live `ship-gate` capture failures that preserve bounded upstream causes, remain fail-closed, and expose retryability so deterministic GitHub capability/permission failures can terminate equivalent probing;
 - deterministic bundles, repository security checks, CodeQL, Dependency Review, live-fixture contracts, and release preparation.
 
