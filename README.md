@@ -19,7 +19,7 @@
 </div>
 
 > [!NOTE]
-> **1.3.6.** This patch closes the remaining Codex lifecycle `Stop` false-positive path: structured completed recommendations can use the dedicated finalization allowance, while ordinary hook narration, tool intent, malformed protocol output, and the completed-answer hard bound remain fail-closed. See [Current state](#current-state).
+> **1.3.7.** Stable self-update now tolerates brief GitHub/CDN gateway failures by retrying release-asset HTTP 502/503/504 responses within a bounded budget, while deterministic client errors and the complete release-verification chain remain fail-closed. See [Current state](#current-state).
 
 > [!IMPORTANT]
 > **Natural language is the public API.** The Node scripts, policy modules, evaluators, mutation broker, and optional Authority host are internal safety/evidence machinery. You normally do not invoke them yourself.
@@ -99,6 +99,14 @@ For installation edge cases, backup/restore, downgrade behavior, manual recovery
 | **Supersede / overtake** | `supersede PR #12 with PR #45` | Explicit replacement or maintainer-takeover workflows with bounded mutation authority |
 | **Merge / close-out** | `merge PR #32` | Final gate, exact transaction authority, head-pinned merge, verification, thanks, linked-issue close-out |
 | **Self-update** | `update github-delivery to the latest stable release` | Stable-release verification, lock-aware Windows recovery, optional old-backup cleanup, safe apply and postconditions |
+
+### What changed in 1.3.7
+
+`1.3.7` is a focused stable self-update reliability patch:
+
+- release-asset HTTP `502`, `503`, and `504` responses are retried up to two times with bounded 250 ms / 750 ms delays;
+- failed transient response bodies are discarded before retrying, while deterministic client errors such as `404` remain fail-fast;
+- the retry is limited to asset acquisition: HTTPS redirect limits, byte limits, GitHub asset digests, `SHA256SUMS`, manifest validation, tag/source binding, and constrained GitHub attestation verification remain unchanged and fail-closed.
 
 ### What changed in 1.3.6
 
@@ -380,7 +388,7 @@ Apply the verified plan:
 npx github-delivery update --apply
 ```
 
-Self-update accepts only the fixed upstream's latest stable `vX.Y.Z` GitHub Release and replaces nothing until release assets, checksums, distribution manifest, tag/source binding, constrained GitHub artifact attestation, and bounded ZIP extraction verify. Local tracked modifications block replacement even with `--force`; update does not silently downgrade an ahead install.
+Self-update accepts only the fixed upstream's latest stable `vX.Y.Z` GitHub Release and replaces nothing until release assets, checksums, distribution manifest, tag/source binding, constrained GitHub artifact attestation, and bounded ZIP extraction verify. Release-asset HTTP `502`, `503`, and `504` responses are retried within a fixed two-retry budget before acquisition fails; deterministic client errors remain fail-fast. Local tracked modifications block replacement even with `--force`; update does not silently downgrade an ahead install.
 
 Exclusive skill and Windows Authority install locks record a github-delivery process identity. If that process exits hard and leaves its lock file behind, a later run reclaims the lock only when it has the exact github-delivery PID + nonce format and the recorded PID is provably gone. Live, malformed, or permission-uncertain locks stay fail-closed as `install_lock_held` rather than risking concurrent installers.
 
@@ -637,7 +645,7 @@ The architecture uses progressive disclosure: route once, load the selected work
 
 ## Current state
 
-`1.3.6` is a focused watchdog finalization follow-up on top of `1.3.5`: structured completed recommendations can finish without spurious lifecycle-hook recovery while ordinary hook budgets, new tool intent, malformed-protocol protection, and the completed-answer hard bound remain fail-closed.
+`1.3.7` is a focused stable self-update reliability patch on top of `1.3.6`: transient GitHub/CDN release-asset HTTP 502/503/504 responses receive two bounded retries, while deterministic client errors and the existing release-verification chain remain fail-closed.
 
 Stable in this release:
 
@@ -656,7 +664,7 @@ Stable in this release:
 - optional Windows Authority Hello grants, push-only branch leases, and PR sessions for later exact-scope push and merge on one PR and approved merge base;
 - inferred-stack restacking/merge-order safety and independent multi-base delivery;
 - SHA-bound remote repository context when a useful local checkout is not already available;
-- verified stable install/update with stale owned install-lock recovery, Windows lock recovery, graceful-close prompting, and optional older-backup cleanup that preserves the fresh rollback backup;
+- verified stable install/update with bounded release-asset gateway retries, stale owned install-lock recovery, Windows lock recovery, graceful-close prompting, and optional older-backup cleanup that preserves the fresh rollback backup;
 - installed workflow helpers that resolve their own skill root while retaining explicit root overrides;
 - generation-fenced rewrite-baseline storage with generation allocation finalized under the acquired lock;
 - progress watchdog/runtime convergence controls that charge operational process/job/worktree polling as volatile evidence rather than neutral progress;
