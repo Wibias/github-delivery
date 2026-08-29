@@ -6,10 +6,13 @@ import {
 import { classifyHookTool } from "./watchdog-progress-classifier.mjs";
 
 const DEFAULT_MAX_NARRATION_RECOVERY_ATTEMPTS = 3;
+const DEFAULT_STOP_FINALIZATION_CHAR_SOFT_LIMIT = 40_000;
+const DEFAULT_STOP_FINALIZATION_CHAR_HARD_LIMIT = 64_000;
 const TERMINAL_STOP_DISPOSITION_PATTERNS = [
   /\bno (?:further|additional) (?:tool\/action |tool |repository )?actions? (?:is|are|was|were) (?:authori[sz]ed|required|needed|available|possible)\b/i,
   /\bnothing (?:else|more) (?:is|was) (?:authori[sz]ed|required|needed)\b/i,
-  /\b(?:cannot|can't|can not) (?:run|execute|perform|take|continue|proceed with) (?:the |that |this )?(?:selected |next )?(?:tool|action|step)\b/i,
+  /\b(?:cannot|can't|can not) (?:run|execute|perform|take|continue|proceed with) (?:the |that |this )?(?:selected next |selected |next )?(?:tool|action|step)\b/i,
+  /\bblocked\b[^.\n]{0,240}\b(?:unauthori[sz]ed|prohibited|forbidden|not (?:permitted|allowed))\b/i,
 ];
 
 export function classifyCodexTool(toolName, toolInput = {}) {
@@ -24,12 +27,19 @@ export function classifyCodexTool(toolName, toolInput = {}) {
 
 function hydrate(state, options) {
   const snapshot = state?.watchdog || state || {};
-  return createProgressWatchdog({
+  const watchdogOptions = {
     ...snapshot,
     volatileReadIntervalMs: options.volatileReadIntervalMs,
     evidenceSoftLimit: options.evidenceSoftLimit,
     evidenceHardLimit: options.evidenceHardLimit,
-  });
+  };
+  if (options.generatedCharSoftLimit !== undefined) {
+    watchdogOptions.generatedCharSoftLimit = options.generatedCharSoftLimit;
+  }
+  if (options.generatedCharHardLimit !== undefined) {
+    watchdogOptions.generatedCharHardLimit = options.generatedCharHardLimit;
+  }
+  return createProgressWatchdog(watchdogOptions);
 }
 
 function hydrateEvidence(state) {
@@ -115,11 +125,16 @@ function stopDecision(watchdog, input, recoveryAttempts, maxRecoveryAttempts) {
   }
 
   const announcedToolAction = watchdog.snapshot().toolEmissionIntentCount > priorToolIntentCount;
-  if (hasTerminalStopDisposition(message) && !announcedToolAction) {
+  const recoveryActive = recoveryAttempts > 0;
+  if (
+    recoveryActive
+    && decision.action !== "interrupt"
+    && hasTerminalStopDisposition(message)
+    && !announcedToolAction
+  ) {
     return { output: null, recoveryAttempts: 0 };
   }
 
-  const recoveryActive = recoveryAttempts > 0;
   if (decision.action !== "interrupt" && !recoveryActive) {
     return { output: null, recoveryAttempts: 0 };
   }
@@ -146,6 +161,7 @@ function stopDecision(watchdog, input, recoveryAttempts, maxRecoveryAttempts) {
 }
 
 export function evaluateCodexHook(input, state = {}, options = {}) {
+  const event = input?.hook_event_name;
   const config = {
     now: options.now ?? Date.now(),
     volatileReadIntervalMs: options.volatileReadIntervalMs ?? 30_000,
@@ -154,6 +170,12 @@ export function evaluateCodexHook(input, state = {}, options = {}) {
     evidenceHardLimit: options.evidenceHardLimit ?? 12,
     maxNarrationRecoveryAttempts:
       options.maxNarrationRecoveryAttempts ?? DEFAULT_MAX_NARRATION_RECOVERY_ATTEMPTS,
+    generatedCharSoftLimit: event === "Stop"
+      ? (options.stopFinalizationCharSoftLimit ?? DEFAULT_STOP_FINALIZATION_CHAR_SOFT_LIMIT)
+      : undefined,
+    generatedCharHardLimit: event === "Stop"
+      ? (options.stopFinalizationCharHardLimit ?? DEFAULT_STOP_FINALIZATION_CHAR_HARD_LIMIT)
+      : undefined,
   };
   if (
     !Number.isInteger(config.maxNarrationRecoveryAttempts)
@@ -164,7 +186,6 @@ export function evaluateCodexHook(input, state = {}, options = {}) {
 
   const watchdog = hydrate(state, config);
   const evidenceRegistry = hydrateEvidence(state);
-  const event = input?.hook_event_name;
   let narrationRecoveryAttempts = hydrateNarrationRecoveryAttempts(state);
   let output = null;
 
