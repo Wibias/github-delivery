@@ -3,6 +3,23 @@ import test from "node:test";
 
 import { evaluateCodexHook } from "../../scripts/lib/codex-watchdog-hook.mjs";
 
+function beginNarrationRecovery() {
+  const first = evaluateCodexHook(
+    {
+      hook_event_name: "Stop",
+      session_id: "s1",
+      turn_id: "t1",
+      stop_hook_active: false,
+      last_assistant_message: "Let me read the reference.\n".repeat(4),
+    },
+    {},
+  );
+
+  assert.equal(first.output.decision, "block");
+  assert.match(first.output.reason, /recovery 1\/3/i);
+  return first;
+}
+
 test("Stop allows a completed final report even when it exceeds the streaming generation budget", () => {
   const report = [
     "# Independent acceptance review",
@@ -28,20 +45,33 @@ test("Stop allows a completed final report even when it exceeds the streaming ge
   assert.equal(result.state.narrationRecoveryAttempts, 0);
 });
 
-test("Stop ends active recovery when the corrective continuation reports a terminal disposition", () => {
-  const first = evaluateCodexHook(
+test("Stop treats a long completed recommendation as finalization without requiring a magic terminal phrase", () => {
+  const report = [
+    "# Contract sufficiency analysis",
+    "F03_CONTRACT_SUFFICIENT = false",
+    "The accepted authority does not define a representation-independent semantic alias predicate.",
+    "x".repeat(20_000),
+    "## G. Recommendation",
+    "`NEXT_ACTION = AUTHOR_NARROW_AUTHORITY_CORRECTION`",
+  ].join("\n");
+
+  const result = evaluateCodexHook(
     {
       hook_event_name: "Stop",
-      session_id: "s1",
-      turn_id: "t1",
+      session_id: "s2",
+      turn_id: "t2",
       stop_hook_active: false,
-      last_assistant_message: "Let me read the reference.\n".repeat(4),
+      last_assistant_message: report,
     },
     {},
   );
 
-  assert.equal(first.output.decision, "block");
-  assert.match(first.output.reason, /recovery 1\/3/i);
+  assert.equal(result.output, null);
+  assert.equal(result.state.narrationRecoveryAttempts, 0);
+});
+
+test("Stop ends active recovery when the corrective continuation reports a terminal disposition", () => {
+  const first = beginNarrationRecovery();
 
   const terminal = evaluateCodexHook(
     {
@@ -59,17 +89,46 @@ test("Stop ends active recovery when the corrective continuation reports a termi
   assert.equal(terminal.state.narrationRecoveryAttempts, 0);
 });
 
-test("terminal wording does not end recovery when the same response announces another tool action", () => {
-  const first = evaluateCodexHook(
+test("Stop ends active recovery when the corrective continuation cannot execute the selected next action", () => {
+  const first = beginNarrationRecovery();
+
+  const terminal = evaluateCodexHook(
     {
       hook_event_name: "Stop",
-      session_id: "s1",
-      turn_id: "t1",
-      stop_hook_active: false,
-      last_assistant_message: "Let me read the reference.\n".repeat(4),
+      session_id: "s3",
+      turn_id: "t3",
+      stop_hook_active: true,
+      last_assistant_message:
+        "Cannot execute the selected next action: the user explicitly prohibited creating authority and required stopping after the recommendation.",
     },
-    {},
+    first.state,
   );
+
+  assert.equal(terminal.output, null);
+  assert.equal(terminal.state.narrationRecoveryAttempts, 0);
+});
+
+test("Stop ends active recovery when the corrective continuation reports an explicit authorization blocker", () => {
+  const first = beginNarrationRecovery();
+
+  const terminal = evaluateCodexHook(
+    {
+      hook_event_name: "Stop",
+      session_id: "s4",
+      turn_id: "t4",
+      stop_hook_active: true,
+      last_assistant_message:
+        "Blocked: authoring the recommended authority correction is explicitly unauthorized by the user.",
+    },
+    first.state,
+  );
+
+  assert.equal(terminal.output, null);
+  assert.equal(terminal.state.narrationRecoveryAttempts, 0);
+});
+
+test("terminal wording does not end recovery when the same response announces another tool action", () => {
+  const first = beginNarrationRecovery();
 
   const mixed = evaluateCodexHook(
     {
@@ -86,4 +145,87 @@ test("terminal wording does not end recovery when the same response announces an
   assert.equal(mixed.output.decision, "block");
   assert.match(mixed.output.reason, /recovery 2\/3/i);
   assert.equal(mixed.state.narrationRecoveryAttempts, 2);
+});
+
+test("a reported blocker does not end recovery when the same response announces another tool action", () => {
+  const first = beginNarrationRecovery();
+
+  const mixed = evaluateCodexHook(
+    {
+      hook_event_name: "Stop",
+      session_id: "s5",
+      turn_id: "t5",
+      stop_hook_active: true,
+      last_assistant_message:
+        "Cannot execute the selected next action because it is unauthorized. I will read one more reference.",
+    },
+    first.state,
+  );
+
+  assert.equal(mixed.output.decision, "block");
+  assert.match(mixed.output.reason, /recovery 2\/3/i);
+  assert.equal(mixed.state.narrationRecoveryAttempts, 2);
+});
+
+test("terminal wording cannot bypass the completed-answer hard generation bound", () => {
+  const report = [
+    "# Final report",
+    "No further action is authorized.",
+    "x".repeat(65_000),
+  ].join("\n");
+
+  const result = evaluateCodexHook(
+    {
+      hook_event_name: "Stop",
+      session_id: "s6",
+      turn_id: "t6",
+      stop_hook_active: false,
+      last_assistant_message: report,
+    },
+    {},
+  );
+
+  assert.equal(result.output.decision, "block");
+  assert.match(result.output.reason, /recovery 1\/3/i);
+});
+
+test("completed-answer allowance does not hide a genuine repeated tool-intent stall", () => {
+  const report = `${"Let me read the reference.\n".repeat(4)}${"x".repeat(20_000)}`;
+
+  const result = evaluateCodexHook(
+    {
+      hook_event_name: "Stop",
+      session_id: "s7",
+      turn_id: "t7",
+      stop_hook_active: false,
+      last_assistant_message: report,
+    },
+    {},
+  );
+
+  assert.equal(result.output.decision, "block");
+  assert.match(result.output.reason, /recovery 1\/3/i);
+});
+
+test("long finalization candidate with a new tool action remains in recovery", () => {
+  const report = [
+    "# Final report",
+    "No further action is authorized.",
+    "x".repeat(20_000),
+    "I will read one more reference.",
+  ].join("\n");
+
+  const result = evaluateCodexHook(
+    {
+      hook_event_name: "Stop",
+      session_id: "s8",
+      turn_id: "t8",
+      stop_hook_active: false,
+      last_assistant_message: report,
+    },
+    {},
+  );
+
+  assert.equal(result.output.decision, "block");
+  assert.match(result.output.reason, /recovery 1\/3/i);
 });
