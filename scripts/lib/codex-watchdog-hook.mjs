@@ -14,6 +14,8 @@ const TERMINAL_STOP_DISPOSITION_PATTERNS = [
   /\b(?:cannot|can't|can not) (?:run|execute|perform|take|continue|proceed with) (?:the |that |this )?(?:selected next |selected |next )?(?:tool|action|step)\b/i,
   /\bblocked\b[^.\n]{0,240}\b(?:unauthori[sz]ed|prohibited|forbidden|not (?:permitted|allowed))\b/i,
 ];
+const STRUCTURED_STOP_RECOMMENDATION_HEADING = /(?:^|\n)\s*#{1,6}\s+(?:[A-Z]\.\s*)?Recommendation\s*$/im;
+const STRUCTURED_STOP_RECOMMENDATION_VALUE = /(?:^|\n)\s*`?NEXT_ACTION\s*=\s*[A-Z][A-Z0-9_]*`?\s*$/i;
 
 export function classifyCodexTool(toolName, toolInput = {}) {
   const classification = classifyHookTool({ tool_name: toolName, tool_input: toolInput });
@@ -109,6 +111,17 @@ function hasTerminalStopDisposition(message) {
   return TERMINAL_STOP_DISPOSITION_PATTERNS.some((pattern) => pattern.test(message));
 }
 
+function hasStructuredStopRecommendation(message) {
+  return (
+    STRUCTURED_STOP_RECOMMENDATION_HEADING.test(message)
+    && STRUCTURED_STOP_RECOMMENDATION_VALUE.test(message)
+  );
+}
+
+function hasStopFinalizationDisposition(message) {
+  return hasTerminalStopDisposition(message) || hasStructuredStopRecommendation(message);
+}
+
 function stopDecision(watchdog, input, recoveryAttempts, maxRecoveryAttempts) {
   const message = input.last_assistant_message || "";
   const priorToolIntentCount = watchdog.snapshot().toolEmissionIntentCount;
@@ -125,17 +138,22 @@ function stopDecision(watchdog, input, recoveryAttempts, maxRecoveryAttempts) {
   }
 
   const announcedToolAction = watchdog.snapshot().toolEmissionIntentCount > priorToolIntentCount;
-  const recoveryActive = recoveryAttempts > 0;
+  const finalizationDisposition = hasStopFinalizationDisposition(message);
   if (
-    recoveryActive
+    finalizationDisposition
     && decision.action !== "interrupt"
-    && hasTerminalStopDisposition(message)
     && !announcedToolAction
   ) {
     return { output: null, recoveryAttempts: 0 };
   }
 
-  if (decision.action !== "interrupt" && !recoveryActive) {
+  const recoveryActive = recoveryAttempts > 0;
+  const contradictoryFinalizationAction = finalizationDisposition && announcedToolAction;
+  if (
+    decision.action !== "interrupt"
+    && !recoveryActive
+    && !contradictoryFinalizationAction
+  ) {
     return { output: null, recoveryAttempts: 0 };
   }
 
@@ -162,6 +180,18 @@ function stopDecision(watchdog, input, recoveryAttempts, maxRecoveryAttempts) {
 
 export function evaluateCodexHook(input, state = {}, options = {}) {
   const event = input?.hook_event_name;
+  const message = typeof input?.last_assistant_message === "string"
+    ? input.last_assistant_message
+    : "";
+  const stopFinalizationCharSoftLimit =
+    options.stopFinalizationCharSoftLimit ?? DEFAULT_STOP_FINALIZATION_CHAR_SOFT_LIMIT;
+  const stopFinalizationCharHardLimit =
+    options.stopFinalizationCharHardLimit ?? DEFAULT_STOP_FINALIZATION_CHAR_HARD_LIMIT;
+  const stopFinalizationCandidate = (
+    event === "Stop"
+    && message.length <= stopFinalizationCharHardLimit
+    && hasStopFinalizationDisposition(message)
+  );
   const config = {
     now: options.now ?? Date.now(),
     volatileReadIntervalMs: options.volatileReadIntervalMs ?? 30_000,
@@ -170,11 +200,11 @@ export function evaluateCodexHook(input, state = {}, options = {}) {
     evidenceHardLimit: options.evidenceHardLimit ?? 12,
     maxNarrationRecoveryAttempts:
       options.maxNarrationRecoveryAttempts ?? DEFAULT_MAX_NARRATION_RECOVERY_ATTEMPTS,
-    generatedCharSoftLimit: event === "Stop"
-      ? (options.stopFinalizationCharSoftLimit ?? DEFAULT_STOP_FINALIZATION_CHAR_SOFT_LIMIT)
+    generatedCharSoftLimit: stopFinalizationCandidate
+      ? stopFinalizationCharSoftLimit
       : undefined,
-    generatedCharHardLimit: event === "Stop"
-      ? (options.stopFinalizationCharHardLimit ?? DEFAULT_STOP_FINALIZATION_CHAR_HARD_LIMIT)
+    generatedCharHardLimit: stopFinalizationCandidate
+      ? stopFinalizationCharHardLimit
       : undefined,
   };
   if (
