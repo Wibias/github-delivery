@@ -101,6 +101,7 @@ function hasTerminalStopDisposition(message) {
 
 function stopDecision(watchdog, input, recoveryAttempts, maxRecoveryAttempts) {
   const message = input.last_assistant_message || "";
+  const priorToolIntentCount = watchdog.snapshot().toolEmissionIntentCount;
   const decision = watchdog.observeAssistantDelta(message);
   if (decision.reason === "tool_protocol_emission_stall") {
     return {
@@ -113,7 +114,8 @@ function stopDecision(watchdog, input, recoveryAttempts, maxRecoveryAttempts) {
     };
   }
 
-  if (hasTerminalStopDisposition(message)) {
+  const announcedToolAction = watchdog.snapshot().toolEmissionIntentCount > priorToolIntentCount;
+  if (hasTerminalStopDisposition(message) && !announcedToolAction) {
     return { output: null, recoveryAttempts: 0 };
   }
 
