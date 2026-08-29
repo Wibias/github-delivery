@@ -58,3 +58,32 @@ test("Stop ends active recovery when the corrective continuation reports a termi
   assert.equal(terminal.output, null);
   assert.equal(terminal.state.narrationRecoveryAttempts, 0);
 });
+
+test("terminal wording does not end recovery when the same response announces another tool action", () => {
+  const first = evaluateCodexHook(
+    {
+      hook_event_name: "Stop",
+      session_id: "s1",
+      turn_id: "t1",
+      stop_hook_active: false,
+      last_assistant_message: "Let me read the reference.\n".repeat(4),
+    },
+    {},
+  );
+
+  const mixed = evaluateCodexHook(
+    {
+      hook_event_name: "Stop",
+      session_id: "s1",
+      turn_id: "t1",
+      stop_hook_active: true,
+      last_assistant_message:
+        "No further action is authorized. Let me read one more reference.",
+    },
+    first.state,
+  );
+
+  assert.equal(mixed.output.decision, "block");
+  assert.match(mixed.output.reason, /recovery 2\/3/i);
+  assert.equal(mixed.state.narrationRecoveryAttempts, 2);
+});
