@@ -6,6 +6,11 @@ import {
 import { classifyHookTool } from "./watchdog-progress-classifier.mjs";
 
 const DEFAULT_MAX_NARRATION_RECOVERY_ATTEMPTS = 3;
+const TERMINAL_STOP_DISPOSITION_PATTERNS = [
+  /\bno (?:further|additional) (?:tool\/action |tool |repository )?actions? (?:is|are|was|were) (?:authori[sz]ed|required|needed|available|possible)\b/i,
+  /\bnothing (?:else|more) (?:is|was) (?:authori[sz]ed|required|needed)\b/i,
+  /\b(?:cannot|can't|can not) (?:run|execute|perform|take|continue|proceed with) (?:the |that |this )?(?:selected |next )?(?:tool|action|step)\b/i,
+];
 
 export function classifyCodexTool(toolName, toolInput = {}) {
   const classification = classifyHookTool({ tool_name: toolName, tool_input: toolInput });
@@ -90,8 +95,13 @@ function recoveryReason(attempt, maxAttempts) {
   return `GitHub Delivery recovery ${attempt}/${maxAttempts}: no tool/action boundary followed the selected next step. Do not narrate or restate the plan. The next assistant action must invoke the already-selected tool/action if authorised; if it cannot run, report the concrete blocker once.`;
 }
 
+function hasTerminalStopDisposition(message) {
+  return TERMINAL_STOP_DISPOSITION_PATTERNS.some((pattern) => pattern.test(message));
+}
+
 function stopDecision(watchdog, input, recoveryAttempts, maxRecoveryAttempts) {
-  const decision = watchdog.observeAssistantDelta(input.last_assistant_message || "");
+  const message = input.last_assistant_message || "";
+  const decision = watchdog.observeAssistantDelta(message);
   if (decision.reason === "tool_protocol_emission_stall") {
     return {
       output: {
@@ -101,6 +111,10 @@ function stopDecision(watchdog, input, recoveryAttempts, maxRecoveryAttempts) {
       },
       recoveryAttempts,
     };
+  }
+
+  if (hasTerminalStopDisposition(message)) {
+    return { output: null, recoveryAttempts: 0 };
   }
 
   const recoveryActive = recoveryAttempts > 0;
