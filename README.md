@@ -19,7 +19,7 @@
 </div>
 
 > [!NOTE]
-> **1.3.5.** This patch fixes a Codex watchdog false positive after completed terminal reviews: explicit terminal dispositions can end lifecycle-hook narration recovery without allowing terminal wording to bypass a newly announced tool action or malformed tool-protocol protection. See [Current state](#current-state).
+> **1.3.6.** This patch closes the remaining Codex lifecycle `Stop` false-positive path: structured completed recommendations can use the dedicated finalization allowance, while ordinary hook narration, tool intent, malformed protocol output, and the completed-answer hard bound remain fail-closed. See [Current state](#current-state).
 
 > [!IMPORTANT]
 > **Natural language is the public API.** The Node scripts, policy modules, evaluators, mutation broker, and optional Authority host are internal safety/evidence machinery. You normally do not invoke them yourself.
@@ -71,7 +71,7 @@ That is the interface.
 
 `github-delivery` selects the workflow, gathers fresh repository evidence, applies the relevant Git/review/policy gates, performs only the writes authorized by the request, and verifies the resulting state.
 
-A status question stays read-only. Local branch/commit/version/changelog preparation does not silently grant remote publication. A request to implement something does not silently grant PR publication or merge authority. A merge happens only from current explicit merge intent; deferred permission such as `merge PR #42 only after I confirm again` is not current merge authority. Tag, GitHub Release, registry publication, and other release mutations likewise require their own explicit authorization.
+A status question stays read-only. Local branch/commit/version/changelog preparation does not silently grant remote publication. A request to implement something does not silently gain `push_code`/`create_pr`. A merge happens only from current explicit merge intent; deferred permission such as `merge PR #42 only after I confirm again` is not current merge authority. Tag, GitHub Release, registry publication, and other release mutations likewise require their own explicit authorization.
 
 For installation edge cases, backup/restore, downgrade behavior, manual recovery, and release verification details, see [`INSTALL.md`](INSTALL.md).
 
@@ -99,6 +99,14 @@ For installation edge cases, backup/restore, downgrade behavior, manual recovery
 | **Supersede / overtake** | `supersede PR #12 with PR #45` | Explicit replacement or maintainer-takeover workflows with bounded mutation authority |
 | **Merge / close-out** | `merge PR #32` | Final gate, exact transaction authority, head-pinned merge, verification, thanks, linked-issue close-out |
 | **Self-update** | `update github-delivery to the latest stable release` | Stable-release verification, lock-aware Windows recovery, optional old-backup cleanup, safe apply and postconditions |
+
+### What changed in 1.3.6
+
+`1.3.6` is a focused follow-up watchdog false-positive correction:
+
+- structured completed recommendation outcomes from read-only reviews are recognized as explicit finalization candidates instead of being forced into narration recovery by the ordinary hook-mode generation budget;
+- active recovery can close when the corrective continuation reports that the selected next action cannot run or is explicitly unauthorized;
+- the larger finalization allowance is scoped only to explicit finalization candidates; ordinary `Stop` narration keeps the stricter hook budget, candidates that announce another tool action still recover, malformed tool-protocol stalls remain hard stops, and output above the completed-answer hard bound remains fail-closed.
 
 ### What changed in 1.3.5
 
@@ -629,7 +637,7 @@ The architecture uses progressive disclosure: route once, load the selected work
 
 ## Current state
 
-`1.3.5` is a focused watchdog false-positive correction patch on top of `1.3.4`: completed terminal reviews can finish without spurious lifecycle-hook recovery while the existing tool-intent and malformed-protocol safeguards stay fail-closed.
+`1.3.6` is a focused watchdog finalization follow-up on top of `1.3.5`: structured completed recommendations can finish without spurious lifecycle-hook recovery while ordinary hook budgets, new tool intent, malformed-protocol protection, and the completed-answer hard bound remain fail-closed.
 
 Stable in this release:
 
@@ -652,7 +660,7 @@ Stable in this release:
 - installed workflow helpers that resolve their own skill root while retaining explicit root overrides;
 - generation-fenced rewrite-baseline storage with generation allocation finalized under the acquired lock;
 - progress watchdog/runtime convergence controls that charge operational process/job/worktree polling as volatile evidence rather than neutral progress;
-- lifecycle-hook narration recovery that can close on explicit terminal dispositions after completed work without treating the same response as terminal when it announces a new tool action;
+- lifecycle-hook finalization that can recognize explicit completed recommendation outcomes and close concrete authorization/blocker recovery, without treating ordinary long `Stop` narration or responses that announce another tool action as final;
 - live `ship-gate` capture failures that preserve bounded upstream causes, remain fail-closed, and expose retryability so deterministic GitHub capability/permission failures can terminate equivalent probing;
 - deterministic bundles, repository security checks, CodeQL, Dependency Review, live-fixture contracts, and release preparation.
 
