@@ -49,7 +49,7 @@ All notable changes to `github-delivery` are documented here.
 ### Fixed
 
 - Operational process, job, and worktree status probes such as `Get-Process`, `Get-CimInstance Win32_Process`, `tasklist`, `ps`, `pgrep`, and `git worktree list` now count as volatile watchdog evidence instead of neutral activity. Repeated polling therefore consumes the protected evidence budget rather than bypassing delivery-convergence limits (PR #386).
-- Authoritative live `ship-gate` snapshot failures now preserve a bounded upstream cause and return a structured fail-closed `unknown` result with retryability classification. Deterministic GitHub capability or permission failures such as 401/403 stop equivalent retries, transient upstream failures remain distinguishishable, and established replay/workflow/argument stderr contracts are unchanged (PR #387).
+- Authoritative live `ship-gate` snapshot failures now preserve a bounded upstream cause and return a structured fail-closed `unknown` result with retryability classification. Deterministic GitHub capability or permission failures such as 401/403 stop equivalent retries, transient upstream failures remain distinguishable, and established replay/workflow/argument stderr contracts are unchanged (PR #387).
 
 ## [1.3.2] - 2026-08-28
 
@@ -105,7 +105,7 @@ All notable changes to `github-delivery` are documented here.
 
 ### Security
 
-- Native PR approval is now a dedicated first-class `approve_pr` authority action. Generic `post_review` cannot encode approval, explicit approval intent remains required, Windows Authority binds the semantic approval action, and self-approval is rejected before a GitHub approval write is attempted (PR #378).
+- Native PR approval is now a dedicated first-class `approve_pr` authority action. Generic `post_review` cannot encode approval, explicit approval intent remains required, Windows Authority binds the semantic approval action, and self-approval is rejected before the GitHub approval write is attempted (PR #378).
 - Windows update lock recovery now binds graceful-close consent to the inspected PID plus process start identity and re-verifies that identity immediately before `CloseMainWindow()`. PID reuse therefore fails closed instead of redirecting an approved close to a different process (PR #381).
 
 ## [1.2.0] - 2026-08-27
