@@ -4,6 +4,16 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.3.6] - 2026-08-29
+
+### Changed
+
+- Bumped the package version from `1.3.5` to `1.3.6`.
+
+### Fixed
+
+- Codex lifecycle `Stop` finalization now recognizes the structured completed-recommendation outcome used by real read-only reviews and gives only those explicit finalization candidates the dedicated completed-answer allowance. Ordinary hook-mode `Stop` messages keep the stricter active-work budget; selected-next-action and explicit authorization blockers can close an active recovery; a newly announced tool action, malformed tool-protocol output, or output above the completed-answer hard bound remains fail-closed (PR #395).
+
 ## [1.3.5] - 2026-08-29
 
 ### Changed
@@ -39,7 +49,7 @@ All notable changes to `github-delivery` are documented here.
 ### Fixed
 
 - Operational process, job, and worktree status probes such as `Get-Process`, `Get-CimInstance Win32_Process`, `tasklist`, `ps`, `pgrep`, and `git worktree list` now count as volatile watchdog evidence instead of neutral activity. Repeated polling therefore consumes the protected evidence budget rather than bypassing delivery-convergence limits (PR #386).
-- Authoritative live `ship-gate` snapshot failures now preserve a bounded upstream cause and return a structured fail-closed `unknown` result with retryability classification. Deterministic GitHub capability or permission failures such as 401/403 stop equivalent retries, transient upstream failures remain distinguishable, and established replay/workflow/argument stderr contracts are unchanged (PR #387).
+- Authoritative live `ship-gate` snapshot failures now preserve a bounded upstream cause and return a structured fail-closed `unknown` result with retryability classification. Deterministic GitHub capability or permission failures such as 401/403 stop equivalent retries, transient upstream failures remain distinguishishable, and established replay/workflow/argument stderr contracts are unchanged (PR #387).
 
 ## [1.3.2] - 2026-08-28
 
