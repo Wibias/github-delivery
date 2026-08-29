@@ -71,7 +71,7 @@ That is the interface.
 
 `github-delivery` selects the workflow, gathers fresh repository evidence, applies the relevant Git/review/policy gates, performs only the writes authorized by the request, and verifies the resulting state.
 
-A status question stays read-only. Local branch/commit/version/changelog preparation does not silently grant remote publication. A request to implement something does not silently gain `push_code`/`create_pr`. A merge happens only from current explicit merge intent; deferred permission such as `merge PR #42 only after I confirm again` is not current merge authority. Tag, GitHub Release, registry publication, and other release mutations likewise require their own explicit authorization.
+A status question stays read-only. Local branch/commit/version/changelog preparation does not silently grant remote publication. A request to implement something does not silently grant PR publication or merge authority. A merge happens only from current explicit merge intent; deferred permission such as `merge PR #42 only after I confirm again` is not current merge authority. Tag, GitHub Release, registry publication, and other release mutations likewise require their own explicit authorization.
 
 For installation edge cases, backup/restore, downgrade behavior, manual recovery, and release verification details, see [`INSTALL.md`](INSTALL.md).
 
