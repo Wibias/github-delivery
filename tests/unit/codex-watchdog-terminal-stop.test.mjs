@@ -50,9 +50,9 @@ test("Stop treats a long completed recommendation as finalization without requir
     "# Contract sufficiency analysis",
     "F03_CONTRACT_SUFFICIENT = false",
     "The accepted authority does not define a representation-independent semantic alias predicate.",
-    "NEXT_ACTION = AUTHOR_NARROW_AUTHORITY_CORRECTION",
-    "STOP after the recommendation.",
     "x".repeat(20_000),
+    "## G. Recommendation",
+    "`NEXT_ACTION = AUTHOR_NARROW_AUTHORITY_CORRECTION`",
   ].join("\n");
 
   const result = evaluateCodexHook(
@@ -197,6 +197,29 @@ test("completed-answer allowance does not hide a genuine repeated tool-intent st
       hook_event_name: "Stop",
       session_id: "s7",
       turn_id: "t7",
+      stop_hook_active: false,
+      last_assistant_message: report,
+    },
+    {},
+  );
+
+  assert.equal(result.output.decision, "block");
+  assert.match(result.output.reason, /recovery 1\/3/i);
+});
+
+test("long finalization candidate with a new tool action remains in recovery", () => {
+  const report = [
+    "# Final report",
+    "No further action is authorized.",
+    "x".repeat(20_000),
+    "I will read one more reference.",
+  ].join("\n");
+
+  const result = evaluateCodexHook(
+    {
+      hook_event_name: "Stop",
+      session_id: "s8",
+      turn_id: "t8",
       stop_hook_active: false,
       last_assistant_message: report,
     },
