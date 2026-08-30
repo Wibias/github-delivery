@@ -4,6 +4,18 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.3.8] - 2026-08-30
+
+### Changed
+
+- Bumped the package version from `1.3.7` to `1.3.8`.
+
+### Fixed
+
+- Routed create-PR workflows now carry controller-owned current-user intent through the exact `create_pr` operation instead of dropping it before mutation execution. The intent remains bound to the canonical operation key, caller-controlled `explicitInstruction` stays non-authoritative, Protection mode Off performs no Authority-host authorization, and model-callable manual workflow-intent repair is rejected in Off mode (issue #400, PR #403).
+- Pre-open review evidence is now bound to the exact repository, resolved base/head commits, candidate diff identity, and file count, and both the workflow controller and mutation boundary require a matching `ready` result before initial `push_code` or `create_pr`. Missing, blocked, unknown, stale, or mismatched evidence therefore stays fail-closed instead of allowing publication to continue after a wrong-scope gate (issue #402, PR #404).
+- The Codex progress watchdog now gives a small bounded investigation credit to successful stable source reads that deterministically follow a dependency referenced by the immediately preceding result. Legitimate dependency tracing can therefore reach a focused regression without being pressured into a premature edit, while unrelated reads, assistant-prose claims, duplicates, volatile polling, and credit beyond the per-generation cap keep the existing evidence limits. Hook and App Server paths share the same behavior (issue #401, PR #405).
+
 ## [1.3.7] - 2026-08-30
 
 ### Changed
@@ -269,7 +281,7 @@ All notable changes to `github-delivery` are documented here.
 
 - Moved the remaining workflow-level `actions: write` permission down to the cleanup job, kept top-level workflow permissions read-only, and added validation that rejects future top-level write scopes while still permitting explicitly allowlisted job-level writes (PR #282).
 - Hardened PR publication identity and retries: exact duplicate detection now binds target repository, head repository/ref, and base; qualified REST head filters prevent same-repository misses; explicit cross-repository `head_repo` identity is supported; and exact owned idempotent retries converge before the broader duplicate preflight (PR #283).
-- Protected existing PR-body screenshots, videos, GitHub uploads, reference-style Markdown images, and other recognized media from accidental body rewrites. Intentional media removal requires an exact approved identity list that is included in trusted `update_pr_body` authority scope (PR #283).
+- Protected existing PR-body screenshots, videos, GitHub uploads, reference-style Markdown images, and other recognized media from accidental body rewrites. Intentional media removal requires exact approved media identities that is included in trusted `update_pr_body` authority scope (PR #283).
 - Prevented cross-repository closing issues and unsafe display URLs from masquerading as trustworthy same-repository work-item evidence, and tightened open-work fixtures so PR-number normalization and repository boundaries are actually exercised (PR #283).
 
 ## [0.8.2] - 2026-08-17
@@ -410,7 +422,7 @@ All notable changes to `github-delivery` are documented here.
 
 ### Fixed
 
-- Repeated grid or malformed tool-protocol placeholder output now hard-stops immediately on the first stall instead of being retried, and the offending model is quarantined across turns and `SessionEnd` so a resume with the same model is blocked before inference until the model is changed. Subagent protocol stalls no longer quarantine the parent task.
+- Repeated grid or malformed tool-protocol placeholder output now hard-stops immediately on the first stall instead of being retried, and the offending model is quarantined across turns and `SessionEnd` so a resume with the same model is blocked before inference until the model changes or a new task begins. Subagent protocol stalls no longer quarantine the parent task.
 - Windows login auto-start is now opt-in (previously enabled by default); users explicitly consent via guided install or `npx github-delivery autostart`.
 
 ## [0.6.0] - 2026-08-14
