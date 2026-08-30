@@ -72,10 +72,11 @@ function nonNegativeInteger(value) {
 
 export function createProgressWatchdog(options = {}) {
   const base = createBaseProgressWatchdog(options);
-  const creditLimit = positiveInteger(
-    options.investigationCreditLimit,
+  const persistedCreditLimit = positiveInteger(
+    options.investigationCreditLimitPersisted,
     DEFAULT_INVESTIGATION_CREDIT_LIMIT,
   );
+  const creditLimit = positiveInteger(options.investigationCreditLimit, persistedCreditLimit);
   let creditGeneration = Number.isInteger(options.investigationCreditGeneration)
     ? options.investigationCreditGeneration
     : base.snapshot().stateGeneration;
@@ -170,6 +171,7 @@ export function createProgressWatchdog(options = {}) {
       investigationCreditGeneration: creditGeneration,
       investigationCreditsUsed: creditsUsed,
       investigationCreditLimit: creditLimit,
+      investigationCreditLimitPersisted: creditLimit,
       investigationReferencedTargets: [...referencedTargets].sort(),
     };
   }
