@@ -45,6 +45,31 @@ function createCheckpoint() {
   return { directory, checkpoint };
 }
 
+function manualWorkflowIntentAuthorization(mode) {
+  const { directory, checkpoint } = createCheckpoint();
+  const requestPath = join(directory, "request.json");
+  writeFileSync(requestPath, `${JSON.stringify(createPrRequest(), null, 2)}\n`, "utf8");
+  const result = spawnSync(
+    process.execPath,
+    [
+      DELIVERY_CONTROLLER,
+      "authorize-mutation",
+      checkpoint,
+      "--request",
+      requestPath,
+      "--workflow-intent",
+    ],
+    {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        GITHUB_DELIVERY_AUTHORITY_MODE: mode,
+      },
+    },
+  );
+  return { directory, result };
+}
+
 test("create-pr-for-issue automatically binds routed create_pr intent to the exact operation", () => {
   const { directory, checkpoint } = createCheckpoint();
   try {
@@ -101,30 +126,21 @@ test("caller-controlled explicitInstruction remains non-authoritative without co
 });
 
 test("Protection Off rejects model-callable manual workflow-intent authorization", () => {
-  const { directory, checkpoint } = createCheckpoint();
-  const requestPath = join(directory, "request.json");
+  const { directory, result } = manualWorkflowIntentAuthorization("off");
   try {
-    writeFileSync(requestPath, `${JSON.stringify(createPrRequest(), null, 2)}\n`, "utf8");
-    const result = spawnSync(
-      process.execPath,
-      [
-        DELIVERY_CONTROLLER,
-        "authorize-mutation",
-        checkpoint,
-        "--request",
-        requestPath,
-        "--workflow-intent",
-      ],
-      {
-        encoding: "utf8",
-        env: {
-          ...process.env,
-          GITHUB_DELIVERY_AUTHORITY_MODE: "off",
-        },
-      },
-    );
     assert.equal(result.status, 2);
     assert.match(result.stderr, /mutation_workflow_intent_is_controller_owned/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("protected modes retain manual workflow-intent compatibility behind trusted authority", () => {
+  const { directory, result } = manualWorkflowIntentAuthorization("high-assurance");
+  try {
+    assert.equal(result.status, 0, result.stderr);
+    const output = JSON.parse(result.stdout);
+    assert.equal(output.result.trustedWorkflowIntent, true);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
