@@ -171,7 +171,7 @@ For installation edge cases, backup/restore, downgrade behavior, manual recovery
 
 `1.3.1` is a focused recovery and concurrency patch for the 1.3.0 runtime:
 
-- exclusive skill and Windows Authority install locks can reclaim only a github-delivery-owned PID + nonce lock whose recorded process is provably gone; live, malformed, and permission-uncertain locks remain fail-closed;
+- exclusive skill and Windows Authority install locks can reclaim only a github-delivery-owned PID + nonce lock whose recorded process is provably gone; live, malformed, or permission-uncertain locks remain fail-closed;
 - `scripts/policy-bundle.mjs` and `scripts/workflow-brief.mjs` default to the installed skill root derived from their own location, so agents can load workflow packets while remaining in the target repository; explicit root overrides are unchanged;
 - rewrite-baseline generation allocation is finalized after the exclusive store lock is acquired, closing the window where a waiting writer could reuse a generation that another writer published immediately before releasing the lock while preserving the existing stale-takeover generation fence.
 
@@ -182,7 +182,7 @@ For installation edge cases, backup/restore, downgrade behavior, manual recovery
 - `references/git-workflow.md` owns repository-aware branch/commit organization, logical commit boundaries, commit-message guidance, pre-commit hygiene, generated-file decisions, Git-history investigation, and evidence-backed change summaries;
 - `references/versioning-release.md` owns release-delta inventory, SemVer classification by observable consumer impact, version-source consistency, human-curated changelogs, tag/version identity, and release-candidate checks;
 - direct commit/branch and SemVer/changelog/release-preparation requests route internally instead of handing off to `git-workflow-and-versioning`, while repository conventions and the stricter existing `GD-GIT-*` safety rules remain authoritative;
-- issue-linked and local-work PR publication compose the Git-workflow reference when branch/commit preparation is needed, preserving progressive disclosure;
+- issue-linked and local-work PR publication compose the Git-workflow reference when branch/commit preparation is actually needed, preserving progressive disclosure;
 - release preparation remains separate from publication: a version/changelog request never grants tag, GitHub Release, npm/package-registry, merge, or other remote publication authority;
 - native approval is a dedicated `approve_pr` authority action: generic `post_review` cannot encode approval, explicit approval intent remains mandatory, Windows Authority binds the semantic approval action, and self-approval is rejected before the GitHub approval write;
 - Git/versioning requests now enter the mandatory one-shot workflow-packet/controller runtime, full-review intent keeps precedence over broad Git/version keywords in attributed repository text, and execution packets advertise only actions present in the mutation registry;
