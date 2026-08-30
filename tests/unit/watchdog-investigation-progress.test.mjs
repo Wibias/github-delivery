@@ -246,3 +246,53 @@ test("Codex App Server receives the same bounded dependency-following evidence c
   assert.equal(watchdog.snapshot().totalEvidenceAttempts, 4);
   assert.equal(watchdog.snapshot().investigationCreditsUsed, 3);
 });
+
+test("volatile evidence never receives dependency-following investigation credit", () => {
+  const watchdog = createProgressWatchdog({ evidenceSoftLimit: 1, evidenceHardLimit: 2 });
+  watchdog.chargeEvidenceAttempt();
+  watchdog.recordEvidenceResult({
+    toolName: "commandExecution",
+    input: { command: "Get-Content src/a.mjs" },
+    volatility: "stable",
+    response: 'export { b } from "./b.mjs";',
+  });
+
+  assert.equal(
+    watchdog.prepareEvidenceAttempt({
+      toolName: "commandExecution",
+      input: { command: "Get-Content src/b.mjs" },
+      volatility: "volatile",
+    }),
+    false,
+  );
+  const blocked = watchdog.chargeEvidenceAttempt();
+  assert.equal(blocked.action, "block");
+  assert.equal(blocked.reason, "evidence_budget_exhausted");
+  assert.equal(watchdog.snapshot().investigationCreditsUsed, 0);
+});
+
+test("state progress clears dependency targets and resets the investigation credit generation", () => {
+  const watchdog = createProgressWatchdog({ evidenceSoftLimit: 2, evidenceHardLimit: 3 });
+  watchdog.chargeEvidenceAttempt();
+  watchdog.recordEvidenceResult({
+    toolName: "commandExecution",
+    input: { command: "Get-Content src/a.mjs" },
+    volatility: "stable",
+    response: 'export { b } from "./b.mjs";',
+  });
+  assert.equal(
+    watchdog.prepareEvidenceAttempt({
+      toolName: "commandExecution",
+      input: { command: "Get-Content src/b.mjs" },
+      volatility: "stable",
+    }),
+    true,
+  );
+  assert.equal(watchdog.chargeEvidenceAttempt().investigationProgress, true);
+  assert.equal(watchdog.snapshot().investigationCreditsUsed, 1);
+
+  watchdog.recordStateProgress("test_state_progress");
+  const reset = watchdog.snapshot();
+  assert.equal(reset.investigationCreditsUsed, 0);
+  assert.deepEqual(reset.investigationReferencedTargets, []);
+});
