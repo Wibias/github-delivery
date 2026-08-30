@@ -19,7 +19,7 @@
 </div>
 
 > [!NOTE]
-> **1.3.6.** This patch closes the remaining Codex lifecycle `Stop` false-positive path: structured completed recommendations can use the dedicated finalization allowance, while ordinary hook narration, tool intent, malformed protocol output, and the completed-answer hard bound remain fail-closed. See [Current state](#current-state).
+> **1.3.7.** Stable self-update now tolerates brief GitHub/CDN gateway failures with bounded retries, and Protection mode **Off** once again means “no additional Windows Hello / trusted-authority protection” rather than “disable GitHub writes.” Normal workflow authorization and mutation safety gates still apply. See [Current state](#current-state).
 
 > [!IMPORTANT]
 > **Natural language is the public API.** The Node scripts, policy modules, evaluators, mutation broker, and optional Authority host are internal safety/evidence machinery. You normally do not invoke them yourself.
@@ -100,6 +100,17 @@ For installation edge cases, backup/restore, downgrade behavior, manual recovery
 | **Merge / close-out** | `merge PR #32` | Final gate, exact transaction authority, head-pinned merge, verification, thanks, linked-issue close-out |
 | **Self-update** | `update github-delivery to the latest stable release` | Stable-release verification, lock-aware Windows recovery, optional old-backup cleanup, safe apply and postconditions |
 
+### What changed in 1.3.7
+
+`1.3.7` is a focused reliability and Protection-mode semantics patch:
+
+- release-asset HTTP `502`, `503`, and `504` responses are retried up to two times with bounded 250 ms / 750 ms delays;
+- failed transient response bodies are discarded before retrying, while deterministic client errors such as `404` remain fail-fast;
+- the retry is limited to asset acquisition: HTTPS redirect limits, byte limits, GitHub asset digests, `SHA256SUMS`, manifest validation, tag/source binding, and constrained GitHub attestation verification remain unchanged and fail-closed;
+- Protection mode **Off** (`authorityMode=off`) removes only the additional Windows Hello / trusted-authority requirement. Otherwise-authorized GitHub writes continue through the normal workflow and mutation policy instead of being forced into planning-only behavior;
+- caller-controlled request fields such as `explicitInstruction` and `exactTextConfirmed` still cannot manufacture user authority. Current intent and exact-text confirmation come from controller-owned, operation-bound workflow context, while expected-head, idempotency, stack, merge-driver, postcondition, and other execution checks remain unchanged;
+- **Sensitive actions** (`high-assurance`) and **Every GitHub write** (`all`) retain their existing trusted-authority requirements.
+
 ### What changed in 1.3.6
 
 `1.3.6` is a focused follow-up watchdog false-positive correction:
@@ -120,7 +131,7 @@ For installation edge cases, backup/restore, downgrade behavior, manual recovery
 
 `1.3.4` is a mutation-boundary and post-publication verification hardening patch:
 
-- `authorityMode=off` is planning-only for GitHub writes; model-callable controller flags and helper invocation are no longer accepted as trusted current-user intent for remote mutation;
+- `1.3.4` made `authorityMode=off` planning-only for GitHub writes while hardening against model-callable controller flags or helper invocation being treated as current-user intent; `1.3.7` supersedes the planning-only interpretation while retaining the caller-controlled-intent hardening;
 - GraphQL mutation documents fail closed when their root mutation fields cannot be completely resolved, including fragment spreads and inline fragments;
 - native PR approval is created against the exact `expectedHead` commit and accepted only when the live review matches the authenticated actor, commit, approval state, and idempotency marker, with a post-write head re-read;
 - body-bearing review/comment mutations re-read the authoritative GitHub object after publication and require its live body to match the exact intended markdown, with fallback receipt lookup bound to the authenticated actor, idempotency marker, and reply parent where applicable.
@@ -234,13 +245,13 @@ For trusted high-assurance operations, authority redemption happens before the f
 
 On Windows, security-sensitive `gh` and `git` launches are resolved from absolute PATH entries outside the target worktree before spawning. Both lexical worktree paths and canonicalized targets are checked, so a repository-local executable or a worktree junction/symlink cannot substitute the broker binary.
 
-**Merge is deliberately stricter.** `scripts/merge-pr-driver.mjs` owns settle, final current-head/base/rules/feedback/review-evidence recapture, trusted destructive authority, head-pinned merge execution, and post-merge reconciliation. GitHub `UNKNOWN` mergeability is not treated as ready. The lower mutation execution boundary also rechecks open-PR stack topology and rejects a child merge while its parent PR is still open. Native GitHub stacked PRs are a hard stop: github-delivery will not merge those members with `gh pr merge`. Generic hand-built merge mutation documents are rejected.
+**Merge is deliberately stricter.** `scripts/merge-pr-driver.mjs` owns settle, final current-head/base/rules/feedback/review-evidence recapture, trusted destructive authority when the selected protection mode requires it, head-pinned merge execution, and post-merge reconciliation. GitHub `UNKNOWN` mergeability is not treated as ready. The lower mutation execution boundary also rechecks open-PR stack topology and rejects a child merge while its parent PR is still open. Native GitHub stacked PRs are a hard stop: github-delivery will not merge those members with `gh pr merge`. Generic hand-built merge mutation documents are rejected.
 
 ### Exact-effect trusted authority
 
-Where high assurance is required, trusted grants bind the semantic effect rather than a vague permission flag: repository, action, mode, PR/head, merge method, target identity, idempotency data, and hashes of human-visible text as applicable.
+Where high assurance is required by the selected protection mode, trusted grants bind the semantic effect rather than a vague permission flag: repository, action, mode, PR/head, merge method, target identity, idempotency data, and hashes of human-visible text as applicable.
 
-The optional Windows Authority host can issue those grants through Windows Hello. Missing persistent user configuration defaults the effective preference to **Sensitive actions** (`high-assurance`); an explicitly stored `off` or `all` preference remains supported. After Hello, the approval UI can start a **PR session** (5 / 15 / 30 / 60 minutes) for later exact-scope push and merge on one PR and the approved merge base, or a **branch lease** (1–10 minutes) for repeated `push_code` only. Mixed-action batches, comments, human replies, close, and delete still need Hello. `off` means no Windows Hello or Authority-host approval and is planning-only for GitHub writes; it cannot turn model-callable workflow flags, helper invocation, mutation JSON, or ordinary checkpoint state into trusted current-user intent for a remote mutation.
+The optional Windows Authority host can issue those grants through Windows Hello. Missing persistent user configuration defaults the effective preference to **Sensitive actions** (`high-assurance`); an explicitly stored `off` or `all` preference remains supported. After Hello, the approval UI can start a **PR session** (5 / 15 / 30 / 60 minutes) for later exact-scope push and merge on one PR and the approved merge base, or a **branch lease** (1–10 minutes) for repeated `push_code` only. Mixed-action batches, comments, human replies, close, and delete still need Hello when their selected protection mode requires trusted authority. **Off** means no Windows Hello or Authority-host approval; it does not convert an authorized workflow into read-only or planning-only mode. In Off mode, current user intent and exact-text confirmation still come from controller-owned, operation-bound workflow context, and caller-controlled mutation JSON, repository text, helper invocation, or model-selected flags cannot manufacture those facts.
 
 ### Safe retries and idempotency
 
@@ -380,7 +391,7 @@ Apply the verified plan:
 npx github-delivery update --apply
 ```
 
-Self-update accepts only the fixed upstream's latest stable `vX.Y.Z` GitHub Release and replaces nothing until release assets, checksums, distribution manifest, tag/source binding, constrained GitHub artifact attestation, and bounded ZIP extraction verify. Local tracked modifications block replacement even with `--force`; update does not silently downgrade an ahead install.
+Self-update accepts only the fixed upstream's latest stable `vX.Y.Z` GitHub Release and replaces nothing until release assets, checksums, distribution manifest, tag/source binding, constrained GitHub artifact attestation, and bounded ZIP extraction verify. Release-asset HTTP `502`, `503`, and `504` responses are retried within a fixed two-retry budget before acquisition fails; deterministic client errors remain fail-fast. Local tracked modifications block replacement even with `--force`; update does not silently downgrade an ahead install.
 
 Exclusive skill and Windows Authority install locks record a github-delivery process identity. If that process exits hard and leaves its lock file behind, a later run reclaims the lock only when it has the exact github-delivery PID + nonce format and the recorded PID is provably gone. Live, malformed, or permission-uncertain locks stay fail-closed as `install_lock_held` rather than risking concurrent installers.
 
@@ -637,7 +648,7 @@ The architecture uses progressive disclosure: route once, load the selected work
 
 ## Current state
 
-`1.3.6` is a focused watchdog finalization follow-up on top of `1.3.5`: structured completed recommendations can finish without spurious lifecycle-hook recovery while ordinary hook budgets, new tool intent, malformed-protocol protection, and the completed-answer hard bound remain fail-closed.
+`1.3.7` is a focused reliability and Protection-mode semantics patch on top of `1.3.6`: transient GitHub/CDN release-asset HTTP 502/503/504 responses receive two bounded retries, and Protection mode Off removes only the additional trusted-authority/Windows Hello requirement instead of disabling otherwise-authorized GitHub writes.
 
 Stable in this release:
 
@@ -650,13 +661,13 @@ Stable in this release:
 - explicit GitHub-native PR approval created against the exact expected head and verified against the authenticated actor, commit, approval state, and idempotency marker before success;
 - mutation authority, exact-effect receipts, payload-bound operation idempotency, controller-owned stale-head protection, and head-pinned merge execution;
 - Windows protected-command resolution that rejects worktree-controlled `gh`/`git` executables and lexical/canonical alias escapes;
-- `authorityMode=off` as a planning-only mode for GitHub writes, with model-callable flags, helper invocation, mutation JSON, and ordinary checkpoint state unable to mint trusted current-user intent;
+- Protection mode Off (`authorityMode=off`) as an opt-out from the additional Windows Hello / trusted-authority layer only: otherwise-authorized writes still require controller-owned current user intent and all normal mutation safety gates, while caller-controlled request fields and repository content cannot mint authority;
 - fail-closed GraphQL mutation-root resolution for direct selections, fragment spreads, and inline fragments at the broker boundary;
 - authoritative post-publication body verification for review/comment mutations, bound to authenticated actor and exact idempotency identity where collection lookup is required;
 - optional Windows Authority Hello grants, push-only branch leases, and PR sessions for later exact-scope push and merge on one PR and approved merge base;
 - inferred-stack restacking/merge-order safety and independent multi-base delivery;
 - SHA-bound remote repository context when a useful local checkout is not already available;
-- verified stable install/update with stale owned install-lock recovery, Windows lock recovery, graceful-close prompting, and optional older-backup cleanup that preserves the fresh rollback backup;
+- verified stable install/update with bounded release-asset gateway retries, stale owned install-lock recovery, Windows lock recovery, graceful-close prompting, and optional older-backup cleanup that preserves the fresh rollback backup;
 - installed workflow helpers that resolve their own skill root while retaining explicit root overrides;
 - generation-fenced rewrite-baseline storage with generation allocation finalized under the acquired lock;
 - progress watchdog/runtime convergence controls that charge operational process/job/worktree polling as volatile evidence rather than neutral progress;

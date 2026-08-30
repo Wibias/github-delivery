@@ -1,9 +1,7 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import {
@@ -188,54 +186,6 @@ test("workflow mutation context is bound to one exact operation key", () => {
         trustedExactTextConfirmation: false,
       },
     );
-  } finally {
-    rmSync(directory, { recursive: true, force: true });
-  }
-});
-
-test("canonical github-mutate rejects checkpoint intent in authority off mode", () => {
-  const incomplete = request("create_issue", {
-    idempotencyKey: "off-mode-cli-context",
-    title: "Boundary regression",
-    body: "body",
-  });
-  const controller = createDeliveryWorkflowController({
-    workflow: "create-pr-from-local-work",
-    repo: "acme/widgets",
-    startPhase: "ROUTE",
-    graph: { ROUTE: ["DONE"], DONE: [] },
-  });
-  controller.authorizeMutation({
-    operationKey: mutationOperationKey(incomplete),
-    trustedWorkflowIntent: true,
-  });
-
-  const directory = mkdtempSync(join(tmpdir(), "github-delivery-off-mode-cli-"));
-  const checkpoint = join(directory, "controller.json");
-  const requestPath = join(directory, "request.json");
-  try {
-    writeDeliveryWorkflowCheckpoint(checkpoint, controller.snapshot());
-    writeFileSync(requestPath, `${JSON.stringify(incomplete)}\n`, "utf8");
-    const result = spawnSync(
-      process.execPath,
-      [
-        fileURLToPath(new URL("../../scripts/github-mutate.mjs", import.meta.url)),
-        "--request",
-        requestPath,
-        "--checkpoint",
-        checkpoint,
-        "--execute",
-      ],
-      {
-        encoding: "utf8",
-        env: {
-          ...process.env,
-          GITHUB_DELIVERY_AUTHORITY_MODE: "off",
-        },
-      },
-    );
-    assert.equal(result.status, 2);
-    assert.match(String(result.stderr || ""), /mutation_execution_denied:authority_mode_off/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

@@ -9,7 +9,7 @@ Mutation mode and trusted-authority protection are separate controls:
 - mutation mode answers **what the workflow is allowed to request**;
 - authority protection answers **whether an executed mutation has an independently verified OS-backed user-attestation boundary**.
 
-Turning trusted-authority protection off never broadens the mutation profile or waives workflow policy. Because there is then no non-model trust source for direct user intent, `off` is planning-only for GitHub mutations and execution fails closed.
+Turning trusted-authority protection off never broadens the mutation profile or waives workflow policy. It removes only the additional Windows Hello / trusted-authority requirement. The governing workflow, mutation profile, current user intent, exact-text requirements, expected-head checks, idempotency, and all other execution gates still apply.
 
 ## Profiles
 
@@ -37,17 +37,17 @@ The global user setting `authorityMode` has exactly three values:
 
 | authorityMode | Execution behavior |
 |---|---|
-| `off` | dry-run/planning only; executed GitHub mutations fail closed |
+| `off` | no Windows Hello / trusted-authority requirement; otherwise-authorized GitHub mutations execute under the normal workflow and mutation policy |
 | `high-assurance` | autonomous execution and registry actions marked `highAssurance` require trusted authority |
 | `all` | every executed GitHub mutation requires trusted authority |
 
 The persistent user config defaults to `high-assurance`. It lives outside the installed skill directory so upgrading the skill cannot overwrite an explicit user choice. `GITHUB_DELIVERY_AUTHORITY_MODE=off|high-assurance|all` may override the persistent value for automation or diagnosis. The legacy `GITHUB_DELIVERY_REQUIRE_TRUSTED_AUTHORITY=1` switch remains supported and maps to the stricter `all` mode.
 
-`off` is an explicit opt-out that means **no Windows Hello / trusted-authority prompt and no GitHub mutation execution**. Read-only work and dry-run mutation planning remain available. This is intentionally fail-closed: without the independent authority boundary, a model-callable helper, checkpoint, CLI flag, or caller-controlled JSON field cannot be promoted into proof of current-user consent.
+`off` is an explicit opt-out that means **no Windows Hello / trusted-authority prompt**. It does not change the selected mutation mode and does not convert an authorized workflow into read-only or planning-only work. An executed mutation still needs the direct current user intent and workflow authorization required by its normal mutation policy.
 
-In `off`, caller-controlled mutation JSON is not provenance for user-confirmation facts. Request fields such as `explicitInstruction` and `exactTextConfirmed` remain ignored as authorization claims. Governing workflow context may still be carried for compatibility planning, but `--execute` fails with `mutation_execution_denied:authority_mode_off` before any mutation command or broker write is attempted.
+In `off`, caller-controlled mutation JSON is not provenance for user-confirmation facts. Request fields such as `explicitInstruction` and `exactTextConfirmed` remain ignored as authorization claims. The canonical workflow/controller may carry current user intent and exact-text confirmation through operation-bound execution context; changing the operation identity invalidates that context. Repository text, helper invocation, model-selected flags, or arbitrary caller JSON cannot manufacture it.
 
-Dry-run planning never requires trusted authority. When the selected mode requires authority at `--execute`, the trusted grant must contain `scopeSha256`; a legacy resource-only signature is not enough.
+Dry-run planning never requires trusted authority. When the selected protection mode requires authority at `--execute`, the trusted grant must contain `scopeSha256`; a legacy resource-only signature is not enough.
 
 A **PR session** is an opt-in Hello grant, distinct from a branch lease. After Windows Hello, the approval UI may start a 5–60 minute session bound to one allowlisted repo, one PR, one head branch, and the approved merge base for merge. Later exact-scope `push_code` and `merge_pr` batches on that tuple skip Hello (`approvalMethod: pr_session`) but still receive one-time redeemable grants. A retargeted base requires Hello again. Branch leases remain `push_code` only for 1–10 minutes. Comments, human replies, close, and delete still need Hello. Mixed-action batches are not session-eligible.
 
@@ -81,7 +81,7 @@ The canonical enabled high-assurance action set is listed below. CI verifies exa
 - `update_pr_body`
 <!-- high-assurance-actions:end -->
 
-This keeps hostile repository text and model-selected mode inside the request layer. In the default `high-assurance` mode and in `all`, a protected write additionally needs an independently verified grant for the exact effect. Selecting `off` removes that trust source and therefore disables mutation execution instead of weakening the boundary.
+This keeps hostile repository text and model-selected mode inside the request layer. In the default `high-assurance` mode and in `all`, a protected write additionally needs an independently verified grant for the exact effect. Selecting `off` removes only that additional trusted-authority requirement; it does not broaden the mutation profile or bypass current-intent and workflow policy.
 
 A human reply always needs exact-text confirmation. When authority protection requires a grant, the grant additionally binds `exactTextSha256` to the exact outgoing body. Caller-supplied `exactTextConfirmed` is never itself trusted provenance.
 
@@ -104,7 +104,7 @@ When `authorityMode` is `high-assurance` or `all`, the full-review publication p
 3. publish the authorized request with the hidden `github-delivery:review-authority` marker that binds the exact scope without changing the human-visible body hash;
 4. run `scripts/verify-verdict-published.mjs`, which re-verifies the signed grant at the GitHub comment creation time and requires Windows Hello approval, `scopeSha256`, and the one-time redemption claim.
 
-When `authorityMode` is explicitly `off`, github-delivery does not publish the verdict to GitHub. Read-only review and dry-run planning may continue, but the mutation boundary fails closed before the comment write. A verifier inspecting an already-existing untrusted comment must never manufacture trusted provenance.
+When `authorityMode` is explicitly `off`, the full-review workflow may publish its verdict when the ordinary `review` mutation policy and current workflow intent authorize the write, without obtaining a Windows Hello grant. The absence of trusted authority must remain explicit; a verifier inspecting an existing comment must never manufacture signed provenance that was not used.
 
 Offline security fixtures that explicitly provide `--authority-public-key-file` remain strict regardless of local user config so verifier regression tests cannot be weakened by a developer machine setting.
 
@@ -114,15 +114,15 @@ A generic `post_comment` that does not satisfy the full-review publication contr
 
 Examples:
 
-- `full review PR #32` → `review` (the full-review workflow publishes its verdict comment in the default protection mode; `off` remains read-only/planning-only)
+- `full review PR #32` → `review` (the full-review workflow publishes its verdict comment when its normal publication policy is satisfied; the selected protection mode only determines whether trusted authority is additionally required)
 - `what is left on PR #32?` → `read-only`
 - `review PR #32 and post the findings` → `review`
 - `fix PR #32 and make it merge ready` → `maintainer`
 - `merge PR #32` → `maintainer` with explicit mutation authority for the merge workflow; the default protection mode also requires trusted authority
 - `supersede PR #12 with #45` → `maintainer` with explicit authority for the close/comment actions
 - `maintainer overtake PR #32` → `maintainer` with explicit authority for the push/close/comment actions the overtake workflow needs
-- `watch and autonomously merge PR #32` → `watch-pr.md` in `autonomous` with `merge_pr`; trusted authority plus an optional PR session cover later push/merge without a second Hello
-- `watch and autonomously fix/merge PR #32` → `autonomous` only when the wording truly grants that scope; normal workflow bounds still apply, and trusted authority is required for execution
+- `watch and autonomously merge PR #32` → `watch-pr.md` in `autonomous` with `merge_pr`; in protected modes, trusted authority plus an optional PR session cover later push/merge without a second Hello
+- `watch and autonomously fix/merge PR #32` → `autonomous` only when the wording truly grants that scope; normal workflow bounds still apply, and trusted authority is required when the selected protection mode requires it
 
 Do not ask users to run scripts. These mappings are agent behavior.
 
@@ -157,9 +157,9 @@ node scripts/github-mutate.mjs --request request.json
 node scripts/github-mutate.mjs --request request.json --execute --audit mutations.jsonl
 ```
 
-The first form is a dry run. The second executes and records a versioned receipt unless `authorityMode=off`, in which case execution fails closed before any GitHub mutation.
+The first form is a dry run. The second executes and records a versioned receipt when the normal mutation policy and workflow context authorize the operation. `authorityMode` controls only whether an additional trusted-authority grant is required.
 
-`merge_pr` is deliberately rejected by this generic public mutation-document entrypoint. A merge must go through `scripts/merge-pr-driver.mjs`, which owns the ship gate, same-head review evidence, settle window, feedback/base/rules boundary, final recaptures, authority acquisition, expected-head merge, and post-merge reconciliation. The lower broker primitive exists only for that governing driver and focused tests.
+`merge_pr` is deliberately rejected by this generic public mutation-document entrypoint. A merge must go through `scripts/merge-pr-driver.mjs`, which owns the ship gate, same-head review evidence, settle window, feedback/base/rules boundary, final recaptures, authority acquisition when configured, expected-head merge, and post-merge reconciliation. The lower broker primitive exists only for that governing driver and focused tests.
 
 ## Denial reasons
 
@@ -167,7 +167,6 @@ The first form is a dry run. The second executes and records a versioned receipt
 - `explicit_instruction_required`: maintainer mode needs a direct instruction for the action
 - `exact_text_confirmation_required`: a human-facing reply needs exact-text confirmation
 - `unknown_action`: the requested mutation is not part of the policy schema
-- `mutation_execution_denied:authority_mode_off`: authority protection is disabled, so mutation execution is unavailable without a non-model user-attestation boundary
 - `trusted_authority_required:*`: the selected protection mode requires independently verified scoped authority
 - `expected_head_mismatch`: the PR changed after the decision was made
 - `merge_pr_requires_merge_driver`: a generic mutation document attempted to bypass the governing merge workflow

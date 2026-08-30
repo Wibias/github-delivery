@@ -39,7 +39,7 @@ test("Off mode ignores caller-attested explicit lifecycle intent", () => {
   );
 });
 
-test("Off mode can retain governing workflow context for dry-run compatibility only", () => {
+test("Off mode accepts governing workflow intent without trusted-authority verification", () => {
   const plan = planMutationWithAuthority(
     mergeRequest({ explicitInstruction: false }),
     { ...off, trustedWorkflowIntent: true },

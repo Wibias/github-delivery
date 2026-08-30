@@ -180,9 +180,9 @@ function requestForAuthorityMode(request, options) {
   if (options?.authorityMode !== "off") return request;
   const normalized = {
     ...request,
-    // Compatibility planning may still carry workflow context, but Off mode
-    // cannot execute any mutation. These booleans therefore never cross the
-    // actual write boundary as user authority.
+    // Protection Off removes only the trusted-authority/Hello layer. Current
+    // user intent still comes from controller-owned workflow context rather
+    // than caller-controlled request booleans.
     explicitInstruction: options?.trustedWorkflowIntent === true,
   };
   if (
@@ -281,13 +281,6 @@ export function executeMutationWithAuthority({
     trustedWorkflowIntent: trustedWorkflowIntent === true,
     trustedExactTextConfirmation: trustedExactTextConfirmation === true,
   };
-  if (
-    execute === true &&
-    options.authorityMode === "off" &&
-    actionDefinition(request?.action)?.mutation === true
-  ) {
-    throw new Error("mutation_execution_denied:authority_mode_off");
-  }
   const effectiveRequest = requestForAuthorityMode(request, options);
   const planned = planWithAuthorityOptions(request, options);
 
