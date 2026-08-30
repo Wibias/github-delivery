@@ -26,7 +26,7 @@ function createPrRequest(overrides = {}) {
   };
 }
 
-test("create-pr-for-issue binds routed create_pr intent to the exact operation", () => {
+function createCheckpoint() {
   const controller = createDeliveryWorkflowController({
     workflow: "create-pr-for-issue",
     repo: "acme/widgets",
@@ -35,18 +35,61 @@ test("create-pr-for-issue binds routed create_pr intent to the exact operation",
   });
   const directory = mkdtempSync(join(tmpdir(), "github-delivery-routed-intent-"));
   const checkpoint = join(directory, "controller.json");
+  writeDeliveryWorkflowCheckpoint(checkpoint, controller.snapshot());
+  return { directory, checkpoint };
+}
+
+test("create-pr-for-issue automatically binds routed create_pr intent to the exact operation", () => {
+  const { directory, checkpoint } = createCheckpoint();
   try {
-    writeDeliveryWorkflowCheckpoint(checkpoint, controller.snapshot());
-    const context = mutationExecutionContextFromCheckpoint({
-      path: checkpoint,
-      request: createPrRequest(),
-      bindWorkflowIntent: true,
-    });
-    assert.deepEqual(context, {
-      trustedWorkflowIntent: true,
-      trustedExactTextConfirmation: false,
-    });
+    const request = createPrRequest();
+    assert.deepEqual(
+      mutationExecutionContextFromCheckpoint({ path: checkpoint, request }),
+      {
+        trustedWorkflowIntent: true,
+        trustedExactTextConfirmation: false,
+      },
+    );
+    assert.deepEqual(
+      mutationExecutionContextFromCheckpoint({ path: checkpoint, request }),
+      {
+        trustedWorkflowIntent: true,
+        trustedExactTextConfirmation: false,
+      },
+    );
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test("routed create_pr intent cannot be rebound to a changed mutation payload", () => {
+  const { directory, checkpoint } = createCheckpoint();
+  try {
+    mutationExecutionContextFromCheckpoint({
+      path: checkpoint,
+      request: createPrRequest(),
+    });
+    assert.throws(
+      () => mutationExecutionContextFromCheckpoint({
+        path: checkpoint,
+        request: createPrRequest({ title: "Different effect" }),
+      }),
+      /mutation_workflow_intent_operation_mismatch/,
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("caller-controlled explicitInstruction remains non-authoritative without controller context", () => {
+  assert.deepEqual(
+    mutationExecutionContextFromCheckpoint({
+      path: null,
+      request: createPrRequest({ explicitInstruction: true }),
+    }),
+    {
+      trustedWorkflowIntent: false,
+      trustedExactTextConfirmation: false,
+    },
+  );
 });
