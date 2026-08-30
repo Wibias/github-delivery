@@ -16,6 +16,11 @@ const DEFAULT_BUDGETS = Object.freeze({
 });
 
 const MUTATION_OPERATION_KEY_RE = /^(?:payload:[0-9a-f]{64}|idempotency:[0-9a-f]{64}:payload:[0-9a-f]{64})$/i;
+const PRE_OPEN_WORKFLOWS = new Set([
+  "create-pr-for-issue",
+  "create-pr-from-local-work",
+]);
+const PRE_OPEN_PUBLICATION_ACTIONS = new Set(["push_code", "create_pr"]);
 
 function nonNegativeInteger(value, fallback = 0) {
   return Number.isInteger(value) && value >= 0 ? value : fallback;
@@ -104,6 +109,55 @@ function normalizeMutationAuthorizations(value = []) {
   return authorizations;
 }
 
+function normalizePreOpenGate(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return {
+    decision: String(value.decision || ""),
+    repo: String(value.repo || ""),
+    baseRef: String(value.baseRef || ""),
+    headRef: String(value.headRef || ""),
+    baseSha: value.baseSha ? String(value.baseSha) : null,
+    headSha: value.headSha ? String(value.headSha) : null,
+    diffIdentity: value.diffIdentity ? String(value.diffIdentity) : null,
+    fileCount: Number.isInteger(value.fileCount) ? value.fileCount : null,
+    recordedAt: Number.isFinite(value.recordedAt) ? value.recordedAt : null,
+  };
+}
+
+function sameIdentity(left, right) {
+  return String(left || "").toLowerCase() === String(right || "").toLowerCase();
+}
+
+export function assertPreOpenPublicationEvidence(snapshot, request = null) {
+  const workflow = String(snapshot?.workflow || "");
+  if (!PRE_OPEN_WORKFLOWS.has(workflow)) return null;
+  if (request && !PRE_OPEN_PUBLICATION_ACTIONS.has(String(request?.action || ""))) return null;
+
+  const gate = normalizePreOpenGate(snapshot?.preOpenGate);
+  if (!gate) throw new Error("pre_open_evidence_missing");
+  if (gate.decision !== "ready") throw new Error("pre_open_evidence_not_ready");
+  if (
+    !gate.repo ||
+    !gate.baseSha ||
+    !gate.headSha ||
+    !gate.diffIdentity ||
+    !snapshot?.baseSha ||
+    !snapshot?.headSha ||
+    !sameIdentity(gate.repo, snapshot.repo) ||
+    !sameIdentity(gate.baseSha, snapshot.baseSha) ||
+    !sameIdentity(gate.headSha, snapshot.headSha)
+  ) {
+    throw new Error("pre_open_evidence_scope_mismatch");
+  }
+  if (
+    request?.action === "push_code" &&
+    !sameIdentity(request?.newTip, gate.headSha)
+  ) {
+    throw new Error("pre_open_evidence_scope_mismatch");
+  }
+  return structuredClone(gate);
+}
+
 export function createDeliveryWorkflowController(options = {}) {
   const snapshot = options.snapshot || null;
   const graph = normalizeGraph(options.graph || snapshot?.graph);
@@ -127,6 +181,7 @@ export function createDeliveryWorkflowController(options = {}) {
   let pr = snapshot?.pr ?? options.pr ?? null;
   let baseSha = snapshot?.baseSha ?? options.baseSha ?? null;
   let headSha = snapshot?.headSha ?? options.headSha ?? null;
+  let preOpenGate = normalizePreOpenGate(snapshot?.preOpenGate || options.preOpenGate);
   let stateGeneration = nonNegativeInteger(snapshot?.stateGeneration);
   const completedPhases = [...(snapshot?.completedPhases || [])].map(String);
   const blockers = new Set((snapshot?.blockers || []).map(String));
@@ -159,6 +214,7 @@ export function createDeliveryWorkflowController(options = {}) {
       pr,
       baseSha,
       headSha,
+      preOpenGate: preOpenGate ? structuredClone(preOpenGate) : null,
       phase,
       graph,
       completedPhases: [...completedPhases],
@@ -192,6 +248,9 @@ export function createDeliveryWorkflowController(options = {}) {
     }
     if (completedPhases.includes(target)) {
       throw new Error(`Cannot transition back into completed phase ${target}`);
+    }
+    if (target === "OPEN_PR" && PRE_OPEN_WORKFLOWS.has(workflow)) {
+      assertPreOpenPublicationEvidence(snapshotState());
     }
     if (!completedPhases.includes(phase)) completedPhases.push(phase);
     phase = target;
@@ -371,6 +430,32 @@ export function createDeliveryWorkflowController(options = {}) {
     return { ...updated, headSha };
   }
 
+  function recordPreOpenGate(result = {}) {
+    if (!PRE_OPEN_WORKFLOWS.has(workflow)) {
+      throw new Error("pre_open_evidence_not_required");
+    }
+    if (!["PREOPEN_GATE", "OPEN_PR"].includes(phase)) {
+      throw new Error("pre_open_evidence_phase_invalid");
+    }
+    const record = normalizePreOpenGate({
+      decision: result.decision,
+      repo: result.repo,
+      baseRef: result.baseRef,
+      headRef: result.headRef,
+      baseSha: result.baseRefOid ?? result.baseSha,
+      headSha: result.headRefOid ?? result.headSha,
+      diffIdentity: result.diffIdentity,
+      fileCount: result.fileCount,
+      recordedAt: now(),
+    });
+    if (!record?.repo || !sameIdentity(record.repo, repo)) {
+      throw new Error("pre_open_evidence_scope_mismatch");
+    }
+    preOpenGate = record;
+    touch();
+    return structuredClone(record);
+  }
+
   function recordEvidence(entry) {
     const result = evidenceRegistry.record({
       ...entry,
@@ -399,6 +484,7 @@ export function createDeliveryWorkflowController(options = {}) {
     authorizeMutation,
     updateRefs,
     reconcileMutationResult,
+    recordPreOpenGate,
     recordEvidence,
     decideEvidence,
     snapshot: snapshotState,

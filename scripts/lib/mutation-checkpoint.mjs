@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 import { resolveDeliveryWorkflowProfile } from "./delivery-workflow-profiles.mjs";
 import {
+  assertPreOpenPublicationEvidence,
   createDeliveryWorkflowController,
   readDeliveryWorkflowCheckpoint,
   writeDeliveryWorkflowCheckpoint,
@@ -21,6 +22,11 @@ const ROUTED_WORKFLOW_INTENT = Object.freeze({
     OPEN_PR: Object.freeze(new Set(["create_pr"])),
   }),
 });
+const PRE_OPEN_WORKFLOWS = new Set([
+  "create-pr-for-issue",
+  "create-pr-from-local-work",
+]);
+const PRE_OPEN_PUBLICATION_ACTIONS = new Set(["push_code", "create_pr"]);
 
 function routedWorkflowIntentSlot(snapshot, request) {
   const workflow = String(snapshot?.workflow || "");
@@ -77,6 +83,15 @@ function ensureRoutedWorkflowIntent({ path, snapshot, request, operationKey }) {
   return true;
 }
 
+function assertPublicationCheckpoint(snapshot, request) {
+  if (!PRE_OPEN_WORKFLOWS.has(String(snapshot?.workflow || ""))) return;
+  if (!PRE_OPEN_PUBLICATION_ACTIONS.has(String(request?.action || ""))) return;
+  if (String(snapshot?.phase || "") !== "OPEN_PR") {
+    throw new Error("pre_open_publication_phase_invalid");
+  }
+  assertPreOpenPublicationEvidence(snapshot, request);
+}
+
 export function mutationExecutionContextFromCheckpoint({ path, request } = {}) {
   if (!path) return { ...EMPTY_EXECUTION_CONTEXT };
   const snapshot = readDeliveryWorkflowCheckpoint(path);
@@ -87,6 +102,7 @@ export function mutationExecutionContextFromCheckpoint({ path, request } = {}) {
   ) {
     throw new Error("mutation_checkpoint_repo_mismatch");
   }
+  assertPublicationCheckpoint(snapshot, request);
   const operationKey = mutationOperationKey(request);
   const routedWorkflowIntent = ensureRoutedWorkflowIntent({
     path,

@@ -16,6 +16,8 @@ import { executeMutationDocument } from "../../scripts/lib/mutation-document-exe
 const DELIVERY_CONTROLLER = fileURLToPath(
   new URL("../../scripts/delivery-controller.mjs", import.meta.url),
 );
+const BASE = "a".repeat(40);
+const HEAD = "b".repeat(40);
 
 function createPrRequest(overrides = {}) {
   return {
@@ -37,6 +39,18 @@ function createCheckpoint() {
   const controller = createDeliveryWorkflowController({
     workflow: "create-pr-for-issue",
     repo: "acme/widgets",
+    baseSha: BASE,
+    headSha: HEAD,
+    preOpenGate: {
+      decision: "ready",
+      repo: "acme/widgets",
+      baseRef: "main",
+      headRef: "fix/issue-95",
+      baseSha: BASE,
+      headSha: HEAD,
+      diffIdentity: `sha256:${"d".repeat(64)}`,
+      fileCount: 1,
+    },
     startPhase: "OPEN_PR",
     graph: { OPEN_PR: ["DONE"], DONE: [] },
   });

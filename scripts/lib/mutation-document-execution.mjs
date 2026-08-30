@@ -134,8 +134,14 @@ export function executeMutationDocument({
   const requests = normalized.requests;
   assertPublicMutationDocument(requests);
 
+  const completedKeys = new Set(
+    Array.isArray(deps.completedOperationKeys) ? deps.completedOperationKeys : [],
+  );
+  const isAlreadyCompleted = (request) => completedKeys.has(mutationOperationKey(request));
+
   if (execute) {
     for (const request of requests) {
+      if (isAlreadyCompleted(request)) continue;
       deps.planMutationWithAuthority(request, {
         env: effectiveEnv,
         readFile,
@@ -145,6 +151,7 @@ export function executeMutationDocument({
 
     const approvalIndexes = [];
     for (let index = 0; index < requests.length; index += 1) {
+      if (isAlreadyCompleted(requests[index])) continue;
       if (
         deps.mutationAuthorityRequired(requests[index], {
           execute: true,
@@ -174,9 +181,6 @@ export function executeMutationDocument({
     }
   }
 
-  const completedKeys = new Set(
-    Array.isArray(deps.completedOperationKeys) ? deps.completedOperationKeys : [],
-  );
   const results = [];
   let partialFailure = false;
 
