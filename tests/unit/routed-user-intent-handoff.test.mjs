@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import {
@@ -9,6 +11,10 @@ import {
   writeDeliveryWorkflowCheckpoint,
 } from "../../scripts/lib/delivery-workflow-controller.mjs";
 import { mutationExecutionContextFromCheckpoint } from "../../scripts/lib/mutation-checkpoint.mjs";
+
+const DELIVERY_CONTROLLER = fileURLToPath(
+  new URL("../../scripts/delivery-controller.mjs", import.meta.url),
+);
 
 function createPrRequest(overrides = {}) {
   return {
@@ -92,4 +98,34 @@ test("caller-controlled explicitInstruction remains non-authoritative without co
       trustedExactTextConfirmation: false,
     },
   );
+});
+
+test("Protection Off rejects model-callable manual workflow-intent authorization", () => {
+  const { directory, checkpoint } = createCheckpoint();
+  const requestPath = join(directory, "request.json");
+  try {
+    writeFileSync(requestPath, `${JSON.stringify(createPrRequest(), null, 2)}\n`, "utf8");
+    const result = spawnSync(
+      process.execPath,
+      [
+        DELIVERY_CONTROLLER,
+        "authorize-mutation",
+        checkpoint,
+        "--request",
+        requestPath,
+        "--workflow-intent",
+      ],
+      {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          GITHUB_DELIVERY_AUTHORITY_MODE: "off",
+        },
+      },
+    );
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /mutation_workflow_intent_is_controller_owned/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
