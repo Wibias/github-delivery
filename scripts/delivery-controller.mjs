@@ -13,6 +13,7 @@ import {
   requestsFromMutationDocument,
 } from "./lib/mutation-document-execution.mjs";
 import { mutationRequiresIndependentIntent } from "./lib/mutation-policy.mjs";
+import { readUserConfig, resolveAuthorityMode } from "./lib/user-config.mjs";
 import { allowedMutationModes } from "./lib/workflow-mode.mjs";
 
 const USAGE = `Usage:
@@ -58,6 +59,11 @@ function takeFlag(argv, name) {
 
 function assertEmpty(argv) {
   if (argv.length) throw new Error(`Unknown arguments: ${argv.join(" ")}\n${USAGE}`);
+}
+
+function effectiveAuthorityMode() {
+  const { config } = readUserConfig();
+  return resolveAuthorityMode({ config, env: process.env });
 }
 
 function load(path) {
@@ -112,6 +118,12 @@ function authorizeMutationRequest(loaded, request, context) {
     !workflowModes.includes(String(request?.mutationMode || "read-only").toLowerCase())
   ) {
     throw new Error("mutation_checkpoint_mode_mismatch");
+  }
+  if (
+    context.trustedWorkflowIntent &&
+    effectiveAuthorityMode() === "off"
+  ) {
+    throw new Error("mutation_workflow_intent_is_controller_owned");
   }
   if (context.trustedWorkflowIntent && !mutationRequiresIndependentIntent(request)) {
     throw new Error("mutation_workflow_intent_not_required");

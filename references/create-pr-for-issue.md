@@ -21,11 +21,11 @@ Open only the requested PRs, normally one, on the issue's canonical repository. 
 
 ## Runtime contract
 
-- Load this workflow and its declared policy modules; load large review methods only when a gate or review axis needs them.
-- Every network-visible GitHub write uses an exact broker action through:
-  `node scripts/github-mutate.mjs --request <file> --execute [--audit <file>]`.
-- Let `github-mutate.mjs` own authority setup, attachment, and redemption. Batch only independent exact writes.
-- Local edits/tests/commits are not publication; remote pushes and GitHub state changes remain brokered.
+- Load policy modules.
+- Keep the controller checkpoint. Writes: `node scripts/github-mutate.mjs --request <file> --execute --checkpoint <workflow-checkpoint>`.
+- `create_pr` intent is controller-owned/operation-bound. Never repair via manual `--workflow-intent`, checkpoint edits, or `explicitInstruction`; changed payloads need fresh intent.
+- `github-mutate.mjs` owns authority; `off` skips only Hello/Authority, protected modes retain it.
+- Local work is not publication; broker remote writes.
 - **Do not merge.**
 
 ## A. Need-to-fix preflight
