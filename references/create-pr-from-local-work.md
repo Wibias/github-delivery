@@ -32,7 +32,7 @@ This workflow is deliberately separate from `create-pr-for-issue.md`. **Do not i
    - no match → continue.
    A PR on the same head branch but a different intended base is not a P0 duplicate; multi-base/port policy may govern it separately.
 7. **Build exact publication requests.** The user’s direct “create pr” instruction authorizes only the `push_code` and `create_pr` effects needed for this workflow. Build exact broker requests for the scoped branch and PR. Default to a draft PR unless the user explicitly asks for ready-for-review publication.
-8. **Plan, authorize, execute.** Send every network-visible GitHub write through `scripts/github-mutate.mjs`. Obtain trusted authority where the action registry requires it, then execute the exact planned `push_code` and `create_pr` effects. If the `create_pr` preflight returns `create_pr_existing`, stop publication and reuse the named PR instead of bypassing the check.
+8. **Plan, authorize, execute.** Keep the canonical workflow-controller checkpoint for this routed run and send every network-visible GitHub write through `scripts/github-mutate.mjs --request <file> --execute --checkpoint <workflow-checkpoint> [--audit <file>]`. For routed `create_pr`, the controller binds the first exact publication operation to the current workflow intent automatically. Do not repair missing intent by adding caller `explicitInstruction`, editing checkpoint JSON, or calling `delivery-controller.mjs authorize-mutation --workflow-intent`. Protection mode `off` skips only the additional Windows Hello / trusted-authority layer; protected modes retain it. If the `create_pr` preflight returns `create_pr_existing`, stop publication and reuse the named PR instead of bypassing the check.
 9. **Verify publication.** Re-read the created or reused PR and confirm repository, base, head, title/body, draft state, and final branch head match the intended publication. Do not rewrite an existing PR body merely because it was reused unless the user’s requested workflow separately authorizes that update.
    Fail closed if the live body contains literal `\\n` / `\\t` escape sequences or collapsed markdown headings instead of real newlines. Repair through `update_pr_body` rather than treating escaped markdown as a successful publication.
 
@@ -40,7 +40,7 @@ This workflow is deliberately separate from `create-pr-for-issue.md`. **Do not i
 
 - Do not load `references/shared-rules.md` as mandatory context. Load the policy kernel and modules declared above.
 - Do not mutate the installed `github-delivery` skill while debugging a target repository. Use read-only inspection or temporary probes outside the installed runtime.
-- If trusted authority is unavailable, fail closed and report the exact missing authority capability/setup.
+- If trusted authority is required by the selected protection mode and unavailable, fail closed and report the exact missing authority capability/setup. Protection mode `off` does not require the Authority host or repository allowlist.
 - **Never offer or perform a bypass** with bare `git push`, `gh pr create`, a mutating connector call, or another write path outside the `github-delivery` mutation boundary.
 - Do not add issue linkage or issue-side effects merely because another create-PR workflow supports them.
 - Do not defeat exact-head duplicate prevention by changing the title/body, inventing another local branch name for the same remote head, or weakening repository identity.
