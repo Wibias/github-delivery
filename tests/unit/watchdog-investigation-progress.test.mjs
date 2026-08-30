@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { evaluateCodexHook } from "../../scripts/lib/codex-watchdog-hook.mjs";
+import { observeCodexAppServerMessage } from "../../scripts/lib/codex-progress-watchdog.mjs";
+import { createProgressWatchdog } from "../../scripts/lib/watchdog-investigation-progress.mjs";
 
 function preEvidence(state, command, now, options = {}) {
   return evaluateCodexHook(
@@ -38,6 +40,48 @@ function runEvidence(state, command, response, now, options = {}) {
       ...options,
     },
   ).state;
+}
+
+function runAppServerEvidence(watchdog, context, command, response, index) {
+  const common = {
+    threadId: "thr-investigation",
+    turnId: "turn-investigation",
+  };
+  const started = observeCodexAppServerMessage(
+    watchdog,
+    {
+      method: "item/started",
+      params: {
+        ...common,
+        item: {
+          id: `cmd-${index}`,
+          type: "commandExecution",
+          command,
+          status: "inProgress",
+        },
+      },
+    },
+    context,
+  );
+  assert.equal(started.interrupt, undefined, started.decision?.reason);
+  observeCodexAppServerMessage(
+    watchdog,
+    {
+      method: "item/completed",
+      params: {
+        ...common,
+        item: {
+          id: `cmd-${index}`,
+          type: "commandExecution",
+          command,
+          status: "completed",
+          exitCode: 0,
+          aggregatedOutput: response,
+        },
+      },
+    },
+    context,
+  );
 }
 
 test("dependency-following source reads can reach one complete RED regression before execution", () => {
@@ -161,4 +205,44 @@ test("linked duplicate stable reads remain blocked before investigation credit",
   const duplicate = preEvidence(state, "Get-Content src/b.mjs", 3_000);
   assert.equal(duplicate.output?.decision, "block");
   assert.match(duplicate.output?.reason || "", /Duplicate read blocked/);
+});
+
+test("Codex App Server receives the same bounded dependency-following evidence credit", () => {
+  const watchdog = createProgressWatchdog({
+    evidenceSoftLimit: 2,
+    evidenceHardLimit: 3,
+  });
+  const context = { interruptedTurns: new Set() };
+
+  runAppServerEvidence(
+    watchdog,
+    context,
+    "Get-Content src/authority-entrypoint.mjs",
+    'import { resolveStoredCredential } from "./stored-credential-resolver.mjs";',
+    1,
+  );
+  runAppServerEvidence(
+    watchdog,
+    context,
+    "Get-Content src/stored-credential-resolver.mjs",
+    'import { refreshManagedToken } from "./managed-token-refresh.mjs";',
+    2,
+  );
+  runAppServerEvidence(
+    watchdog,
+    context,
+    "Get-Content src/managed-token-refresh.mjs",
+    'See "../tests/stored-account-retry.test.mjs".',
+    3,
+  );
+  runAppServerEvidence(
+    watchdog,
+    context,
+    "Get-Content tests/stored-account-retry.test.mjs",
+    "test(\"stored account refreshes once after 401\", () => {});",
+    4,
+  );
+
+  assert.equal(watchdog.snapshot().totalEvidenceAttempts, 4);
+  assert.equal(watchdog.snapshot().investigationCreditsUsed, 3);
 });
