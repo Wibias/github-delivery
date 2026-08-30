@@ -11,6 +11,7 @@ import {
   writeDeliveryWorkflowCheckpoint,
 } from "../../scripts/lib/delivery-workflow-controller.mjs";
 import { mutationExecutionContextFromCheckpoint } from "../../scripts/lib/mutation-checkpoint.mjs";
+import { executeMutationDocument } from "../../scripts/lib/mutation-document-execution.mjs";
 
 const DELIVERY_CONTROLLER = fileURLToPath(
   new URL("../../scripts/delivery-controller.mjs", import.meta.url),
@@ -88,6 +89,55 @@ test("create-pr-for-issue automatically binds routed create_pr intent to the exa
         trustedExactTextConfirmation: false,
       },
     );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("Protection Off executes the routed create_pr document without Authority-host authorization", () => {
+  const { directory, checkpoint } = createCheckpoint();
+  let authorityCalls = 0;
+  let executionCalls = 0;
+  try {
+    const request = createPrRequest();
+    const result = executeMutationDocument({
+      document: request,
+      execute: true,
+      env: {
+        ...process.env,
+        GITHUB_DELIVERY_AUTHORITY_MODE: "off",
+      },
+      dependencies: {
+        executionContextForRequest(currentRequest) {
+          return mutationExecutionContextFromCheckpoint({
+            path: checkpoint,
+            request: currentRequest,
+          });
+        },
+        authorizeBatchSync() {
+          authorityCalls += 1;
+          throw new Error("Authority host must not be called in Protection Off");
+        },
+        executeMutationWithAuthority(options) {
+          executionCalls += 1;
+          assert.equal(options.trustedWorkflowIntent, true);
+          assert.equal(options.env.GITHUB_DELIVERY_AUTHORITY_MODE, "off");
+          return {
+            action: options.request.action,
+            request: options.request,
+            status: "succeeded",
+            authority: {
+              verified: false,
+              provenance: "authority_disabled_by_user",
+            },
+          };
+        },
+      },
+    });
+    assert.equal(authorityCalls, 0);
+    assert.equal(executionCalls, 1);
+    assert.equal(result.status, "succeeded");
+    assert.equal(result.authority.verified, false);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
