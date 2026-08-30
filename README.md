@@ -171,7 +171,7 @@ For installation edge cases, backup/restore, downgrade behavior, manual recovery
 
 `1.3.1` is a focused recovery and concurrency patch for the 1.3.0 runtime:
 
-- exclusive skill and Windows Authority install locks can reclaim only a github-delivery-owned PID + nonce lock whose recorded process is provably gone; live, malformed, or permission-uncertain locks remain fail-closed;
+- exclusive skill and Windows Authority install locks can reclaim only a github-delivery-owned PID + nonce lock whose recorded process is provably gone; live, malformed, and permission-uncertain locks remain fail-closed;
 - `scripts/policy-bundle.mjs` and `scripts/workflow-brief.mjs` default to the installed skill root derived from their own location, so agents can load workflow packets while remaining in the target repository; explicit root overrides are unchanged;
 - rewrite-baseline generation allocation is finalized after the exclusive store lock is acquired, closing the window where a waiting writer could reuse a generation that another writer published immediately before releasing the lock while preserving the existing stale-takeover generation fence.
 
