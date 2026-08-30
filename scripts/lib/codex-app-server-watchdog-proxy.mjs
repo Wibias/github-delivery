@@ -80,44 +80,43 @@ export function createAppServerWatchdogRouter(options = {}) {
     return state;
   }
 
-  function route(message) {
+  function onServerMessage(message) {
+    if (message && Object.hasOwn(message, "id") && privateIds.has(message.id)) {
+      const metadata = privateIds.get(message.id);
+      privateIds.delete(message.id);
+      if (message.error && typeof options.onInternalRequestError === "function") {
+        options.onInternalRequestError({ message, metadata });
+      }
+      return { forward: null, internalRequests: [] };
+    }
+
     const state = stateFor(message);
-    if (!state) return { messages: [message], interrupt: null };
+    if (!state) {
+      emitTelemetry(options, message);
+      return { forward: message, internalRequests: [] };
+    }
+
     const outcome = observeCodexAppServerMessage(state.watchdog, message, state.context);
     emitTelemetry(options, message, outcome);
-    if (!outcome.interrupt) return { messages: [message], interrupt: null };
+    const internalRequests = [];
+    if (outcome.interrupt) {
+      const id = `${prefix}-${++sequence}`;
+      privateIds.set(id, {
+        method: outcome.interrupt.method,
+        turnId: messageTurnId(message),
+        threadId: messageThreadId(message) || state.threadId,
+      });
+      internalRequests.push({ id, ...outcome.interrupt });
+    }
 
-    sequence += 1;
-    const privateId = `${prefix}-${sequence}`;
-    privateIds.set(privateId, {
-      threadId: outcome.interrupt.params.threadId,
-      turnId: outcome.interrupt.params.turnId,
-    });
-    return {
-      messages: [
-        message,
-        {
-          id: privateId,
-          method: outcome.interrupt.method,
-          params: outcome.interrupt.params,
-        },
-      ],
-      interrupt: {
-        ...outcome.interrupt,
-        id: privateId,
-      },
-    };
-  }
-
-  function absorbClientResponse(message) {
-    const id = message?.id;
-    if (!id || !privateIds.has(String(id))) return false;
-    privateIds.delete(String(id));
-    return true;
+    if (message?.method === "turn/completed") {
+      turns.delete(messageTurnId(message));
+    }
+    return { forward: message, internalRequests };
   }
 
   return {
-    route,
-    absorbClientResponse,
+    onServerMessage,
+    activeTurnCount: () => turns.size,
   };
 }
