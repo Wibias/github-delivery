@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { resolveDeliveryWorkflowProfile } from "./delivery-workflow-profiles.mjs";
 import {
   createDeliveryWorkflowController,
@@ -11,6 +13,70 @@ const EMPTY_EXECUTION_CONTEXT = Object.freeze({
   trustedExactTextConfirmation: false,
 });
 
+const ROUTED_WORKFLOW_INTENT = Object.freeze({
+  "create-pr-for-issue": Object.freeze({
+    OPEN_PR: Object.freeze(new Set(["create_pr"])),
+  }),
+  "create-pr-from-local-work": Object.freeze({
+    OPEN_PR: Object.freeze(new Set(["create_pr"])),
+  }),
+});
+
+function routedWorkflowIntentSlot(snapshot, request) {
+  const workflow = String(snapshot?.workflow || "");
+  const phase = String(snapshot?.phase || "");
+  const action = String(request?.action || "");
+  if (ROUTED_WORKFLOW_INTENT[workflow]?.[phase]?.has(action) !== true) {
+    return null;
+  }
+  return `${workflow}:${phase}:${action}`;
+}
+
+function routedWorkflowIntentMarkerKey(slot) {
+  const digest = createHash("sha256")
+    .update(`github-delivery:routed-workflow-intent:${slot}`, "utf8")
+    .digest("hex");
+  return `payload:${digest}`;
+}
+
+function mutationAuthorization(snapshot, operationKey) {
+  return Array.isArray(snapshot?.mutationAuthorizations)
+    ? snapshot.mutationAuthorizations.find(
+        (entry) => String(entry?.operationKey || "") === operationKey,
+      )
+    : null;
+}
+
+function ensureRoutedWorkflowIntent({ path, snapshot, request, operationKey }) {
+  const slot = routedWorkflowIntentSlot(snapshot, request);
+  if (!slot) return false;
+
+  const markerKey = routedWorkflowIntentMarkerKey(slot);
+  const marker = mutationAuthorization(snapshot, markerKey);
+  const authorization = mutationAuthorization(snapshot, operationKey);
+
+  if (marker?.trustedWorkflowIntent === true) {
+    if (authorization?.trustedWorkflowIntent === true) return true;
+    throw new Error("mutation_workflow_intent_operation_mismatch");
+  }
+
+  const profile = resolveDeliveryWorkflowProfile(snapshot.workflow);
+  const controller = createDeliveryWorkflowController({
+    snapshot,
+    graph: profile.graph,
+  });
+  controller.authorizeMutation({
+    operationKey: markerKey,
+    trustedWorkflowIntent: true,
+  });
+  controller.authorizeMutation({
+    operationKey,
+    trustedWorkflowIntent: true,
+  });
+  writeDeliveryWorkflowCheckpoint(path, controller.snapshot());
+  return true;
+}
+
 export function mutationExecutionContextFromCheckpoint({ path, request } = {}) {
   if (!path) return { ...EMPTY_EXECUTION_CONTEXT };
   const snapshot = readDeliveryWorkflowCheckpoint(path);
@@ -22,13 +88,16 @@ export function mutationExecutionContextFromCheckpoint({ path, request } = {}) {
     throw new Error("mutation_checkpoint_repo_mismatch");
   }
   const operationKey = mutationOperationKey(request);
-  const authorization = Array.isArray(snapshot.mutationAuthorizations)
-    ? snapshot.mutationAuthorizations.find(
-        (entry) => String(entry?.operationKey || "") === operationKey,
-      )
-    : null;
+  const routedWorkflowIntent = ensureRoutedWorkflowIntent({
+    path,
+    snapshot,
+    request,
+    operationKey,
+  });
+  const authorization = mutationAuthorization(snapshot, operationKey);
   return {
-    trustedWorkflowIntent: authorization?.trustedWorkflowIntent === true,
+    trustedWorkflowIntent:
+      routedWorkflowIntent || authorization?.trustedWorkflowIntent === true,
     trustedExactTextConfirmation:
       authorization?.trustedExactTextConfirmation === true,
   };
