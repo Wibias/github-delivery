@@ -1,4 +1,4 @@
-import { createProgressWatchdog } from "./agent-progress-watchdog.mjs";
+import { createProgressWatchdog } from "./watchdog-investigation-progress.mjs";
 import { observeCodexAppServerMessage } from "./codex-progress-watchdog.mjs";
 
 const STREAM_WATCHDOG_DEFAULTS = Object.freeze({
@@ -80,43 +80,44 @@ export function createAppServerWatchdogRouter(options = {}) {
     return state;
   }
 
-  function onServerMessage(message) {
-    if (message && Object.hasOwn(message, "id") && privateIds.has(message.id)) {
-      const metadata = privateIds.get(message.id);
-      privateIds.delete(message.id);
-      if (message.error && typeof options.onInternalRequestError === "function") {
-        options.onInternalRequestError({ message, metadata });
-      }
-      return { forward: null, internalRequests: [] };
-    }
-
+  function route(message) {
     const state = stateFor(message);
-    if (!state) {
-      emitTelemetry(options, message);
-      return { forward: message, internalRequests: [] };
-    }
-
+    if (!state) return { messages: [message], interrupt: null };
     const outcome = observeCodexAppServerMessage(state.watchdog, message, state.context);
     emitTelemetry(options, message, outcome);
-    const internalRequests = [];
-    if (outcome.interrupt) {
-      const id = `${prefix}-${++sequence}`;
-      privateIds.set(id, {
-        method: outcome.interrupt.method,
-        turnId: messageTurnId(message),
-        threadId: messageThreadId(message) || state.threadId,
-      });
-      internalRequests.push({ id, ...outcome.interrupt });
-    }
+    if (!outcome.interrupt) return { messages: [message], interrupt: null };
 
-    if (message?.method === "turn/completed") {
-      turns.delete(messageTurnId(message));
-    }
-    return { forward: message, internalRequests };
+    sequence += 1;
+    const privateId = `${prefix}-${sequence}`;
+    privateIds.set(privateId, {
+      threadId: outcome.interrupt.params.threadId,
+      turnId: outcome.interrupt.params.turnId,
+    });
+    return {
+      messages: [
+        message,
+        {
+          id: privateId,
+          method: outcome.interrupt.method,
+          params: outcome.interrupt.params,
+        },
+      ],
+      interrupt: {
+        ...outcome.interrupt,
+        id: privateId,
+      },
+    };
+  }
+
+  function absorbClientResponse(message) {
+    const id = message?.id;
+    if (!id || !privateIds.has(String(id))) return false;
+    privateIds.delete(String(id));
+    return true;
   }
 
   return {
-    onServerMessage,
-    activeTurnCount: () => turns.size,
+    route,
+    absorbClientResponse,
   };
 }
