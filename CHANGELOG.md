@@ -752,7 +752,8 @@ All notable changes to `github-delivery` are documented here.
   focused failing excerpt before loading full raw output. Pending-only required
   CI is owned by `scripts/ci-wait.mjs` instead of parallel manual polling.
 - Refreshed the README with a faster natural-language quick start, repository
-  workflow visuals, clearer safety/value positioning, consolidated installation/maintenance guidance, dedicated stack/competing-PR/backport explanation, updated workflow reference, and the current lean CI topology.
+  workflow visuals, clearer safety/value positioning, and user-facing setup
+  and architecture documentation for the progress watchdog.
 
 ## [0.1.1] - 2026-08-11
 
