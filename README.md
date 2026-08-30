@@ -180,9 +180,9 @@ For installation edge cases, backup/restore, downgrade behavior, manual recovery
 `1.3.0` brings local Git workflow and release versioning into the same delivery lifecycle:
 
 - `references/git-workflow.md` owns repository-aware branch/commit organization, logical commit boundaries, commit-message guidance, pre-commit hygiene, generated-file decisions, Git-history investigation, and evidence-backed change summaries;
-- `references/versioning-release.md` owns release-delta inventory, SemVer classification by observable consumer impact, version-source consistency, human-curated changelogs, tag identity, and release-candidate checks;
+- `references/versioning-release.md` owns release-delta inventory, SemVer classification by observable consumer impact, version-source consistency, human-curated changelogs, tag/version identity, and release-candidate checks;
 - direct commit/branch and SemVer/changelog/release-preparation requests route internally instead of handing off to `git-workflow-and-versioning`, while repository conventions and the stricter existing `GD-GIT-*` safety rules remain authoritative;
-- issue-linked and local-work PR publication compose the Git-workflow reference when branch/commit preparation is actually needed, preserving progressive disclosure;
+- issue-linked and local-work PR publication compose the Git-workflow reference when branch/commit preparation is needed, preserving progressive disclosure;
 - release preparation remains separate from publication: a version/changelog request never grants tag, GitHub Release, npm/package-registry, merge, or other remote publication authority;
 - native approval is a dedicated `approve_pr` authority action: generic `post_review` cannot encode approval, explicit approval intent remains mandatory, Windows Authority binds the semantic approval action, and self-approval is rejected before the GitHub approval write;
 - Git/versioning requests now enter the mandatory one-shot workflow-packet/controller runtime, full-review intent keeps precedence over broad Git/version keywords in attributed repository text, and execution packets advertise only actions present in the mutation registry;
