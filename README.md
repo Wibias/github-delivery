@@ -19,7 +19,7 @@
 </div>
 
 > [!NOTE]
-> **1.3.7.** Stable self-update now tolerates brief GitHub/CDN gateway failures with bounded retries, and Protection mode **Off** once again means “no additional Windows Hello / trusted-authority protection” rather than “disable GitHub writes.” Normal workflow authorization and mutation safety gates still apply. See [Current state](#current-state).
+> **1.3.8.** Routed create-PR intent now survives to the exact mutation boundary, pre-open review evidence is bound to the exact publication candidate, and the watchdog recognizes a small bounded amount of deterministic dependency-following investigation instead of pressuring legitimate reads into premature edits. See [Current state](#current-state).
 
 > [!IMPORTANT]
 > **Natural language is the public API.** The Node scripts, policy modules, evaluators, mutation broker, and optional Authority host are internal safety/evidence machinery. You normally do not invoke them yourself.
@@ -99,6 +99,17 @@ For installation edge cases, backup/restore, downgrade behavior, manual recovery
 | **Supersede / overtake** | `supersede PR #12 with PR #45` | Explicit replacement or maintainer-takeover workflows with bounded mutation authority |
 | **Merge / close-out** | `merge PR #32` | Final gate, exact transaction authority, head-pinned merge, verification, thanks, linked-issue close-out |
 | **Self-update** | `update github-delivery to the latest stable release` | Stable-release verification, lock-aware Windows recovery, optional old-backup cleanup, safe apply and postconditions |
+
+### What changed in 1.3.8
+
+`1.3.8` is a focused publication-integrity and watchdog reliability patch:
+
+- routed create-PR intent is carried automatically from the selected workflow into the exact `create_pr` mutation operation instead of being dropped before execution;
+- that intent remains controller-owned and operation-bound: changing the mutation payload invalidates the authorization, caller-controlled `explicitInstruction` remains non-authoritative, and Protection mode **Off** still performs zero Authority-host authorization;
+- pre-open evidence now binds the exact repository, resolved base/head commits, candidate diff identity, and file count, and both the controller and mutation boundary require a matching `ready` result before initial publication;
+- wrong-scope, missing, blocked, unknown, stale, or mismatched pre-open evidence therefore cannot be narrated around into `push_code` or `create_pr`;
+- successful stable source reads can receive a small bounded investigation credit only when the next read deterministically follows a source dependency referenced by the immediately previous result. Unrelated reads, assistant-prose claims, duplicates, volatile polling, and reads beyond the per-generation cap retain the ordinary evidence limits;
+- the dependency-following behavior is shared by Codex lifecycle hooks and the App Server watchdog path.
 
 ### What changed in 1.3.7
 
@@ -457,6 +468,8 @@ GitHub Delivery treats convergence as a runtime + workflow problem rather than a
 Key defaults include:
 
 - evidence warning/block at **8 / 12** consecutive attempts without execution/state progress;
+- up to **4** dependency-following investigation credits per state generation for successful stable source reads whose next target is deterministically referenced by the immediately preceding result; credited reads still count toward total evidence telemetry;
+- unrelated reads, assistant-prose claims, exact duplicate stable reads, and volatile polling never gain investigation credit;
 - operational process/job/worktree polling counts as **volatile evidence**, so repeating those probes cannot reset or bypass the evidence budget;
 - protected-stream active-work warning/hard bounds of **4k / 8k generated characters** and **1,024 / 2,048 generated output tokens** since real progress;
 - larger completed-plan finalization allowance of **40k / 64k characters** and **12k / 16k output tokens**;
@@ -639,6 +652,7 @@ The public interface stays small even though the enforcement surface is not. Key
 | `scripts/lib/pr-consolidation.mjs` | Read-only competing-PR clustering/planning evidence |
 | `scripts/lib/multi-base-delivery.mjs` | Parallel port identities/provenance/completion |
 | `scripts/lib/agent-progress-watchdog.mjs` | Shared progress/evidence/tool-emission watchdog logic |
+| `scripts/lib/watchdog-investigation-progress.mjs` | Bounded deterministic dependency-following evidence progress for hook/App Server paths |
 | `scripts/build-dist.mjs` | Deterministic versioned skill bundle build |
 | `scripts/prepare-release.mjs` | Release identity/checksum/SBOM/provenance preparation |
 
@@ -648,7 +662,7 @@ The architecture uses progressive disclosure: route once, load the selected work
 
 ## Current state
 
-`1.3.7` is a focused reliability and Protection-mode semantics patch on top of `1.3.6`: transient GitHub/CDN release-asset HTTP 502/503/504 responses receive two bounded retries, and Protection mode Off removes only the additional trusted-authority/Windows Hello requirement instead of disabling otherwise-authorized GitHub writes.
+`1.3.8` is a focused publication-integrity and watchdog reliability patch on top of `1.3.7`: routed create-PR intent reaches the exact operation-bound mutation context, pre-open review evidence is bound to the exact publication candidate, and deterministic dependency-following source investigation receives a small bounded progress allowance without weakening duplicate or volatile-read controls.
 
 Stable in this release:
 
@@ -657,6 +671,8 @@ Stable in this release:
 - evidence-backed SemVer classification, version metadata consistency, curated changelogs, and tag/release preparation with publication kept separately authorized;
 - read-only open-work and competing-PR analysis;
 - issue research, implementation, publication, external work-item delivery, and exact-head duplicate prevention;
+- routed create-PR intent that remains controller-owned and bound to the exact canonical mutation operation instead of relying on caller-controlled request flags;
+- exact-candidate pre-open publication evidence, enforced both at the workflow transition and again at the mutation boundary before initial push/PR creation;
 - deep current-head review with deterministic probe coverage, conditional visual evidence, and independently opt-outable no-comments/simplify hygiene passes;
 - explicit GitHub-native PR approval created against the exact expected head and verified against the authenticated actor, commit, approval state, and idempotency marker before success;
 - mutation authority, exact-effect receipts, payload-bound operation idempotency, controller-owned stale-head protection, and head-pinned merge execution;
@@ -670,7 +686,7 @@ Stable in this release:
 - verified stable install/update with bounded release-asset gateway retries, stale owned install-lock recovery, Windows lock recovery, graceful-close prompting, and optional older-backup cleanup that preserves the fresh rollback backup;
 - installed workflow helpers that resolve their own skill root while retaining explicit root overrides;
 - generation-fenced rewrite-baseline storage with generation allocation finalized under the acquired lock;
-- progress watchdog/runtime convergence controls that charge operational process/job/worktree polling as volatile evidence rather than neutral progress;
+- progress watchdog/runtime convergence controls that charge operational process/job/worktree polling as volatile evidence rather than neutral progress while allowing only a capped deterministic dependency-following stable-source chain to avoid increasing the consecutive no-progress read streak;
 - lifecycle-hook finalization that can recognize explicit completed recommendation outcomes and close concrete authorization/blocker recovery, without treating ordinary long `Stop` narration or responses that announce another tool action as final;
 - live `ship-gate` capture failures that preserve bounded upstream causes, remain fail-closed, and expose retryability so deterministic GitHub capability/permission failures can terminate equivalent probing;
 - deterministic bundles, repository security checks, CodeQL, Dependency Review, live-fixture contracts, and release preparation.

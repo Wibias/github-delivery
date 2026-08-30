@@ -4,6 +4,18 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.3.8] - 2026-08-30
+
+### Changed
+
+- Bumped the package version from `1.3.7` to `1.3.8`.
+
+### Fixed
+
+- Routed create-PR workflows now carry controller-owned current-user intent through the exact `create_pr` operation instead of dropping it before mutation execution. The intent remains bound to the canonical operation key, caller-controlled `explicitInstruction` stays non-authoritative, Protection mode Off performs no Authority-host authorization, and model-callable manual workflow-intent repair is rejected in Off mode (issue #400, PR #403).
+- Pre-open review evidence is now bound to the exact repository, resolved base/head commits, candidate diff identity, and file count, and both the workflow controller and mutation boundary require a matching `ready` result before initial `push_code` or `create_pr`. Missing, blocked, unknown, stale, or mismatched evidence therefore stays fail-closed instead of allowing publication to continue after a wrong-scope gate (issue #402, PR #404).
+- The Codex progress watchdog now gives a small bounded investigation credit to successful stable source reads that deterministically follow a dependency referenced by the immediately preceding result. Legitimate dependency tracing can therefore reach a focused regression without being pressured into a premature edit, while unrelated reads, assistant-prose claims, duplicates, volatile polling, and credit beyond the per-generation cap keep the existing evidence limits. Hook and App Server paths share the same behavior (issue #401, PR #405).
+
 ## [1.3.7] - 2026-08-30
 
 ### Changed
