@@ -13,6 +13,7 @@ All notable changes to `github-delivery` are documented here.
 ### Fixed
 
 - Stable self-update release-asset downloads now retry transient HTTP `502`, `503`, and `504` responses up to two times with bounded 250 ms / 750 ms delays, discarding each failed response body before retrying. Deterministic client errors such as `404` still fail immediately, and the existing HTTPS redirect, byte-limit, checksum/digest, tag/source-binding, and GitHub attestation verification chain remains fail-closed (PR #397).
+- Protection mode **Off** (`authorityMode=off`) once again disables only the optional Windows Hello / trusted-authority layer instead of blocking GitHub mutation execution. Otherwise-authorized writes still require controller-owned current user intent plus the normal mutation-mode, exact-text, expected-head, idempotency, stack, merge-driver, and postcondition gates; caller-controlled request booleans remain non-authoritative, while `high-assurance` and `all` keep their existing trusted-authority requirements (issue #398, PR #399).
 
 ## [1.3.6] - 2026-08-29
 
@@ -751,8 +752,7 @@ All notable changes to `github-delivery` are documented here.
   focused failing excerpt before loading full raw output. Pending-only required
   CI is owned by `scripts/ci-wait.mjs` instead of parallel manual polling.
 - Refreshed the README with a faster natural-language quick start, repository
-  workflow visuals, clearer safety/value positioning, and user-facing setup
-  and architecture documentation for the progress watchdog.
+  workflow visuals, clearer safety/value positioning, consolidated installation/maintenance guidance, dedicated stack/competing-PR/backport explanation, updated workflow reference, and the current lean CI topology.
 
 ## [0.1.1] - 2026-08-11
 
