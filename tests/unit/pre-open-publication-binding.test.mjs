@@ -12,6 +12,10 @@ import {
   writeDeliveryWorkflowCheckpoint,
 } from "../../scripts/lib/delivery-workflow-controller.mjs";
 import { resolveDeliveryWorkflowProfile } from "../../scripts/lib/delivery-workflow-profiles.mjs";
+import {
+  executeMutationDocument,
+  mutationOperationKey,
+} from "../../scripts/lib/mutation-document-execution.mjs";
 import { mutationExecutionContextFromCheckpoint } from "../../scripts/lib/mutation-checkpoint.mjs";
 
 const PRE_OPEN_GATE = fileURLToPath(
@@ -137,6 +141,40 @@ test("mutation boundary independently rejects missing, changed, or stale pre-ope
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test("completed audit operation skips before pre-open execution context", () => {
+  const request = pushRequest();
+  let contextCalls = 0;
+  let executionCalls = 0;
+  const result = executeMutationDocument({
+    document: request,
+    execute: true,
+    dependencies: {
+      completedOperationKeys: [mutationOperationKey(request)],
+      authorityRuntimeEnvironment: ({ env }) => env,
+      executionContextForRequest() {
+        contextCalls += 1;
+        throw new Error("pre-open context must not run for an already completed operation");
+      },
+      planMutationWithAuthority() {
+        throw new Error("planning must not run for an already completed operation");
+      },
+      mutationAuthorityRequired() {
+        throw new Error("authority checks must not run for an already completed operation");
+      },
+      executeMutationWithAuthority() {
+        executionCalls += 1;
+        throw new Error("execution must not run for an already completed operation");
+      },
+    },
+  });
+
+  assert.equal(result.status, "already_applied");
+  assert.equal(result.outcome, "already_completed");
+  assert.equal(result.skipped, true);
+  assert.equal(contextCalls, 0);
+  assert.equal(executionCalls, 0);
 });
 
 test("wrong historical pre-open range blocks publication until the exact candidate reruns ready", () => {
