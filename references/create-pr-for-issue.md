@@ -73,7 +73,7 @@ Default to one cohesive PR. Split only when independently shippable concerns nee
 After implementation and before any push/open action, run:
 
 ```text
-node <github-delivery>/scripts/pre-open-gate.mjs OWNER/REPO <base> <head>
+node <github-delivery>/scripts/pre-open-gate.mjs OWNER/REPO <base> <head> --checkpoint <workflow-checkpoint>
 ```
 
 - `ready`: continue.
