@@ -1,14 +1,22 @@
 #!/usr/bin/env node
 
+import { resolve } from "node:path";
+
 import { isDirectInvocation } from "./lib/direct-invocation.mjs";
 import { collectBranchReviewInput } from "./lib/branch-review-input.mjs";
+import {
+  createDeliveryWorkflowController,
+  readDeliveryWorkflowCheckpoint,
+  writeDeliveryWorkflowCheckpoint,
+} from "./lib/delivery-workflow-controller.mjs";
+import { resolveDeliveryWorkflowProfile } from "./lib/delivery-workflow-profiles.mjs";
 import { planReviewScope } from "./lib/review-scope.mjs";
 import { projectBugScope, projectSecurityScope } from "./lib/review-scope-compat.mjs";
 import { evidenceClears, validatePreOpenEvidence } from "./lib/pre-open-evidence.mjs";
 import { validateProbeEvidence } from "./lib/probe-evidence.mjs";
 
 function usageError() {
-  throw new Error("Usage: node scripts/pre-open-gate.mjs OWNER/REPO BASE_REF HEAD_REF [--output FILE] [--evidence-file FILE] | --self-test");
+  throw new Error("Usage: node scripts/pre-open-gate.mjs OWNER/REPO BASE_REF HEAD_REF [--output FILE] [--evidence-file FILE] [--checkpoint FILE] | --self-test");
 }
 
 function probeCoverage(plan, evidence) {
@@ -84,14 +92,17 @@ export function evaluate(plan, evidence = null) {
   };
 }
 
-function report({ repo, baseRef, headRef, headRefOid, bugScope, securityScope, requiredProbes, probeEvidenceErrors, blockers, clearedByEvidence, decision, complete, implementationDiffPresent, evidenceApplied }) {
+function report({ repo, baseRef, headRef, baseRefOid, headRefOid, diffIdentity, fileCount, bugScope, securityScope, requiredProbes, probeEvidenceErrors, blockers, clearedByEvidence, decision, complete, implementationDiffPresent, evidenceApplied }) {
   return {
     schemaVersion: 1,
     kind: "github-delivery/pre-open-gate",
     repo,
     baseRef,
     headRef,
+    baseRefOid,
     headRefOid,
+    diffIdentity,
+    fileCount,
     decision,
     complete,
     implementationDiffPresent,
@@ -117,6 +128,7 @@ function parseArgs(argv) {
   let headRef = null;
   let output = null;
   let evidenceFile = null;
+  let checkpoint = null;
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];
     if (value === "--output") {
@@ -126,6 +138,9 @@ function parseArgs(argv) {
       if (evidenceFile !== null) throw new Error("--evidence-file may be given only once");
       evidenceFile = argv[++index];
       if (evidenceFile === undefined) throw new Error("--evidence-file requires a file path");
+    } else if (value === "--checkpoint") {
+      checkpoint = argv[++index];
+      if (checkpoint === undefined) throw new Error("--checkpoint requires a file path");
     } else if (repo === null) {
       repo = value;
     } else if (baseRef === null) {
@@ -136,7 +151,7 @@ function parseArgs(argv) {
       throw new Error(`unexpected argument: ${value}`);
     }
   }
-  return { repo, baseRef, headRef, output, evidenceFile };
+  return { repo, baseRef, headRef, output, evidenceFile, checkpoint };
 }
 
 async function loadEvidence(evidenceFile) {
@@ -154,6 +169,16 @@ async function loadEvidence(evidenceFile) {
   return validated.evidence;
 }
 
+function persistCheckpoint(checkpointPath, result) {
+  if (!checkpointPath) return;
+  const checkpoint = resolve(checkpointPath);
+  const snapshot = readDeliveryWorkflowCheckpoint(checkpoint);
+  const profile = resolveDeliveryWorkflowProfile(snapshot.workflow);
+  const controller = createDeliveryWorkflowController({ snapshot, graph: profile.graph });
+  controller.recordPreOpenGate(result);
+  writeDeliveryWorkflowCheckpoint(checkpoint, controller.snapshot());
+}
+
 function selfTest() {
   const plan = planReviewScope({
     repo: "acme/widget",
@@ -161,12 +186,12 @@ function selfTest() {
     headRefOid: "abc",
     files: [{ path: "src/worker.ts", patch: "+new Worker(url)\n+worker.terminate()", status: "modified", additions: 2, deletions: 0 }],
   });
-  const out = report({ repo: plan.repo, baseRef: "dev", headRef: "feat/x", headRefOid: plan.headRefOid, ...evaluate(plan) });
+  const out = report({ repo: plan.repo, baseRef: "dev", headRef: "feat/x", baseRefOid: "base", headRefOid: plan.headRefOid, diffIdentity: "sha256:test", fileCount: plan.fileCount, ...evaluate(plan) });
   if (out.decision !== "blocked" || !out.blockers.some((b) => b.startsWith("bug:requiredLenses:"))) {
     throw new Error("self-test failed: expected blocked with bug lenses");
   }
   const emptyPlan = planReviewScope({ repo: "acme/widget", pr: null, headRefOid: "base", files: [] });
-  const emptyOut = report({ repo: emptyPlan.repo, baseRef: "dev", headRef: "feat/empty", headRefOid: emptyPlan.headRefOid, ...evaluate(emptyPlan) });
+  const emptyOut = report({ repo: emptyPlan.repo, baseRef: "dev", headRef: "feat/empty", baseRefOid: "base", headRefOid: emptyPlan.headRefOid, diffIdentity: "sha256:empty", fileCount: emptyPlan.fileCount, ...evaluate(emptyPlan) });
   if (emptyOut.decision !== "blocked" || !emptyOut.blockers.includes("workflow:implementation_missing")) {
     throw new Error("self-test failed: expected empty candidate diff to block as implementation_missing");
   }
@@ -174,12 +199,22 @@ function selfTest() {
 }
 
 async function main() {
-  const { repo, baseRef, headRef, output, evidenceFile } = parseArgs(process.argv.slice(2));
+  const { repo, baseRef, headRef, output, evidenceFile, checkpoint } = parseArgs(process.argv.slice(2));
   if (!repo?.includes("/") || !baseRef || !headRef) usageError();
   const input = collectBranchReviewInput(baseRef, headRef);
   const plan = planReviewScope(input);
   const evidence = await loadEvidence(evidenceFile);
-  const result = report({ repo, baseRef, headRef, headRefOid: input.headRefOid, ...evaluate(plan, evidence) });
+  const result = report({
+    repo,
+    baseRef,
+    headRef,
+    baseRefOid: input.baseRefOid,
+    headRefOid: input.headRefOid,
+    diffIdentity: input.diffIdentity,
+    fileCount: plan.fileCount,
+    ...evaluate(plan, evidence),
+  });
+  persistCheckpoint(checkpoint, result);
   const json = JSON.stringify(result, null, 2) + "\n";
   process.stdout.write(json);
   if (output) {
