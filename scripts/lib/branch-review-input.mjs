@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { boundedSpawnSync } from "./subprocess-policy.mjs";
 
 function run(command, args, { trim = true } = {}) {
@@ -78,6 +80,24 @@ function patchForRecord(baseRef, headRef, record) {
   );
 }
 
+function diffIdentity({ baseRefOid, headRefOid, files }) {
+  const digest = createHash("sha256");
+  digest.update(String(baseRefOid || ""));
+  digest.update("\0");
+  digest.update(String(headRefOid || ""));
+  for (const file of files) {
+    digest.update("\0");
+    digest.update(String(file.status || ""));
+    digest.update("\0");
+    digest.update(String(file.previousPath || ""));
+    digest.update("\0");
+    digest.update(String(file.path || ""));
+    digest.update("\0");
+    digest.update(String(file.patch || ""));
+  }
+  return `sha256:${digest.digest("hex")}`;
+}
+
 export function collectBranchReviewInput(baseRef, headRef) {
   const nameStatus = run(
     "git",
@@ -102,6 +122,14 @@ export function collectBranchReviewInput(baseRef, headRef) {
       deletions,
     };
   });
+  const baseRefOid = maybe("git", ["rev-parse", "--verify", baseRef]) || null;
   const headRefOid = maybe("git", ["rev-parse", "--verify", headRef]) || null;
-  return { repo: resolveRepoForBranch(), pr: null, headRefOid, files };
+  return {
+    repo: resolveRepoForBranch(),
+    pr: null,
+    baseRefOid,
+    headRefOid,
+    diffIdentity: diffIdentity({ baseRefOid, headRefOid, files }),
+    files,
+  };
 }
