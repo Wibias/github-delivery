@@ -1,4 +1,4 @@
-import { createProgressWatchdog } from "./agent-progress-watchdog.mjs";
+import { createProgressWatchdog } from "./watchdog-investigation-progress.mjs";
 import {
   classifyAppServerItem,
   isSuccessfulAppServerItem,
@@ -92,6 +92,43 @@ function activeTextWatchdog(watchdog, context) {
 function resetMicroNarration(context) {
   context.microNarrationBuffer = "";
   context.microNarrationIntentCount = 0;
+}
+
+function appServerEvidence(item = {}) {
+  if (item?.type === "commandExecution") {
+    return {
+      toolName: "commandExecution",
+      input: {
+        command: item.command ?? item.commandText ?? item.process?.command ?? "",
+      },
+      response:
+        item.aggregatedOutput ??
+        item.output ??
+        item.stdout ??
+        item.result ??
+        item.text ??
+        item.content ??
+        "",
+    };
+  }
+  return {
+    toolName:
+      item?.appContext?.actionName ||
+      item?.toolName ||
+      item?.tool ||
+      item?.name ||
+      item?.server ||
+      "",
+    input: item?.arguments ?? item?.input ?? {},
+    response:
+      item?.aggregatedOutput ??
+      item?.output ??
+      item?.stdout ??
+      item?.result ??
+      item?.text ??
+      item?.content ??
+      "",
+  };
 }
 
 function observeMicroNarration(delta, context) {
@@ -189,6 +226,14 @@ export function observeCodexAppServerMessage(watchdog, message, context = {}) {
     }
     const classification = classifyAppServerItem(item);
     if (classification.kind === "evidence") {
+      if (typeof watchdog.prepareEvidenceAttempt === "function") {
+        const evidence = appServerEvidence(item);
+        watchdog.prepareEvidenceAttempt({
+          toolName: evidence.toolName,
+          input: evidence.input,
+          volatility: classification.volatility || "stable",
+        });
+      }
       const decision = watchdog.chargeEvidenceAttempt();
       if (decision.action === "block") {
         return maybeInterrupt(
@@ -212,6 +257,17 @@ export function observeCodexAppServerMessage(watchdog, message, context = {}) {
       } else if (classification.kind === "execution") {
         watchdog.recordExecutionProgress({ kind: "codex_execution_completed" });
         resetMicroNarration(context);
+      } else if (
+        classification.kind === "evidence" &&
+        typeof watchdog.recordEvidenceResult === "function"
+      ) {
+        const evidence = appServerEvidence(item);
+        watchdog.recordEvidenceResult({
+          toolName: evidence.toolName,
+          input: evidence.input,
+          volatility: classification.volatility || "stable",
+          response: evidence.response,
+        });
       }
     }
     return { decision: { action: "allow" } };

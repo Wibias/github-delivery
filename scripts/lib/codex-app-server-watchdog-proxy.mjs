@@ -1,4 +1,4 @@
-import { createProgressWatchdog } from "./agent-progress-watchdog.mjs";
+import { createProgressWatchdog } from "./watchdog-investigation-progress.mjs";
 import { observeCodexAppServerMessage } from "./codex-progress-watchdog.mjs";
 
 const STREAM_WATCHDOG_DEFAULTS = Object.freeze({

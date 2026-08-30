@@ -1,4 +1,4 @@
-import { createProgressWatchdog } from "./agent-progress-watchdog.mjs";
+import { createProgressWatchdog } from "./watchdog-investigation-progress.mjs";
 import {
   createEvidenceRegistry,
   deriveShellEvidenceDescriptor,
@@ -34,6 +34,7 @@ function hydrate(state, options) {
     volatileReadIntervalMs: options.volatileReadIntervalMs,
     evidenceSoftLimit: options.evidenceSoftLimit,
     evidenceHardLimit: options.evidenceHardLimit,
+    investigationCreditLimit: options.investigationCreditLimit,
   };
   if (options.generatedCharSoftLimit !== undefined) {
     watchdogOptions.generatedCharSoftLimit = options.generatedCharSoftLimit;
@@ -198,6 +199,7 @@ export function evaluateCodexHook(input, state = {}, options = {}) {
     maxSubagentInputChars: options.maxSubagentInputChars ?? 6_000,
     evidenceSoftLimit: options.evidenceSoftLimit ?? 8,
     evidenceHardLimit: options.evidenceHardLimit ?? 12,
+    investigationCreditLimit: options.investigationCreditLimit,
     maxNarrationRecoveryAttempts:
       options.maxNarrationRecoveryAttempts ?? DEFAULT_MAX_NARRATION_RECOVERY_ATTEMPTS,
     generatedCharSoftLimit: stopFinalizationCandidate
@@ -285,6 +287,12 @@ export function evaluateCodexHook(input, state = {}, options = {}) {
     } else if (classification.kind === "execution") {
       watchdog.recordExecutionProgress({ kind: "tool_execution_completed", toolName: input.tool_name });
     } else if (classification.kind === "evidence" && !responseExplicitlyFailed(input.tool_response)) {
+      watchdog.recordEvidenceResult({
+        toolName: input.tool_name,
+        input: input.tool_input,
+        volatility: classification.volatility || "stable",
+        response: input.tool_response,
+      });
       const descriptor = shellEvidenceDescriptor(input);
       if (descriptor) {
         evidenceRegistry.record({
