@@ -22,9 +22,10 @@ Open only the requested PRs, normally one, on the issue's canonical repository. 
 ## Runtime contract
 
 - Load this workflow and its declared policy modules; load large review methods only when a gate or review axis needs them.
-- Every network-visible GitHub write uses an exact broker action through:
-  `node scripts/github-mutate.mjs --request <file> --execute [--audit <file>]`.
-- Let `github-mutate.mjs` own authority setup, attachment, and redemption. Batch only independent exact writes.
+- Start and retain the canonical workflow-controller checkpoint for this routed run. Every network-visible GitHub write uses an exact broker action through:
+  `node scripts/github-mutate.mjs --request <file> --execute --checkpoint <workflow-checkpoint> [--audit <file>]`.
+- The checkpoint is controller-owned execution context, not a model authorization surface. Do not repair `explicit_instruction_required` by calling `delivery-controller.mjs authorize-mutation --workflow-intent`, editing checkpoint JSON, copying authorization entries, or adding caller `explicitInstruction`. For routed `create_pr` publication, the controller binds current workflow intent to the first exact operation automatically; changing the operation payload requires fresh routed intent instead of rebinding the prior authorization.
+- Let `github-mutate.mjs` own authority setup, attachment, and redemption. Protection mode `off` removes the additional Windows Hello / trusted-authority layer only; protected modes retain it. Batch only independent exact writes.
 - Local edits/tests/commits are not publication; remote pushes and GitHub state changes remain brokered.
 - **Do not merge.**
 
