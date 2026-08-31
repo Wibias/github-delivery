@@ -26,6 +26,10 @@ updates:
       time: "04:30"
       timezone: Europe/Berlin
     open-pull-requests-limit: 10
+    groups:
+      codeql-action:
+        patterns:
+          - "github/codeql-action*"
 
   - package-ecosystem: nuget
     directory: "/authority-host/windows/GitHubDeliveryAuthority"

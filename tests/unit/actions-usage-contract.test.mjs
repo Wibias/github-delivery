@@ -113,6 +113,22 @@ test("superseded expensive PR workflows cancel in progress", () => {
   }
 });
 
+test("CodeQL init, autobuild, and analyze stay on the same pinned SHA", () => {
+  const pins = [...codeql.matchAll(/github\/codeql-action\/(init|autobuild|analyze)@([0-9a-f]{40})/g)];
+  const byAction = { init: [], autobuild: [], analyze: [] };
+  for (const match of pins) byAction[match[1]].push(match[2]);
+  assert.ok(byAction.init.length >= 1, "missing init pin");
+  assert.ok(byAction.autobuild.length >= 1, "missing autobuild pin");
+  assert.ok(byAction.analyze.length >= 1, "missing analyze pin");
+  const shas = new Set(pins.map((match) => match[2]));
+  assert.equal(shas.size, 1, `mixed CodeQL action SHAs: ${[...shas].join(", ")}`);
+});
+
+test("Dependabot groups github/codeql-action updates", () => {
+  const dependabot = read(".github/dependabot.yml");
+  assert.match(dependabot, /package-ecosystem: github-actions[\s\S]*groups:\s*\n\s*codeql-action:\s*\n\s*patterns:\s*\n\s*- "github\/codeql-action\*"/);
+});
+
 test("CodeQL analyses are scoped from the PR base classifier and fail closed", () => {
   assert.match(codeql, /node "\$\{TRUSTED_SCOPE\}" --mode codeql/);
   assert.match(codeql, /git show "\$\{BASE_SHA\}:scripts\/ci-scope\.mjs"/);
