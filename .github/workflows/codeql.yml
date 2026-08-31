@@ -16,8 +16,54 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  scope:
+    name: Detect CodeQL scope
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      javascript: ${{ steps.scope.outputs.javascript }}
+      csharp: ${{ steps.scope.outputs.csharp }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Detect CodeQL scope
+        id: scope
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "${EVENT_NAME}" != "pull_request" ]]; then
+            echo "javascript=true" >> "${GITHUB_OUTPUT}"
+            echo "csharp=true" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          TRUSTED_SCOPE="${RUNNER_TEMP}/github-delivery-ci-scope-base.mjs"
+          git show "${BASE_SHA}:scripts/ci-scope.mjs" > "${TRUSTED_SCOPE}"
+          if git diff --name-only -z "${BASE_SHA}"...HEAD |
+            node "${TRUSTED_SCOPE}" --mode codeql >> "${GITHUB_OUTPUT}"; then
+            exit 0
+          fi
+          echo "::warning::Base CI scope classifier does not support CodeQL mode; fail-closed to running both analyses."
+          echo "javascript=true" >> "${GITHUB_OUTPUT}"
+          echo "csharp=true" >> "${GITHUB_OUTPUT}"
+
   analyze:
     name: CodeQL / Analyze (javascript-typescript)
+    needs: scope
+    if: always() && (needs.scope.result != 'success' || github.event_name != 'pull_request' || needs.scope.outputs.javascript == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -25,6 +71,12 @@ jobs:
       packages: read
       security-events: write
     steps:
+      - name: Fail closed when scope detection failed
+        if: needs.scope.result != 'success'
+        run: |
+          echo "::error::Detect CodeQL scope did not complete successfully."
+          exit 1
+
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -45,6 +97,8 @@ jobs:
 
   analyze-csharp:
     name: CodeQL / Analyze (csharp)
+    needs: scope
+    if: always() && (needs.scope.result != 'success' || github.event_name != 'pull_request' || needs.scope.outputs.csharp == 'true')
     runs-on: windows-latest
     timeout-minutes: 30
     permissions:
@@ -52,6 +106,12 @@ jobs:
       packages: read
       security-events: write
     steps:
+      - name: Fail closed when C# scope detection failed
+        if: needs.scope.result != 'success'
+        run: |
+          echo "::error::Detect CodeQL scope did not complete successfully."
+          exit 1
+
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

@@ -20,6 +20,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       node_compat: ${{ steps.scope.outputs.node_compat }}
+      windows_authority: ${{ steps.scope.outputs.windows_authority }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -33,7 +34,7 @@ jobs:
           node-version: 24
           package-manager-cache: false
 
-      - name: Detect Node compatibility scope
+      - name: Detect CI scope
         id: scope
         shell: bash
         env:
@@ -43,6 +44,7 @@ jobs:
           set -euo pipefail
           if [[ "${EVENT_NAME}" != "pull_request" ]]; then
             echo "node_compat=true" >> "${GITHUB_OUTPUT}"
+            echo "windows_authority=true" >> "${GITHUB_OUTPUT}"
             exit 0
           fi
 
@@ -111,9 +113,17 @@ jobs:
 
   windows-authority:
     name: Node 24 / windows-latest
+    needs: scope
+    if: always() && (needs.scope.result != 'success' || github.event_name != 'pull_request' || needs.scope.outputs.windows_authority == 'true')
     runs-on: windows-latest
     timeout-minutes: 25
     steps:
+      - name: Fail closed when scope detection failed
+        if: needs.scope.result != 'success'
+        run: |
+          echo "::error::Detect CI scope did not complete successfully."
+          exit 1
+
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

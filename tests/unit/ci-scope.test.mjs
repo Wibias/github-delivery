@@ -45,7 +45,13 @@ test("ordinary unrelated paths remain outside scoped compatibility lanes", () =>
     nodeCompat: false,
     windowsAuthority: false,
     csharp: false,
+    javascript: false,
   });
+});
+
+test("non-documentation paths keep JavaScript CodeQL in scope", () => {
+  assert.equal(classifyCiScope(["scripts/lib/skill-router.mjs"]).javascript, true);
+  assert.equal(classifyCiScope(["authority-host/windows/service.cs"]).javascript, true);
 });
 
 test("CI and C# output stays explicit and machine-readable", () => {
@@ -55,12 +61,20 @@ test("CI and C# output stays explicit and machine-readable", () => {
     "node_compat=true\nwindows_authority=true",
   );
   assert.equal(formatScopeOutput("csharp", scope), "required=true");
+  assert.equal(
+    formatScopeOutput("codeql", scope),
+    "javascript=true\ncsharp=true",
+  );
 });
 
 test("CLI contract consumes only a complete NUL-delimited stream", () => {
   assert.equal(
     runCiScope({ mode: "ci", input: Buffer.from("docs/a.md\0", "utf8") }),
     "node_compat=false\nwindows_authority=false",
+  );
+  assert.equal(
+    runCiScope({ mode: "codeql", input: Buffer.from("docs/a.md\0README.md\0", "utf8") }),
+    "javascript=false\ncsharp=false",
   );
   assert.throws(
     () => runCiScope({ mode: "ci", input: Buffer.from("docs/a.md", "utf8") }),
