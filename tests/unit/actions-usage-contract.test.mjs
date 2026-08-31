@@ -29,18 +29,19 @@ test("pull-request CI keeps one canonical full check and bounded compatibility l
   assert.match(ci, /cancel-in-progress: true/);
 });
 
-test("only Node compatibility remains scoped; Windows Authority is unconditional", () => {
+test("Node compatibility and Windows Authority lanes are scoped from the PR base classifier", () => {
   assert.match(ci, /scope:/);
   assert.match(ci, /node_compat:/);
+  assert.match(ci, /windows_authority:/);
   assert.match(ci, /git show "\$\{BASE_SHA\}:scripts\/ci-scope\.mjs"/);
   assert.match(ci, /git diff --name-only -z/);
   assert.match(ci, /node "\$\{TRUSTED_SCOPE\}" --mode ci/);
   assert.match(ci, /needs\.scope\.outputs\.node_compat == 'true'/);
 
   const windowsBlock = ci.slice(ci.indexOf("  windows-authority:"));
-  assert.doesNotMatch(windowsBlock, /needs: scope/);
-  assert.doesNotMatch(windowsBlock, /needs\.scope\.outputs\.windows_authority/);
-  assert.doesNotMatch(windowsBlock, /Fail closed when scope detection failed/);
+  assert.match(windowsBlock, /needs: scope/);
+  assert.match(windowsBlock, /needs\.scope\.outputs\.windows_authority == 'true'/);
+  assert.match(windowsBlock, /Fail closed when scope detection failed/);
   assert.match(windowsBlock, /authority-host\/windows\//);
   assert.match(windowsBlock, /scripts\/prepare-authority-host-runtime-smoke\.mjs/);
 });
@@ -112,15 +113,24 @@ test("superseded expensive PR workflows cancel in progress", () => {
   }
 });
 
-test("C# CodeQL always runs on pull requests", () => {
-  assert.doesNotMatch(codeql, /csharp_scope:/);
+test("CodeQL analyses are scoped from the PR base classifier and fail closed", () => {
+  assert.match(codeql, /node "\$\{TRUSTED_SCOPE\}" --mode codeql/);
+  assert.match(codeql, /git show "\$\{BASE_SHA\}:scripts\/ci-scope\.mjs"/);
+  assert.match(codeql, /needs\.scope\.outputs\.javascript == 'true'/);
   assert.match(codeql, /analyze-csharp:/);
   assert.match(codeql, /name: CodeQL \/ Analyze \(csharp\)/);
   const csharpBlock = codeql.slice(codeql.indexOf("  analyze-csharp:"));
-  assert.doesNotMatch(csharpBlock, /needs: csharp_scope/);
-  assert.doesNotMatch(csharpBlock, /needs\.csharp_scope/);
-  assert.doesNotMatch(csharpBlock, /Fail closed when C# scope detection failed/);
+  assert.match(csharpBlock, /needs: scope/);
+  assert.match(csharpBlock, /needs\.scope\.outputs\.csharp == 'true'/);
+  assert.match(csharpBlock, /Fail closed when C# scope detection failed/);
   assert.match(csharpBlock, /authority-host\/windows\//);
+});
+
+test("Windows rewrite-baseline CI is path-filtered to the files it exercises", () => {
+  const rewrite = read(".github/workflows/windows-rewrite-baseline.yml");
+  assert.match(rewrite, /paths:/);
+  assert.match(rewrite, /scripts\/lib\/rewrite-baseline-store\.mjs/);
+  assert.match(rewrite, /tests\/unit\/push-cleanup-convergence\.test\.mjs/);
 });
 
 test("maintenance schedules stay bounded", () => {

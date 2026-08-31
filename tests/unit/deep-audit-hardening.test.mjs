@@ -37,21 +37,25 @@ test("CI scope policy changes remain conservative when the classifier itself cha
   assert.equal(scope.nodeCompat, true);
   assert.equal(scope.windowsAuthority, true);
   assert.equal(scope.csharp, true);
+  assert.equal(scope.javascript, true);
 });
 
-test("security-critical Windows and C# lanes cannot be scoped out by a pull request", () => {
+test("scoped Windows and C# lanes use the pull-request base classifier and fail closed", () => {
   const ci = source(".github/workflows/ci.yml");
   const codeql = source(".github/workflows/codeql.yml");
 
   assert.match(ci, /git show "\$\{BASE_SHA\}:scripts\/ci-scope\.mjs"/);
   const windowsBlock = ci.slice(ci.indexOf("  windows-authority:"));
-  assert.doesNotMatch(windowsBlock, /needs: scope/);
-  assert.doesNotMatch(windowsBlock, /needs\.scope\.outputs\.windows_authority/);
+  assert.match(windowsBlock, /needs: scope/);
+  assert.match(windowsBlock, /needs\.scope\.outputs\.windows_authority == 'true'/);
+  assert.match(windowsBlock, /Fail closed when scope detection failed/);
 
-  assert.doesNotMatch(codeql, /csharp_scope:/);
+  assert.match(codeql, /git show "\$\{BASE_SHA\}:scripts\/ci-scope\.mjs"/);
+  assert.match(codeql, /node "\$\{TRUSTED_SCOPE\}" --mode codeql/);
   const csharpBlock = codeql.slice(codeql.indexOf("  analyze-csharp:"));
-  assert.doesNotMatch(csharpBlock, /needs: csharp_scope/);
-  assert.doesNotMatch(csharpBlock, /needs\.csharp_scope/);
+  assert.match(csharpBlock, /needs: scope/);
+  assert.match(csharpBlock, /needs\.scope\.outputs\.csharp == 'true'/);
+  assert.match(csharpBlock, /Fail closed when C# scope detection failed/);
 });
 
 test("trusted authority is redeemed before an internal coordination write executes", () => {

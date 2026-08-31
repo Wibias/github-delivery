@@ -29,6 +29,12 @@ const CSHARP_PATTERNS = [
   /^\.github\/workflows\/codeql\.yml$/,
 ];
 
+const DOCUMENTATION_PATTERNS = [
+  /\.md$/i,
+  /^docs\/assets\//,
+  /^LICENSE$/,
+];
+
 function matchesAny(path, patterns) {
   return patterns.some((pattern) => pattern.test(path));
 }
@@ -53,6 +59,7 @@ export function classifyCiScope(paths = []) {
     nodeCompat: paths.some((path) => matchesAny(path, NODE_COMPAT_PATTERNS)),
     windowsAuthority: paths.some((path) => matchesAny(path, WINDOWS_AUTHORITY_PATTERNS)),
     csharp: paths.some((path) => matchesAny(path, CSHARP_PATTERNS)),
+    javascript: paths.some((path) => !matchesAny(path, DOCUMENTATION_PATTERNS)),
   };
 }
 
@@ -65,6 +72,12 @@ export function formatScopeOutput(mode, scope) {
   }
   if (mode === "csharp") {
     return `required=${scope.csharp ? "true" : "false"}`;
+  }
+  if (mode === "codeql") {
+    return [
+      `javascript=${scope.javascript ? "true" : "false"}`,
+      `csharp=${scope.csharp ? "true" : "false"}`,
+    ].join("\n");
   }
   throw new Error(`ci_scope_mode_invalid:${mode || "missing"}`);
 }

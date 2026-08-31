@@ -4,6 +4,11 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- README current-state now keeps only the documented fail-closed limits and the still-expanding list, and release notes point at `CHANGELOG.md` instead of duplicating version history.
+- Pull-request Windows Authority, JavaScript CodeQL, and C# CodeQL jobs now run only when the trusted base-SHA path classifier says those lanes are in scope. Scope detection failure still fail-closes into running the lane. The Windows rewrite-baseline workflow is path-filtered to the files it exercises.
+
 ## [1.3.8] - 2026-08-30
 
 ### Changed

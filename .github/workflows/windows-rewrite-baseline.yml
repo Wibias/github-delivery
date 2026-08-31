@@ -2,9 +2,19 @@ name: Windows rewrite baseline
 
 on:
   pull_request:
+    paths:
+      - "scripts/lib/rewrite-baseline-store.mjs"
+      - "scripts/lib/github-lifecycle-mutation-broker.mjs"
+      - "tests/unit/push-cleanup-convergence.test.mjs"
+      - ".github/workflows/windows-rewrite-baseline.yml"
   push:
     branches:
       - main
+    paths:
+      - "scripts/lib/rewrite-baseline-store.mjs"
+      - "scripts/lib/github-lifecycle-mutation-broker.mjs"
+      - "tests/unit/push-cleanup-convergence.test.mjs"
+      - ".github/workflows/windows-rewrite-baseline.yml"
 
 permissions:
   contents: read

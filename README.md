@@ -18,9 +18,6 @@
 
 </div>
 
-> [!NOTE]
-> **1.3.8.** Routed create-PR intent now survives to the exact mutation boundary, pre-open review evidence is bound to the exact publication candidate, and the watchdog recognizes a small bounded amount of deterministic dependency-following investigation instead of pressuring legitimate reads into premature edits. See [Current state](#current-state).
-
 > [!IMPORTANT]
 > **Natural language is the public API.** The Node scripts, policy modules, evaluators, mutation broker, and optional Authority host are internal safety/evidence machinery. You normally do not invoke them yourself.
 
@@ -100,96 +97,7 @@ For installation edge cases, backup/restore, downgrade behavior, manual recovery
 | **Merge / close-out** | `merge PR #32` | Final gate, exact transaction authority, head-pinned merge, verification, thanks, linked-issue close-out |
 | **Self-update** | `update github-delivery to the latest stable release` | Stable-release verification, lock-aware Windows recovery, optional old-backup cleanup, safe apply and postconditions |
 
-### What changed in 1.3.8
-
-`1.3.8` is a focused publication-integrity and watchdog reliability patch:
-
-- routed create-PR intent is carried automatically from the selected workflow into the exact `create_pr` mutation operation instead of being dropped before execution;
-- that intent remains controller-owned and operation-bound: changing the mutation payload invalidates the authorization, caller-controlled `explicitInstruction` remains non-authoritative, and Protection mode **Off** still performs zero Authority-host authorization;
-- pre-open evidence now binds the exact repository, resolved base/head commits, candidate diff identity, and file count, and both the controller and mutation boundary require a matching `ready` result before initial publication;
-- wrong-scope, missing, blocked, unknown, stale, or mismatched pre-open evidence therefore cannot be narrated around into `push_code` or `create_pr`;
-- successful stable source reads can receive a small bounded investigation credit only when the next read deterministically follows a source dependency referenced by the immediately previous result. Unrelated reads, assistant-prose claims, duplicates, volatile polling, and reads beyond the per-generation cap retain the ordinary evidence limits;
-- the dependency-following behavior is shared by Codex lifecycle hooks and the App Server watchdog path.
-
-### What changed in 1.3.7
-
-`1.3.7` is a focused reliability and Protection-mode semantics patch:
-
-- release-asset HTTP `502`, `503`, and `504` responses are retried up to two times with bounded 250 ms / 750 ms delays;
-- failed transient response bodies are discarded before retrying, while deterministic client errors such as `404` remain fail-fast;
-- the retry is limited to asset acquisition: HTTPS redirect limits, byte limits, GitHub asset digests, `SHA256SUMS`, manifest validation, tag/source binding, and constrained GitHub attestation verification remain unchanged and fail-closed;
-- Protection mode **Off** (`authorityMode=off`) removes only the additional Windows Hello / trusted-authority requirement. Otherwise-authorized GitHub writes continue through the normal workflow and mutation policy instead of being forced into planning-only behavior;
-- caller-controlled request fields such as `explicitInstruction` and `exactTextConfirmed` still cannot manufacture user authority. Current intent and exact-text confirmation come from controller-owned, operation-bound workflow context, while expected-head, idempotency, stack, merge-driver, postcondition, and other execution checks remain unchanged;
-- **Sensitive actions** (`high-assurance`) and **Every GitHub write** (`all`) retain their existing trusted-authority requirements.
-
-### What changed in 1.3.6
-
-`1.3.6` is a focused follow-up watchdog false-positive correction:
-
-- structured completed recommendation outcomes from read-only reviews are recognized as explicit finalization candidates instead of being forced into narration recovery by the ordinary hook-mode generation budget;
-- active recovery can close when the corrective continuation reports that the selected next action cannot run or is explicitly unauthorized;
-- the larger finalization allowance is scoped only to explicit finalization candidates; ordinary `Stop` narration keeps the stricter hook budget, candidates that announce another tool action still recover, malformed tool-protocol stalls remain hard stops, and output above the completed-answer hard bound remains fail-closed.
-
-### What changed in 1.3.5
-
-`1.3.5` is a focused watchdog false-positive correction patch:
-
-- the Codex lifecycle `Stop` hook recognizes explicit terminal dispositions after completed work and clears narration recovery instead of injecting another corrective continuation;
-- a completed terminal review can therefore finish without spurious `recovery 1/3` or persisted `recovery 2/3` feedback;
-- terminal wording does not end recovery when the same response announces another tool action, and malformed tool-protocol stalls keep their existing hard-stop behavior.
-
-### What changed in 1.3.4
-
-`1.3.4` is a mutation-boundary and post-publication verification hardening patch:
-
-- `1.3.4` made `authorityMode=off` planning-only for GitHub writes while hardening against model-callable controller flags or helper invocation being treated as current-user intent; `1.3.7` supersedes the planning-only interpretation while retaining the caller-controlled-intent hardening;
-- GraphQL mutation documents fail closed when their root mutation fields cannot be completely resolved, including fragment spreads and inline fragments;
-- native PR approval is created against the exact `expectedHead` commit and accepted only when the live review matches the authenticated actor, commit, approval state, and idempotency marker, with a post-write head re-read;
-- body-bearing review/comment mutations re-read the authoritative GitHub object after publication and require its live body to match the exact intended markdown, with fallback receipt lookup bound to the authenticated actor, idempotency marker, and reply parent where applicable.
-
-### What changed in 1.3.3
-
-`1.3.3` is a convergence and terminal-failure hardening patch:
-
-- operational process, job, and worktree probes such as `Get-Process`, `Get-CimInstance Win32_Process`, `tasklist`, `ps`, `pgrep`, and `git worktree list` are volatile watchdog evidence, so repeated polling consumes the protected evidence budget instead of masquerading as neutral progress;
-- authoritative live `ship-gate` capture failures preserve a bounded upstream cause and return a machine-readable fail-closed `unknown` result rather than collapsing the incident into generic stderr;
-- deterministic GitHub capability/permission failures such as 401/403 are classified non-retryable, transient upstream failures remain distinguishable as retryable, and unknown causes remain fail-closed;
-- established replay-integrity, workflow, and argument-error CLI stderr contracts are unchanged.
-
-### What changed in 1.3.2
-
-`1.3.2` is a review-hygiene and mutation-boundary hardening patch:
-
-- `no-comments` is a first-class hygiene pass with an independent comment inspector; no-comments and simplify run independently by default on full review, re-review, merge-ready/fix, and create-PR pre-open, and opting out of one pass does not disable or authorize the other;
-- negated simplify requests such as `without simplify` and `skip simplify` remain read-only and cannot accidentally grant `push_code`;
-- on Windows, protected `gh` and `git` subprocesses resolve only from absolute PATH entries outside the lexical and canonical worktree, closing current-directory executable hijacking plus junction/symlink escape paths;
-- `authorityMode=off` can consume trusted workflow intent through the canonical mutation controller without trusting caller-supplied booleans; the checkpoint evidence is bound to the exact operation identity;
-- mutation-document idempotency and resume identities bind the full canonical payload, so reusing a human label cannot silently suppress a different operation;
-- path normalization no longer uses the input-dependent trailing-separator regular expression flagged by GitHub Advanced Security.
-
-### What changed in 1.3.1
-
-`1.3.1` is a focused recovery and concurrency patch for the 1.3.0 runtime:
-
-- exclusive skill and Windows Authority install locks can reclaim only a github-delivery-owned PID + nonce lock whose recorded process is provably gone; live, malformed, and permission-uncertain locks remain fail-closed;
-- `scripts/policy-bundle.mjs` and `scripts/workflow-brief.mjs` default to the installed skill root derived from their own location, so agents can load workflow packets while remaining in the target repository; explicit root overrides are unchanged;
-- rewrite-baseline generation allocation is finalized after the exclusive store lock is acquired, closing the window where a waiting writer could reuse a generation that another writer published immediately before releasing the lock while preserving the existing stale-takeover generation fence.
-
-### What changed in 1.3.0
-
-`1.3.0` brings local Git workflow and release versioning into the same delivery lifecycle:
-
-- `references/git-workflow.md` owns repository-aware branch/commit organization, logical commit boundaries, commit-message guidance, pre-commit hygiene, generated-file decisions, Git-history investigation, and evidence-backed change summaries;
-- `references/versioning-release.md` owns release-delta inventory, SemVer classification by observable consumer impact, version-source consistency, human-curated changelogs, tag/version identity, and release-candidate checks;
-- direct commit/branch and SemVer/changelog/release-preparation requests route internally instead of handing off to `git-workflow-and-versioning`, while repository conventions and the stricter existing `GD-GIT-*` safety rules remain authoritative;
-- issue-linked and local-work PR publication compose the Git-workflow reference when branch/commit preparation is actually needed, preserving progressive disclosure;
-- release preparation remains separate from publication: a version/changelog request never grants tag, GitHub Release, npm/package-registry, merge, or other remote publication authority;
-- native approval is a dedicated `approve_pr` authority action: generic `post_review` cannot encode approval, explicit approval intent remains mandatory, Windows Authority binds the semantic approval action, and self-approval is rejected before the GitHub approval write;
-- Git/versioning requests now enter the mandatory one-shot workflow-packet/controller runtime, full-review intent keeps precedence over broad Git/version keywords in attributed repository text, and execution packets advertise only actions present in the mutation registry;
-- verified uncertain pushes (`reconciled_after_error`) count as completed controller progress, and resumed `already_applied` receipts retain the original request including `newTip` so head checkpoints can recover after a crash;
-- Windows update graceful-close consent is bound to the inspected PID plus process start identity and re-verified immediately before `CloseMainWindow()`, so PID reuse fails closed instead of closing a different process.
-
-See [`CHANGELOG.md`](CHANGELOG.md) for the full release-level details, including the `1.2.0` Windows update-safety changes.
+See [`CHANGELOG.md`](CHANGELOG.md) for what changed in this release and previous versions.
 
 ---
 
@@ -604,24 +512,24 @@ npm run reliability:gate
 
 ### Lean required CI topology
 
-The pull-request CI topology is deliberately asymmetric to avoid repeating the full repository suite across every OS/runtime combination while keeping the security-critical platform lanes unskippable by PR scope logic:
+The pull-request CI topology is deliberately asymmetric to avoid repeating the full repository suite across every OS/runtime combination. Expensive lanes run only when the trusted path classifier from the PR **base** says those files changed; if that classifier cannot run, the lane fail-closes into running.
 
 | Required context | PR behavior |
 |---|---|
-| **Node 24 / ubuntu-latest** | Canonical full `npm run check`; then bounded Node 26 syntax/package/unit compatibility on the same workspace |
-| **Node 22 / ubuntu-latest** | Bounded compatibility lane only when runtime-relevant paths change; its path classifier is executed from the PR base version |
-| **Node 24 / windows-latest** | Always runs Windows Authority restore/build/self-test/publish/install smoke on pull requests |
-| **Dependency Review** | Runs on pull requests |
-| **CodeQL / Analyze (javascript-typescript)** | Runs on pull requests |
-| **CodeQL / Analyze (csharp)** | Always runs on pull requests, plus `main` and schedules |
+| **Node 24 / ubuntu-latest** | Canonical full `npm run check` on every PR; then bounded Node 26 syntax/package/unit compatibility on the same workspace |
+| **Node 22 / ubuntu-latest** | Bounded compatibility lane only when runtime-relevant paths change |
+| **Node 24 / windows-latest** | Windows Authority restore/build/self-test/publish/install smoke only when Authority-host paths change |
+| **Dependency Review** | Runs on pull requests (the action itself is cheap when lockfiles did not change) |
+| **CodeQL / Analyze (javascript-typescript)** | Runs when the PR is not documentation-only |
+| **CodeQL / Analyze (csharp)** | Runs when C# / Authority-host paths change, plus `main` and schedules |
 
-There are no macOS PR compatibility lanes and no duplicate Architecture Contracts workflow. Superseded CI, CodeQL, and Dependency Review runs are cancelled when a newer commit arrives. Repository-policy verification is daily and orphan-workflow cleanup is weekly; cleanup pins the default-branch generation before deleting stale workflow histories.
+There are no macOS PR compatibility lanes and no duplicate Architecture Contracts workflow. The Windows rewrite-baseline workflow is not a required check and uses path filters so it only starts when rewrite-baseline files change. Superseded CI, CodeQL, and Dependency Review runs are cancelled when a newer commit arrives. Repository-policy verification is daily and orphan-workflow cleanup is weekly; cleanup pins the default-branch generation before deleting stale workflow histories.
 
-For ordinary runtime-relevant PRs this keeps full `npm run check` executions at **1**, full unit-suite runtime executions at **3**, one Windows Authority lane on every PR, and **0** macOS PR jobs while retaining Node 22/24/26 compatibility coverage and unconditional Windows/C# security coverage.
+For ordinary runtime-relevant PRs this keeps full `npm run check` executions at **1**, full unit-suite runtime executions at **3**, Windows Authority and C# CodeQL only when those surfaces changed, and **0** macOS PR jobs while retaining Node 22/24/26 compatibility coverage.
 
 ### Live lifecycle fixture
 
-The unit/eval suite proves deterministic contracts. An explicitly opted-in fixture repository exercises the real GitHub lifecycle with immutable repository-identity binding before the first mutation. Fixture diffs force the scoped Node 22 compatibility lane; the Windows Authority lane already runs unconditionally.
+The unit/eval suite proves deterministic contracts. An explicitly opted-in fixture repository exercises the real GitHub lifecycle with immutable repository-identity binding before the first mutation. Fixture diffs force the scoped Node 22 and Windows Authority compatibility lanes.
 
 See [`docs/live-integration.md`](docs/live-integration.md) and [`docs/live-github-integration.md`](docs/live-github-integration.md).
 
@@ -661,35 +569,6 @@ The architecture uses progressive disclosure: route once, load the selected work
 ---
 
 ## Current state
-
-`1.3.8` is a focused publication-integrity and watchdog reliability patch on top of `1.3.7`: routed create-PR intent reaches the exact operation-bound mutation context, pre-open review evidence is bound to the exact publication candidate, and deterministic dependency-following source investigation receives a small bounded progress allowance without weakening duplicate or volatile-read controls.
-
-Stable in this release:
-
-- natural-language routing for local Git workflow plus the issue/PR lifecycle;
-- repository-aware branch/commit organization, commit messages, pre-commit hygiene, generated-file handling, and bounded Git-history investigation;
-- evidence-backed SemVer classification, version metadata consistency, curated changelogs, and tag/release preparation with publication kept separately authorized;
-- read-only open-work and competing-PR analysis;
-- issue research, implementation, publication, external work-item delivery, and exact-head duplicate prevention;
-- routed create-PR intent that remains controller-owned and bound to the exact canonical mutation operation instead of relying on caller-controlled request flags;
-- exact-candidate pre-open publication evidence, enforced both at the workflow transition and again at the mutation boundary before initial push/PR creation;
-- deep current-head review with deterministic probe coverage, conditional visual evidence, and independently opt-outable no-comments/simplify hygiene passes;
-- explicit GitHub-native PR approval created against the exact expected head and verified against the authenticated actor, commit, approval state, and idempotency marker before success;
-- mutation authority, exact-effect receipts, payload-bound operation idempotency, controller-owned stale-head protection, and head-pinned merge execution;
-- Windows protected-command resolution that rejects worktree-controlled `gh`/`git` executables and lexical/canonical alias escapes;
-- Protection mode Off (`authorityMode=off`) as an opt-out from the additional Windows Hello / trusted-authority layer only: otherwise-authorized writes still require controller-owned current user intent and all normal mutation safety gates, while caller-controlled request fields and repository content cannot mint authority;
-- fail-closed GraphQL mutation-root resolution for direct selections, fragment spreads, and inline fragments at the broker boundary;
-- authoritative post-publication body verification for review/comment mutations, bound to authenticated actor and exact idempotency identity where collection lookup is required;
-- optional Windows Authority Hello grants, push-only branch leases, and PR sessions for later exact-scope push and merge on one PR and approved merge base;
-- inferred-stack restacking/merge-order safety and independent multi-base delivery;
-- SHA-bound remote repository context when a useful local checkout is not already available;
-- verified stable install/update with bounded release-asset gateway retries, stale owned install-lock recovery, Windows lock recovery, graceful-close prompting, and optional older-backup cleanup that preserves the fresh rollback backup;
-- installed workflow helpers that resolve their own skill root while retaining explicit root overrides;
-- generation-fenced rewrite-baseline storage with generation allocation finalized under the acquired lock;
-- progress watchdog/runtime convergence controls that charge operational process/job/worktree polling as volatile evidence rather than neutral progress while allowing only a capped deterministic dependency-following stable-source chain to avoid increasing the consecutive no-progress read streak;
-- lifecycle-hook finalization that can recognize explicit completed recommendation outcomes and close concrete authorization/blocker recovery, without treating ordinary long `Stop` narration or responses that announce another tool action as final;
-- live `ship-gate` capture failures that preserve bounded upstream causes, remain fail-closed, and expose retryability so deterministic GitHub capability/permission failures can terminate equivalent probing;
-- deterministic bundles, repository security checks, CodeQL, Dependency Review, live-fixture contracts, and release preparation.
 
 Known limits, documented and fail-closed:
 
