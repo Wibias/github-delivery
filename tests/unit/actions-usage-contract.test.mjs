@@ -115,7 +115,11 @@ test("superseded expensive PR workflows cancel in progress", () => {
 
 test("CodeQL init, autobuild, and analyze stay on the same pinned SHA", () => {
   const pins = [...codeql.matchAll(/github\/codeql-action\/(init|autobuild|analyze)@([0-9a-f]{40})/g)];
-  assert.ok(pins.length >= 5, `expected init/autobuild/analyze pins, found ${pins.length}`);
+  const byAction = { init: [], autobuild: [], analyze: [] };
+  for (const match of pins) byAction[match[1]].push(match[2]);
+  assert.ok(byAction.init.length >= 1, "missing init pin");
+  assert.ok(byAction.autobuild.length >= 1, "missing autobuild pin");
+  assert.ok(byAction.analyze.length >= 1, "missing analyze pin");
   const shas = new Set(pins.map((match) => match[2]));
   assert.equal(shas.size, 1, `mixed CodeQL action SHAs: ${[...shas].join(", ")}`);
 });
