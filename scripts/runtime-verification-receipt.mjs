@@ -4,6 +4,7 @@ import { pathToFileURL } from "node:url";
 
 const SHA_RE = /^[0-9a-f]{40}$/i;
 const RESULTS = new Set(["pass", "fail", "blocked"]);
+const SURFACES = new Set(["cli", "tui", "web", "desktop", "api", "mobile", "library"]);
 
 function requireText(value, code) {
   if (typeof value !== "string" || !value.trim()) throw new Error(code);
@@ -17,6 +18,7 @@ function validateReceipt(receipt) {
   requireText(receipt.repository, "receipt_repository_invalid");
   requireText(receipt.feature, "receipt_feature_invalid");
   if (!SHA_RE.test(String(receipt.head_sha || ""))) throw new Error("receipt_head_sha_invalid");
+  if (!SURFACES.has(receipt.surface)) throw new Error("receipt_surface_invalid");
   if (!RESULTS.has(receipt.result)) throw new Error("receipt_result_invalid");
   if (!RESULTS.has(receipt.cleanup)) throw new Error("receipt_cleanup_invalid");
   for (const field of ["checks", "artifacts", "side_effects", "started_resources"]) {
