@@ -8,7 +8,7 @@ Policy modules:
 - reviews
 - issues
 - publication
-- runtime-verification (when a project-local verify-* skill exists and the candidate changes observable runtime behavior or has material runtime risk)
+- runtime-verification (conditional)
 - stacks (when stack topology is detected)
 <!-- policy-modules:end -->
 
@@ -111,11 +111,11 @@ Then:
 Work on the current PR head until the authoritative merge-ready bar is satisfied:
 
 1. Keep the branch current with base and resolve conflicts safely. Remote branch updates use `push_code`.
-2. Process current human/bot feedback. Fix required findings or decline them with verified rationale under review policy.
-3. Required CI must be green on the authoritative current SHA. CI helpers aid diagnosis; they do not override `ship-gate.mjs`.
-4. Complete own bug, security, Spec + Standards, semantic propagation, proactive contract verification, relevant CODEOWNERS checks, and runtime verification when the conditional `runtime-verification` module applies. A runtime receipt must classify as `pass_current` for the current head before it is used as positive evidence; `stale`, `fail`, `blocked`, and `invalid` remain visible non-passes.
-5. Reconcile the PR description with final head scope, validation, limitations, and linkage; update it through broker action `update_pr_body` when needed. Existing protected media must survive the rewrite unless exact media identities were explicitly authorized for removal under `references/pr-description.md`.
-6. Run the settle window, re-read current reviews/checks/rules/base/head, then run the authoritative final ship gate. Head changes invalidate head-bound evidence, including runtime receipts.
+2. Process current human/bot feedback; fix required findings or decline them with verified rationale.
+3. Required CI must be green on the current SHA. CI helpers diagnose; they do not override `ship-gate.mjs`.
+4. Complete own bug, security, Spec + Standards, semantic propagation, proactive contract verification, CODEOWNERS, and applicable `runtime-verification` checks. Load detailed references only for active axes.
+5. Reconcile the PR description with final-head scope, validation, limitations, and linkage through broker action `update_pr_body`. Preserve protected media unless explicitly authorized for removal.
+6. Run the settle window; re-read reviews/checks/rules/base/head; then run the authoritative final ship gate. Head changes invalidate head-bound evidence.
 7. When ready, publish merge-ready PR and linked-issue notifications through brokered actions. **Do not merge.**
 
 ## H. Completion report
@@ -131,6 +131,6 @@ Before final reporting, apply `references/completion-claims.md` to current autho
 - Every network-visible write went through `github-mutate.mjs`; required trusted authority was obtained/redeemed by the mutation runtime.
 - PR description matches final head/issue contract; linkage follows the default/non-default rule without futile retries and protected media was preserved during rewrites.
 - Issue self-assigned when possible; one complete opened-PR comment; no duplicates.
-- Own reviews, current feedback, required CI, freshness checks, conditional current-head runtime evidence when applicable, and final ship gate are satisfied on final head.
+- Own reviews, current feedback, required CI, freshness checks, applicable runtime verification, and final ship gate are satisfied on final head.
 - Final report satisfies `references/completion-claims.md`.
 - Merge-ready was published and **the PR was not merged**.
