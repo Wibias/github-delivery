@@ -110,13 +110,13 @@ Then:
 
 Work on the current PR head until the authoritative merge-ready bar is satisfied:
 
-1. Keep the branch current with base and resolve conflicts safely. Remote branch updates use `push_code`.
-2. Process current human/bot feedback; fix required findings or decline them with verified rationale.
-3. Required CI must be green on the current SHA. CI helpers diagnose; they do not override `ship-gate.mjs`.
-4. Complete own bug, security, Spec + Standards, semantic propagation, proactive contract verification, CODEOWNERS, and applicable `runtime-verification` checks. Load detailed references only for active axes.
-5. Reconcile the PR description with final-head scope, validation, limitations, and linkage through broker action `update_pr_body`. Preserve protected media unless explicitly authorized for removal.
-6. Run the settle window; re-read reviews/checks/rules/base/head; then run the authoritative final ship gate. Head changes invalidate head-bound evidence.
-7. When ready, publish merge-ready PR and linked-issue notifications through brokered actions. **Do not merge.**
+1. Keep branch current with base; resolve conflicts safely. Remote updates use `push_code`.
+2. Process current human/bot feedback; fix required findings or decline with verified rationale.
+3. Require green CI on current SHA; helpers diagnose but never override `ship-gate.mjs`.
+4. Complete own bug, security, Spec + Standards, semantic propagation, proactive contract verification, CODEOWNERS, and applicable `runtime-verification`; load detail only for active axes.
+5. Reconcile the PR description with final-head scope, validation, limitations, and linkage via broker `update_pr_body`; preserve protected media absent explicit removal authority.
+6. Run the settle window; re-read reviews/checks/rules/base/head; run the authoritative final ship gate. Head changes invalidate head-bound evidence.
+7. Publish merge-ready PR and linked-issue notifications through brokered actions. **Do not merge.**
 
 ## H. Completion report
 
@@ -124,13 +124,13 @@ Before final reporting, apply `references/completion-claims.md` to current autho
 
 ## Done when
 
-- Requested PR count only; canonical issue repository and intended base/head.
-- Full issue thread and screenshot gate completed; bounded preflight reached an evidence-backed outcome.
-- Non-empty implementation diff existed before the pre-open gate; pre-open bug/security requirements cleared before publication.
-- Existing exact-head/base publication was reused instead of duplicated after a race/retry.
-- Every network-visible write went through `github-mutate.mjs`; required trusted authority was obtained/redeemed by the mutation runtime.
-- PR description matches final head/issue contract; linkage follows the default/non-default rule without futile retries and protected media was preserved during rewrites.
-- Issue self-assigned when possible; one complete opened-PR comment; no duplicates.
-- Own reviews, current feedback, required CI, freshness checks, applicable runtime verification, and final ship gate are satisfied on final head.
+- Only requested PRs; canonical issue repository and intended base/head.
+- Full issue thread and screenshot gate complete; preflight has evidence-backed outcome.
+- Non-empty implementation diff existed before the pre-open gate; bug/security publication requirements cleared.
+- Exact-head/base publication was reused instead of duplicated.
+- Network writes used `github-mutate.mjs` with required authority.
+- PR description matches final head/issue contract; linkage and protected-media rules are satisfied.
+- Self-assignment when possible; one opened-PR issue comment; no duplicates.
+- Reviews, feedback, required CI, freshness, applicable runtime verification, and final ship gate pass on final head.
 - Final report satisfies `references/completion-claims.md`.
 - Merge-ready was published and **the PR was not merged**.
