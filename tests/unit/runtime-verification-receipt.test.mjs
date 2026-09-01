@@ -107,3 +107,30 @@ test("requires full 40-character expected and receipt SHAs", async () => {
     /receipt_head_sha_invalid/,
   );
 });
+
+test("matches the producer surface contract", async () => {
+  await assert.rejects(
+    evaluateRuntimeVerificationReceipt({
+      receiptPath: await receipt({ surface: undefined }),
+      repository: "owner/repo",
+      headSha: HEAD,
+    }),
+    /receipt_surface_invalid/,
+  );
+
+  await assert.rejects(
+    evaluateRuntimeVerificationReceipt({
+      receiptPath: await receipt({ surface: "console" }),
+      repository: "owner/repo",
+      headSha: HEAD,
+    }),
+    /receipt_surface_invalid/,
+  );
+
+  const tui = await evaluateRuntimeVerificationReceipt({
+    receiptPath: await receipt({ surface: "tui" }),
+    repository: "owner/repo",
+    headSha: HEAD,
+  });
+  assert.equal(tui.status, "pass_current");
+});
