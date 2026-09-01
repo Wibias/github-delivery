@@ -8,7 +8,7 @@ Policy modules:
 - reviews
 - issues
 - publication
-- runtime-verification (conditional)
+- runtime-verification (when a project-local verify-* skill exists and the candidate changes observable runtime behavior or has material runtime risk)
 - stacks (when stack topology is detected)
 <!-- policy-modules:end -->
 
