@@ -114,7 +114,7 @@ Work on the current PR head until the authoritative merge-ready bar is satisfied
 2. Process current human/bot feedback; fix required findings or decline with verified rationale.
 3. Require green CI on current SHA; helpers diagnose but never override `ship-gate.mjs`.
 4. Complete own bug, security, Spec + Standards, semantic propagation, proactive contract verification, CODEOWNERS, and applicable `runtime-verification`; load detail only for active axes.
-5. Reconcile the PR description with final-head scope, validation, limitations, and linkage via broker `update_pr_body`; preserve protected media absent explicit removal authority.
+5. Reconcile the PR description with final-head scope, validation, limitations, and linkage via broker action `update_pr_body`; preserve protected media absent explicit removal authority.
 6. Run the settle window; re-read reviews/checks/rules/base/head; run the authoritative final ship gate. Head changes invalidate head-bound evidence.
 7. Publish merge-ready PR and linked-issue notifications through brokered actions. **Do not merge.**
 
