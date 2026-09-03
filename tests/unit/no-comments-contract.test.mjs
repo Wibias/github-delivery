@@ -69,6 +69,24 @@ test("comment inspector never writes application code and parent inspects", () =
   assert.doesNotMatch(agent, /Yes\.\.\. Ha ha ha/);
 });
 
+test("comment inspector freezes scope and emits only final classifications", () => {
+  const agent = read("agents/comment-inspector.md");
+  const workflow = read("references/no-comments.md");
+
+  assert.match(agent, /freeze the parent-provided scope/i);
+  assert.match(agent, /never add files to that scope/i);
+  assert.match(agent, /classify each scoped comment exactly once/i);
+  assert.match(agent, /do not emit provisional decisions/i);
+  assert.match(agent, /no progress narration/i);
+  assert.match(agent, /directly covered by the deleted alibi/i);
+  assert.match(agent, /do not infer broader architecture work/i);
+  assert.match(agent, /report only/i);
+
+  assert.match(workflow, /immutable scope/i);
+  assert.match(workflow, /outside that scope/i);
+  assert.match(workflow, /provisional or contradictory classifications/i);
+});
+
 test("apply vs report, encodings, and merge-ready blockers", () => {
   const workflow = read("references/no-comments.md");
   assert.match(workflow, /push_code/);
