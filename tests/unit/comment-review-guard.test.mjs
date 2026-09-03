@@ -18,9 +18,13 @@ function fixture() {
   return root;
 }
 
-test("captures scoped bytes, detects reviewer mutation, and restores exact bytes", () => {
+function snapshotFor(root) {
+  return `${root}.snapshot.json`;
+}
+
+test("captures scoped bytes outside the repo, detects reviewer mutation, and restores exact bytes", () => {
   const root = fixture();
-  const snapshot = join(root, ".review-snapshot.json");
+  const snapshot = snapshotFor(root);
   try {
     const before = readFileSync(join(root, "a.ts"));
     const captured = captureCommentReviewSnapshot({
@@ -41,17 +45,32 @@ test("captures scoped bytes, detects reviewer mutation, and restores exact bytes
     assert.deepEqual(readFileSync(join(root, "a.ts")), before);
     assert.equal(verifyCommentReviewSnapshot({ root, snapshotPath: snapshot }).unchanged, true);
   } finally {
+    rmSync(snapshot, { force: true });
     rmSync(root, { recursive: true, force: true });
   }
 });
 
 test("capture rejects paths outside the repository root", () => {
   const root = fixture();
-  const snapshot = join(root, ".review-snapshot.json");
+  const snapshot = snapshotFor(root);
   try {
     assert.throws(
       () => captureCommentReviewSnapshot({ root, files: ["../outside.ts"], snapshotPath: snapshot }),
       /comment_review_scope_path_invalid/,
+    );
+  } finally {
+    rmSync(snapshot, { force: true });
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("capture rejects a backup path inside the repository", () => {
+  const root = fixture();
+  const snapshot = join(root, ".review-snapshot.json");
+  try {
+    assert.throws(
+      () => captureCommentReviewSnapshot({ root, files: ["a.ts"], snapshotPath: snapshot }),
+      /comment_review_snapshot_must_be_outside_root/,
     );
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -60,13 +79,14 @@ test("capture rejects paths outside the repository root", () => {
 
 test("discard removes the private snapshot after the reviewer window", () => {
   const root = fixture();
-  const snapshot = join(root, ".review-snapshot.json");
+  const snapshot = snapshotFor(root);
   try {
     captureCommentReviewSnapshot({ root, files: ["a.ts"], snapshotPath: snapshot });
     const result = discardCommentReviewSnapshot({ snapshotPath: snapshot });
     assert.equal(result.discarded, true);
     assert.throws(() => readFileSync(snapshot), /ENOENT/);
   } finally {
+    rmSync(snapshot, { force: true });
     rmSync(root, { recursive: true, force: true });
   }
 });
