@@ -56,3 +56,21 @@ test("local-work workflow is maintainer-compatible and declares safety boundarie
   assert.match(workflow, /Do not load `references\/shared-rules\.md` as mandatory context/i);
   assert.doesNotMatch(workflow, /Issue conversation intake/);
 });
+
+test("local-work workflow consumes one locked packet and deterministic publication plan", () => {
+  const workflow = readFileSync(
+    new URL("../../references/create-pr-from-local-work.md", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(workflow, /workflow-brief\.mjs.*create-pr-from-local-work/i);
+  assert.match(workflow, /run it once/i);
+  assert.match(workflow, /do not re-decide/i);
+  assert.match(workflow, /pre-open-gate\.mjs.*--compact/i);
+  assert.match(workflow, /top-level `decision`/i);
+  assert.match(workflow, /create-pr-publication-plan\.mjs/i);
+  assert.match(workflow, /initial `create_pr` is always draft/i);
+  assert.match(workflow, /pass the generated plan unchanged/i);
+  assert.match(workflow, /fail closed once/i);
+  assert.match(workflow, /do not debate precedence/i);
+});

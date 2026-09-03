@@ -63,7 +63,7 @@ test("comment inspector never writes application code and parent inspects", () =
   assert.match(workflow, /must spawn/i);
   assert.match(workflow, /comment inspector/i);
   assert.match(workflow, /parent fallback/i);
-  assert.match(workflow, /application-code edits/);
+  assert.match(workflow, /claimed or observed reviewer workspace mutation/i);
   assert.match(workflow, /second rejected report fails/i);
   assert.doesNotMatch(workflow, /subagent_type: "Comment Sicko"/);
   assert.doesNotMatch(agent, /Yes\.\.\. Ha ha ha/);
@@ -85,6 +85,21 @@ test("comment inspector freezes scope and emits only final classifications", () 
   assert.match(workflow, /immutable scope/i);
   assert.match(workflow, /outside that scope/i);
   assert.match(workflow, /provisional or contradictory classifications/i);
+});
+
+test("comment inspector is report-only and parent owns workspace mutation", () => {
+  const agent = read("agents/comment-inspector.md");
+  const workflow = read("references/no-comments.md");
+
+  assert.match(agent, /report-only/i);
+  assert.match(agent, /never edit files/i);
+  assert.doesNotMatch(agent, /touch comments/i);
+  assert.match(workflow, /parent applies accepted comment deletions/i);
+  assert.match(workflow, /reviewer failure cannot leave workspace mutations/i);
+  assert.match(workflow, /subagent.*error.*parent fallback/i);
+  assert.match(workflow, /pre-spawn byte snapshot/i);
+  assert.match(workflow, /no concurrent writer/i);
+  assert.match(workflow, /restore the exact pre-spawn bytes/i);
 });
 
 test("apply vs report, encodings, and merge-ready blockers", () => {
