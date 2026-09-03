@@ -55,10 +55,19 @@ function controller(startPhase = "PREOPEN_GATE") {
   });
 }
 
+function hygienePasses(headSha = HEAD) {
+  return {
+    noComments: { status: "done", headSha, recordedAt: 1 },
+    simplify: { status: "done", headSha, recordedAt: 1 },
+  };
+}
+
 function completeHygiene(current) {
-  current.recordHygienePass("no-comments", { status: "done" });
-  current.recordHygienePass("simplify", { status: "done" });
-  return current;
+  const snapshot = current.snapshot();
+  return createDeliveryWorkflowController({
+    snapshot: { ...snapshot, hygienePasses: hygienePasses(snapshot.headSha) },
+    graph: snapshot.graph,
+  });
 }
 
 function pushRequest(newTip = HEAD) {
@@ -205,15 +214,14 @@ test("wrong historical pre-open range blocks publication until the exact candida
     const taskHead = commit(directory, "task candidate");
 
     const profile = resolveDeliveryWorkflowProfile("create-pr-for-issue");
-    const initial = createDeliveryWorkflowController({
+    const initial = completeHygiene(createDeliveryWorkflowController({
       workflow: profile.workflow,
       repo: "acme/widgets",
       baseSha: devBase,
       headSha: taskHead,
       graph: profile.graph,
       startPhase: "PREOPEN_GATE",
-    });
-    completeHygiene(initial);
+    }));
     writeDeliveryWorkflowCheckpoint(checkpoint, initial.snapshot());
 
     const wrong = spawnSync(
