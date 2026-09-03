@@ -21,6 +21,10 @@ const PRE_OPEN_WORKFLOWS = new Set([
   "create-pr-from-local-work",
 ]);
 const PRE_OPEN_PUBLICATION_ACTIONS = new Set(["push_code", "create_pr"]);
+const PRE_OPEN_HYGIENE_PASSES = Object.freeze([
+  Object.freeze({ id: "no-comments", key: "noComments" }),
+  Object.freeze({ id: "simplify", key: "simplify" }),
+]);
 
 function nonNegativeInteger(value, fallback = 0) {
   return Number.isInteger(value) && value >= 0 ? value : fallback;
@@ -124,8 +128,42 @@ function normalizePreOpenGate(value) {
   };
 }
 
+function normalizeHygienePass(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  if (value.status !== "done") return null;
+  return {
+    status: "done",
+    headSha: value.headSha ? String(value.headSha) : null,
+    recordedAt: Number.isFinite(value.recordedAt) ? value.recordedAt : null,
+  };
+}
+
+function normalizeHygienePasses(value) {
+  const input = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  return {
+    noComments: normalizeHygienePass(input.noComments),
+    simplify: normalizeHygienePass(input.simplify),
+  };
+}
+
 function sameIdentity(left, right) {
   return String(left || "").toLowerCase() === String(right || "").toLowerCase();
+}
+
+export function assertPreOpenHygieneEvidence(snapshot, request = null) {
+  const workflow = String(snapshot?.workflow || "");
+  if (!PRE_OPEN_WORKFLOWS.has(workflow)) return null;
+  if (request && !PRE_OPEN_PUBLICATION_ACTIONS.has(String(request?.action || ""))) return null;
+
+  const passes = normalizeHygienePasses(snapshot?.hygienePasses);
+  for (const pass of PRE_OPEN_HYGIENE_PASSES) {
+    const receipt = passes[pass.key];
+    if (!receipt) throw new Error(`pre_open_hygiene_${pass.key === "noComments" ? "no_comments" : pass.key}_missing`);
+    if (!snapshot?.headSha || !sameIdentity(receipt.headSha, snapshot.headSha)) {
+      throw new Error(`pre_open_hygiene_${pass.key === "noComments" ? "no_comments" : pass.key}_stale`);
+    }
+  }
+  return structuredClone(passes);
 }
 
 export function assertPreOpenPublicationEvidence(snapshot, request = null) {
@@ -182,6 +220,7 @@ export function createDeliveryWorkflowController(options = {}) {
   let baseSha = snapshot?.baseSha ?? options.baseSha ?? null;
   let headSha = snapshot?.headSha ?? options.headSha ?? null;
   let preOpenGate = normalizePreOpenGate(snapshot?.preOpenGate || options.preOpenGate);
+  let hygienePasses = normalizeHygienePasses(snapshot?.hygienePasses || options.hygienePasses);
   let stateGeneration = nonNegativeInteger(snapshot?.stateGeneration);
   const completedPhases = [...(snapshot?.completedPhases || [])].map(String);
   const blockers = new Set((snapshot?.blockers || []).map(String));
@@ -215,6 +254,7 @@ export function createDeliveryWorkflowController(options = {}) {
       baseSha,
       headSha,
       preOpenGate: preOpenGate ? structuredClone(preOpenGate) : null,
+      hygienePasses: structuredClone(hygienePasses),
       phase,
       graph,
       completedPhases: [...completedPhases],
@@ -250,6 +290,7 @@ export function createDeliveryWorkflowController(options = {}) {
       throw new Error(`Cannot transition back into completed phase ${target}`);
     }
     if (target === "OPEN_PR" && PRE_OPEN_WORKFLOWS.has(workflow)) {
+      assertPreOpenHygieneEvidence(snapshotState());
       assertPreOpenPublicationEvidence(snapshotState());
     }
     if (!completedPhases.includes(phase)) completedPhases.push(phase);
@@ -430,6 +471,21 @@ export function createDeliveryWorkflowController(options = {}) {
     return { ...updated, headSha };
   }
 
+  function recordHygienePass(pass, { status = "done" } = {}) {
+    if (!PRE_OPEN_WORKFLOWS.has(workflow)) {
+      throw new Error("pre_open_hygiene_not_required");
+    }
+    const definition = PRE_OPEN_HYGIENE_PASSES.find((entry) => entry.id === String(pass || ""));
+    if (!definition) throw new Error("pre_open_hygiene_pass_invalid");
+    if (status !== "done") throw new Error("pre_open_hygiene_status_invalid");
+    if (!headSha) throw new Error("pre_open_hygiene_head_missing");
+    if (phase === "OPEN_PR") throw new Error("pre_open_hygiene_phase_invalid");
+    const record = { status: "done", headSha, recordedAt: now() };
+    hygienePasses[definition.key] = record;
+    touch();
+    return structuredClone(record);
+  }
+
   function recordPreOpenGate(result = {}) {
     if (!PRE_OPEN_WORKFLOWS.has(workflow)) {
       throw new Error("pre_open_evidence_not_required");
@@ -484,6 +540,7 @@ export function createDeliveryWorkflowController(options = {}) {
     authorizeMutation,
     updateRefs,
     reconcileMutationResult,
+    recordHygienePass,
     recordPreOpenGate,
     recordEvidence,
     decideEvidence,

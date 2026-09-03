@@ -51,6 +51,10 @@ function createCheckpoint() {
       diffIdentity: `sha256:${"d".repeat(64)}`,
       fileCount: 1,
     },
+    hygienePasses: {
+      noComments: { status: "done", headSha: HEAD },
+      simplify: { status: "done", headSha: HEAD },
+    },
     startPhase: "OPEN_PR",
     graph: { OPEN_PR: ["DONE"], DONE: [] },
   });
