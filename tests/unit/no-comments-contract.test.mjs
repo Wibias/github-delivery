@@ -87,6 +87,18 @@ test("comment inspector freezes scope and emits only final classifications", () 
   assert.match(workflow, /provisional or contradictory classifications/i);
 });
 
+test("comment inspector is report-only and parent owns workspace mutation", () => {
+  const agent = read("agents/comment-inspector.md");
+  const workflow = read("references/no-comments.md");
+
+  assert.match(agent, /report-only/i);
+  assert.match(agent, /never edit files/i);
+  assert.doesNotMatch(agent, /touch comments/i);
+  assert.match(workflow, /parent applies accepted comment deletions/i);
+  assert.match(workflow, /reviewer failure cannot leave workspace mutations/i);
+  assert.match(workflow, /subagent.*error.*parent fallback/i);
+});
+
 test("apply vs report, encodings, and merge-ready blockers", () => {
   const workflow = read("references/no-comments.md");
   assert.match(workflow, /push_code/);
