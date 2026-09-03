@@ -1,6 +1,7 @@
 import { buildWorkflowPacket } from "./delivery-workflow-profiles.mjs";
 
 const NORMAL_HELPERS = Object.freeze({
+  commentReviewGuard: "scripts/comment-review-guard.mjs",
   controller: "scripts/delivery-controller.mjs",
   mutation: "scripts/github-mutate.mjs",
   preOpenGate: "scripts/pre-open-gate.mjs",
