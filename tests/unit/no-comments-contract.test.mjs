@@ -63,7 +63,7 @@ test("comment inspector never writes application code and parent inspects", () =
   assert.match(workflow, /must spawn/i);
   assert.match(workflow, /comment inspector/i);
   assert.match(workflow, /parent fallback/i);
-  assert.match(workflow, /application-code edits/);
+  assert.match(workflow, /claimed or observed reviewer workspace mutation/i);
   assert.match(workflow, /second rejected report fails/i);
   assert.doesNotMatch(workflow, /subagent_type: "Comment Sicko"/);
   assert.doesNotMatch(agent, /Yes\.\.\. Ha ha ha/);
