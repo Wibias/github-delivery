@@ -4,6 +4,20 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.4.3] - 2026-09-03
+
+### Added
+
+- Added deterministic diff-added-line Comment Inspector scope, structured final-result validation, head-bound pre-open hygiene evidence, and authoritative remote-base resolution for local PR publication (PR #423).
+
+### Changed
+
+- Bumped the package version from `1.4.2` to `1.4.3`.
+
+### Fixed
+
+- `create-pr-from-local-work` now locks the exact planner operation identities into the workflow checkpoint and requires matching successful broker receipts before publication can complete. Raw controller hygiene-receipt minting is removed, Comment Inspector classifications are confined to the new-side candidate diff, and local pre-open review binds to the remote base SHA without weakening the existing issue-linked workflow's checkpoint base authority (PR #423).
+
 ## [1.4.2] - 2026-09-03
 
 ### Added
@@ -220,7 +234,7 @@ All notable changes to `github-delivery` are documented here.
 - Review briefs label files as core, mechanical, or other, and call out relocated blocks of three or more lines as moved code. Textually identical relocation does not prove unchanged behavior; surrounding context still requires review. PR description review notes name the core files when a diff mixes implementation with generated or lockfile changes.
 - Absence claims need a positive-control search that matches a known hit before `no residual X`.
 - Confirmation checks re-run in the same shell and PATH as the original observation so a PATH switch cannot produce a false result.
-- `authorityMode=off` now means zero Windows Hello / Authority-host approval. Direct lifecycle intent and exact-text confirmation still remain mandatory where policy requires them, but caller-controlled mutation JSON cannot mint those facts; governing workflows provide them through trusted execution context (PR #370).
+- `authorityMode=off` now means zero Windows Hello / Authority-host approval. Direct lifecycle intent and exact-text confirmation still remain mandatory where policy requires it, but caller-controlled mutation JSON cannot mint those facts; governing workflows provide them through trusted execution context (PR #370).
 
 ### Fixed
 
