@@ -55,6 +55,12 @@ function controller(startPhase = "PREOPEN_GATE") {
   });
 }
 
+function completeHygiene(current) {
+  current.recordHygienePass("no-comments", { status: "done" });
+  current.recordHygienePass("simplify", { status: "done" });
+  return current;
+}
+
 function pushRequest(newTip = HEAD) {
   return {
     schemaVersion: 1,
@@ -79,16 +85,16 @@ function commit(cwd, message) {
   return run(cwd, "git", ["rev-parse", "HEAD"]);
 }
 
-test("create-PR workflow cannot enter publication without ready pre-open evidence", () => {
+test("create-PR workflow cannot enter publication without required pre-open completion", () => {
   const current = controller();
   assert.throws(
     () => current.transition("OPEN_PR"),
-    /pre_open_evidence_missing/,
+    /pre_open_hygiene_no_comments_missing/,
   );
 });
 
 test("blocked and mismatched pre-open evidence remain publication blockers", () => {
-  const current = controller();
+  const current = completeHygiene(controller());
   current.recordPreOpenGate(readyGate({ decision: "blocked" }));
   assert.throws(() => current.transition("OPEN_PR"), /pre_open_evidence_not_ready/);
 
@@ -107,10 +113,10 @@ test("mutation boundary independently rejects missing, changed, or stale pre-ope
     writeDeliveryWorkflowCheckpoint(checkpoint, missing.snapshot());
     assert.throws(
       () => mutationExecutionContextFromCheckpoint({ path: checkpoint, request: pushRequest() }),
-      /pre_open_evidence_missing/,
+      /pre_open_hygiene_no_comments_missing/,
     );
 
-    const current = controller();
+    const current = completeHygiene(controller());
     current.recordPreOpenGate(readyGate());
     current.transition("OPEN_PR");
     writeDeliveryWorkflowCheckpoint(checkpoint, current.snapshot());
@@ -136,7 +142,7 @@ test("mutation boundary independently rejects missing, changed, or stale pre-ope
         path: checkpoint,
         request: pushRequest(NEXT_HEAD),
       }),
-      /pre_open_evidence_scope_mismatch/,
+      /pre_open_hygiene_no_comments_stale/,
     );
   } finally {
     rmSync(directory, { recursive: true, force: true });
@@ -207,6 +213,7 @@ test("wrong historical pre-open range blocks publication until the exact candida
       graph: profile.graph,
       startPhase: "PREOPEN_GATE",
     });
+    completeHygiene(initial);
     writeDeliveryWorkflowCheckpoint(checkpoint, initial.snapshot());
 
     const wrong = spawnSync(
