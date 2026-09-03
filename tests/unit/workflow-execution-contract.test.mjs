@@ -10,6 +10,7 @@ test("create-pr workflow packet exposes normal execution helpers and actions wit
   });
 
   assert.deepEqual(packet.execution.helpers, {
+    commentReviewGuard: "scripts/comment-review-guard.mjs",
     controller: "scripts/delivery-controller.mjs",
     mutation: "scripts/github-mutate.mjs",
     preOpenGate: "scripts/pre-open-gate.mjs",
@@ -41,6 +42,7 @@ test("local-work create-pr packet locks the normal publication path", () => {
     "create_pr",
     "push_code",
   ]);
+  assert.equal(packet.execution.helpers.commentReviewGuard, "scripts/comment-review-guard.mjs");
   assert.equal(packet.execution.helpers.publicationPlanner, "scripts/create-pr-publication-plan.mjs");
   assert.deepEqual(packet.execution.workflowPlan, {
     decisionAuthority: "workflow-packet+controller-checkpoint",
