@@ -92,6 +92,9 @@ function assertPublicationCheckpoint(snapshot, request) {
   }
   assertPreOpenHygieneEvidence(snapshot, request);
   assertPreOpenPublicationEvidence(snapshot, request);
+  if (request?.action === "create_pr" && request?.draft !== true) {
+    throw new Error("routed_create_pr_requires_draft");
+  }
 }
 
 export function mutationExecutionContextFromCheckpoint({ path, request } = {}) {
