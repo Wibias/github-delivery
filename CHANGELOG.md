@@ -4,6 +4,22 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-09-03
+
+### Added
+
+- Added a deterministic create-PR publication planner that composes the canonical maintainer `push_code` and initial draft `create_pr` request shapes, preserves force-with-lease tip identities including `expectedRemoteTip: "absent"`, and points execution at the checkpointed `scripts/github-mutate.mjs` boundary without duplicating broker, authority, or pre-open policy (PR #418).
+
+### Changed
+
+- Bumped the package version from `1.4.0` to `1.4.1`.
+
+### Fixed
+
+- Create-PR publication now requires current-head completion receipts for both default pre-open hygiene passes, `no-comments` and `simplify`, at the controller transition and mutation checkpoint. Missing or stale hygiene receipts therefore fail closed even when bug/security evidence is otherwise ready (PR #415).
+- Routed `create_pr` publication now keeps initial PR creation draft-only. A routed non-draft create payload is rejected instead of silently publishing ready-for-review, while any later ready-for-review transition remains a separate explicit operation (PR #416).
+- Pre-open bug/security review evidence now requires structured provenance bound to the current candidate head with bounded method and reviewed-file context. Bare `"done"` strings cannot satisfy schema v2, and stale structured evidence cannot clear current-head obligations (PR #417).
+
 ## [1.4.0] - 2026-09-01
 
 ### Added
@@ -434,7 +450,7 @@ All notable changes to `github-delivery` are documented here.
 
 ### Fixed
 
-- Repeated grid or malformed tool-protocol placeholder output now hard-stops immediately on the first stall instead of being retried, and the offending model is quarantined across turns and `SessionEnd` so a resume with the same model is blocked before inference until the model is changed. Subagent protocol stalls no longer quarantine the parent task.
+- Repeated grid or malformed tool-protocol placeholder output now hard-stops immediately on the first stall instead of being retried, and the offending model is quarantined across turns and `SessionEnd` so a resume with the same model is blocked before inference until the model changes. Subagent protocol stalls no longer quarantine the parent task.
 - Windows login auto-start is now opt-in (previously enabled by default); users explicitly consent via guided install or `npx github-delivery autostart`.
 
 ## [0.6.0] - 2026-08-14
