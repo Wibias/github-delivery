@@ -42,31 +42,31 @@ Correctness or safety suppressions (`eslint-disable` for a real-bug rule, `@ts-i
 
 Hunt nearby code before judging a claimed keep. A keep survives only with scoped proof that it matches the innocent list. After the hunt, if it is still an alibi, delete it. Leaving an unproven alibi in place is a failed pass.
 
-Do not polish an alibi into a shorter comment. Delete it. The comment inspector never writes application code. The parent lands the root-cause flag.
+Do not polish an alibi into a shorter comment. Delete it. The comment inspector never writes application code. The parent lands the accepted deletion and any root-cause flag.
 
 ## Independent reviewer
 
 When the host can spawn a subagent, the parent **must spawn** the **comment inspector** with one immutable scope: the exact parent-scoped file set or exact diff. The parent must not restate the inspector rules. Load `agents/comment-inspector.md` as that agent's prompt. Do not hunt comments in the same agent that wrote the code.
 
-The inspector may read nearby context outside that scope only to judge a scoped comment. It must not inspect or delete comments, edit code, or raise root-cause flags outside that scope.
+The inspector is report-only. It may read nearby context outside that scope only to judge a scoped comment, but it must never edit files, delete comments, reformat code, or otherwise mutate the workspace. It must not classify comments or raise root-cause flags outside the immutable scope.
 
-If spawn is unavailable or rejected by the host, run the same keep-list as a separate **parent fallback** phase, as if this agent did not write the code. Missing spawn is not a failed hunt.
-
-The comment inspector may only touch comments and raise root-cause flags. It must never write application code.
+A reviewer failure cannot leave workspace mutations because reviewer mutation is forbidden. If the subagent returns an error, is interrupted, or fails before a valid final report, discard partial/provisional output and run the **parent fallback**; do not infer whether the reviewer "probably" applied anything. If spawn is unavailable or rejected by the host, run the same keep-list as a separate parent fallback phase, as if this agent did not write the code. Missing or failed spawn is not itself a failed hunt.
 
 ## Parent inspector
 
-Inspect the final report and comment-only diff. Reject:
+Inspect the final report before mutation. Reject:
 
-- application-code edits or incidental reformatting
-- scope escapes, including any deletion, classification, or flag outside the immutable scope
+- any claimed or observed reviewer workspace mutation
+- scope escapes, including any classification or flag outside the immutable scope
 - provisional or contradictory classifications in the report
-- exception-protected deletions (innocent-list comments removed without proof)
+- exception-protected deletions (innocent-list comments marked DELETE without proof)
 - misstated root-cause flag reasons
 - root-cause flags not directly covered by the deleted alibi
 - flags that treat kept intentional code as guilty
 
-Root-cause flags on our-code surprises stay actionable. Do not restore those comments.
+The parent applies accepted comment deletions only after the report passes inspection. The parent also owns every in-scope root-cause fix or cheap encoding allowed by the current mutation mode. Reviewer output is evidence, never a workspace mutation boundary.
+
+Root-cause flags on our-code surprises stay actionable. Do not retain those comments merely because the reviewer was report-only.
 
 One rejected report may be rerun with the failure named. A **second rejected report fails** the pass.
 
@@ -74,10 +74,10 @@ One rejected report may be rerun with the failure named. A **second rejected rep
 
 | Situation | What happens |
 |---|---|
-| Own PR, current mode already has `push_code` | Auto-apply accepted in-scope kills, root-cause flag fixes, and cheap encodings of proven innocent comments |
+| Own PR, current mode already has `push_code` | Parent auto-applies accepted in-scope kills, root-cause flag fixes, and cheap encodings of proven innocent comments |
 | Own PR, read-only / no `push_code` | Report-only. Do not upgrade mutation mode |
 | Foreign PR | Report-only. Deliver findings to the PR owner. Write nothing |
-| Out-of-scope root cause | Delete the alibi. Leave the leftover workaround as a **merge-ready blocker**. Do not claim merge-ready or publication |
+| Out-of-scope root cause | Parent deletes the alibi when mutation is already allowed. Leave the leftover workaround as a **merge-ready blocker**. Do not claim merge-ready or publication |
 
 Cheap encodings are an in-scope type, test, lint, or CI rule that makes a **proven innocent** comment unnecessary. Apply those when the apply row allows it, then delete the comment. Keep an innocent-list comment when no cheap encoding exists. Do not encode an alibi.
 
@@ -88,8 +88,8 @@ Root-cause flag fixes are the smallest in-scope root cause: delete a dead path, 
 A failed no-comments pass **blocks the review verdict**, merge-ready claim, and create-PR publication:
 
 - two rejected reviewer reports in a row
-- the reviewer still touches application code or escapes scope after one rerun
-- own PR with `push_code` already allowed, and an accepted in-scope kill or root-cause flag was not landed
+- the reviewer claims workspace mutation, escapes scope, or still produces an invalid final report after one rerun
+- own PR with `push_code` already allowed, and an accepted in-scope kill or root-cause flag was not landed by the parent
 - an unproven alibi comment was left in place
 - a leftover workaround after a deleted alibi remains (in-scope unlanded, or out-of-scope named as a merge-ready blocker)
 
@@ -104,8 +104,8 @@ Ship-gate, mutation, ownership, and foreign-PR rules still outrank this pass.
 3. Simplify via `references/simplify-pr.md` (unless opted out).
 4. If the head changed, re-validate with both passes disabled.
 
-At most one no-comments pass per reviewed head. The comment inspector does not reshape application code. The parent lands in-scope root-cause flags during apply / later correctness work before claiming merge-ready.
+At most one no-comments pass per reviewed head. The comment inspector never reshapes the workspace. The parent lands accepted in-scope deletions and root-cause flags during apply / later correctness work before claiming merge-ready.
 
 ## Report
 
-Name deletion count, restored comments, reruns, in-scope fixes, encodings, leftover merge-ready blockers, and any skip reason (`skipped no-comments: without no-comments`). The inspector emits only this final report; no progress narration or provisional keep/kill decisions belong in the durable result.
+Name deletion count, restored comments, reruns, in-scope fixes, encodings, leftover merge-ready blockers, and any skip reason (`skipped no-comments: without no-comments`). The inspector emits only its final report; no progress narration or provisional keep/kill decisions belong in the durable result.
