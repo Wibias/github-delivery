@@ -30,6 +30,7 @@ function createPrRequest(overrides = {}) {
     head: "fix/issue-95",
     title: "Fix issue 95",
     body: "Refs #95",
+    draft: true,
     idempotencyKey: "issue-95-pr",
     ...overrides,
   };
