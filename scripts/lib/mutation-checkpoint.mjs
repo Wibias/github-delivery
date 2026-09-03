@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import {
   assertCreatePrPublicationRequest,
   createPrPublicationPlanLock,
+  normalizeCreatePrPublicationPlanLock,
   reconcileCreatePrPublicationReceipts,
 } from "./create-pr-publication-state.mjs";
 import { resolveDeliveryWorkflowProfile } from "./delivery-workflow-profiles.mjs";
@@ -103,6 +104,18 @@ function assertPublicationCheckpoint(snapshot, request) {
   }
 }
 
+function samePublicationLock(left, right) {
+  const current = normalizeCreatePrPublicationPlanLock(left);
+  const next = normalizeCreatePrPublicationPlanLock(right);
+  return Boolean(
+    current &&
+    next &&
+    String(current.headSha || "").toLowerCase() === String(next.headSha || "").toLowerCase() &&
+    current.operationKeys.push_code === next.operationKeys.push_code &&
+    current.operationKeys.create_pr === next.operationKeys.create_pr
+  );
+}
+
 export function lockCreatePrPublicationPlanCheckpoint({ path, plan } = {}) {
   if (!path) throw new Error("checkpoint path is required");
   const snapshot = readDeliveryWorkflowCheckpoint(path);
@@ -114,10 +127,10 @@ export function lockCreatePrPublicationPlanCheckpoint({ path, plan } = {}) {
   }
   const lock = createPrPublicationPlanLock(plan, { headSha: snapshot.headSha });
   if (snapshot.publicationPlan) {
-    const existing = JSON.stringify(snapshot.publicationPlan);
-    const next = JSON.stringify(lock);
-    if (existing !== next) throw new Error("create_pr_publication_plan_already_locked");
-    return structuredClone(snapshot.publicationPlan);
+    if (!samePublicationLock(snapshot.publicationPlan, lock)) {
+      throw new Error("create_pr_publication_plan_already_locked");
+    }
+    return normalizeCreatePrPublicationPlanLock(snapshot.publicationPlan);
   }
   snapshot.publicationPlan = lock;
   snapshot.publicationReceipts = {};
