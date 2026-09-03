@@ -24,7 +24,14 @@ function readyGate() {
   };
 }
 
-function controller() {
+function hygienePasses(headSha = HEAD) {
+  return {
+    noComments: { status: "done", headSha, recordedAt: 1 },
+    simplify: { status: "done", headSha, recordedAt: 1 },
+  };
+}
+
+function controller({ hygiene = false } = {}) {
   return createDeliveryWorkflowController({
     workflow: "create-pr-from-local-work",
     repo: "acme/widgets",
@@ -32,6 +39,7 @@ function controller() {
     headSha: HEAD,
     graph: GRAPH,
     startPhase: "PREOPEN_GATE",
+    ...(hygiene ? { hygienePasses: hygienePasses() } : {}),
   });
 }
 
@@ -46,10 +54,8 @@ test("ready pre-open evidence cannot publish before both default hygiene passes 
 });
 
 test("current-head no-comments and simplify receipts allow publication", () => {
-  const current = controller();
+  const current = controller({ hygiene: true });
   current.recordPreOpenGate(readyGate());
-  current.recordHygienePass("no-comments", { status: "done" });
-  current.recordHygienePass("simplify", { status: "done" });
 
   const snapshot = current.snapshot();
   assert.equal(snapshot.hygienePasses.noComments.status, "done");
@@ -60,10 +66,8 @@ test("current-head no-comments and simplify receipts allow publication", () => {
 });
 
 test("changing the candidate head invalidates completed hygiene receipts", () => {
-  const current = controller();
+  const current = controller({ hygiene: true });
   current.recordPreOpenGate(readyGate());
-  current.recordHygienePass("no-comments", { status: "done" });
-  current.recordHygienePass("simplify", { status: "done" });
   current.updateRefs({ headSha: NEXT_HEAD });
 
   assert.throws(
