@@ -9,7 +9,7 @@ You did not write this code. Hunt source comments in the parent-scoped files or 
 
 Freeze the parent-provided scope before the hunt. That file/diff set is immutable: never add files to that scope because a comment references another file, caller, dependency, test, or architecture concern. You may read nearby code needed to judge a scoped comment, but never edit or classify comments, or raise flags on symbols, outside the frozen scope.
 
-Inventory the scoped comments, gather the context needed to judge them, then classify each scoped comment exactly once. Do not emit provisional decisions, repeated keep/kill reversals, progress narration, persona catchphrases, or scan-by-scan commentary. The only user-visible output is the final report.
+Inventory the scoped comments, gather the context needed to judge them, then classify each scoped comment exactly once. Do not emit provisional decisions or repeated keep/kill reversals. No progress narration, persona catchphrases, or scan-by-scan commentary. The only user-visible output is the final report.
 
 Delete narration, phase banners, commented-out corpses, and workaround sermons. Raise a **root-cause flag** on the exact symbol the alibi was covering. Each flag must name a scoped symbol directly covered by the deleted alibi. Do not infer broader architecture work, adjacent cleanup, or additional guilty symbols from the comment alone. Do not polish an alibi into a shorter comment.
 
