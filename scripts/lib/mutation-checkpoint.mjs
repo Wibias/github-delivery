@@ -1,5 +1,10 @@
 import { createHash } from "node:crypto";
 
+import {
+  assertCreatePrPublicationRequest,
+  createPrPublicationPlanLock,
+  reconcileCreatePrPublicationReceipts,
+} from "./create-pr-publication-state.mjs";
 import { resolveDeliveryWorkflowProfile } from "./delivery-workflow-profiles.mjs";
 import {
   assertPreOpenHygieneEvidence,
@@ -92,9 +97,32 @@ function assertPublicationCheckpoint(snapshot, request) {
   }
   assertPreOpenHygieneEvidence(snapshot, request);
   assertPreOpenPublicationEvidence(snapshot, request);
+  assertCreatePrPublicationRequest(snapshot, request);
   if (request?.action === "create_pr" && request?.draft !== true) {
     throw new Error("routed_create_pr_requires_draft");
   }
+}
+
+export function lockCreatePrPublicationPlanCheckpoint({ path, plan } = {}) {
+  if (!path) throw new Error("checkpoint path is required");
+  const snapshot = readDeliveryWorkflowCheckpoint(path);
+  if (String(snapshot.workflow || "") !== "create-pr-from-local-work") {
+    throw new Error("create_pr_publication_plan_not_required");
+  }
+  if (!["PREOPEN_GATE", "OPEN_PR"].includes(String(snapshot.phase || ""))) {
+    throw new Error("create_pr_publication_plan_phase_invalid");
+  }
+  const lock = createPrPublicationPlanLock(plan, { headSha: snapshot.headSha });
+  if (snapshot.publicationPlan) {
+    const existing = JSON.stringify(snapshot.publicationPlan);
+    const next = JSON.stringify(lock);
+    if (existing !== next) throw new Error("create_pr_publication_plan_already_locked");
+    return structuredClone(snapshot.publicationPlan);
+  }
+  snapshot.publicationPlan = lock;
+  snapshot.publicationReceipts = {};
+  writeDeliveryWorkflowCheckpoint(path, snapshot);
+  return structuredClone(lock);
 }
 
 export function mutationExecutionContextFromCheckpoint({ path, request } = {}) {
@@ -127,17 +155,22 @@ export function mutationExecutionContextFromCheckpoint({ path, request } = {}) {
 export function reconcileMutationCheckpoint({ path, output } = {}) {
   if (!path) return { changed: false, checkpoint: null };
   const snapshot = readDeliveryWorkflowCheckpoint(path);
+  const publication = reconcileCreatePrPublicationReceipts(snapshot, output);
+  if (publication.changed) snapshot.publicationReceipts = publication.receipts;
+
   const profile = resolveDeliveryWorkflowProfile(snapshot.workflow);
   const controller = createDeliveryWorkflowController({
     snapshot,
     graph: profile.graph,
   });
   const result = controller.reconcileMutationResult(output);
-  if (result.changed) {
+  const changed = result.changed || publication.changed;
+  if (changed) {
     writeDeliveryWorkflowCheckpoint(path, controller.snapshot());
   }
   return {
     ...result,
+    changed,
     checkpoint: path,
   };
 }
