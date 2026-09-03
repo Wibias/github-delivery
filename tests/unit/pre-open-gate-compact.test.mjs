@@ -67,7 +67,7 @@ test("compact pre-open report exposes only authoritative remaining obligations",
   assert.equal(Object.hasOwn(compact, "bugScope"), false);
   assert.equal(Object.hasOwn(compact, "securityScope"), false);
   assert.deepEqual(compact.remaining, {
-    lenses: ["silent_failures", "edge_cases"],
+    lenses: ["edge_cases", "silent_failures"],
     surfaces: ["authn"],
     probes: ["test-honesty"],
     other: [],
