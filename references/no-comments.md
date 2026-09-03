@@ -46,7 +46,9 @@ Do not polish an alibi into a shorter comment. Delete it. The comment inspector 
 
 ## Independent reviewer
 
-When the host can spawn a subagent, the parent **must spawn** the **comment inspector** with the scoped files or diff and must not restate its rules. Load `agents/comment-inspector.md` as that agent's prompt. Do not hunt comments in the same agent that wrote the code.
+When the host can spawn a subagent, the parent **must spawn** the **comment inspector** with one immutable scope: the exact parent-scoped file set or exact diff. The parent must not restate the inspector rules. Load `agents/comment-inspector.md` as that agent's prompt. Do not hunt comments in the same agent that wrote the code.
+
+The inspector may read nearby context outside that scope only to judge a scoped comment. It must not inspect or delete comments, edit code, or raise root-cause flags outside that scope.
 
 If spawn is unavailable or rejected by the host, run the same keep-list as a separate **parent fallback** phase, as if this agent did not write the code. Missing spawn is not a failed hunt.
 
@@ -54,12 +56,14 @@ The comment inspector may only touch comments and raise root-cause flags. It mus
 
 ## Parent inspector
 
-Inspect the report and comment-only diff. Reject:
+Inspect the final report and comment-only diff. Reject:
 
-- application-code edits
-- scope escapes
+- application-code edits or incidental reformatting
+- scope escapes, including any deletion, classification, or flag outside the immutable scope
+- provisional or contradictory classifications in the report
 - exception-protected deletions (innocent-list comments removed without proof)
 - misstated root-cause flag reasons
+- root-cause flags not directly covered by the deleted alibi
 - flags that treat kept intentional code as guilty
 
 Root-cause flags on our-code surprises stay actionable. Do not restore those comments.
@@ -104,4 +108,4 @@ At most one no-comments pass per reviewed head. The comment inspector does not r
 
 ## Report
 
-Name deletion count, restored comments, reruns, in-scope fixes, encodings, leftover merge-ready blockers, and any skip reason (`skipped no-comments: without no-comments`).
+Name deletion count, restored comments, reruns, in-scope fixes, encodings, leftover merge-ready blockers, and any skip reason (`skipped no-comments: without no-comments`). The inspector emits only this final report; no progress narration or provisional keep/kill decisions belong in the durable result.
