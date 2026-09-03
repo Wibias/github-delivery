@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 import { resolveDeliveryWorkflowProfile } from "./delivery-workflow-profiles.mjs";
 import {
+  assertPreOpenHygieneEvidence,
   assertPreOpenPublicationEvidence,
   createDeliveryWorkflowController,
   readDeliveryWorkflowCheckpoint,
@@ -89,7 +90,11 @@ function assertPublicationCheckpoint(snapshot, request) {
   if (String(snapshot?.phase || "") !== "OPEN_PR") {
     throw new Error("pre_open_publication_phase_invalid");
   }
+  assertPreOpenHygieneEvidence(snapshot, request);
   assertPreOpenPublicationEvidence(snapshot, request);
+  if (request?.action === "create_pr" && request?.draft !== true) {
+    throw new Error("routed_create_pr_requires_draft");
+  }
 }
 
 export function mutationExecutionContextFromCheckpoint({ path, request } = {}) {

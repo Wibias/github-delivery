@@ -30,6 +30,7 @@ function createPrRequest(overrides = {}) {
     head: "fix/issue-95",
     title: "Fix issue 95",
     body: "Refs #95",
+    draft: true,
     idempotencyKey: "issue-95-pr",
     ...overrides,
   };
@@ -50,6 +51,10 @@ function createCheckpoint() {
       headSha: HEAD,
       diffIdentity: `sha256:${"d".repeat(64)}`,
       fileCount: 1,
+    },
+    hygienePasses: {
+      noComments: { status: "done", headSha: HEAD },
+      simplify: { status: "done", headSha: HEAD },
     },
     startPhase: "OPEN_PR",
     graph: { OPEN_PR: ["DONE"], DONE: [] },
