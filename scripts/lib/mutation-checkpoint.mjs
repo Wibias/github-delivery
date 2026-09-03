@@ -98,10 +98,10 @@ function assertPublicationCheckpoint(snapshot, request) {
   }
   assertPreOpenHygieneEvidence(snapshot, request);
   assertPreOpenPublicationEvidence(snapshot, request);
-  assertCreatePrPublicationRequest(snapshot, request);
   if (request?.action === "create_pr" && request?.draft !== true) {
     throw new Error("routed_create_pr_requires_draft");
   }
+  assertCreatePrPublicationRequest(snapshot, request);
 }
 
 function samePublicationLock(left, right) {
