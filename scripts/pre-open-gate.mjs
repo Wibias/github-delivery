@@ -346,7 +346,11 @@ function persistCheckpoint(checkpointPath, result, hygieneEvidence = null) {
   }
   const profile = resolveDeliveryWorkflowProfile(snapshot.workflow);
   const controller = createDeliveryWorkflowController({ snapshot, graph: profile.graph });
-  controller.updateRefs({ baseSha: result.baseRefOid, headSha: result.headRefOid });
+  controller.updateRefs(
+    snapshot.workflow === "create-pr-from-local-work"
+      ? { baseSha: result.baseRefOid, headSha: result.headRefOid }
+      : { headSha: result.headRefOid },
+  );
   controller.recordPreOpenGate(result);
   writeDeliveryWorkflowCheckpoint(checkpoint, controller.snapshot());
 }
