@@ -90,6 +90,9 @@ function assertPublicationCheckpoint(snapshot, request) {
     throw new Error("pre_open_publication_phase_invalid");
   }
   assertPreOpenPublicationEvidence(snapshot, request);
+  if (request?.action === "create_pr" && request?.draft !== true) {
+    throw new Error("routed_create_pr_requires_draft");
+  }
 }
 
 export function mutationExecutionContextFromCheckpoint({ path, request } = {}) {
