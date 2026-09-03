@@ -11,12 +11,15 @@ import {
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, isAbsolute, relative, resolve } from "node:path";
+import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 
 import { isDirectInvocation } from "./lib/direct-invocation.mjs";
 
 const SNAPSHOT_SCHEMA_VERSION = 1;
 const SNAPSHOT_KIND = "github-delivery/comment-review-snapshot";
+const MAX_SCOPE_FILES = 200;
+const MAX_SCOPE_BYTES = 32 * 1024 * 1024;
+const MAX_SNAPSHOT_BYTES = 48 * 1024 * 1024;
 const USAGE = `Usage:
   node scripts/comment-review-guard.mjs capture --root ROOT --files FILE --snapshot FILE
   node scripts/comment-review-guard.mjs verify --root ROOT --snapshot FILE
@@ -29,6 +32,11 @@ function sha256(bytes) {
 
 function sortedUnique(values) {
   return [...new Set((values || []).map(String).filter(Boolean))].sort();
+}
+
+function escapesRoot(root, target) {
+  const value = relative(root, target);
+  return value === ".." || value.startsWith(`..${sep}`) || isAbsolute(value);
 }
 
 function canonicalRoot(root) {
@@ -45,7 +53,7 @@ function normalizedScopePath(root, value, { allowMissing = false } = {}) {
   if (!raw || isAbsolute(raw)) throw new Error(`comment_review_scope_path_invalid:${raw || "(empty)"}`);
   const absolute = resolve(root, raw);
   const lexical = relative(root, absolute);
-  if (!lexical || lexical === ".." || lexical.startsWith(`..${process.platform === "win32" ? "\\" : "/"}`) || isAbsolute(lexical)) {
+  if (!lexical || escapesRoot(root, absolute)) {
     throw new Error(`comment_review_scope_path_invalid:${raw}`);
   }
 
@@ -54,24 +62,27 @@ function normalizedScopePath(root, value, { allowMissing = false } = {}) {
     if (!stat.isFile() || stat.isSymbolicLink()) {
       throw new Error(`comment_review_scope_file_invalid:${raw}`);
     }
-    const canonical = realpathSync(absolute);
-    const physical = relative(root, canonical);
-    if (!physical || physical === ".." || physical.startsWith(`..${process.platform === "win32" ? "\\" : "/"}`) || isAbsolute(physical)) {
+    if (escapesRoot(root, realpathSync(absolute))) {
       throw new Error(`comment_review_scope_path_invalid:${raw}`);
     }
-  } else {
-    const parent = realpathSync(dirname(absolute));
-    const physicalParent = relative(root, parent);
-    if (physicalParent === ".." || physicalParent.startsWith(`..${process.platform === "win32" ? "\\" : "/"}`) || isAbsolute(physicalParent)) {
-      throw new Error(`comment_review_scope_path_invalid:${raw}`);
-    }
+  } else if (escapesRoot(root, realpathSync(dirname(absolute)))) {
+    throw new Error(`comment_review_scope_path_invalid:${raw}`);
   }
 
   return { path: lexical.replaceAll("\\", "/"), absolute };
 }
 
-function writePrivateSnapshot(path, value) {
-  const target = resolve(path);
+function snapshotTargetOutsideRoot(root, snapshotPath) {
+  const target = resolve(String(snapshotPath || ""));
+  const parent = realpathSync(dirname(target));
+  if (target === root || !escapesRoot(root, target) || parent === root || !escapesRoot(root, parent)) {
+    throw new Error("comment_review_snapshot_must_be_outside_root");
+  }
+  return target;
+}
+
+function writePrivateSnapshot(root, path, value) {
+  const target = snapshotTargetOutsideRoot(root, path);
   const fd = openSync(target, "wx", 0o600);
   try {
     writeFileSync(fd, `${JSON.stringify(value, null, 2)}\n`, "utf8");
@@ -85,16 +96,32 @@ function writePrivateSnapshot(path, value) {
   }
 }
 
+function validSnapshotEntry(entry) {
+  return (
+    entry &&
+    typeof entry === "object" &&
+    typeof entry.path === "string" &&
+    /^[0-9a-f]{64}$/i.test(String(entry.sha256 || "")) &&
+    typeof entry.contentBase64 === "string" &&
+    Number.isInteger(entry.mode)
+  );
+}
+
 function readSnapshot(snapshotPath) {
   const target = resolve(String(snapshotPath || ""));
   const stat = lstatSync(target);
-  if (!stat.isFile() || stat.isSymbolicLink()) throw new Error("comment_review_snapshot_invalid");
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.size > MAX_SNAPSHOT_BYTES) {
+    throw new Error("comment_review_snapshot_invalid");
+  }
   const parsed = JSON.parse(readFileSync(target, "utf8"));
   if (
     parsed?.schemaVersion !== SNAPSHOT_SCHEMA_VERSION ||
     parsed?.kind !== SNAPSHOT_KIND ||
     typeof parsed?.root !== "string" ||
-    !Array.isArray(parsed?.files)
+    !Array.isArray(parsed?.files) ||
+    parsed.files.length === 0 ||
+    parsed.files.length > MAX_SCOPE_FILES ||
+    !parsed.files.every(validSnapshotEntry)
   ) {
     throw new Error("comment_review_snapshot_invalid");
   }
@@ -104,15 +131,24 @@ function readSnapshot(snapshotPath) {
 function assertSnapshotRoot(root, snapshot) {
   const canonical = canonicalRoot(root);
   if (canonical !== snapshot.root) throw new Error("comment_review_snapshot_root_mismatch");
+  snapshotTargetOutsideRoot(canonical, snapshot.__path || "");
   return canonical;
+}
+
+function snapshotWithPath(snapshotPath) {
+  const snapshot = readSnapshot(snapshotPath);
+  Object.defineProperty(snapshot, "__path", {
+    value: resolve(String(snapshotPath || "")),
+    enumerable: false,
+  });
+  return snapshot;
 }
 
 function entryState(root, entry) {
   const scoped = normalizedScopePath(root, entry.path, { allowMissing: true });
   if (!existsSync(scoped.absolute)) return { ...scoped, changed: true, reason: "missing" };
   const bytes = readFileSync(scoped.absolute);
-  const digest = sha256(bytes);
-  if (digest !== entry.sha256 || bytes.toString("base64") !== entry.contentBase64) {
+  if (sha256(bytes) !== entry.sha256 || bytes.toString("base64") !== entry.contentBase64) {
     return { ...scoped, changed: true, reason: "bytes_changed" };
   }
   return { ...scoped, changed: false, reason: null };
@@ -122,10 +158,14 @@ export function captureCommentReviewSnapshot({ root, files, snapshotPath } = {})
   const canonical = canonicalRoot(root);
   const paths = sortedUnique(files);
   if (paths.length === 0) throw new Error("comment_review_scope_files_required");
+  if (paths.length > MAX_SCOPE_FILES) throw new Error("comment_review_scope_too_many_files");
+  let totalBytes = 0;
   const entries = paths.map((path) => {
     const scoped = normalizedScopePath(canonical, path);
     const stat = lstatSync(scoped.absolute);
     const bytes = readFileSync(scoped.absolute);
+    totalBytes += bytes.length;
+    if (totalBytes > MAX_SCOPE_BYTES) throw new Error("comment_review_scope_too_large");
     return {
       path: scoped.path,
       sha256: sha256(bytes),
@@ -133,17 +173,17 @@ export function captureCommentReviewSnapshot({ root, files, snapshotPath } = {})
       mode: stat.mode & 0o777,
     };
   });
-  writePrivateSnapshot(snapshotPath, {
+  writePrivateSnapshot(canonical, snapshotPath, {
     schemaVersion: SNAPSHOT_SCHEMA_VERSION,
     kind: SNAPSHOT_KIND,
     root: canonical,
     files: entries,
   });
-  return { fileCount: entries.length, files: entries.map((entry) => entry.path) };
+  return { fileCount: entries.length, totalBytes, files: entries.map((entry) => entry.path) };
 }
 
 export function verifyCommentReviewSnapshot({ root, snapshotPath } = {}) {
-  const snapshot = readSnapshot(snapshotPath);
+  const snapshot = snapshotWithPath(snapshotPath);
   const canonical = assertSnapshotRoot(root, snapshot);
   const changedFiles = snapshot.files
     .filter((entry) => entryState(canonical, entry).changed)
@@ -157,7 +197,7 @@ export function verifyCommentReviewSnapshot({ root, snapshotPath } = {}) {
 }
 
 export function restoreCommentReviewSnapshot({ root, snapshotPath } = {}) {
-  const snapshot = readSnapshot(snapshotPath);
+  const snapshot = snapshotWithPath(snapshotPath);
   const canonical = assertSnapshotRoot(root, snapshot);
   const restoredFiles = [];
   for (const entry of snapshot.files) {
