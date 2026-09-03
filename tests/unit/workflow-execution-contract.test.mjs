@@ -13,6 +13,7 @@ test("create-pr workflow packet exposes normal execution helpers and actions wit
     controller: "scripts/delivery-controller.mjs",
     mutation: "scripts/github-mutate.mjs",
     preOpenGate: "scripts/pre-open-gate.mjs",
+    publicationPlanner: "scripts/create-pr-publication-plan.mjs",
     shipGate: "scripts/ship-gate.mjs",
   });
   assert.equal(packet.execution.sourceDiscovery, "diagnostic-only");
@@ -27,4 +28,36 @@ test("create-pr workflow packet exposes normal execution helpers and actions wit
   ]) {
     assert.equal(packet.execution.declaredActions.includes(action), true, action);
   }
+});
+
+test("local-work create-pr packet locks the normal publication path", () => {
+  const packet = buildExecutionWorkflowPacket({
+    root: process.cwd(),
+    workflow: "create-pr-from-local-work",
+  });
+
+  assert.deepEqual(packet.execution.declaredActions, [
+    "change_draft_state",
+    "create_pr",
+    "push_code",
+  ]);
+  assert.equal(packet.execution.helpers.publicationPlanner, "scripts/create-pr-publication-plan.mjs");
+  assert.deepEqual(packet.execution.workflowPlan, {
+    decisionAuthority: "workflow-packet+controller-checkpoint",
+    sourceDiscovery: "diagnostic-only-on-helper-failure",
+    instructionConflict: "fail-closed",
+    preOpen: {
+      output: "compact",
+      decisionField: "decision",
+      readyValue: "ready",
+    },
+    publication: {
+      initialCreate: "draft-only",
+      planner: "scripts/create-pr-publication-plan.mjs",
+      mutationEntrypoint: "scripts/github-mutate.mjs",
+      directWriteFallback: "forbidden",
+    },
+  });
+  assert.match(packet.execution.normalOperation, /do not re-decide/i);
+  assert.match(packet.execution.normalOperation, /do not fall back/i);
 });
