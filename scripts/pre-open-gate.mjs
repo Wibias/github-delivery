@@ -12,7 +12,11 @@ import {
 import { resolveDeliveryWorkflowProfile } from "./lib/delivery-workflow-profiles.mjs";
 import { planReviewScope } from "./lib/review-scope.mjs";
 import { projectBugScope, projectSecurityScope } from "./lib/review-scope-compat.mjs";
-import { evidenceClears, validatePreOpenEvidence } from "./lib/pre-open-evidence.mjs";
+import {
+  PRE_OPEN_EVIDENCE_SCHEMA_VERSION,
+  evidenceClears,
+  validatePreOpenEvidence,
+} from "./lib/pre-open-evidence.mjs";
 import { validateProbeEvidence } from "./lib/probe-evidence.mjs";
 
 function usageError() {
@@ -40,17 +44,21 @@ export function evaluate(plan, evidence = null) {
   const implementationDiffPresent = Number(plan?.fileCount || 0) > 0;
   const lensMap = evidence?.lenses ?? {};
   const surfaceMap = evidence?.surfaces ?? {};
+  const reviewEvidenceOptions =
+    evidence?.schemaVersion === PRE_OPEN_EVIDENCE_SCHEMA_VERSION
+      ? { headSha: plan?.headRefOid }
+      : null;
   const clearedByEvidence = [];
   const blockers = [];
 
   for (const id of bugScope.requiredLenses) {
     const blocker = `bug:requiredLenses:${id}`;
-    if (evidenceClears(lensMap, id)) clearedByEvidence.push(blocker);
+    if (evidenceClears(lensMap, id, reviewEvidenceOptions)) clearedByEvidence.push(blocker);
     else blockers.push(blocker);
   }
   for (const id of securityScope.requiredSurfaces) {
     const blocker = `security:requiredSurfaces:${id}`;
-    if (evidenceClears(surfaceMap, id)) clearedByEvidence.push(blocker);
+    if (evidenceClears(surfaceMap, id, reviewEvidenceOptions)) clearedByEvidence.push(blocker);
     else blockers.push(blocker);
   }
 
@@ -166,6 +174,11 @@ async function loadEvidence(evidenceFile) {
   }
   const validated = validatePreOpenEvidence(parsed);
   if (!validated.ok) throw new Error(`--evidence-file is invalid:\n- ${validated.errors.join("\n- ")}`);
+  if (validated.evidence.schemaVersion !== PRE_OPEN_EVIDENCE_SCHEMA_VERSION) {
+    throw new Error(
+      `--evidence-file is invalid:\n- evidence schemaVersion must be ${PRE_OPEN_EVIDENCE_SCHEMA_VERSION} for publication`,
+    );
+  }
   return validated.evidence;
 }
 
