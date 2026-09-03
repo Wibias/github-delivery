@@ -4,6 +4,20 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.4.2] - 2026-09-03
+
+### Added
+
+- Added deterministic local-PR orchestration primitives: compact `pre-open-gate --compact` output, a CLI for the canonical create-PR publication planner, and a scoped comment-review byte guard that verifies and restores the reviewer window before parent-owned edits are applied (PR #421).
+
+### Changed
+
+- Bumped the package version from `1.4.1` to `1.4.2`.
+
+### Fixed
+
+- `create-pr-from-local-work` now consumes one locked workflow packet and canonical generated publication plan instead of repeatedly rediscovering route, draft state, mutation entrypoint, or gate semantics. Initial PR creation remains draft-only, direct `git push` / `gh pr create` fallback is forbidden once the workflow is selected, and Comment Inspector is report-only so failed or interrupted reviewer runs cannot leave ambiguous workspace mutations (PR #421).
+
 ## [1.4.1] - 2026-09-03
 
 ### Added
