@@ -52,12 +52,19 @@ test("local-work create-pr packet locks the normal publication path", () => {
       output: "compact",
       decisionField: "decision",
       readyValue: "ready",
+      baseAuthority: "checkpoint-locked-remote",
+    },
+    hygiene: {
+      commentScope: "diff-added-lines",
+      resultValidation: "structured-final-only",
+      receiptAuthority: "pre-open-gate",
     },
     publication: {
       initialCreate: "draft-only",
       planner: "scripts/create-pr-publication-plan.mjs",
       mutationEntrypoint: "scripts/github-mutate.mjs",
       directWriteFallback: "forbidden",
+      completion: "broker-receipts",
     },
   });
   assert.match(packet.execution.normalOperation, /do not re-decide/i);
