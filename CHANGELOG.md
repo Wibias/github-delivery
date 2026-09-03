@@ -479,7 +479,7 @@ All notable changes to `github-delivery` are documented here.
 
 ### Fixed
 
-- Repeated grid or malformed tool-protocol placeholder output now hard-stops immediately on the first stall instead of being retried, and the offending model is quarantined across turns and `SessionEnd` so a resume with the same model is blocked before inference until the model changes or a new task begins. Subagent protocol stalls no longer quarantine the parent task.
+- Repeated grid or malformed tool-protocol placeholder output now hard-stops immediately on the first stall instead of being retried, and the offending model is quarantined across turns and `SessionEnd` so a resume with the same model is blocked before inference until the model is changed. Subagent protocol stalls no longer quarantine the parent task.
 - Windows login auto-start is now opt-in (previously enabled by default); users explicitly consent via guided install or `npx github-delivery autostart`.
 
 ## [0.6.0] - 2026-08-14
