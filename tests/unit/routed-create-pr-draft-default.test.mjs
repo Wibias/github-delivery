@@ -23,8 +23,8 @@ function readyGate() {
     repo: "acme/widgets",
     baseRef: "dev",
     headRef: "task",
-    baseRefOid: BASE,
-    headRefOid: HEAD,
+    baseSha: BASE,
+    headSha: HEAD,
     diffIdentity: `sha256:${"d".repeat(64)}`,
     fileCount: 2,
   };
@@ -56,6 +56,8 @@ function checkpoint(path) {
     startPhase: "PREOPEN_GATE",
   });
   controller.recordPreOpenGate(readyGate());
+  controller.recordHygienePass("no-comments", { status: "done" });
+  controller.recordHygienePass("simplify", { status: "done" });
   controller.transition("OPEN_PR");
   writeDeliveryWorkflowCheckpoint(path, controller.snapshot());
 }
