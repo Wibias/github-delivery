@@ -37,12 +37,19 @@ const WORKFLOW_PLANS = Object.freeze({
       output: "compact",
       decisionField: "decision",
       readyValue: "ready",
+      baseAuthority: "checkpoint-locked-remote",
+    }),
+    hygiene: Object.freeze({
+      commentScope: "diff-added-lines",
+      resultValidation: "structured-final-only",
+      receiptAuthority: "pre-open-gate",
     }),
     publication: Object.freeze({
       initialCreate: "draft-only",
       planner: "scripts/create-pr-publication-plan.mjs",
       mutationEntrypoint: "scripts/github-mutate.mjs",
       directWriteFallback: "forbidden",
+      completion: "broker-receipts",
     }),
   }),
 });

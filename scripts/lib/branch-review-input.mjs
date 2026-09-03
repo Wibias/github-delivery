@@ -49,6 +49,32 @@ export function parseNullDelimitedNameStatus(output) {
   return rows;
 }
 
+export function parseRemoteBranchHead(output) {
+  const rows = String(output || "")
+    .trim()
+    .split(/\r?\n/)
+    .filter(Boolean);
+  if (rows.length !== 1) throw new Error("pre_open_remote_base_unresolved");
+  const [sha, ref, ...extra] = rows[0].split(/\s+/);
+  if (extra.length || !/^[0-9a-f]{40,64}$/i.test(String(sha || "")) || !String(ref || "").startsWith("refs/heads/")) {
+    throw new Error("pre_open_remote_base_invalid");
+  }
+  return sha;
+}
+
+export function resolveRemoteBranchHead(remote, branch) {
+  const remoteName = String(remote || "").trim();
+  const branchName = String(branch || "").trim();
+  if (!remoteName || !branchName) throw new Error("pre_open_remote_base_required");
+  const output = run("git", [
+    "ls-remote",
+    "--heads",
+    remoteName,
+    `refs/heads/${branchName}`,
+  ]);
+  return parseRemoteBranchHead(output);
+}
+
 function resolveRepoForBranch() {
   try {
     const name = JSON.parse(run("gh", ["repo", "view", "--json", "nameWithOwner"])).nameWithOwner;

@@ -1,6 +1,11 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
+import {
+  assertCreatePrPublicationComplete,
+  normalizeCreatePrPublicationPlanLock,
+  normalizeCreatePrPublicationReceipts,
+} from "./create-pr-publication-state.mjs";
 import { createEvidenceRegistry } from "./watchdog-evidence-registry.mjs";
 
 const DEFAULT_BUDGETS = Object.freeze({
@@ -221,6 +226,12 @@ export function createDeliveryWorkflowController(options = {}) {
   let headSha = snapshot?.headSha ?? options.headSha ?? null;
   let preOpenGate = normalizePreOpenGate(snapshot?.preOpenGate || options.preOpenGate);
   let hygienePasses = normalizeHygienePasses(snapshot?.hygienePasses || options.hygienePasses);
+  const publicationPlan = normalizeCreatePrPublicationPlanLock(
+    snapshot?.publicationPlan || options.publicationPlan,
+  );
+  const publicationReceipts = normalizeCreatePrPublicationReceipts(
+    snapshot?.publicationReceipts || options.publicationReceipts,
+  );
   let stateGeneration = nonNegativeInteger(snapshot?.stateGeneration);
   const completedPhases = [...(snapshot?.completedPhases || [])].map(String);
   const blockers = new Set((snapshot?.blockers || []).map(String));
@@ -255,6 +266,8 @@ export function createDeliveryWorkflowController(options = {}) {
       headSha,
       preOpenGate: preOpenGate ? structuredClone(preOpenGate) : null,
       hygienePasses: structuredClone(hygienePasses),
+      publicationPlan: publicationPlan ? structuredClone(publicationPlan) : null,
+      publicationReceipts: structuredClone(publicationReceipts),
       phase,
       graph,
       completedPhases: [...completedPhases],
@@ -292,6 +305,9 @@ export function createDeliveryWorkflowController(options = {}) {
     if (target === "OPEN_PR" && PRE_OPEN_WORKFLOWS.has(workflow)) {
       assertPreOpenHygieneEvidence(snapshotState());
       assertPreOpenPublicationEvidence(snapshotState());
+    }
+    if (phase === "OPEN_PR" && workflow === "create-pr-from-local-work") {
+      assertCreatePrPublicationComplete(snapshotState());
     }
     if (!completedPhases.includes(phase)) completedPhases.push(phase);
     phase = target;
@@ -471,21 +487,6 @@ export function createDeliveryWorkflowController(options = {}) {
     return { ...updated, headSha };
   }
 
-  function recordHygienePass(pass, { status = "done" } = {}) {
-    if (!PRE_OPEN_WORKFLOWS.has(workflow)) {
-      throw new Error("pre_open_hygiene_not_required");
-    }
-    const definition = PRE_OPEN_HYGIENE_PASSES.find((entry) => entry.id === String(pass || ""));
-    if (!definition) throw new Error("pre_open_hygiene_pass_invalid");
-    if (status !== "done") throw new Error("pre_open_hygiene_status_invalid");
-    if (!headSha) throw new Error("pre_open_hygiene_head_missing");
-    if (phase === "OPEN_PR") throw new Error("pre_open_hygiene_phase_invalid");
-    const record = { status: "done", headSha, recordedAt: now() };
-    hygienePasses[definition.key] = record;
-    touch();
-    return structuredClone(record);
-  }
-
   function recordPreOpenGate(result = {}) {
     if (!PRE_OPEN_WORKFLOWS.has(workflow)) {
       throw new Error("pre_open_evidence_not_required");
@@ -540,7 +541,6 @@ export function createDeliveryWorkflowController(options = {}) {
     authorizeMutation,
     updateRefs,
     reconcileMutationResult,
-    recordHygienePass,
     recordPreOpenGate,
     recordEvidence,
     decideEvidence,

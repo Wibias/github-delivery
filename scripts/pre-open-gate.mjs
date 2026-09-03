@@ -3,13 +3,17 @@
 import { resolve } from "node:path";
 
 import { isDirectInvocation } from "./lib/direct-invocation.mjs";
-import { collectBranchReviewInput } from "./lib/branch-review-input.mjs";
+import {
+  collectBranchReviewInput,
+  resolveRemoteBranchHead,
+} from "./lib/branch-review-input.mjs";
 import {
   createDeliveryWorkflowController,
   readDeliveryWorkflowCheckpoint,
   writeDeliveryWorkflowCheckpoint,
 } from "./lib/delivery-workflow-controller.mjs";
 import { resolveDeliveryWorkflowProfile } from "./lib/delivery-workflow-profiles.mjs";
+import { preOpenHygieneReceipts, validatePreOpenHygieneEvidence } from "./lib/pre-open-hygiene-evidence.mjs";
 import { planReviewScope } from "./lib/review-scope.mjs";
 import { projectBugScope, projectSecurityScope } from "./lib/review-scope-compat.mjs";
 import {
@@ -20,7 +24,7 @@ import {
 import { validateProbeEvidence } from "./lib/probe-evidence.mjs";
 
 function usageError() {
-  throw new Error("Usage: node scripts/pre-open-gate.mjs OWNER/REPO BASE_REF HEAD_REF [--compact] [--output FILE] [--evidence-file FILE] [--checkpoint FILE] | --self-test");
+  throw new Error("Usage: node scripts/pre-open-gate.mjs OWNER/REPO BASE_REF HEAD_REF [--compact] [--output FILE] [--evidence-file FILE] [--hygiene-file FILE] [--checkpoint FILE] [--remote REMOTE] | --self-test");
 }
 
 function probeCoverage(plan, evidence) {
@@ -239,7 +243,9 @@ function parseArgs(argv) {
   let headRef = null;
   let output = null;
   let evidenceFile = null;
+  let hygieneFile = null;
   let checkpoint = null;
+  let remote = "origin";
   let compact = false;
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];
@@ -252,9 +258,16 @@ function parseArgs(argv) {
       if (evidenceFile !== null) throw new Error("--evidence-file may be given only once");
       evidenceFile = argv[++index];
       if (evidenceFile === undefined) throw new Error("--evidence-file requires a file path");
+    } else if (value === "--hygiene-file") {
+      if (hygieneFile !== null) throw new Error("--hygiene-file may be given only once");
+      hygieneFile = argv[++index];
+      if (hygieneFile === undefined) throw new Error("--hygiene-file requires a file path");
     } else if (value === "--checkpoint") {
       checkpoint = argv[++index];
       if (checkpoint === undefined) throw new Error("--checkpoint requires a file path");
+    } else if (value === "--remote") {
+      remote = argv[++index];
+      if (!remote) throw new Error("--remote requires a remote name");
     } else if (repo === null) {
       repo = value;
     } else if (baseRef === null) {
@@ -265,7 +278,7 @@ function parseArgs(argv) {
       throw new Error(`unexpected argument: ${value}`);
     }
   }
-  return { repo, baseRef, headRef, output, evidenceFile, checkpoint, compact };
+  return { repo, baseRef, headRef, output, evidenceFile, hygieneFile, checkpoint, remote, compact };
 }
 
 async function loadEvidence(evidenceFile) {
@@ -288,12 +301,56 @@ async function loadEvidence(evidenceFile) {
   return validated.evidence;
 }
 
-function persistCheckpoint(checkpointPath, result) {
+async function loadHygieneEvidence(hygieneFile, headSha) {
+  if (!hygieneFile) return null;
+  const { readFileSync } = await import("node:fs");
+  let parsed;
+  try {
+    parsed = JSON.parse(readFileSync(hygieneFile, "utf8"));
+  } catch (error) {
+    throw new Error(`--hygiene-file is not valid JSON: ${error?.message || error}`);
+  }
+  return validatePreOpenHygieneEvidence(parsed, { headSha });
+}
+
+function checkpointReviewRefs({ checkpointPath, repo, baseRef, headRef, remote }) {
+  if (!checkpointPath) return { base: baseRef, head: headRef, snapshot: null };
+  const snapshot = readDeliveryWorkflowCheckpoint(resolve(checkpointPath));
+  if (String(snapshot.repo || "").toLowerCase() !== String(repo || "").toLowerCase()) {
+    throw new Error("pre_open_checkpoint_repo_mismatch");
+  }
+  if (snapshot.workflow !== "create-pr-from-local-work") {
+    return { base: baseRef, head: headRef, snapshot };
+  }
+  const remotePrefix = `${remote}/`;
+  const branch = String(baseRef).startsWith(remotePrefix)
+    ? String(baseRef).slice(remotePrefix.length)
+    : String(baseRef);
+  const base = resolveRemoteBranchHead(remote, branch);
+  const head = String(snapshot.headSha || headRef || "").trim();
+  if (!head) throw new Error("pre_open_checkpoint_head_missing");
+  return { base, head, snapshot };
+}
+
+function persistCheckpoint(checkpointPath, result, hygieneEvidence = null) {
   if (!checkpointPath) return;
   const checkpoint = resolve(checkpointPath);
   const snapshot = readDeliveryWorkflowCheckpoint(checkpoint);
+  if (snapshot.headSha && String(snapshot.headSha).toLowerCase() !== String(result.headRefOid || "").toLowerCase()) {
+    throw new Error("pre_open_checkpoint_head_changed");
+  }
+  if (hygieneEvidence) {
+    snapshot.hygienePasses = preOpenHygieneReceipts(hygieneEvidence, {
+      headSha: result.headRefOid,
+    });
+  }
   const profile = resolveDeliveryWorkflowProfile(snapshot.workflow);
   const controller = createDeliveryWorkflowController({ snapshot, graph: profile.graph });
+  controller.updateRefs(
+    snapshot.workflow === "create-pr-from-local-work"
+      ? { baseSha: result.baseRefOid, headSha: result.headRefOid }
+      : { headSha: result.headRefOid },
+  );
   controller.recordPreOpenGate(result);
   writeDeliveryWorkflowCheckpoint(checkpoint, controller.snapshot());
 }
@@ -322,11 +379,13 @@ function selfTest() {
 }
 
 async function main() {
-  const { repo, baseRef, headRef, output, evidenceFile, checkpoint, compact } = parseArgs(process.argv.slice(2));
+  const { repo, baseRef, headRef, output, evidenceFile, hygieneFile, checkpoint, remote, compact } = parseArgs(process.argv.slice(2));
   if (!repo?.includes("/") || !baseRef || !headRef) usageError();
-  const input = collectBranchReviewInput(baseRef, headRef);
+  const refs = checkpointReviewRefs({ checkpointPath: checkpoint, repo, baseRef, headRef, remote });
+  const input = collectBranchReviewInput(refs.base, refs.head);
   const plan = planReviewScope(input);
   const evidence = await loadEvidence(evidenceFile);
+  const hygieneEvidence = await loadHygieneEvidence(hygieneFile, input.headRefOid);
   const result = report({
     repo,
     baseRef,
@@ -337,7 +396,7 @@ async function main() {
     fileCount: plan.fileCount,
     ...evaluate(plan, evidence),
   });
-  persistCheckpoint(checkpoint, result);
+  persistCheckpoint(checkpoint, result, hygieneEvidence);
   const emitted = compact ? compactPreOpenGateReport(result) : result;
   const json = JSON.stringify(emitted, null, 2) + "\n";
   process.stdout.write(json);

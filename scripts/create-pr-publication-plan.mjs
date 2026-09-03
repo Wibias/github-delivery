@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 
 import { buildCreatePrPublicationPlan } from "./lib/create-pr-publication-plan.mjs";
 import { isDirectInvocation } from "./lib/direct-invocation.mjs";
+import { lockCreatePrPublicationPlanCheckpoint } from "./lib/mutation-checkpoint.mjs";
 
 const USAGE =
   "Usage: node scripts/create-pr-publication-plan.mjs --input FILE [--output FILE]";
@@ -35,6 +36,9 @@ export function planFromFile(path) {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const plan = planFromFile(args.input);
+  const checkpoint = String(plan?.execute?.checkpoint || "").trim();
+  if (!checkpoint) throw new Error("create_pr_publication_checkpoint_required");
+  lockCreatePrPublicationPlanCheckpoint({ path: resolve(checkpoint), plan });
   const json = `${JSON.stringify(plan, null, 2)}\n`;
   process.stdout.write(json);
   if (args.output) writeFileSync(args.output, json, "utf8");

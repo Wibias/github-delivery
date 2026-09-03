@@ -4,11 +4,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
+import { buildCreatePrPublicationPlan } from "../../scripts/lib/create-pr-publication-plan.mjs";
 import {
   createDeliveryWorkflowController,
   writeDeliveryWorkflowCheckpoint,
 } from "../../scripts/lib/delivery-workflow-controller.mjs";
-import { mutationExecutionContextFromCheckpoint } from "../../scripts/lib/mutation-checkpoint.mjs";
+import {
+  lockCreatePrPublicationPlanCheckpoint,
+  mutationExecutionContextFromCheckpoint,
+} from "../../scripts/lib/mutation-checkpoint.mjs";
 
 const BASE = "a".repeat(40);
 const HEAD = "b".repeat(40);
@@ -35,7 +39,6 @@ function request(draft) {
     schemaVersion: 1,
     action: "create_pr",
     mutationMode: "maintainer",
-    explicitInstruction: false,
     repo: "acme/widgets",
     base: "dev",
     head: "task",
@@ -46,6 +49,22 @@ function request(draft) {
   };
 }
 
+function plan(path) {
+  return buildCreatePrPublicationPlan({
+    repo: "acme/widgets",
+    remote: "origin",
+    branch: "task",
+    base: "dev",
+    expectedRemoteTip: "absent",
+    originalLocalTip: HEAD,
+    newTip: HEAD,
+    title: "Fix widgets",
+    body: "Body",
+    idempotencyKey: "routed-create-pr-draft-default",
+    checkpoint: path,
+  });
+}
+
 function checkpoint(path) {
   const controller = createDeliveryWorkflowController({
     workflow: "create-pr-from-local-work",
@@ -54,12 +73,15 @@ function checkpoint(path) {
     headSha: HEAD,
     graph: GRAPH,
     startPhase: "PREOPEN_GATE",
+    hygienePasses: {
+      noComments: { status: "done", headSha: HEAD, recordedAt: 1 },
+      simplify: { status: "done", headSha: HEAD, recordedAt: 1 },
+    },
   });
   controller.recordPreOpenGate(readyGate());
-  controller.recordHygienePass("no-comments", { status: "done" });
-  controller.recordHygienePass("simplify", { status: "done" });
   controller.transition("OPEN_PR");
   writeDeliveryWorkflowCheckpoint(path, controller.snapshot());
+  lockCreatePrPublicationPlanCheckpoint({ path, plan: plan(path) });
 }
 
 test("routed create-PR publication rejects a non-draft create_pr payload", () => {
@@ -76,7 +98,7 @@ test("routed create-PR publication rejects a non-draft create_pr payload", () =>
   }
 });
 
-test("routed create-PR publication still binds workflow intent for draft creation", () => {
+test("routed create-PR publication still binds workflow intent for the exact draft plan", () => {
   const directory = mkdtempSync(join(tmpdir(), "github-delivery-routed-draft-ok-"));
   const path = join(directory, "checkpoint.json");
   try {
