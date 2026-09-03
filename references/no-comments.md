@@ -56,6 +56,8 @@ If verification reports reviewer mutation, run `scripts/comment-review-guard.mjs
 
 A reviewer failure cannot leave workspace mutations because reviewer mutation is forbidden and the byte guard verifies the boundary. If the subagent returns an error, is interrupted, or fails before a valid final report, discard partial/provisional output, verify/restore the snapshot as needed, and run the **parent fallback**; do not infer whether the reviewer "probably" applied anything. If spawn is unavailable or rejected by the host before execution begins, run the same keep-list as a separate parent fallback phase, as if this agent did not write the code. Missing or failed spawn is not itself a failed hunt.
 
+After the reviewer window is verified or restored, delete the temporary byte copy with `scripts/comment-review-guard.mjs discard --snapshot <temp-file>` before applying any parent-owned changes or starting a rerun. Do not retain source snapshots as workflow evidence.
+
 ## Parent inspector
 
 Inspect the final report only after the byte guard verifies an unchanged reviewer window. Reject:
