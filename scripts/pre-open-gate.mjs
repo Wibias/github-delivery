@@ -20,7 +20,7 @@ import {
 import { validateProbeEvidence } from "./lib/probe-evidence.mjs";
 
 function usageError() {
-  throw new Error("Usage: node scripts/pre-open-gate.mjs OWNER/REPO BASE_REF HEAD_REF [--output FILE] [--evidence-file FILE] [--checkpoint FILE] | --self-test");
+  throw new Error("Usage: node scripts/pre-open-gate.mjs OWNER/REPO BASE_REF HEAD_REF [--compact] [--output FILE] [--evidence-file FILE] [--checkpoint FILE] | --self-test");
 }
 
 function probeCoverage(plan, evidence) {
@@ -130,6 +130,109 @@ function report({ repo, baseRef, headRef, baseRefOid, headRefOid, diffIdentity, 
   };
 }
 
+function sortedUnique(values) {
+  return [...new Set((values || []).map(String).filter(Boolean))].sort();
+}
+
+function remainingObligations(blockers = []) {
+  const remaining = { lenses: [], surfaces: [], probes: [], other: [] };
+  for (const blocker of blockers) {
+    const value = String(blocker || "");
+    if (value.startsWith("bug:requiredLenses:")) {
+      remaining.lenses.push(value.slice("bug:requiredLenses:".length));
+    } else if (value.startsWith("security:requiredSurfaces:")) {
+      remaining.surfaces.push(value.slice("security:requiredSurfaces:".length));
+    } else if (value.startsWith("probe:requiredProbes:")) {
+      remaining.probes.push(value.slice("probe:requiredProbes:".length));
+    } else {
+      remaining.other.push(value);
+    }
+  }
+  return Object.fromEntries(
+    Object.entries(remaining).map(([key, values]) => [key, sortedUnique(values)]),
+  );
+}
+
+function fallbackReviewedFiles(result) {
+  return sortedUnique([
+    ...(result?.bugScope?.logicFilesSample || []),
+    ...(result?.securityScope?.reviewPlan?.logicFiles || []),
+  ]);
+}
+
+function requirementFiles(files, fallback) {
+  const scoped = sortedUnique(files);
+  return scoped.length ? scoped : fallback;
+}
+
+export function compactPreOpenGateReport(result) {
+  const blockers = Array.isArray(result?.blockers) ? result.blockers.map(String) : [];
+  const remaining = remainingObligations(blockers);
+  const fallback = fallbackReviewedFiles(result);
+  const lenses = {};
+  for (const id of remaining.lenses) {
+    const evidence = result?.bugScope?.lensEvidence?.[id] || {};
+    lenses[id] = {
+      reviewedFiles: requirementFiles(evidence.files, fallback),
+      ...(Array.isArray(evidence.reasons) && evidence.reasons.length
+        ? { why: evidence.reasons.join("; ") }
+        : {}),
+    };
+  }
+  const surfaces = {};
+  for (const id of remaining.surfaces) {
+    const evidence = result?.securityScope?.matched?.[id] || {};
+    surfaces[id] = {
+      reviewedFiles: requirementFiles(evidence.files, fallback),
+      ...(evidence.why ? { why: String(evidence.why) } : {}),
+    };
+  }
+  const probes = {};
+  const probeEvidence = {
+    ...(result?.bugScope?.reviewPlan?.probeEvidence || {}),
+    ...(result?.securityScope?.reviewPlan?.probeEvidence || {}),
+  };
+  for (const id of remaining.probes) {
+    probes[id] = {
+      files: requirementFiles(probeEvidence?.[id]?.files, fallback),
+    };
+  }
+
+  const nextAction =
+    result?.decision === "ready"
+      ? "proceed_to_publication"
+      : result?.decision === "blocked"
+        ? "complete_evidence"
+        : "restore_branch_evidence";
+
+  return {
+    schemaVersion: 1,
+    kind: "github-delivery/pre-open-gate-summary",
+    repo: result?.repo,
+    baseRef: result?.baseRef,
+    headRef: result?.headRef,
+    baseRefOid: result?.baseRefOid,
+    headRefOid: result?.headRefOid,
+    diffIdentity: result?.diffIdentity,
+    fileCount: result?.fileCount,
+    decision: result?.decision,
+    complete: result?.complete,
+    implementationDiffPresent: result?.implementationDiffPresent,
+    evidenceApplied: result?.evidenceApplied,
+    blockerCount: blockers.length,
+    remaining,
+    evidenceRequirements: {
+      schemaVersion: PRE_OPEN_EVIDENCE_SCHEMA_VERSION,
+      headSha: result?.headRefOid,
+      lenses,
+      surfaces,
+      probes,
+    },
+    clearedCount: Array.isArray(result?.clearedByEvidence) ? result.clearedByEvidence.length : 0,
+    nextAction,
+  };
+}
+
 function parseArgs(argv) {
   let repo = null;
   let baseRef = null;
@@ -137,9 +240,12 @@ function parseArgs(argv) {
   let output = null;
   let evidenceFile = null;
   let checkpoint = null;
+  let compact = false;
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];
-    if (value === "--output") {
+    if (value === "--compact") {
+      compact = true;
+    } else if (value === "--output") {
       output = argv[++index];
       if (output === undefined) throw new Error("--output requires a file path");
     } else if (value === "--evidence-file") {
@@ -159,7 +265,7 @@ function parseArgs(argv) {
       throw new Error(`unexpected argument: ${value}`);
     }
   }
-  return { repo, baseRef, headRef, output, evidenceFile, checkpoint };
+  return { repo, baseRef, headRef, output, evidenceFile, checkpoint, compact };
 }
 
 async function loadEvidence(evidenceFile) {
@@ -203,6 +309,10 @@ function selfTest() {
   if (out.decision !== "blocked" || !out.blockers.some((b) => b.startsWith("bug:requiredLenses:"))) {
     throw new Error("self-test failed: expected blocked with bug lenses");
   }
+  const compact = compactPreOpenGateReport(out);
+  if (compact.kind !== "github-delivery/pre-open-gate-summary" || compact.blockerCount === 0) {
+    throw new Error("self-test failed: expected compact blocker summary");
+  }
   const emptyPlan = planReviewScope({ repo: "acme/widget", pr: null, headRefOid: "base", files: [] });
   const emptyOut = report({ repo: emptyPlan.repo, baseRef: "dev", headRef: "feat/empty", baseRefOid: "base", headRefOid: emptyPlan.headRefOid, diffIdentity: "sha256:empty", fileCount: emptyPlan.fileCount, ...evaluate(emptyPlan) });
   if (emptyOut.decision !== "blocked" || !emptyOut.blockers.includes("workflow:implementation_missing")) {
@@ -212,7 +322,7 @@ function selfTest() {
 }
 
 async function main() {
-  const { repo, baseRef, headRef, output, evidenceFile, checkpoint } = parseArgs(process.argv.slice(2));
+  const { repo, baseRef, headRef, output, evidenceFile, checkpoint, compact } = parseArgs(process.argv.slice(2));
   if (!repo?.includes("/") || !baseRef || !headRef) usageError();
   const input = collectBranchReviewInput(baseRef, headRef);
   const plan = planReviewScope(input);
@@ -228,7 +338,8 @@ async function main() {
     ...evaluate(plan, evidence),
   });
   persistCheckpoint(checkpoint, result);
-  const json = JSON.stringify(result, null, 2) + "\n";
+  const emitted = compact ? compactPreOpenGateReport(result) : result;
+  const json = JSON.stringify(emitted, null, 2) + "\n";
   process.stdout.write(json);
   if (output) {
     const { writeFileSync } = await import("node:fs");
