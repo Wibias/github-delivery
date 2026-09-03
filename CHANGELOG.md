@@ -234,7 +234,7 @@ All notable changes to `github-delivery` are documented here.
 - Review briefs label files as core, mechanical, or other, and call out relocated blocks of three or more lines as moved code. Textually identical relocation does not prove unchanged behavior; surrounding context still requires review. PR description review notes name the core files when a diff mixes implementation with generated or lockfile changes.
 - Absence claims need a positive-control search that matches a known hit before `no residual X`.
 - Confirmation checks re-run in the same shell and PATH as the original observation so a PATH switch cannot produce a false result.
-- `authorityMode=off` now means zero Windows Hello / Authority-host approval. Direct lifecycle intent and exact-text confirmation still remain mandatory where policy requires it, but caller-controlled mutation JSON cannot mint those facts; governing workflows provide them through trusted execution context (PR #370).
+- `authorityMode=off` now means zero Windows Hello / Authority-host approval. Direct lifecycle intent and exact-text confirmation still remain mandatory where policy requires them, but caller-controlled mutation JSON cannot mint those facts; governing workflows provide them through trusted execution context (PR #370).
 
 ### Fixed
 
@@ -479,7 +479,7 @@ All notable changes to `github-delivery` are documented here.
 
 ### Fixed
 
-- Repeated grid or malformed tool-protocol placeholder output now hard-stops immediately on the first stall instead of being retried, and the offending model is quarantined across turns and `SessionEnd` so a resume with the same model is blocked before inference until the model is changed. Subagent protocol stalls no longer quarantine the parent task.
+- Repeated grid or malformed tool-protocol placeholder output now hard-stops immediately on the first stall instead of being retried, and the offending model is quarantined across turns and `SessionEnd` so a resume with the same model is blocked before inference until the model changes or a new task begins. Subagent protocol stalls no longer quarantine the parent task.
 - Windows login auto-start is now opt-in (previously enabled by default); users explicitly consent via guided install or `npx github-delivery autostart`.
 
 ## [0.6.0] - 2026-08-14
