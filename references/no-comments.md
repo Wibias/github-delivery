@@ -50,11 +50,15 @@ When the host can spawn a subagent, the parent **must spawn** the **comment insp
 
 The inspector is report-only. It may read nearby context outside that scope only to judge a scoped comment, but it must never edit files, delete comments, reformat code, or otherwise mutate the workspace. It must not classify comments or raise root-cause flags outside the immutable scope.
 
-A reviewer failure cannot leave workspace mutations because reviewer mutation is forbidden. If the subagent returns an error, is interrupted, or fails before a valid final report, discard partial/provisional output and run the **parent fallback**; do not infer whether the reviewer "probably" applied anything. If spawn is unavailable or rejected by the host, run the same keep-list as a separate parent fallback phase, as if this agent did not write the code. Missing or failed spawn is not itself a failed hunt.
+Before spawn, the parent creates a **pre-spawn byte snapshot** of every scoped file with `scripts/comment-review-guard.mjs capture --root <repo-root> --files <scope-json> --snapshot <temp-file>`. No concurrent writer may modify those scoped files until the reviewer result has been verified. Immediately after the subagent returns or errors, run `scripts/comment-review-guard.mjs verify --root <repo-root> --snapshot <temp-file>` before trusting any report.
+
+If verification reports reviewer mutation, run `scripts/comment-review-guard.mjs restore --root <repo-root> --snapshot <temp-file>` to **restore the exact pre-spawn bytes**, reject that reviewer result, and use the parent fallback (or the one permitted rerun). This rollback is safe only because the scoped files have **no concurrent writer** during the reviewer window. Never use rollback to overwrite known parent/user edits made after capture; such concurrency is a workflow violation and must fail closed instead.
+
+A reviewer failure cannot leave workspace mutations because reviewer mutation is forbidden and the byte guard verifies the boundary. If the subagent returns an error, is interrupted, or fails before a valid final report, discard partial/provisional output, verify/restore the snapshot as needed, and run the **parent fallback**; do not infer whether the reviewer "probably" applied anything. If spawn is unavailable or rejected by the host before execution begins, run the same keep-list as a separate parent fallback phase, as if this agent did not write the code. Missing or failed spawn is not itself a failed hunt.
 
 ## Parent inspector
 
-Inspect the final report before mutation. Reject:
+Inspect the final report only after the byte guard verifies an unchanged reviewer window. Reject:
 
 - any claimed or observed reviewer workspace mutation
 - scope escapes, including any classification or flag outside the immutable scope
@@ -89,6 +93,8 @@ A failed no-comments pass **blocks the review verdict**, merge-ready claim, and 
 
 - two rejected reviewer reports in a row
 - the reviewer claims workspace mutation, escapes scope, or still produces an invalid final report after one rerun
+- the byte guard cannot verify or restore the exact scoped pre-spawn state
+- a concurrent writer touched scoped files during the reviewer window
 - own PR with `push_code` already allowed, and an accepted in-scope kill or root-cause flag was not landed by the parent
 - an unproven alibi comment was left in place
 - a leftover workaround after a deleted alibi remains (in-scope unlanded, or out-of-scope named as a merge-ready blocker)
