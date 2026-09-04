@@ -183,10 +183,13 @@ test("only exact locked requests can complete local PR publication", () => {
 test("local PR execution contract names executable base, hygiene-scope, and completion boundaries", () => {
   const plan = executionContractForWorkflow("create-pr-from-local-work").workflowPlan;
   assert.equal(plan.preOpen.baseAuthority, "checkpoint-locked-remote");
+  assert.equal(plan.preOpen.evidenceAssembler, "scripts/pre-open-review-evidence.mjs");
   assert.deepEqual(plan.hygiene, {
     commentScope: "diff-added-lines",
     resultValidation: "structured-final-only",
     receiptAuthority: "pre-open-gate",
+    orchestrator: "scripts/create-pr-hygiene.mjs",
   });
+  assert.equal(plan.publication.directWriteGuard, "runtime-after-workflow-selection");
   assert.equal(plan.publication.completion, "broker-receipts");
 });
