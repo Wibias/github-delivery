@@ -37,6 +37,34 @@ function compactSummary() {
   };
 }
 
+function aggregateReview(overrides = {}) {
+  return {
+    schemaVersion: 1,
+    kind: "github-delivery/pre-open-review-result",
+    headSha: HEAD,
+    bug: {
+      status: "clean",
+      method: "focused candidate bug review",
+      coveredIds: ["edge_cases", "ui_accessibility"],
+      reviewedFiles: ["src/ui.ts", "src/a11y.ts"],
+    },
+    security: {
+      status: "clean",
+      method: "focused candidate security review",
+      coveredIds: ["authn", "injection"],
+      reviewedFiles: ["src/session.ts", "src/ui.ts"],
+    },
+    probes: {
+      "ui-accessibility": {
+        probeId: "ui-accessibility",
+        status: "clean",
+        files: ["src/ui.ts"],
+      },
+    },
+    ...overrides,
+  };
+}
+
 test("local PR execution contract exposes the deterministic hygiene and aggregated evidence helpers", () => {
   const contract = executionContractForWorkflow("create-pr-from-local-work");
   assert.equal(contract.helpers.hygieneOrchestrator, "scripts/create-pr-hygiene.mjs");
@@ -48,28 +76,7 @@ test("local PR execution contract exposes the deterministic hygiene and aggregat
 
 test("one bug review and one security review expand into current schema-v2 evidence", () => {
   assert.equal(typeof preOpenEvidence.expandAggregatePreOpenEvidence, "function");
-  const output = preOpenEvidence.expandAggregatePreOpenEvidence(compactSummary(), {
-    schemaVersion: 1,
-    kind: "github-delivery/pre-open-review-result",
-    headSha: HEAD,
-    bug: {
-      status: "clean",
-      method: "focused candidate bug review",
-      reviewedFiles: ["src/ui.ts", "src/a11y.ts"],
-    },
-    security: {
-      status: "clean",
-      method: "focused candidate security review",
-      reviewedFiles: ["src/session.ts", "src/ui.ts"],
-    },
-    probes: {
-      "ui-accessibility": {
-        probeId: "ui-accessibility",
-        status: "clean",
-        files: ["src/ui.ts"],
-      },
-    },
-  });
+  const output = preOpenEvidence.expandAggregatePreOpenEvidence(compactSummary(), aggregateReview());
 
   assert.equal(output.schemaVersion, 2);
   assert.deepEqual(Object.keys(output.lenses).sort(), ["edge_cases", "ui_accessibility"]);
@@ -86,24 +93,20 @@ test("one bug review and one security review expand into current schema-v2 evide
 
 test("aggregated evidence fails when the axis review did not cover a required file", () => {
   assert.equal(typeof preOpenEvidence.expandAggregatePreOpenEvidence, "function");
+  const review = aggregateReview();
+  review.bug = { ...review.bug, reviewedFiles: ["src/ui.ts"] };
   assert.throws(
-    () => preOpenEvidence.expandAggregatePreOpenEvidence(compactSummary(), {
-      schemaVersion: 1,
-      kind: "github-delivery/pre-open-review-result",
-      headSha: HEAD,
-      bug: {
-        status: "clean",
-        method: "focused candidate bug review",
-        reviewedFiles: ["src/ui.ts"],
-      },
-      security: {
-        status: "clean",
-        method: "focused candidate security review",
-        reviewedFiles: ["src/session.ts", "src/ui.ts"],
-      },
-      probes: {},
-    }),
+    () => preOpenEvidence.expandAggregatePreOpenEvidence(compactSummary(), review),
     /pre_open_review_bug_scope_incomplete/,
+  );
+});
+
+test("aggregated evidence fails when the axis review did not cover a required semantic ID", () => {
+  const review = aggregateReview();
+  review.security = { ...review.security, coveredIds: ["authn"] };
+  assert.throws(
+    () => preOpenEvidence.expandAggregatePreOpenEvidence(compactSummary(), review),
+    /pre_open_review_security_ids_incomplete/,
   );
 });
 
