@@ -9,12 +9,16 @@ import {
 } from "./comment-review-guard.mjs";
 import { parseCommentReviewScopePatch } from "./comment-review-scope.mjs";
 import { isDirectInvocation } from "./lib/direct-invocation.mjs";
-import { buildPreOpenHygieneEvidence } from "./lib/pre-open-hygiene-evidence.mjs";
+import {
+  buildPreOpenHygieneEvidence,
+  validatePreOpenHygieneEvidence,
+} from "./lib/pre-open-hygiene-evidence.mjs";
 import { boundedSpawnSync } from "./lib/subprocess-policy.mjs";
 
 const USAGE = `Usage:
   node scripts/create-pr-hygiene.mjs prepare --root ROOT --base REF --head REF --scope FILE --snapshot FILE
-  node scripts/create-pr-hygiene.mjs finalize --root ROOT --head SHA --scope FILE --snapshot FILE --result FILE --simplify FILE --output FILE`;
+  node scripts/create-pr-hygiene.mjs finalize --root ROOT --head SHA --scope FILE --snapshot FILE --result FILE --simplify FILE --output FILE
+  node scripts/create-pr-hygiene.mjs skip-no-comments --head SHA --reason TEXT --simplify FILE --output FILE`;
 
 function takeOption(argv, name, { required = true } = {}) {
   const index = argv.indexOf(name);
@@ -129,12 +133,43 @@ function finalize(argv) {
   };
 }
 
+function skipNoComments(argv) {
+  const head = takeOption(argv, "--head");
+  const reason = takeOption(argv, "--reason");
+  const simplifyPath = takeOption(argv, "--simplify");
+  const outputPath = takeOption(argv, "--output");
+  assertNoUnknown(argv);
+
+  const evidence = validatePreOpenHygieneEvidence({
+    schemaVersion: 1,
+    kind: "github-delivery/pre-open-hygiene-evidence",
+    headSha: head,
+    passes: {
+      "no-comments": {
+        outcome: "skipped",
+        method: "opt-out",
+        reason,
+      },
+      simplify: readJson(simplifyPath, "simplify_result"),
+    },
+  }, { headSha: head });
+  writeJson(outputPath, evidence);
+  return {
+    schemaVersion: 1,
+    kind: "github-delivery/create-pr-hygiene-skip-no-comments",
+    outputPath: resolve(outputPath),
+    headSha: evidence.headSha,
+    passes: evidence.passes,
+  };
+}
+
 async function main() {
   const argv = process.argv.slice(2);
   const command = argv.shift();
   let result;
   if (command === "prepare") result = prepare(argv);
   else if (command === "finalize") result = finalize(argv);
+  else if (command === "skip-no-comments") result = skipNoComments(argv);
   else throw new Error(USAGE);
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
 }
