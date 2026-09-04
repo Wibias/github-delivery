@@ -4,6 +4,22 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.4.4] - 2026-09-04
+
+### Added
+
+- Added deterministic local-PR hygiene orchestration that derives Comment Inspector scope from diff-added lines, validates one structured final result, verifies reviewer bytes, and emits current-head hygiene evidence without manual receipt construction (PR #424).
+- Added aggregate pre-open review evidence expansion that converts complete bug/security axis coverage plus canonical probe records into the existing schema-v2 obligations without reducing required semantic IDs or file coverage (PR #424).
+
+### Changed
+
+- Bumped the package version from `1.4.3` to `1.4.4`.
+- `create-pr-from-local-work` now documents one executable happy path for hygiene, compact pre-open evidence, planner locking, and broker receipt completion; Comment Inspector guidance is aligned to generated immutable scope and structured final output (PR #424).
+
+### Fixed
+
+- Selected local-PR workflows now reject direct `git push` / `gh pr create` execution through the protected Codex hook with `create_pr_direct_write_forbidden`, eliminating the observed fallback/re-decision loop before the canonical publication boundary (PR #424).
+
 ## [1.4.3] - 2026-09-03
 
 ### Added
@@ -60,6 +76,10 @@ All notable changes to `github-delivery` are documented here.
 - Bumped the package version from `1.3.8` to `1.4.0`.
 - README current-state now keeps only the documented fail-closed limits and the still-expanding list, and release notes point at `CHANGELOG.md` instead of duplicating version history.
 - Pull-request Windows Authority, JavaScript CodeQL, and C# CodeQL jobs now run only when the trusted base-SHA path classifier says those lanes are in scope. Scope detection failure still fail-closes into running the lane. The Windows rewrite-baseline workflow is path-filtered to the files it exercises.
+
+### Fixed
+
+- Updating on Windows no longer surfaces the raw directory-rename `EPERM` as the only recovery path when applications such as editors hold handles inside the installed `github-delivery` tree (PR #376).
 
 ## [1.3.8] - 2026-08-30
 
@@ -821,8 +841,7 @@ All notable changes to `github-delivery` are documented here.
   focused failing excerpt before loading full raw output. Pending-only required
   CI is owned by `scripts/ci-wait.mjs` instead of parallel manual polling.
 - Refreshed the README with a faster natural-language quick start, repository
-  workflow visuals, clearer safety/value positioning, and user-facing setup
-  and architecture documentation for the progress watchdog.
+  workflow visuals, clearer safety/value positioning, consolidated installation/maintenance guidance, dedicated stack/competing-PR/backport explanation, updated workflow reference, and the current lean CI topology. Release-specific implementation detail is no longer embedded in the hero text.
 
 ## [0.1.1] - 2026-08-11
 
