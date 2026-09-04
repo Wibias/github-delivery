@@ -52,7 +52,7 @@ For `create-pr-from-local-work`, scope is executable rather than model-selected:
 
 For other workflows that compose no-comments, retain their declared exact parent file/diff scope and create the pre-spawn byte snapshot with `scripts/comment-review-guard.mjs capture --root <repo-root> --files <scope-json> --snapshot <temp-file>` unless their owning workflow supplies an equivalent deterministic wrapper.
 
-The inspector is report-only. It must never edit files, delete comments, reformat code, or otherwise mutate the workspace. It must not classify comments or raise root-cause flags outside the immutable scope. Its durable output is one final structured result, never progress narration or provisional classifications.
+The inspector is report-only. It must never edit files, delete comments, reformat code, or otherwise mutate the workspace. It must not classify comments or raise root-cause flags outside that scope. Its durable output is one final structured result, never progress narration or provisional classifications.
 
 For the local create-PR path, the final result must be `schemaVersion: 1`, `kind: "github-delivery/comment-review-result"`, carry the exact generated `scopeDigest`, and contain unique `{ path, line, disposition, reason }` classifications plus any root-cause flags. `scripts/create-pr-hygiene.mjs finalize` validates this through the canonical `comment-review-result` boundary. A pre-existing line, duplicate/reversed classification, detached root-cause flag, wrong scope digest, or non-KEEP/DELETE disposition is rejected structurally.
 
