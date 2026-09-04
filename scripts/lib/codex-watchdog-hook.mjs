@@ -54,11 +54,16 @@ function hydrateNarrationRecoveryAttempts(state) {
   return Number.isInteger(value) && value >= 0 ? value : 0;
 }
 
-function stateOf(watchdog, evidenceRegistry, narrationRecoveryAttempts) {
+function hydrateLocalPrWorkflowLocked(state) {
+  return state?.localPrWorkflowLocked === true;
+}
+
+function stateOf(watchdog, evidenceRegistry, narrationRecoveryAttempts, localPrWorkflowLocked) {
   return {
     watchdog: watchdog.snapshot(),
     evidenceRegistry: evidenceRegistry.snapshot(),
     narrationRecoveryAttempts,
+    localPrWorkflowLocked,
   };
 }
 
@@ -89,11 +94,30 @@ function inputChars(value) {
   }
 }
 
-function shellEvidenceDescriptor(input) {
+function shellCommand(input) {
   const name = String(input?.tool_name || input?.toolName || "");
-  if (name !== "Bash" && !/(?:^|__)shell(?:_|$)/i.test(name)) return null;
+  if (name !== "Bash" && !/(?:^|__)shell(?:_|$)/i.test(name)) return "";
   const toolInput = input?.tool_input ?? input?.toolInput ?? {};
-  return deriveShellEvidenceDescriptor(toolInput?.command);
+  return typeof toolInput?.command === "string" ? toolInput.command : "";
+}
+
+function shellEvidenceDescriptor(input) {
+  const command = shellCommand(input);
+  return command ? deriveShellEvidenceDescriptor(command) : null;
+}
+
+function selectsLocalPrWorkflow(input) {
+  const command = shellCommand(input);
+  return /^\s*(?:&\s*)?node(?:\.exe)?\s+(?:"[^"]*workflow-brief\.mjs"|'[^']*workflow-brief\.mjs'|\S*workflow-brief\.mjs)\s+create-pr-from-local-work(?:\s|$)/i.test(command);
+}
+
+function directLocalPrPublication(input) {
+  const command = shellCommand(input);
+  if (!command) return false;
+  return (
+    /(?:^|[;&|]\s*)(?:&\s*)?git(?:\.exe)?(?:\s+-C\s+(?:"[^"]+"|'[^']+'|\S+))?\s+push(?:\s|$)/i.test(command)
+    || /(?:^|[;&|]\s*)(?:&\s*)?gh(?:\.exe)?\s+pr\s+create(?:\s|$)/i.test(command)
+  );
 }
 
 function responseExplicitlyFailed(response) {
@@ -219,6 +243,7 @@ export function evaluateCodexHook(input, state = {}, options = {}) {
   const watchdog = hydrate(state, config);
   const evidenceRegistry = hydrateEvidence(state);
   let narrationRecoveryAttempts = hydrateNarrationRecoveryAttempts(state);
+  let localPrWorkflowLocked = hydrateLocalPrWorkflowLocked(state);
   let output = null;
 
   if (event === "PreToolUse") {
@@ -227,60 +252,70 @@ export function evaluateCodexHook(input, state = {}, options = {}) {
     watchdog.recordToolStart();
     narrationRecoveryAttempts = 0;
 
-    const classification = classifyHookTool(input);
-    if (classification.kind === "evidence") {
-      const descriptor = shellEvidenceDescriptor(input);
-      const generation = watchdog.snapshot().stateGeneration;
-      const coverageDecision = descriptor
-        ? evidenceRegistry.decide({
-            stateGeneration: generation,
-            key: descriptor.key,
-            requires: descriptor.covers,
-          })
-        : { action: "allow" };
+    if (localPrWorkflowLocked && directLocalPrPublication(input)) {
+      output = {
+        decision: "block",
+        reason: "create_pr_direct_write_forbidden: create-pr-from-local-work is locked; use the canonical publication planner and scripts/github-mutate.mjs instead of direct git push or gh pr create.",
+      };
+    } else {
+      const classification = classifyHookTool(input);
+      if (classification.kind === "evidence") {
+        const descriptor = shellEvidenceDescriptor(input);
+        const generation = watchdog.snapshot().stateGeneration;
+        const coverageDecision = descriptor
+          ? evidenceRegistry.decide({
+              stateGeneration: generation,
+              key: descriptor.key,
+              requires: descriptor.covers,
+            })
+          : { action: "allow" };
 
-      if (coverageDecision.action === "block") {
-        output = { decision: "block", reason: coveredEvidenceReason(descriptor) };
-      } else {
-        const read = {
-          toolName: input.tool_name,
-          input: input.tool_input,
-          volatility: classification.volatility || "stable",
-          now: config.now,
-        };
-        const readDecision = watchdog.decideRead({ ...read, record: false });
-        if (readDecision.action === "block") {
-          output = { decision: "block", reason: duplicateReason(readDecision) };
+        if (coverageDecision.action === "block") {
+          output = { decision: "block", reason: coveredEvidenceReason(descriptor) };
         } else {
-          const budgetDecision = watchdog.chargeEvidenceAttempt();
-          if (budgetDecision.action === "block") {
-            output = {
-              decision: "block",
-              reason: evidenceBudgetReason(budgetDecision),
-            };
+          const read = {
+            toolName: input.tool_name,
+            input: input.tool_input,
+            volatility: classification.volatility || "stable",
+            now: config.now,
+          };
+          const readDecision = watchdog.decideRead({ ...read, record: false });
+          if (readDecision.action === "block") {
+            output = { decision: "block", reason: duplicateReason(readDecision) };
           } else {
-            watchdog.decideRead({ ...read, record: true });
-            if (budgetDecision.action === "warn") {
+            const budgetDecision = watchdog.chargeEvidenceAttempt();
+            if (budgetDecision.action === "block") {
               output = {
-                hookSpecificOutput: {
-                  hookEventName: "PreToolUse",
-                  additionalContext: evidenceWarning(budgetDecision),
-                },
+                decision: "block",
+                reason: evidenceBudgetReason(budgetDecision),
               };
+            } else {
+              watchdog.decideRead({ ...read, record: true });
+              if (budgetDecision.action === "warn") {
+                output = {
+                  hookSpecificOutput: {
+                    hookEventName: "PreToolUse",
+                    additionalContext: evidenceWarning(budgetDecision),
+                  },
+                };
+              }
             }
           }
         }
+      } else if (
+        classification.kind === "delegate" &&
+        inputChars(input.tool_input) > config.maxSubagentInputChars
+      ) {
+        output = {
+          decision: "block",
+          reason: `Subagent brief exceeds the ${config.maxSubagentInputChars}-character context budget. Compact it to the task, target refs/files, required checks, and output schema; reference source files instead of copying large context blocks.`,
+        };
       }
-    } else if (
-      classification.kind === "delegate" &&
-      inputChars(input.tool_input) > config.maxSubagentInputChars
-    ) {
-      output = {
-        decision: "block",
-        reason: `Subagent brief exceeds the ${config.maxSubagentInputChars}-character context budget. Compact it to the task, target refs/files, required checks, and output schema; reference source files instead of copying large context blocks.`,
-      };
     }
   } else if (event === "PostToolUse") {
+    if (selectsLocalPrWorkflow(input) && !responseExplicitlyFailed(input.tool_response)) {
+      localPrWorkflowLocked = true;
+    }
     const classification = classifyHookTool(input);
     if (classification.kind === "state-change") {
       watchdog.recordStateProgress("tool_state_change_completed");
@@ -319,6 +354,6 @@ export function evaluateCodexHook(input, state = {}, options = {}) {
 
   return {
     output,
-    state: stateOf(watchdog, evidenceRegistry, narrationRecoveryAttempts),
+    state: stateOf(watchdog, evidenceRegistry, narrationRecoveryAttempts, localPrWorkflowLocked),
   };
 }

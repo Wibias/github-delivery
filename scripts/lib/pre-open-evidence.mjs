@@ -178,6 +178,113 @@ export function validatePreOpenEvidence(input) {
   };
 }
 
+function aggregateAxis(review, axis, expectedHead, requiredIds) {
+  const value = review?.[axis];
+  if (!isRecord(value)) throw new Error(`pre_open_review_${axis}_missing`);
+  if (value.status !== "clean") throw new Error(`pre_open_review_${axis}_not_clean`);
+  const method = typeof value.method === "string" ? value.method.trim() : "";
+  if (!method || method.length > MAX_METHOD_LENGTH) {
+    throw new Error(`pre_open_review_${axis}_method_invalid`);
+  }
+  const coveredIds = Array.isArray(value.coveredIds)
+    ? [...new Set(value.coveredIds.map(String).filter(Boolean))]
+    : [];
+  const coveredSet = new Set(coveredIds);
+  if (requiredIds.some((id) => !coveredSet.has(id))) {
+    throw new Error(`pre_open_review_${axis}_ids_incomplete`);
+  }
+  const errors = [];
+  const reviewedFiles = normalizeReviewedFiles(value.reviewedFiles, `aggregate:${axis}`, errors);
+  if (errors.length) throw new Error(`pre_open_review_${axis}_files_invalid`);
+  return {
+    headSha: expectedHead,
+    method,
+    coveredIds,
+    reviewedFiles,
+    reviewedSet: new Set(reviewedFiles),
+  };
+}
+
+function requirementFiles(requirement, axisReview, code) {
+  const files = Array.isArray(requirement?.reviewedFiles)
+    ? [...new Set(requirement.reviewedFiles.map(String).filter(Boolean))]
+    : [];
+  const scoped = files.length ? files : axisReview.reviewedFiles;
+  if (scoped.some((file) => !axisReview.reviewedSet.has(file))) throw new Error(code);
+  return scoped;
+}
+
+/**
+ * Expand one candidate-wide bug review and one candidate-wide security review
+ * into the exact schema-v2 rows requested by a compact pre-open summary.
+ *
+ * This is an evidence-shape reducer, not a coverage reducer: every required row
+ * remains present, retains its semantic id and scoped files, and can be emitted
+ * only when the corresponding axis review explicitly covered both.
+ */
+export function expandAggregatePreOpenEvidence(summary, review) {
+  if (!isRecord(summary) || summary.kind !== "github-delivery/pre-open-gate-summary") {
+    throw new Error("pre_open_review_summary_invalid");
+  }
+  if (!isRecord(review) || review.schemaVersion !== 1 || review.kind !== "github-delivery/pre-open-review-result") {
+    throw new Error("pre_open_review_result_invalid");
+  }
+  const requirements = summary.evidenceRequirements;
+  if (!isRecord(requirements) || requirements.schemaVersion !== PRE_OPEN_EVIDENCE_SCHEMA_VERSION) {
+    throw new Error("pre_open_review_requirements_invalid");
+  }
+  const expectedHead = String(requirements.headSha || summary.headRefOid || "").trim().toLowerCase();
+  if (!/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(expectedHead)) {
+    throw new Error("pre_open_review_head_invalid");
+  }
+  if (String(review.headSha || "").trim().toLowerCase() !== expectedHead) {
+    throw new Error("pre_open_review_head_mismatch");
+  }
+
+  const lensRequirements = isRecord(requirements.lenses) ? requirements.lenses : {};
+  const surfaceRequirements = isRecord(requirements.surfaces) ? requirements.surfaces : {};
+  const bug = aggregateAxis(review, "bug", expectedHead, Object.keys(lensRequirements));
+  const security = aggregateAxis(review, "security", expectedHead, Object.keys(surfaceRequirements));
+  const lenses = {};
+  for (const [id, requirement] of Object.entries(lensRequirements)) {
+    lenses[id] = {
+      status: "done",
+      headSha: expectedHead,
+      method: bug.method,
+      reviewedFiles: requirementFiles(requirement, bug, "pre_open_review_bug_scope_incomplete"),
+    };
+  }
+  const surfaces = {};
+  for (const [id, requirement] of Object.entries(surfaceRequirements)) {
+    surfaces[id] = {
+      status: "done",
+      headSha: expectedHead,
+      method: security.method,
+      reviewedFiles: requirementFiles(requirement, security, "pre_open_review_security_scope_incomplete"),
+    };
+  }
+
+  const reviewProbes = isRecord(review.probes) ? review.probes : {};
+  const requiredProbeIds = Array.isArray(summary?.remaining?.probes)
+    ? summary.remaining.probes.map(String)
+    : Object.keys(isRecord(requirements.probes) ? requirements.probes : {});
+  const probes = {};
+  for (const id of requiredProbeIds) {
+    if (!isRecord(reviewProbes[id])) throw new Error(`pre_open_review_probe_missing:${id}`);
+    probes[id] = structuredClone(reviewProbes[id]);
+  }
+
+  const candidate = {
+    schemaVersion: PRE_OPEN_EVIDENCE_SCHEMA_VERSION,
+    lenses,
+    surfaces,
+    probes,
+  };
+  const validated = validatePreOpenEvidence(candidate);
+  if (!validated.ok) throw new Error(`pre_open_review_evidence_invalid:${validated.errors.join(";")}`);
+  return validated.evidence;
+}
+
 /**
  * Whether lens/surface evidence clears a required id.
  *

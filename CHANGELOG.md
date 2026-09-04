@@ -4,6 +4,22 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.4.4] - 2026-09-04
+
+### Added
+
+- Added deterministic local-PR hygiene orchestration that derives Comment Inspector scope from diff-added lines, validates one structured final result, verifies reviewer bytes, and emits current-head hygiene evidence without manual receipt construction (PR #424).
+- Added aggregate pre-open review evidence expansion that converts complete bug/security axis coverage plus canonical probe records into the existing schema-v2 obligations without reducing required semantic IDs or file coverage (PR #424).
+
+### Changed
+
+- Bumped the package version from `1.4.3` to `1.4.4`.
+- `create-pr-from-local-work` now documents one executable happy path for hygiene, compact pre-open evidence, planner locking, and broker receipt completion; Comment Inspector guidance is aligned to generated immutable scope and structured final output (PR #424).
+
+### Fixed
+
+- Selected local-PR workflows now reject direct `git push` / `gh pr create` execution through the protected Codex hook with `create_pr_direct_write_forbidden`, eliminating the observed fallback/re-decision loop before the canonical publication boundary (PR #424).
+
 ## [1.4.3] - 2026-09-03
 
 ### Added
