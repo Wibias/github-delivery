@@ -1,3 +1,5 @@
+import { validateCommentReviewResult } from "../comment-review-result.mjs";
+
 const PASS_IDS = Object.freeze(["no-comments", "simplify"]);
 const OUTCOMES = new Set(["clean", "applied", "skipped"]);
 
@@ -85,6 +87,66 @@ export function validatePreOpenHygieneEvidence(value, { headSha = null } = {}) {
       simplify: validateSimplify(value.passes.simplify),
     },
   };
+}
+
+/**
+ * Convert the deterministic no-comments boundaries plus the simplify result into
+ * the only hygiene-evidence shape accepted by the pre-open gate.
+ *
+ * A reviewer DELETE cannot be converted into a clean receipt: the parent must
+ * apply the accepted change, revalidate the candidate, and rerun hygiene on the
+ * new head. This keeps the builder from turning a finding into completion.
+ */
+export function buildPreOpenHygieneEvidence({
+  scope,
+  commentResult,
+  guardVerification,
+  simplify,
+  headSha,
+} = {}) {
+  if (!plainObject(scope) || scope.schemaVersion !== 1 || scope.kind !== "github-delivery/comment-review-scope") {
+    throw new Error("pre_open_hygiene_comment_scope_invalid");
+  }
+  const expectedHead = requiredString(headSha, "pre_open_hygiene_head_required");
+  if (scope.headRef && String(scope.headRef).toLowerCase() !== expectedHead.toLowerCase()) {
+    throw new Error("pre_open_hygiene_comment_scope_head_mismatch");
+  }
+  if (
+    !plainObject(guardVerification) ||
+    guardVerification.unchanged !== true ||
+    (Array.isArray(guardVerification.changedFiles) && guardVerification.changedFiles.length !== 0)
+  ) {
+    throw new Error("pre_open_hygiene_comment_workspace_unverified");
+  }
+  const scopedFileCount = Array.isArray(scope.files) ? scope.files.length : 0;
+  if (
+    Number.isInteger(guardVerification.fileCount) &&
+    guardVerification.fileCount !== scopedFileCount
+  ) {
+    throw new Error("pre_open_hygiene_comment_guard_scope_mismatch");
+  }
+
+  const validatedResult = validateCommentReviewResult(scope, commentResult);
+  if (validatedResult.deletionCount !== 0 || validatedResult.rootCauseFlags.length !== 0) {
+    throw new Error("pre_open_hygiene_no_comments_changes_pending");
+  }
+
+  const candidate = {
+    schemaVersion: 1,
+    kind: "github-delivery/pre-open-hygiene-evidence",
+    headSha: expectedHead,
+    passes: {
+      "no-comments": {
+        outcome: "clean",
+        method: "comment-inspector",
+        scopeKind: "diff-added-lines",
+        resultValid: true,
+        workspaceVerified: true,
+      },
+      simplify: validateSimplify(simplify),
+    },
+  };
+  return validatePreOpenHygieneEvidence(candidate, { headSha: expectedHead });
 }
 
 export function preOpenHygieneReceipts(value, { headSha, now = Date.now } = {}) {
