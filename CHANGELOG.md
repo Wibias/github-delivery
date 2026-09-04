@@ -77,10 +77,6 @@ All notable changes to `github-delivery` are documented here.
 - README current-state now keeps only the documented fail-closed limits and the still-expanding list, and release notes point at `CHANGELOG.md` instead of duplicating version history.
 - Pull-request Windows Authority, JavaScript CodeQL, and C# CodeQL jobs now run only when the trusted base-SHA path classifier says those lanes are in scope. Scope detection failure still fail-closes into running the lane. The Windows rewrite-baseline workflow is path-filtered to the files it exercises.
 
-### Fixed
-
-- Updating on Windows no longer surfaces the raw directory-rename `EPERM` as the only recovery path when applications such as editors hold handles inside the installed `github-delivery` tree (PR #376).
-
 ## [1.3.8] - 2026-08-30
 
 ### Changed
@@ -841,7 +837,8 @@ All notable changes to `github-delivery` are documented here.
   focused failing excerpt before loading full raw output. Pending-only required
   CI is owned by `scripts/ci-wait.mjs` instead of parallel manual polling.
 - Refreshed the README with a faster natural-language quick start, repository
-  workflow visuals, clearer safety/value positioning, consolidated installation/maintenance guidance, dedicated stack/competing-PR/backport explanation, updated workflow reference, and the current lean CI topology. Release-specific implementation detail is no longer embedded in the hero text.
+  workflow visuals, clearer safety/value positioning, and user-facing setup
+  and architecture documentation for the progress watchdog.
 
 ## [0.1.1] - 2026-08-11
 
