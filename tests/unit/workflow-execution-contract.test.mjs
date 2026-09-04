@@ -12,7 +12,9 @@ test("create-pr workflow packet exposes normal execution helpers and actions wit
   assert.deepEqual(packet.execution.helpers, {
     commentReviewGuard: "scripts/comment-review-guard.mjs",
     controller: "scripts/delivery-controller.mjs",
+    hygieneOrchestrator: "scripts/create-pr-hygiene.mjs",
     mutation: "scripts/github-mutate.mjs",
+    preOpenEvidenceAssembler: "scripts/pre-open-review-evidence.mjs",
     preOpenGate: "scripts/pre-open-gate.mjs",
     publicationPlanner: "scripts/create-pr-publication-plan.mjs",
     shipGate: "scripts/ship-gate.mjs",
@@ -43,6 +45,8 @@ test("local-work create-pr packet locks the normal publication path", () => {
     "push_code",
   ]);
   assert.equal(packet.execution.helpers.commentReviewGuard, "scripts/comment-review-guard.mjs");
+  assert.equal(packet.execution.helpers.hygieneOrchestrator, "scripts/create-pr-hygiene.mjs");
+  assert.equal(packet.execution.helpers.preOpenEvidenceAssembler, "scripts/pre-open-review-evidence.mjs");
   assert.equal(packet.execution.helpers.publicationPlanner, "scripts/create-pr-publication-plan.mjs");
   assert.deepEqual(packet.execution.workflowPlan, {
     decisionAuthority: "workflow-packet+controller-checkpoint",
@@ -53,17 +57,20 @@ test("local-work create-pr packet locks the normal publication path", () => {
       decisionField: "decision",
       readyValue: "ready",
       baseAuthority: "checkpoint-locked-remote",
+      evidenceAssembler: "scripts/pre-open-review-evidence.mjs",
     },
     hygiene: {
       commentScope: "diff-added-lines",
       resultValidation: "structured-final-only",
       receiptAuthority: "pre-open-gate",
+      orchestrator: "scripts/create-pr-hygiene.mjs",
     },
     publication: {
       initialCreate: "draft-only",
       planner: "scripts/create-pr-publication-plan.mjs",
       mutationEntrypoint: "scripts/github-mutate.mjs",
       directWriteFallback: "forbidden",
+      directWriteGuard: "runtime-after-workflow-selection",
       completion: "broker-receipts",
     },
   });
