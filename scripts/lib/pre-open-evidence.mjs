@@ -178,7 +178,7 @@ export function validatePreOpenEvidence(input) {
   };
 }
 
-function aggregateAxis(review, axis, expectedHead) {
+function aggregateAxis(review, axis, expectedHead, requiredIds) {
   const value = review?.[axis];
   if (!isRecord(value)) throw new Error(`pre_open_review_${axis}_missing`);
   if (value.status !== "clean") throw new Error(`pre_open_review_${axis}_not_clean`);
@@ -186,12 +186,20 @@ function aggregateAxis(review, axis, expectedHead) {
   if (!method || method.length > MAX_METHOD_LENGTH) {
     throw new Error(`pre_open_review_${axis}_method_invalid`);
   }
+  const coveredIds = Array.isArray(value.coveredIds)
+    ? [...new Set(value.coveredIds.map(String).filter(Boolean))]
+    : [];
+  const coveredSet = new Set(coveredIds);
+  if (requiredIds.some((id) => !coveredSet.has(id))) {
+    throw new Error(`pre_open_review_${axis}_ids_incomplete`);
+  }
   const errors = [];
   const reviewedFiles = normalizeReviewedFiles(value.reviewedFiles, `aggregate:${axis}`, errors);
   if (errors.length) throw new Error(`pre_open_review_${axis}_files_invalid`);
   return {
     headSha: expectedHead,
     method,
+    coveredIds,
     reviewedFiles,
     reviewedSet: new Set(reviewedFiles),
   };
@@ -211,8 +219,8 @@ function requirementFiles(requirement, axisReview, code) {
  * into the exact schema-v2 rows requested by a compact pre-open summary.
  *
  * This is an evidence-shape reducer, not a coverage reducer: every required row
- * remains present, retains its scoped files, and can be emitted only when the
- * corresponding axis review covered every file required by that row.
+ * remains present, retains its semantic id and scoped files, and can be emitted
+ * only when the corresponding axis review explicitly covered both.
  */
 export function expandAggregatePreOpenEvidence(summary, review) {
   if (!isRecord(summary) || summary.kind !== "github-delivery/pre-open-gate-summary") {
@@ -233,10 +241,12 @@ export function expandAggregatePreOpenEvidence(summary, review) {
     throw new Error("pre_open_review_head_mismatch");
   }
 
-  const bug = aggregateAxis(review, "bug", expectedHead);
-  const security = aggregateAxis(review, "security", expectedHead);
+  const lensRequirements = isRecord(requirements.lenses) ? requirements.lenses : {};
+  const surfaceRequirements = isRecord(requirements.surfaces) ? requirements.surfaces : {};
+  const bug = aggregateAxis(review, "bug", expectedHead, Object.keys(lensRequirements));
+  const security = aggregateAxis(review, "security", expectedHead, Object.keys(surfaceRequirements));
   const lenses = {};
-  for (const [id, requirement] of Object.entries(isRecord(requirements.lenses) ? requirements.lenses : {})) {
+  for (const [id, requirement] of Object.entries(lensRequirements)) {
     lenses[id] = {
       status: "done",
       headSha: expectedHead,
@@ -245,7 +255,7 @@ export function expandAggregatePreOpenEvidence(summary, review) {
     };
   }
   const surfaces = {};
-  for (const [id, requirement] of Object.entries(isRecord(requirements.surfaces) ? requirements.surfaces : {})) {
+  for (const [id, requirement] of Object.entries(surfaceRequirements)) {
     surfaces[id] = {
       status: "done",
       headSha: expectedHead,
