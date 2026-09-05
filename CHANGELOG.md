@@ -13,6 +13,7 @@ All notable changes to `github-delivery` are documented here.
 ### Fixed
 
 - The Codex progress watchdog now counts successful direct Node source-file invocations and explicit `node --input-type=module -e/--eval` diagnostic module harnesses as execution progress, so a completed reproduction or validation run resets the consecutive evidence-exploration streak before narrow follow-up source inspection. Generic inline Node eval/print snippets remain neutral, and the existing evidence thresholds, duplicate-read protection, and volatile-poll protections are unchanged (PR #425).
+- Stable `update --apply` now keeps an installed Windows Authority host in place when the newly verified release payload's program files are byte-identical, ignoring only `authority-host-version.json`; changed, missing, legacy, or unverifiable payloads still take the normal replacement or repair path (PR #426).
 
 ## [1.4.4] - 2026-09-04
 

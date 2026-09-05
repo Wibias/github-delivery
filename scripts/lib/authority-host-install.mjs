@@ -1,8 +1,9 @@
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import { boundedSpawnSync } from "./subprocess-policy.mjs";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, lstatSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { dirname, join, resolve, win32 as win32Path } from "node:path";
+import { dirname, join, relative, resolve, sep, win32 as win32Path } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { callAuthorityHostSync } from "./authority-host-client.mjs";
@@ -328,6 +329,67 @@ export function planAuthorityHostUpdate({ mode, targetVersion, installed } = {})
   return { action: "update", required: true, currentVersion: installed.version, targetVersion };
 }
 
+const AUTHORITY_VERSION_METADATA_PATH = "authority-host-version.json";
+
+function candidateAuthorityProgramFiles(payload) {
+  if (!Array.isArray(payload?.metadata?.files) || payload.metadata.files.length === 0) return null;
+  const files = new Map();
+  for (const entry of payload.metadata.files) {
+    const path = typeof entry?.path === "string" ? entry.path.replaceAll("\\", "/") : "";
+    if (
+      !path || path.startsWith("/") || path.split("/").some((part) => !part || part === "." || part === "..") ||
+      !Number.isSafeInteger(entry?.bytes) || entry.bytes < 0 ||
+      !/^[0-9a-f]{64}$/i.test(String(entry?.sha256 || ""))
+    ) return null;
+    if (path === AUTHORITY_VERSION_METADATA_PATH) continue;
+    if (files.has(path)) return null;
+    files.set(path, { bytes: entry.bytes, sha256: entry.sha256.toLowerCase() });
+  }
+  return files.size > 0 ? files : null;
+}
+
+function installedAuthorityProgramFiles(appRoot) {
+  const files = new Map();
+  const visit = (directory) => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const fullPath = join(directory, entry.name);
+      const path = relative(appRoot, fullPath).split(sep).join("/");
+      if (path === AUTHORITY_VERSION_METADATA_PATH) continue;
+      const stat = lstatSync(fullPath);
+      if (stat.isSymbolicLink()) return false;
+      if (stat.isDirectory()) {
+        if (!visit(fullPath)) return false;
+        continue;
+      }
+      if (!stat.isFile()) return false;
+      const content = readFileSync(fullPath);
+      files.set(path, {
+        bytes: stat.size,
+        sha256: createHash("sha256").update(content).digest("hex"),
+      });
+    }
+    return true;
+  };
+  try {
+    return visit(appRoot) ? files : null;
+  } catch {
+    return null;
+  }
+}
+
+function authorityProgramPayloadMatchesInstalled({ installed, payload }) {
+  if (!installed?.installed || installed.legacy || !installed.exePath) return false;
+  const candidate = candidateAuthorityProgramFiles(payload);
+  if (!candidate) return false;
+  const current = installedAuthorityProgramFiles(dirname(installed.exePath));
+  if (!current || current.size !== candidate.size) return false;
+  for (const [path, expected] of candidate) {
+    const actual = current.get(path);
+    if (!actual || actual.bytes !== expected.bytes || actual.sha256 !== expected.sha256) return false;
+  }
+  return true;
+}
+
 function defaultInstallScript() {
   return resolve(dirname(fileURLToPath(import.meta.url)), "../../authority-host/windows/install-release.ps1");
 }
@@ -441,6 +503,16 @@ export async function reconcileStableAuthorityHost({
         expectedSourceCommit: expectedRelease.sourceCommit,
         attestationRunner,
       });
+      if (plan.action === "update" && authorityProgramPayloadMatchesInstalled({ installed, payload })) {
+        return {
+          ...plan,
+          action: "unchanged_content",
+          required: false,
+          changed: false,
+          installed,
+          mode,
+        };
+      }
       const result = install({ payload, runner: installRunner, scriptPath });
       const after = readInstalled({ platform, env, home });
       if (!after.installed || after.version !== expectedRelease.version || after.sourceCommit !== expectedRelease.sourceCommit.toLowerCase()) {
