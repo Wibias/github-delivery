@@ -105,3 +105,58 @@ test("protected launcher kills the process tree when bridge enforcement fails", 
   assert.equal(client.killed, true);
   assert.equal(bridgeClosed, true);
 });
+
+test("protected launcher routes stream summaries into the opt-in debug recorder", async () => {
+  const appServer = fakeChild({ piped: true });
+  const client = fakeChild();
+  const spawned = [appServer, client];
+  const spawnImpl = () => {
+    const child = spawned.shift();
+    queueMicrotask(() => {
+      child.emit("spawn");
+      if (child === client) queueMicrotask(() => child.emit("exit", 0, null));
+    });
+    return child;
+  };
+
+  const recorded = [];
+  let recorderClosed = false;
+  const debugTraceRecorder = {
+    enabled: true,
+    record: (event) => recorded.push(event),
+    close: () => {
+      recorderClosed = true;
+    },
+  };
+  const bridgeStarter = async ({ router }) => {
+    router.onServerMessage({
+      method: "item/reasoning/summaryTextDelta",
+      params: {
+        threadId: "thr-protected",
+        turnId: "turn-protected",
+        itemId: "reasoning-protected",
+        delta: "Visible protected-stream summary",
+      },
+    });
+    return {
+      url: "ws://127.0.0.1:4500",
+      failure: new Promise(() => {}),
+      close: async () => {},
+    };
+  };
+
+  const result = await runProtectedCodex({
+    args: [],
+    env: {},
+    spawnImpl,
+    bridgeStarter,
+    stderr: { write() {} },
+    debugTraceRecorder,
+  });
+
+  assert.deepEqual(result, { code: 0, signal: null });
+  assert.equal(recorded.length, 1);
+  assert.equal(recorded[0].type, "reasoning_summary_delta");
+  assert.equal(recorded[0].text, "Visible protected-stream summary");
+  assert.equal(recorderClosed, true);
+});
