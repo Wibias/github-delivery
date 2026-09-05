@@ -16,6 +16,8 @@ const POWERSHELL_READ =
   /(?:^|[;|&(]\s*|\$[A-Za-z_][\w:]*\s*=\s*)(?:get-content|get-childitem|select-string|rg|grep|cat|head|tail|findstr|type|ls|dir|pwd)\b/i;
 const NODE_SCRIPT_EXECUTION =
   /(?:^|[;&|]\s*)node(?:\.exe)?\s+(?:"[^"]+\.(?:[cm]?[jt]s)"|'[^']+\.(?:[cm]?[jt]s)'|[^\s;&|]+\.(?:[cm]?[jt]s))(?:\s|$)/i;
+const NODE_MODULE_EVAL_EXECUTION =
+  /(?:^|[;&|]\s*)node(?:\.exe)?\s+--input-type=module\s+(?:-e|--eval)(?:\s|$)/i;
 
 function commandText(command) {
   if (Array.isArray(command)) return command.join(" ");
@@ -101,7 +103,7 @@ function classifyCommand(command) {
     return { kind: "state-change" };
   }
 
-  if (NODE_SCRIPT_EXECUTION.test(raw)) {
+  if (NODE_SCRIPT_EXECUTION.test(raw) || NODE_MODULE_EVAL_EXECUTION.test(raw)) {
     return { kind: "execution" };
   }
 
