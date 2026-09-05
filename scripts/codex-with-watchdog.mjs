@@ -3,6 +3,8 @@ import { randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
 import { pathToFileURL } from "node:url";
 
+import { createAppServerWatchdogRouter } from "./lib/codex-app-server-watchdog-proxy.mjs";
+import { createCodexDebugTraceRecorder } from "./lib/codex-debug-trace.mjs";
 import { startCodexWatchdogRemoteBridge } from "./lib/codex-watchdog-remote-bridge.mjs";
 
 const TOKEN_ENV = "GITHUB_DELIVERY_CODEX_REMOTE_TOKEN";
@@ -19,6 +21,15 @@ function waitForExit(child) {
     child.once("error", reject);
     child.once("exit", (code, signal) => resolve({ code, signal }));
   });
+}
+
+function disabledDebugTraceRecorder() {
+  return {
+    enabled: false,
+    path: null,
+    record() {},
+    close() {},
+  };
 }
 
 export function validateProtectedClientArgs(args) {
@@ -65,8 +76,33 @@ export async function runProtectedCodex({
   spawnImpl = spawn,
   bridgeStarter = startCodexWatchdogRemoteBridge,
   stderr = process.stderr,
+  debugTraceStateDir = null,
+  debugTraceRecorder = null,
 } = {}) {
   validateProtectedClientArgs(args);
+
+  let trace = debugTraceRecorder;
+  if (!trace) {
+    try {
+      trace = createCodexDebugTraceRecorder({ env, stateDir: debugTraceStateDir });
+    } catch (error) {
+      trace = disabledDebugTraceRecorder();
+      stderr.write(
+        `github-delivery debug trace unavailable: ${error?.message || error}\n`,
+      );
+    }
+  }
+  let traceClosed = false;
+  const closeTrace = () => {
+    if (traceClosed) return;
+    traceClosed = true;
+    try {
+      trace.close();
+    } catch {
+      // Debug tracing is optional diagnostics and must not change launcher behavior.
+    }
+  };
+
   const token = randomBytes(32).toString("base64url");
   const runtimeEnv = protectedRuntimeEnv(env);
   const appServer = spawnImpl(codexBin, ["app-server"], {
@@ -74,17 +110,27 @@ export async function runProtectedCodex({
     windowsHide: true,
     env: runtimeEnv,
   });
-  await waitForSpawn(appServer);
+  try {
+    await waitForSpawn(appServer);
+  } catch (error) {
+    closeTrace();
+    throw error;
+  }
 
+  const router = createAppServerWatchdogRouter({
+    onDebugTrace: trace.enabled ? (event) => trace.record(event) : undefined,
+  });
   let bridge;
   try {
     bridge = await bridgeStarter({
       appServerInput: appServer.stdin,
       appServerOutput: appServer.stdout,
       token,
+      router,
     });
   } catch (error) {
     if (!appServer.killed) appServer.kill();
+    closeTrace();
     throw error;
   }
 
@@ -101,6 +147,7 @@ export async function runProtectedCodex({
     if (client && !client.killed) client.kill();
     if (!appServer.killed) appServer.kill();
     await bridge.close().catch(() => {});
+    closeTrace();
     throw error;
   }
 
@@ -108,6 +155,7 @@ export async function runProtectedCodex({
     if (client && !client.killed) client.kill();
     if (!appServer.killed) appServer.kill();
     await bridge.close().catch(() => {});
+    closeTrace();
   };
   const signals = ["SIGINT", "SIGTERM"];
   const handlers = new Map();
