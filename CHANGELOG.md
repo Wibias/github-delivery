@@ -4,6 +4,16 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.4.5] - 2026-09-05
+
+### Changed
+
+- Bumped the package version from `1.4.4` to `1.4.5`.
+
+### Fixed
+
+- The Codex progress watchdog now counts successful direct Node source-file invocations and explicit `node --input-type=module -e/--eval` diagnostic module harnesses as execution progress, so a completed reproduction or validation run resets the consecutive evidence-exploration streak before narrow follow-up source inspection. Generic inline Node eval/print snippets remain neutral, and the existing evidence thresholds, duplicate-read protection, and volatile-poll protections are unchanged (PR #425).
+
 ## [1.4.4] - 2026-09-04
 
 ### Added
