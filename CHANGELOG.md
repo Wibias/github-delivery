@@ -4,6 +4,16 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.4.6] - 2026-09-05
+
+### Changed
+
+- Bumped the package version from `1.4.5` to `1.4.6`.
+
+### Fixed
+
+- `workflow-brief.mjs create-pr-from-local-work` now bootstraps local PR publication with an exact repository + routed-head identity, creates or recovers the deterministic persistent controller checkpoint, and returns that checkpoint path as part of the execution packet. Repeating the same bound bootstrap resumes the same controller state without re-deciding the route, while a different head gets a distinct checkpoint and the old unbound local-PR brief fails closed (PR #427).
+
 ## [1.4.5] - 2026-09-05
 
 ### Changed
