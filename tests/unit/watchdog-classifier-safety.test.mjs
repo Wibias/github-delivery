@@ -128,3 +128,21 @@ test("PowerShell assignment-prefixed reads from real incidents are evidence", ()
     assert.equal(classify(command).kind, "evidence", command);
   }
 });
+
+test("direct Node script execution counts as execution progress", () => {
+  assert.equal(
+    classify("node collect-ft10-evidence.mjs --rows=33").kind,
+    "execution",
+  );
+  assert.equal(
+    classify("node scripts/check-contract.mjs --fixture candidate.json").kind,
+    "execution",
+  );
+});
+
+test("inline Node snippets remain neutral instead of manufacturing execution progress", () => {
+  assert.equal(classify("node -e \"console.log('noop')\"").kind, "neutral");
+  assert.equal(classify("node --eval \"process.exit(0)\"").kind, "neutral");
+  assert.equal(classify("node -p \"1 + 1\"").kind, "neutral");
+  assert.equal(classify("node --print \"1 + 1\"").kind, "neutral");
+});
