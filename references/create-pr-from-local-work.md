@@ -20,7 +20,11 @@ This workflow is deliberately separate from `create-pr-for-issue.md`. **Do not i
 
 ## Execution lock
 
-Immediately after routing, run `node scripts/workflow-brief.mjs create-pr-from-local-work` and **run it once** for the routed head. Treat its execution contract plus the persistent workflow-controller checkpoint as the normal-operation authority for helper paths, declared GitHub actions, source-discovery policy, pre-open output mode, initial PR state, and publication boundary.
+Immediately after routing and resolving the target `OWNER/REPO` plus the full current candidate HEAD, run `node scripts/workflow-brief.mjs create-pr-from-local-work --repo OWNER/REPO --head HEAD_SHA`. The command emits the execution packet and atomically creates or reuses the deterministic persistent controller checkpoint for that exact repository + workflow + routed-head identity. Use the returned `controller.checkpointPath` as `<workflow-checkpoint>` for every later controller, pre-open, planner, and mutation command.
+
+Bootstrap once per repository + routed-head identity during normal execution. If conversation/process context is lost, rerunning the **exact same bound command** is checkpoint recovery, not route re-decision: it must return the same checkpoint and preserve its current phase/state. A different repository or routed head gets a different checkpoint. Do not inspect prior PR artifacts, repository history, or github-delivery source merely to rediscover the checkpoint path.
+
+Treat the emitted execution contract plus that persistent workflow-controller checkpoint as the normal-operation authority for helper paths, declared GitHub actions, source-discovery policy, pre-open output mode, initial PR state, and publication boundary.
 
 After that successful workflow selection, supported Codex hook execution rejects direct `git push` and `gh pr create` with `create_pr_direct_write_forbidden`. This is an early execution guard, not the publication proof: the controller still requires the canonical planner lock and successful broker receipts.
 
