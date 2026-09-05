@@ -4,6 +4,16 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.4.5] - 2026-09-05
+
+### Changed
+
+- Bumped the package version from `1.4.4` to `1.4.5`.
+
+### Fixed
+
+- The Codex progress watchdog now counts successful direct Node source-file invocations and explicit `node --input-type=module -e/--eval` diagnostic module harnesses as execution progress, so a completed reproduction or validation run resets the consecutive evidence-exploration streak before narrow follow-up source inspection. Generic inline Node eval/print snippets remain neutral, and the existing evidence thresholds, duplicate-read protection, and volatile-poll protections are unchanged (PR #425).
+
 ## [1.4.4] - 2026-09-04
 
 ### Added
@@ -381,7 +391,7 @@ All notable changes to `github-delivery` are documented here.
 - Fixed Windows Hello desktop approval startup and recovery handling, including fail-closed classification of TPM/TBS error `0x80284002`, retry/sign-in recovery, and exact owner-window verification.
 - Fixed approval windows appearing behind other windows by keeping a pending approval window above other application windows until the approval is completed or cancelled.
 - Fixed approval summaries so branch-driving fields are explicit and temporary branch grants remain bound to one exact repository and branch.
-- Fixed lifecycle-hook narration recovery so short no-progress follow-up messages keep the corrective obligation active until a real `PreToolUse` boundary is reached, with up to three corrective continuations by default before failing closed. Real tool boundaries clear the pending recovery signal, while malformed tool-protocol stalls still stop immediately (PR #277).
+- Fixed lifecycle-hook narration recovery so short no-progress follow-up messages keep the corrective obligation active until a real `PreToolUse` boundary is reached, with up to three corrective continuations by default before failing closed. Real tool boundaries clear the pending recovery signal, while malformed tool-protocol stalls keep their existing hard-stop behavior (PR #277).
 
 ## [0.8.0] - 2026-08-16
 
