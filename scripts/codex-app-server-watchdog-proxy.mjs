@@ -4,6 +4,16 @@ import { createInterface } from "node:readline";
 import { pathToFileURL } from "node:url";
 
 import { createAppServerWatchdogRouter } from "./lib/codex-app-server-watchdog-proxy.mjs";
+import { createCodexDebugTraceRecorder } from "./lib/codex-debug-trace.mjs";
+
+function disabledDebugTraceRecorder() {
+  return {
+    enabled: false,
+    path: null,
+    record() {},
+    close() {},
+  };
+}
 
 export function runProxy({
   codexBin = process.env.CODEX_BIN || "codex",
@@ -12,14 +22,46 @@ export function runProxy({
   stdout = process.stdout,
   stderr = process.stderr,
   spawnImpl = spawn,
+  debugTraceEnv = process.env,
+  debugTraceStateDir = null,
+  debugTraceRecorder = null,
 } = {}) {
   const child = spawnImpl(codexBin, ["app-server", ...args], {
     stdio: ["pipe", "pipe", "pipe"],
     windowsHide: true,
   });
-  const router = createAppServerWatchdogRouter();
+
+  let trace = debugTraceRecorder;
+  if (!trace) {
+    try {
+      trace = createCodexDebugTraceRecorder({
+        env: debugTraceEnv,
+        stateDir: debugTraceStateDir,
+      });
+    } catch (error) {
+      trace = disabledDebugTraceRecorder();
+      stderr.write(
+        `github-delivery debug trace unavailable: ${error?.message || error}\n`,
+      );
+    }
+  }
+
+  const router = createAppServerWatchdogRouter({
+    onDebugTrace: trace.enabled ? (event) => trace.record(event) : undefined,
+  });
   const clientLines = createInterface({ input: stdin, crlfDelay: Infinity });
   const serverLines = createInterface({ input: child.stdout, crlfDelay: Infinity });
+  let traceClosed = false;
+
+  function closeTrace() {
+    if (traceClosed) return;
+    traceClosed = true;
+    try {
+      trace.close();
+    } catch {
+      // Debug tracing is optional diagnostics and must not change proxy behavior.
+    }
+  }
 
   clientLines.on("line", (line) => {
     if (child.stdin.writable) child.stdin.write(`${line}\n`);
@@ -47,9 +89,11 @@ export function runProxy({
 
   child.stderr.on("data", (chunk) => stderr.write(chunk));
   child.on("error", (error) => {
+    closeTrace();
     stderr.write(`github-delivery watchdog proxy error: ${error?.message || error}\n`);
   });
   child.on("exit", (code, signal) => {
+    closeTrace();
     clientLines.close();
     serverLines.close();
     if (signal) {
