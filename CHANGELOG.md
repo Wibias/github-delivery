@@ -13,6 +13,7 @@ All notable changes to `github-delivery` are documented here.
 ### Fixed
 
 - The Codex progress watchdog now counts successful direct Node source-file invocations and explicit `node --input-type=module -e/--eval` diagnostic module harnesses as execution progress, so a completed reproduction or validation run resets the consecutive evidence-exploration streak before narrow follow-up source inspection. Generic inline Node eval/print snippets remain neutral, and the existing evidence thresholds, duplicate-read protection, and volatile-poll protections are unchanged (PR #425).
+- Stable `update --apply` now keeps an installed Windows Authority host in place when the newly verified release payload's program files are byte-identical, ignoring only `authority-host-version.json`; changed, missing, legacy, or unverifiable payloads still take the normal replacement or repair path (PR #426).
 
 ## [1.4.4] - 2026-09-04
 
@@ -771,97 +772,48 @@ All notable changes to `github-delivery` are documented here.
 - Fixed the read-exploration failure where every completed non-write tool was
   treated as progress, allowing dozens or hundreds of different reads to evade
   the stall detector indefinitely.
-- Fixed cross-turn contamination in both hook persistence and the App Server
-  router.
-- Hardened protected stream mode to fail closed when required notifications are
-  disabled or disappear, the watchdog router fails, or a private
-  `turn/interrupt` is rejected or not acknowledged within the bounded timeout.
-  The protected launcher terminates its Codex process tree rather than
-  continuing under a false `stream` protection claim.
-- Hardened watchdog state storage against predictable temp-path redirection and
-  symlink/unowned path attacks without persisting prompts, conversations, bearer
-  tokens, or raw tool inputs.
+- Fixed cross-turn contamination in both hook persistence and the App Server router.
+- Hardened protected stream mode to fail closed when required notifications are disabled or disappear, the watchdog router fails, or a private `turn/interrupt` is rejected or not acknowledged within the bounded timeout. The protected launcher terminates its Codex process tree rather than continuing under a false `stream` protection claim.
+- Hardened watchdog state storage against predictable temp-path redirection and symlink/unowned path attacks without persisting prompts, conversations, bearer tokens, or raw tool inputs.
 
 ## [0.3.0] - 2026-08-11
 
 ### Added
 
-- Added a protected Codex streaming launcher, `scripts/codex-with-watchdog.mjs`,
-  that starts the real App Server on stdio and places an authenticated loopback
-  bridge in front of the Codex remote client. The bridge observes streamed
-  assistant deltas and can issue one private `turn/interrupt` while repeated
-  no-progress narration is still being generated.
-- Added persisted watchdog activation metadata under the active Codex home so
-  runtime capability reporting can distinguish configured state from verified
-  active protection without storing prompts, conversations, bearer tokens, or
-  raw tool inputs.
+- Added a protected Codex streaming launcher, `scripts/codex-with-watchdog.mjs`, that starts the real App Server on stdio and places an authenticated loopback bridge in front of the Codex remote client. The bridge observes streamed assistant deltas and can issue one private `turn/interrupt` while repeated no-progress narration is still being generated.
+- Added persisted watchdog activation metadata under the active Codex home so runtime capability reporting can distinguish configured state from verified active protection without storing prompts, conversations, bearer tokens, or raw tool inputs.
 
 ### Changed
 
-- Normal Codex installation and upgrade now configure GitHub Delivery's
-  `PreToolUse`, `PostToolUse`, `Stop`, `SubagentStop`, and `SessionEnd` hooks
-  as part of the standard installer flow. The standalone hook installer remains
-  available for repair and non-standard installs.
-- Watchdog capability reporting now uses the strongest mode that can actually
-  be proven: controlled `stream`, explicitly trusted `hooks`, or `none`.
-  Newly configured non-managed Codex hooks report `hook_trust_required` until
-  their exact unchanged definition is reviewed in `/hooks`; the installer does
-  not bypass Codex's hook-trust gate.
-- Added same-version activation refresh support so trusted hook state can be
-  recorded with `node scripts/install-skill.mjs --hook-trust-verified --apply`
-  without reinstalling or backing up the skill again.
+- Normal Codex installation and upgrade now configure GitHub Delivery's `PreToolUse`, `PostToolUse`, `Stop`, `SubagentStop`, and `SessionEnd` hooks as part of the standard installer flow. The standalone hook installer remains available for repair and non-standard installs.
+- Watchdog capability reporting now uses the strongest mode that can actually be proven: controlled `stream`, explicitly trusted `hooks`, or `none`. Newly configured non-managed Codex hooks report `hook_trust_required` until their exact unchanged definition is reviewed in `/hooks`; the installer does not bypass Codex's hook-trust gate.
+- Added same-version activation refresh support so trusted hook state can be recorded with `node scripts/install-skill.mjs --hook-trust-verified --apply` without reinstalling or backing up the skill again.
 
 ### Fixed
 
-- Closed the v0.2.0 activation gap where the watchdog implementation could be
-  installed but remain dormant in a normal Codex setup.
-- Added end-to-end regression coverage for the observed `Let me check the
-  type...` narration loop and require streaming interruption before 500 emitted
-  characters, with exactly one interrupt per stalled turn.
-- Hardened the protected loopback bridge with bearer authentication, one-client
-  enforcement, WebSocket v13 upgrade validation, bounded frames, malformed
-  traffic handling, and launcher-owned remote flags that cannot be replaced by
-  caller arguments.
+- Closed the v0.2.0 activation gap where the watchdog implementation could be installed but remain dormant in a normal Codex setup.
+- Added end-to-end regression coverage for the observed `Let me check the type...` narration loop and require streaming interruption before 500 emitted characters, with exactly one interrupt per stalled turn.
+- Hardened the protected loopback bridge with bearer authentication, one-client enforcement, WebSocket v13 upgrade validation, bounded frames, malformed traffic handling, and launcher-owned remote flags that cannot be replaced by caller arguments.
 
 ## [0.2.0] - 2026-08-11
 
 ### Added
 
-- Added a layered runtime progress watchdog that detects repeated no-progress
-  intent narration, blocks exact stable reads on unchanged state, rate-limits
-  volatile status polling, compacts oversized model-facing tool output, and
-  rejects oversized subagent briefs in favor of focused source-referenced
-  context. The watchdog never grants mutation authority or executes GitHub
-  writes.
-- Added opt-in Codex lifecycle hooks for `PreToolUse`, `PostToolUse`, `Stop`,
-  `SubagentStop`, and `SessionEnd`, plus a Codex App Server streaming proxy
-  that can issue one private `turn/interrupt` while pathological repeated
-  narration is still being generated. Runtime capability reporting now
-  distinguishes `none`, `hooks`, and `stream`.
+- Added a layered runtime progress watchdog that detects repeated no-progress intent narration, blocks exact stable reads on unchanged state, rate-limits volatile status polling, compacts oversized model-facing tool output, and rejects oversized subagent briefs in favor of focused source-referenced context. The watchdog never grants mutation authority or executes GitHub writes.
+- Added opt-in Codex lifecycle hooks for `PreToolUse`, `PostToolUse`, `Stop`, `SubagentStop`, and `SessionEnd`, plus a Codex App Server streaming proxy that can issue one private `turn/interrupt` while pathological repeated narration is still being generated. Runtime capability reporting now distinguishes `none`, `hooks`, and `stream`.
 
 ### Changed
 
-- Added evidence/context economy rules that prefer authoritative aggregate
-  reads, reuse valid state snapshots, keep deterministic gate interpretation
-  out of unnecessary subagents, and escalate diagnostics from status to a
-  focused failing excerpt before loading full raw output. Pending-only required
-  CI is owned by `scripts/ci-wait.mjs` instead of parallel manual polling.
-- Refreshed the README with a faster natural-language quick start, repository
-  workflow visuals, clearer safety/value positioning, and user-facing setup
-  and architecture documentation for the progress watchdog.
+- Added evidence/context economy rules that prefer authoritative aggregate reads, reuse valid state snapshots, keep deterministic gate interpretation out of unnecessary subagents, and escalate diagnostics from status to a focused failing excerpt before loading full raw output. Pending-only required CI is owned by `scripts/ci-wait.mjs` instead of parallel manual polling.
+- Refreshed the README with a faster natural-language quick start, repository workflow visuals, clearer safety/value positioning, and user-facing setup and architecture documentation for the progress watchdog.
 
 ## [0.1.1] - 2026-08-11
 
 ### Fixed
 
-- Prevented severe no-progress agent loops after a GitHub mutation is already
-  prepared by adding the global `GD-CORE-008` bounded forward-progress rule.
-- Prepared GitHub writes now cross directly into `github-mutate.mjs` once the
-  required evidence and authority are satisfied. Re-verification remains
-  required after relevant state changes, failed or ambiguous tool results, or
-  explicit workflow freshness requirements.
-- Added regression coverage that fails when unchanged-state re-planning can
-  replace the next required tool call or mutation.
+- Prevented severe no-progress agent loops after a GitHub mutation is already prepared by adding the global `GD-CORE-008` bounded forward-progress rule.
+- Prepared GitHub writes now cross directly into `github-mutate.mjs` once the required evidence and authority are satisfied. Re-verification remains required after relevant state changes, failed or ambiguous tool results, or explicit workflow freshness requirements.
+- Added regression coverage that fails when unchanged-state re-planning can replace the next required tool call or mutation.
 
 ## [0.1.0] - 2026-08-01
 
