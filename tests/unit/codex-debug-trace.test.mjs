@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, readdirSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -100,3 +100,23 @@ test("debug recorder creates no files while disabled and bounded JSONL while ena
   assert.match(persisted, /visible summary/);
   assert.match(persisted, /github-delivery\/codex-debug-trace-event/);
 });
+
+test(
+  "debug recorder rejects a symlinked trace directory",
+  { skip: process.platform === "win32" },
+  async () => {
+    const module = await loadDebugTraceModule();
+    assert.ok(module, "codex debug trace module is missing");
+    const stateDir = mkdtempSync(join(tmpdir(), "gd-debug-trace-root-"));
+    const redirected = mkdtempSync(join(tmpdir(), "gd-debug-trace-target-"));
+    symlinkSync(redirected, join(stateDir, "debug-traces"), "dir");
+
+    assert.throws(
+      () => module.createCodexDebugTraceRecorder({
+        env: { GITHUB_DELIVERY_DEBUG_TRACE: "1" },
+        stateDir,
+      }),
+      /symlinked debug trace directory/i,
+    );
+  },
+);
