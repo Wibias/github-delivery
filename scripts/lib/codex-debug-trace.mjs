@@ -1,12 +1,13 @@
 import {
   chmodSync,
   closeSync,
+  lstatSync,
   mkdirSync,
   openSync,
   writeSync,
 } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 const DEFAULT_MAX_BYTES = 2 * 1024 * 1024;
 const TRACE_KIND = "github-delivery/codex-debug-trace-event";
@@ -50,8 +51,28 @@ function sanitizeEvent(event) {
 }
 
 function traceRoot(env, stateDir) {
-  if (stateDir) return stateDir;
-  return env.GITHUB_DELIVERY_STATE_DIR || join(homedir(), ".github-delivery");
+  const root = stateDir || env.GITHUB_DELIVERY_STATE_DIR || join(homedir(), ".github-delivery");
+  return resolve(root);
+}
+
+function assertOwnedByCurrentUser(stat, path) {
+  if (typeof process.getuid !== "function") return;
+  if (stat.uid !== process.getuid()) {
+    throw new Error(`Refusing debug trace directory not owned by the current user: ${path}`);
+  }
+}
+
+function ensurePrivateDirectory(path, label) {
+  mkdirSync(path, { recursive: true, mode: 0o700 });
+  const stat = lstatSync(path);
+  if (stat.isSymbolicLink()) {
+    throw new Error(`Refusing symlinked ${label}: ${path}`);
+  }
+  if (!stat.isDirectory()) {
+    throw new Error(`Debug trace path is not a directory: ${path}`);
+  }
+  assertOwnedByCurrentUser(stat, path);
+  if (process.platform !== "win32") chmodSync(path, 0o700);
 }
 
 function safeTimestamp(value) {
@@ -93,20 +114,13 @@ export function createCodexDebugTraceRecorder({
   }
 
   const byteLimit = Number.isInteger(maxBytes) && maxBytes > 0 ? maxBytes : DEFAULT_MAX_BYTES;
-  const directory = join(traceRoot(env, stateDir), "debug-traces");
-  mkdirSync(directory, { recursive: true, mode: 0o700 });
-  try {
-    chmodSync(directory, 0o700);
-  } catch {
-    // Windows permission semantics differ; the file itself is still opened 0600 where supported.
-  }
+  const root = traceRoot(env, stateDir);
+  const directory = join(root, "debug-traces");
+  ensurePrivateDirectory(root, "debug trace state directory");
+  ensurePrivateDirectory(directory, "debug trace directory");
 
   const opened = openTraceFile(directory, safeTimestamp(now()), pid);
-  try {
-    chmodSync(opened.path, 0o600);
-  } catch {
-    // Best-effort on platforms that do not implement POSIX file modes.
-  }
+  if (process.platform !== "win32") chmodSync(opened.path, 0o600);
 
   let fd = opened.fd;
   let bytesWritten = 0;
