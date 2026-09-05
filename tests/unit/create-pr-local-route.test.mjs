@@ -64,7 +64,8 @@ test("local-work workflow consumes one locked packet and deterministic publicati
   );
 
   assert.match(workflow, /workflow-brief\.mjs.*create-pr-from-local-work/i);
-  assert.match(workflow, /run it once/i);
+  assert.match(workflow, /Bootstrap once per repository \+ routed-head identity/i);
+  assert.match(workflow, /checkpoint recovery, not route re-decision/i);
   assert.match(workflow, /do not re-decide/i);
   assert.match(workflow, /pre-open-gate\.mjs.*--compact/i);
   assert.match(workflow, /top-level `decision`/i);
