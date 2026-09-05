@@ -35,6 +35,56 @@ function emitTelemetry(options, message, outcome = null) {
   }
 }
 
+function debugTraceEvent(message, outcome = null) {
+  const method = String(message?.method || "");
+  const common = {
+    schemaVersion: 1,
+    kind: "github-delivery/codex-debug-trace-event",
+    threadId: messageThreadId(message),
+    turnId: messageTurnId(message),
+    watchdogDecision: outcome?.decision?.action || "allow",
+    interrupted: Boolean(outcome?.interrupt),
+  };
+
+  if (method === "item/reasoning/summaryTextDelta") {
+    return {
+      ...common,
+      type: "reasoning_summary_delta",
+      itemId: message?.params?.itemId || null,
+      text: typeof message?.params?.delta === "string" ? message.params.delta : "",
+    };
+  }
+
+  if (method === "item/started" || method === "item/completed") {
+    return {
+      ...common,
+      type: method === "item/started" ? "item_started" : "item_completed",
+      itemId: message?.params?.item?.id || message?.params?.itemId || null,
+      itemType: message?.params?.item?.type || null,
+    };
+  }
+
+  if (method === "turn/started" || method === "turn/completed") {
+    return {
+      ...common,
+      type: method === "turn/started" ? "turn_started" : "turn_completed",
+    };
+  }
+
+  return null;
+}
+
+function emitDebugTrace(options, message, outcome = null) {
+  if (typeof options.onDebugTrace !== "function") return;
+  const event = debugTraceEvent(message, outcome);
+  if (!event) return;
+  try {
+    options.onDebugTrace(event);
+  } catch {
+    // Debug tracing is optional diagnostics and must never change enforcement behavior.
+  }
+}
+
 export function createAppServerWatchdogRouter(options = {}) {
   const turns = new Map();
   const privateIds = new Map();
@@ -93,11 +143,13 @@ export function createAppServerWatchdogRouter(options = {}) {
     const state = stateFor(message);
     if (!state) {
       emitTelemetry(options, message);
+      emitDebugTrace(options, message);
       return { forward: message, internalRequests: [] };
     }
 
     const outcome = observeCodexAppServerMessage(state.watchdog, message, state.context);
     emitTelemetry(options, message, outcome);
+    emitDebugTrace(options, message, outcome);
     const internalRequests = [];
     if (outcome.interrupt) {
       const id = `${prefix}-${++sequence}`;
