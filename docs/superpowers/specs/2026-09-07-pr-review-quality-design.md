@@ -29,7 +29,7 @@ Keep `references/pr-description.md` as the canonical policy, but make it own bot
 
 ### Bot finding triage
 
-Add one small canonical review-finding triage reference and compose it into bot-fix/full-review paths.
+Add one small canonical review-finding triage reference and compose it through the existing review policy and bot-fix path rather than duplicating the rules inside every full-review workflow document.
 
 Every bot finding gets two independent classifications:
 
@@ -44,7 +44,7 @@ Claims about library/runtime/API behavior must be checked against the actual pin
 
 Do not add a second code-review engine. Keep the existing Spec and Standards axes and their shared fixed comparison. Continue applying `references/design-quality.md` and `references/code-smells.md` as advisory lenses when relevant.
 
-Full-review and merge-ready evidence should expose `Code quality` separately from the Spec and Standards conclusions so advisory design findings are visible without being confused with hard standards violations.
+`references/spec-standards-review.md` exposes `Code quality` separately from the Spec and Standards conclusions so advisory design findings are visible without being confused with hard standards violations.
 
 ### Blast radius
 
@@ -53,9 +53,13 @@ Do not add a duplicate blast-radius subsystem. Reuse:
 - `references/semantic-propagation-review.md` to map changed concepts beyond the diff; and
 - `references/safety-invariant.md` to name and prove the one or two material facts a positive verdict depends on.
 
-Review output should surface a compact `Blast radius` result containing local/non-local scope, affected concepts, safety invariant/proof level when applicable, confirmed risks, cleared risks, and remaining unproven assumptions. Local changes with no shared/public/persisted/non-local effect may report `n/a` with a concrete reason.
+A small `references/review-outcome.md` visibility contract composes those existing results for full-review/merge-ready evidence. It reports local/non-local scope, affected concepts, safety invariant/proof level when applicable, confirmed risks, cleared risks, and remaining unproven assumptions. Local changes with no shared/public/persisted/non-local effect may report `n/a` with a concrete reason.
 
 A material invariant that remains below executable proof must remain explicitly `unproven`; prose must not round it up to safe.
+
+### Composition and context budget
+
+The global `reviews` policy stays a thin router. Detailed Truth/Action and outcome-format rules live in focused companions and are loaded by the workflows that need them. This preserves the repository's workflow-policy context budget and avoids repeating the same review guidance inside `full-review-pr.md`, `comment-depth.md`, and other broad workflow packets.
 
 ## Scope
 
@@ -63,12 +67,13 @@ Expected files:
 
 - `references/pr-description.md`
 - `references/review-finding-triage.md` (new)
+- `references/review-outcome.md` (new)
 - `references/policy/reviews.md`
 - `references/fix-pr-bots.md`
-- `references/full-review-pr.md`
 - `references/spec-standards-review.md`
-- `references/comment-depth.md`
 - focused contract tests/evals
 - `CHANGELOG.md` existing `1.4.7` section only
+
+The existing `full-review-pr.md`, `comment-depth.md`, semantic-propagation, and safety-invariant contracts remain owning inputs and are composed rather than duplicated when no direct edit is needed.
 
 `package.json` remains `1.4.7`. No tag, GitHub Release, npm publication, merge, or ready-for-review transition is part of this work.
