@@ -14,10 +14,15 @@ const REQUIRED_RUNTIME = new Set([
   "scripts/github-delivery-cli.mjs",
   "scripts/grok-trace.mjs",
   "scripts/grok-with-debug-trace.mjs",
+  "scripts/cursor-trace.mjs",
+  "scripts/cursor-with-debug-trace.mjs",
+  "scripts/codex-trace.mjs",
+  "scripts/codex-with-watchdog.mjs",
   "scripts/install-codex-watchdog-hooks.mjs",
   "scripts/install-skill.mjs",
   "scripts/windows-install-locks.ps1",
   "scripts/lib/agent-debug-trace.mjs",
+  "scripts/lib/agent-trace-launcher.mjs",
   "scripts/lib/authority-host-client.mjs",
   "scripts/lib/authority-host-install.mjs",
   "scripts/lib/authority-host-release.mjs",
@@ -25,6 +30,11 @@ const REQUIRED_RUNTIME = new Set([
   "scripts/lib/bootstrap-command.mjs",
   "scripts/lib/bootstrap-install.mjs",
   "scripts/lib/bootstrap-maintenance.mjs",
+  "scripts/lib/codex-app-server-watchdog-proxy.mjs",
+  "scripts/lib/codex-debug-trace.mjs",
+  "scripts/lib/codex-progress-watchdog.mjs",
+  "scripts/lib/codex-watchdog-remote-bridge.mjs",
+  "scripts/lib/cursor-debug-trace.mjs",
   "scripts/lib/distribution.mjs",
   "scripts/lib/grok-debug-trace.mjs",
   "scripts/lib/grok-trace-launcher.mjs",
@@ -40,6 +50,10 @@ const REQUIRED_RUNTIME = new Set([
   "scripts/lib/user-config.mjs",
   "scripts/lib/watchdog-activation.mjs",
   "scripts/lib/windows-install-locks.mjs",
+  "scripts/lib/watchdog-investigation-progress.mjs",
+  "scripts/lib/agent-progress-watchdog.mjs",
+  "scripts/lib/watchdog-progress-classifier.mjs",
+  "scripts/lib/watchdog-evidence-registry.mjs",
 ]);
 
 const ALWAYS_ALLOWED = new Set([
@@ -87,6 +101,8 @@ test("package metadata exposes only the supported public CLI entrypoints", () =>
   assert.deepEqual(pkg.bin, {
     "github-delivery": "scripts/github-delivery-cli.mjs",
     "grok-trace": "scripts/grok-trace.mjs",
+    "cursor-trace": "scripts/cursor-trace.mjs",
+    "codex-trace": "scripts/codex-trace.mjs",
   });
   assert.equal(pkg.license, "MIT");
   assert.deepEqual(pkg.repository, {
