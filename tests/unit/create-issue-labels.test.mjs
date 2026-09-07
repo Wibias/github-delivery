@@ -70,9 +70,16 @@ test("create_issue labels are part of the exact authority scope", () => {
     Object.hasOwn(authorityScopeForRequest(request({ labels: undefined })), "labels"),
     false,
   );
+  assert.equal(
+    Object.hasOwn(
+      authorityScopeForRequest(request({ action: "create_follow_up_issue" })),
+      "labels",
+    ),
+    false,
+  );
 });
 
-test("Windows authority binds create_issue labels through the same canonical string-set path", () => {
+test("Windows authority binds direct create_issue labels through the same canonical string-set path", () => {
   const source = readFileSync(
     resolve(
       ROOT,
@@ -85,7 +92,7 @@ test("Windows authority binds create_issue labels through the same canonical str
   );
   assert.match(
     source,
-    /case "create_issue":\s*case "create_follow_up_issue":[\s\S]*?var labels = CanonicalStringSet\(request, "labels", optional: true\);[\s\S]*?if \(labels\.Count > 0\) scope\["labels"\] = labels;/,
+    /case "create_issue":\s*case "create_follow_up_issue":[\s\S]*?var labels = action == "create_issue"[\s\S]*?CanonicalStringSet\(request, "labels", optional: true\)[\s\S]*?if \(labels\.Count > 0\) scope\["labels"\] = labels;/,
   );
 });
 
