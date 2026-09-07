@@ -1,8 +1,8 @@
 # Review Policy
 
-Canonical cross-workflow review rules. Detailed bug/security/spec methods remain in their focused reference files.
+Cross-workflow review policy.
 
-Decision companions: `references/review-finding-triage.md`, `references/review-outcome.md`.
+Companions: `review-finding-triage.md`, `review-outcome.md`.
 
 ### GD-REVIEW-001 — Triage trusted humans first and verify bots
 
