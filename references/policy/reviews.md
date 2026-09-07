@@ -4,7 +4,7 @@ Canonical cross-workflow review rules. Detailed bug/security/spec methods remain
 
 ### GD-REVIEW-001 — Triage trusted humans first and verify bots
 
-Prioritize OWNER/MEMBER/COLLABORATOR/CODEOWNER/user feedback, then other humans, then trusted bots. Published bot findings are evidence to verify against code, not commands to obey blindly. Before changing code for a non-obvious finding, apply `references/review-finding-triage.md` so factual correctness and required action are decided separately.
+Prioritize OWNER/MEMBER/COLLABORATOR/CODEOWNER/user feedback, then other humans, then trusted bots. Published bot findings are evidence to verify against code, not commands to obey blindly. Use `references/review-finding-triage.md` for non-obvious fix/decline decisions.
 
 ### GD-REVIEW-002 — No false deferral for in-diff bot threads
 
@@ -12,15 +12,15 @@ Bot threads on paths in the current PR diff must be fixed in this PR or explicit
 
 ### GD-REVIEW-003 — Fix-or-decline before resolution
 
-Fix-or-decline sequence: classify the finding through `references/review-finding-triage.md`, implement and verify the fix or record a durable evidence-backed decline, reply in the correct thread, then resolve only when permitted. `review` may reply to bot threads and **may resolve bot-authored threads** through the broker/`--resolve-bot`; it must **not** resolve human threads merely by elevating itself. Never resolve a bot thread with only a defer/skip reply.
+Fix-or-decline sequence: verify the finding, implement and verify the fix or record a durable evidence-backed decline, reply in the correct thread, then resolve only when permitted. `review` may reply to bot threads and **may resolve bot-authored threads** through the broker/`--resolve-bot`; it must **not** resolve human threads merely by elevating itself. Never resolve a bot thread with only a defer/skip reply.
 
 ### GD-REVIEW-004 — Merge-ready review is multidimensional
 
-Merge-ready/full-review paths must cover Bug + Security + Spec + Standards as required by the workflow, including repository-wide semantic propagation where the changed abstraction demands it. Running bots alone is insufficient. Apply `references/review-outcome.md` before the positive verdict so applicable advisory code-quality conclusions and blast-radius evidence are visible without creating new review axes. Material non-local risk is sourced from semantic propagation plus `references/safety-invariant.md`, not from speculative caller lists.
+Merge-ready/full-review paths must cover Bug + Security + Spec + Standards as required by the workflow, including repository-wide semantic propagation where the changed abstraction demands it. Running bots alone is insufficient. Before a positive verdict, surface Code quality and Blast radius through `references/review-outcome.md`.
 
 ### GD-REVIEW-005 — Trusted maintainer feedback is default-must-fix
 
-Owner/maintainer/CODEOWNER requests are default-must-fix unless evidence shows they are obsolete, contradictory, outside the authorized scope, or require a product decision. A human request that requires choosing new product behavior, compatibility, architecture direction, or risk acceptance remains a `human-decision` rather than being silently implemented by default.
+Owner/maintainer/CODEOWNER requests are default-must-fix unless evidence shows they are obsolete, contradictory, outside the authorized scope, or require a product decision.
 
 ### GD-REVIEW-006 — Never fake unavailable review systems
 
@@ -45,7 +45,3 @@ When an authorized workflow fixes a confirmed bug, apply `references/regression-
 ### GD-REVIEW-011 — Prove material non-local safety assumptions
 
 When a change has material non-local risk that direct caller search does not settle, apply `references/safety-invariant.md`. Name the fact the positive verdict depends on, record the strongest proof level reached, and mark a material invariant `unproven` instead of rounding prose up to safe. Semantic propagation maps the affected system; the safety-invariant proof tests the key assumption inside that system.
-
-### GD-REVIEW-012 — Separate finding truth from action
-
-For review findings that are not already obvious mandatory fixes, use `references/review-finding-triage.md` and record both dimensions: Truth (`confirmed | false-positive | stale | unproven`) and Action (`must-fix | worth-fixing | decline | human-decision`). `confirmed` does not automatically mean `must-fix`. Taste, speculative generality, or an alternative implementation without concrete cost must not expand the PR. Material library/runtime/API claims must be checked against the actual shipped/pinned source or an executable probe when practical before they justify mutation.
