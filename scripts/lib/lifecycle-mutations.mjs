@@ -205,6 +205,16 @@ function validateApprovedMediaRemovals(value) {
   });
 }
 
+function canonicalIssueLabels(value) {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) throw new Error("labels_invalid");
+  const labels = value.map((entry) => {
+    if (typeof entry !== "string" || !entry.trim()) throw new Error("label_invalid");
+    return entry.trim();
+  });
+  return [...new Set(labels)].sort();
+}
+
 function assertUpdatePrBodySafe(request, runner) {
   const repo = String(required(request.repo, "repo"));
   const pr = positiveInteger(request.pr, "pr");
@@ -389,6 +399,7 @@ export function validateLifecycleMutation(request = {}) {
       required(request.body, "body");
       assertPublishedMarkdown(request.body);
       required(request.idempotencyKey, "idempotency_key");
+      canonicalIssueLabels(request.labels);
       break;
     case "assign_issue":
       positiveInteger(request.issue, "issue");
@@ -433,8 +444,8 @@ export function lifecycleCommandFor(request = {}) {
         "--body",
         String(required(request.body, "body")),
       ];
-    case "create_issue":
-      return [
+    case "create_issue": {
+      const command = [
         "gh",
         "issue",
         "create",
@@ -445,6 +456,11 @@ export function lifecycleCommandFor(request = {}) {
         "--body",
         String(required(request.body, "body")),
       ];
+      for (const label of canonicalIssueLabels(request.labels)) {
+        command.push("--label", label);
+      }
+      return command;
+    }
     case "assign_issue":
       return [
         "gh",
