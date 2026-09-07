@@ -4,6 +4,18 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.4.7] - 2026-09-07
+
+### Added
+
+- Added opt-in provider-neutral agent debug tracing for Codex, Grok CLI, Cursor CLI, and Cursor IDE/Agent hooks. Grok `streaming-json` thoughts, Cursor `stream-json` thinking deltas, and sanitized tool lifecycle events are normalized into bounded local JSONL traces. Cursor hook files are scoped by a SHA-256 digest of the conversation identifier rather than the raw identifier (PR #429).
+- Added `references/agent-debug-trace.md` with setup and privacy guidance. Raw tool inputs/outputs plus Cursor user email, workspace roots, transcript paths, and tool payloads are excluded from normalized persisted events; reasoning-summary text remains diagnostic content and can itself contain sensitive data (PR #429).
+
+### Changed
+
+- Bumped the package version from `1.4.6` to `1.4.7`.
+- Existing Codex debug tracing now uses the shared provider-neutral recorder while preserving its compatibility trace kind and the default-off `GITHUB_DELIVERY_DEBUG_TRACE` opt-in contract (PR #429).
+
 ## [1.4.6] - 2026-09-05
 
 ### Changed
