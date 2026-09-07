@@ -888,21 +888,21 @@ All notable changes to `github-delivery` are documented here.
   focused failing excerpt before loading full raw output. Pending-only required
   CI is owned by `scripts/ci-wait.mjs` instead of parallel manual polling.
 - Refreshed the README with a faster natural-language quick start, repository
-  workflow visuals, clearer safety/value positioning, consolidated installation/maintenance guidance, dedicated stack/competing-PR/backport explanation, updated workflow reference, and the current lean CI topology. Release-specific implementation detail is no longer embedded in the hero text.
-
-### Fixed
-
-- Fixed the v0.4 protected-stream blind spot where large loops emitted through
-  reasoning or plan channels could bypass a detector that watched only
-  `item/agentMessage/delta`.
+  workflow visuals, clearer safety/value positioning, and user-facing setup
+  and architecture documentation for the progress watchdog.
 
 ## [0.1.1] - 2026-08-11
 
 ### Fixed
 
-- Prevented severe no-progress agent loops after a GitHub mutation is already prepared by adding the global `GD-CORE-008` bounded forward-progress rule.
-- Prepared GitHub writes now cross directly into `github-mutate.mjs` once the required evidence and authority are satisfied. Re-verification remains required after relevant state changes, failed or ambiguous tool results, or explicit workflow freshness requirements.
-- Added regression coverage that fails when unchanged-state re-planning can replace the next required tool call or mutation.
+- Prevented severe no-progress agent loops after a GitHub mutation is already
+  prepared by adding the global `GD-CORE-008` bounded forward-progress rule.
+- Prepared GitHub writes now cross directly into `github-mutate.mjs` once the
+  required evidence and authority are satisfied. Re-verification remains
+  required after relevant state changes, failed or ambiguous tool results, or
+  explicit workflow freshness requirements.
+- Added regression coverage that fails when unchanged-state re-planning can
+  replace the next required tool call or mutation.
 
 ## [0.1.0] - 2026-08-01
 
