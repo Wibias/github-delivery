@@ -62,8 +62,7 @@ export function exactIdempotencyRecordMatches({ record, request, actorLogin } = 
   }
 
   switch (request.action) {
-    case "create_issue":
-    case "create_follow_up_issue": {
+    case "create_issue": {
       if (record.pull_request) return false;
       if (!sameText(record.title, request.title)) return false;
       const requestedLabels = requestedLabelSet(request.labels);
@@ -74,6 +73,9 @@ export function exactIdempotencyRecordMatches({ record, request, actorLogin } = 
       }
       return true;
     }
+    case "create_follow_up_issue":
+      if (record.pull_request) return false;
+      return sameText(record.title, request.title);
     case "create_pr": {
       if (record.pull_request === undefined && !record.head && !record.base) return false;
       if (!sameText(record.title, request.title)) return false;
