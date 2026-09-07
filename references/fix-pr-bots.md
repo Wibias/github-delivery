@@ -43,7 +43,9 @@ Resolve the two passes independently:
 3. **Behind base + compile against tip:** update from base if needed — only when the PR is ours (shared **PR ownership boundary**); on a foreign PR, tell the owner to update from the latest base and do not push the base sync. Run local compile/typecheck/focused tests against tip; push; wait for required CI on the new SHA. If tip broke the branch, fix or hard-block — never claim ready while stale or non-compiling.
 4. Collect unresolved review threads via `scripts/review-threads.mjs` (owners/maintainers first, then other humans, then bots). Skip resolved/outdated.
 5. **Bot-thread triage (mandatory before any resolve):**
-   - For each unresolved bot thread, read the file path and diff hunk. If the path is in this PR's changed files, the fix belongs **in this PR** unless you can prove a durable out-of-scope reason with code evidence.
+   - For each unresolved bot thread, read the file path and diff hunk, then apply `references/review-finding-triage.md`. Record both Truth (`confirmed | false-positive | stale | unproven`) and Action (`must-fix | worth-fixing | decline | human-decision`) before mutating code.
+   - `confirmed` is not synonymous with `must-fix`. Do not change code for taste-only alternatives, speculative refactors, unsupported hypothetical failures, or style already accepted/enforced by repository tooling. Material library/runtime/API claims must be checked against the actual shipped/pinned source or an executable probe when practical.
+   - If the path is in this PR's changed files and the classified action is `must-fix`, the fix belongs **in this PR** unless you can prove a durable out-of-scope reason with code evidence.
    - **Forbidden deferrals:**
 
 <!-- assertion-anchors -->
@@ -53,10 +55,10 @@ Resolve the two passes independently:
 <!-- /assertion-anchors -->
 
  "inherited/fabric file — fix in another PR", "rebase will pick it up later", "non-blocking nit — reply and resolve", or "consumer lives elsewhere" without proving the current PR does not own the file.
-   - **Fix order:** fix → push → verify (tests/CI as appropriate) → in-thread reply with commit/SHA + path evidence → only then `resolve_thread` when mutation mode allows it.
-   - `[GD]` skip notes are only for verified false positives, durable won't-fix with reason, or true out-of-scope. They do **not** replace a fix for in-scope bot findings.
+   - **Fix order:** classify → fix → push → verify (tests/CI as appropriate) → in-thread reply with commit/SHA + path evidence → only then `resolve_thread` when mutation mode allows it.
+   - `[GD]` skip notes are only for verified false positives, stale findings, evidence-backed declines, durable won't-fix with reason, or true out-of-scope. They do **not** replace a fix for in-scope `must-fix` findings.
    - In `review` mutation mode: reply allowed; **bot-authored** threads you verified addressed may be resolved via `scripts/review-threads.mjs --resolve-bot`; human threads stay out of scope (need `maintainer` + explicit).
-6. Triage and fix necessary/useful items (trusted humans first; verify bots). For human declines needing a written reply: confirm exact text in chat first (shared social policy). Bot skip notes may use `[GD]` prefix.
+6. Triage and fix necessary/useful items (trusted humans first; verify bots). Use `references/review-finding-triage.md` for non-obvious review findings. For human declines needing a written reply: confirm exact text in chat first (shared social policy). Bot skip notes may use `[GD]` prefix.
 7. Push fixes (git safety: no force-push; stop if rejected / dirty unrelated tree / **fork-head unwritable**
 
 <!-- assertion-anchors -->
@@ -76,12 +78,13 @@ Resolve the two passes independently:
    - Subagent **preflight** (checkout PR head; stash only with user OK) — shared rules.
    - **Bug:** run **`references/bug-review.md`** (`bug-scope.mjs` → Bugbot when Cursor → complementary lenses). Never fake Bugbot on Claude/Codex; never auto deep multi-agent kits.
    - **Security:** run **`references/security-review.md`** (scope script + matrix). **Never** Cursor harness `security-review` / `review-security`.
-   - **Spec + Standards:** run or hand off skill `review` against PR base/merge-base (shared rules). Fix necessary gaps.
+   - **Spec + Standards + Code quality:** run or hand off `references/spec-standards-review.md` against PR base/merge-base. Keep Spec/Standards authority separate; surface the existing advisory design-quality/code-smell/type-evidence conclusions as `Code quality`. Fix necessary gaps; classify advisory actions through `references/review-finding-triage.md`.
+   - **Blast radius:** use the existing `references/semantic-propagation-review.md` mapping. When material non-local risk remains after caller/representation tracing, apply `references/safety-invariant.md`; report local/non-local scope, affected concepts, confirmed/cleared risks, proof level, and any material `unproven` invariant. Do not create a duplicate blast-radius review engine.
    - Triage findings; fix what can/should land in this PR; skip 0.1% nits. Public request-changes / comments stay redacted for exploit detail. Changelog nudge when user-facing.
    - **Proactive contract verification (shared rules):** wiring trace, operator smoke, test-honesty, adversarial config, docs-vs-non-goals, input-shape/evidence semantics, hot-path scale/determinism, malformed-input robustness. Do not claim merge-ready when a flag/field is a no-op, a scanner misses real request shapes, tests overclaim behavior, or ingest/analytics code loads unbounded input.
 11. Recheck human/bot threads (`review-threads.mjs`) + required CI after any review-driven pushes (loop again if needed). Apply **rate-limit backoff** (Composio `GITHUB_GET_GRAPHQL_RATE_LIMIT` → `gh api rate_limit`). If **stacked**, label ready-vs-parent vs trunk; trunk merge → `manage-stacked-prs`. If **in merge queue**, keep watching until merged (do not stop at queued).
 12. Bot/human **inline** replies go in-thread (shared rules), never as duplicate top-level comments.
-13. **Final evidence sweep** (shared rules + gate helpers). **Refuse merge-ready** while useful bot/human threads remain open, while any bot thread has only a defer/skip reply without verified fix or durable won't-fix, while protection/enforced CODEOWNERS/stale-approval/merge-queue blocks, or while own bug/security/spec findings that should block merge are unfixed. CI green alone is not enough.
+13. **Final evidence sweep** (shared rules + gate helpers). **Refuse merge-ready** while useful bot/human threads remain open, while any bot thread has only a defer/skip reply without verified fix or durable won't-fix, while protection/enforced CODEOWNERS/stale-approval/merge-queue blocks, while material blast-radius assumptions remain unproven without an explicit blocking disposition, or while own bug/security/spec findings that should block merge are unfixed. CI green alone is not enough.
 14. **Thin settle** (`references/policy/ci.md`): after the sweep would allow ready, wait ~3–5 min quiet (~4 default; stretch once if bot in-progress), recheck threads + CI. Activity resets the clock. Cap at two settle windows, then post. Do **not** skip settle for merge-ready. **Docs-only fast path:** if the current head is docs/markdown-only, use the **~30–60s** settle in `references/policy/ci.md` instead of the default window — the CI legs that would not exercise the docs change add no signal. **Doomed-run abort:** if a bot review lands during the settle with findings on this diff (or an actionable human thread appears), stop waiting, fix + push, and re-enter the settle on the new head rather than burning the old window.
 
 <!-- assertion-anchors -->
@@ -113,7 +116,7 @@ For monitoring **after** merge-ready while the PR stays open (new late comments)
 - Every targeted PR has a valid merge-ready PR comment **and** linked-issue notify (or a clear hard blocker — no false merge-ready)
 - Useful human + bot threads handled (or declined with policy) before any merge-ready claim
 - No bot thread resolved with only a defer-to-another-PR / fabric-rebase excuse for a file changed in this PR
-- Own **bug + security + Spec/Standards** reviews completed; necessary findings fixed
+- Own **bug + security + Spec/Standards + Code quality + blast-radius** review evidence completed; necessary findings fixed
 - Branch not conflicted / not behind / **compiles against current tip** (when claiming ready)
 - CLI + required CI green (when claiming ready)
 - **Thin settle** completed (or two-window cap) before the merge-ready claim
