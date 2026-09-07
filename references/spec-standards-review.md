@@ -18,6 +18,8 @@ Review the same fixed diff through two independent questions:
 
 Do not merge the axes into one generic quality opinion. Code may satisfy the spec while violating repository standards, or follow every convention while implementing the wrong behavior.
 
+Applicable code-smell, design-quality, and type-evidence observations remain **advisory** unless another repository rule, Bug, Security, Spec, or safety-invariant consequence makes them binding. Summarize those observations separately as **Code quality** so a reviewer can see material maintainability/testability concerns without confusing them with hard Standards violations. This is a reporting view over the existing lenses, not a third review engine or a third authority axis.
+
 ## 1. Pin one comparison
 
 For an existing PR, use its actual base branch and checked-out head. Record the exact refs and run the merge-base comparison:
@@ -120,17 +122,27 @@ Use these headings in chat and in the full-review verdict evidence:
 
 ## Standards
 
-List findings with file or symbol, evidence, governing standard, and required action. Keep advisory smells/design-quality/type-evidence observations visibly separate from hard violations. Use `none` with the sources checked when clean.
+List hard documented-standard findings with file or symbol, evidence, governing standard, and required action. Use `none` with the sources checked when clean. Do not hide advisory design/code-smell/type-evidence observations inside this hard-violation list.
 
 ## Spec
 
 List missing, partial, incorrect, or unrequested behavior with the supporting requirement. Use `no spec available` when appropriate rather than manufacturing a pass.
 
-Do not merge or rerank the axes into a single list. Deduplicate only exact overlap while preserving which axis found it.
+## Code quality
+
+Summarize only material advisory observations from `references/code-smells.md`, `references/design-quality.md`, and applicable `references/type-evidence-review.md` evidence:
+
+- `clean` when the applied lenses found no material maintenance/testability/reader-cost issue;
+- `n/a — <reason>` when the changed surface has no meaningful code-quality lens (for example docs-only/mechanical-only);
+- otherwise list the concrete location, lens/smell, cost, and smallest bounded correction.
+
+Keep the authority explicit: `advisory` unless another axis independently makes the same evidence binding. Do not turn taste, theoretical refactoring, or tooling-enforced style into a quality finding. When a material observation is actionable, classify it through `references/review-finding-triage.md` rather than assuming every true observation requires code change.
+
+Do not merge or rerank Spec and Standards into a single list. `Code quality` is a compact visibility layer over the existing advisory lenses; it does not change the authority of either axis. Deduplicate exact overlap while preserving which governing axis, if any, makes an observation binding.
 
 ## Fix and completion rules
 
-On merge-ready workflows, fix concrete in-scope blockers when feasible and add focused regression coverage for corrected behavior. Skip cosmetic or speculative smell/design/type-evidence suggestions that do not create a real maintenance or correctness cost.
+On merge-ready workflows, fix concrete in-scope blockers when feasible and add focused regression coverage for corrected behavior. Apply `references/review-finding-triage.md` to material advisory findings before changing code. Skip cosmetic or speculative smell/design/type-evidence suggestions that do not create a real maintenance or correctness cost.
 
 The axis is complete only when:
 
@@ -142,4 +154,4 @@ The axis is complete only when:
 - the design-quality companion was applied where relevant or explicitly recorded `n/a`
 - the type-evidence companion was applied where relevant or explicitly recorded `n/a`
 - docs/help were checked against explicit non-goals when the PR defines phase boundaries
-- `## Standards` and `## Spec` results are available for the final verdict
+- `## Standards`, `## Spec`, and `## Code quality` results are available for the final verdict
