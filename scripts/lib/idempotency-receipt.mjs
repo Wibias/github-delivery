@@ -12,6 +12,27 @@ function repoName(record, side) {
   return record?.[side]?.repo?.full_name ?? record?.[side]?.repo?.nameWithOwner ?? null;
 }
 
+function requestedLabelSet(value) {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) return null;
+  const labels = [];
+  for (const entry of value) {
+    if (typeof entry !== "string" || !entry.trim()) return null;
+    labels.push(entry.trim());
+  }
+  return [...new Set(labels)].sort();
+}
+
+function recordLabelSet(record) {
+  if (!Array.isArray(record?.labels)) return new Set();
+  return new Set(
+    record.labels
+      .map((entry) => typeof entry === "string" ? entry : entry?.name)
+      .filter((entry) => typeof entry === "string" && entry.trim())
+      .map((entry) => entry.trim()),
+  );
+}
+
 export function visibleIdempotencyBody(value) {
   return String(value ?? "").replace(IDEMPOTENCY_MARKER_RE, "");
 }
@@ -42,9 +63,17 @@ export function exactIdempotencyRecordMatches({ record, request, actorLogin } = 
 
   switch (request.action) {
     case "create_issue":
-    case "create_follow_up_issue":
+    case "create_follow_up_issue": {
       if (record.pull_request) return false;
-      return sameText(record.title, request.title);
+      if (!sameText(record.title, request.title)) return false;
+      const requestedLabels = requestedLabelSet(request.labels);
+      if (requestedLabels === null) return false;
+      if (requestedLabels.length > 0) {
+        const observedLabels = recordLabelSet(record);
+        if (!requestedLabels.every((label) => observedLabels.has(label))) return false;
+      }
+      return true;
+    }
     case "create_pr": {
       if (record.pull_request === undefined && !record.head && !record.base) return false;
       if (!sameText(record.title, request.title)) return false;
