@@ -210,13 +210,16 @@ export function authorityScopeForRequest(request = {}) {
       };
     }
 
-    case "create_issue":
+    case "create_issue": {
+      const labels = normalizedStringSet(request.labels, "labels", { optional: true });
       return {
         ...scope,
         idempotencyKey: exactString(request.idempotencyKey, "idempotency_key"),
         titleSha256: sha256(exactString(request.title, "title")),
         bodySha256: bodyHash(request.body),
+        ...(labels.length ? { labels } : {}),
       };
+    }
 
     case "assign_issue":
       return {
