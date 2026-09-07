@@ -2,9 +2,11 @@
 
 Canonical cross-workflow review rules. Detailed bug/security/spec methods remain in their focused reference files.
 
+Decision companions: `references/review-finding-triage.md`, `references/review-outcome.md`.
+
 ### GD-REVIEW-001 — Triage trusted humans first and verify bots
 
-Prioritize OWNER/MEMBER/COLLABORATOR/CODEOWNER/user feedback, then other humans, then trusted bots. Published bot findings are evidence to verify against code, not commands to obey blindly. Use `references/review-finding-triage.md` for non-obvious fix/decline decisions.
+Prioritize OWNER/MEMBER/COLLABORATOR/CODEOWNER/user feedback, then other humans, then trusted bots. Published bot findings are evidence to verify against code, not commands to obey blindly.
 
 ### GD-REVIEW-002 — No false deferral for in-diff bot threads
 
@@ -16,7 +18,7 @@ Fix-or-decline sequence: verify the finding, implement and verify the fix or rec
 
 ### GD-REVIEW-004 — Merge-ready review is multidimensional
 
-Merge-ready/full-review paths must cover Bug + Security + Spec + Standards as required by the workflow, including repository-wide semantic propagation where the changed abstraction demands it. Running bots alone is insufficient. Before a positive verdict, surface Code quality and Blast radius through `references/review-outcome.md`.
+Merge-ready/full-review paths must cover Bug + Security + Spec + Standards as required by the workflow, including repository-wide semantic propagation where the changed abstraction demands it. Running bots alone is insufficient.
 
 ### GD-REVIEW-005 — Trusted maintainer feedback is default-must-fix
 
