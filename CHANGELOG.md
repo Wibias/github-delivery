@@ -269,7 +269,7 @@ All notable changes to `github-delivery` are documented here.
 
 ### Fixed
 
-- Deferred merge authority such as `merge PR #42 when I approve it later` remains read-only and is not misrouted as an immediate native approval request (PR #373).
+- Deferred merge authority such as `merge PR #42 only after I confirm again` remains read-only and is not misrouted as an immediate native approval request (PR #373).
 
 ## [1.1.0] - 2026-08-24
 
@@ -362,7 +362,7 @@ All notable changes to `github-delivery` are documented here.
 ### Changed
 
 - Bound leftover GitHub and Git subprocesses on review, verdict, CI forensics, ship-gate, runtime, live-fixture, release, and npm helper paths so a stuck `gh`/`git` child cannot hang the delivery process indefinitely.
-- Bumped the package version from `0.8.5` to `1.4.6`.
+- Bumped the package version from `0.8.5` to `0.8.6`.
 
 ### Fixed
 
@@ -896,6 +896,6 @@ All notable changes to `github-delivery` are documented here.
 - Snapshot-backed authoritative ship decisions with base-health isolation.
 - Guarded GitHub mutation profiles and runtime capability discovery.
 - Executable offline routing and retained-regression evaluations.
-- Deterministic versioned skill bundles with checksums, installation planning, backups, and restore.
+- Deterministic versioned skill bundles with checksums, installation planning, backups, restore.
 - Tag-bound GitHub Releases with checksum verification, SPDX SBOMs, and artifact attestations.
 - Dependabot, Dependency Review, CodeQL, Scorecard, and executable repository workflow policy checks.
