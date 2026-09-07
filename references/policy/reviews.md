@@ -16,7 +16,7 @@ Fix-or-decline sequence: classify the finding through `references/review-finding
 
 ### GD-REVIEW-004 — Merge-ready review is multidimensional
 
-Merge-ready/full-review paths must cover Bug + Security + Spec + Standards as required by the workflow, including repository-wide semantic propagation where the changed abstraction demands it. Running bots alone is insufficient. Applicable advisory design-quality findings should remain visibly separate from hard Spec/Standards violations, and material non-local risk should be summarized as blast-radius evidence from semantic propagation plus safety-invariant proof rather than as a list of speculative callers.
+Merge-ready/full-review paths must cover Bug + Security + Spec + Standards as required by the workflow, including repository-wide semantic propagation where the changed abstraction demands it. Running bots alone is insufficient. Apply `references/review-outcome.md` before the positive verdict so applicable advisory code-quality conclusions and blast-radius evidence are visible without creating new review axes. Material non-local risk is sourced from semantic propagation plus `references/safety-invariant.md`, not from speculative caller lists.
 
 ### GD-REVIEW-005 — Trusted maintainer feedback is default-must-fix
 
