@@ -70,6 +70,7 @@ Useful options include:
 - a before/after table with screenshots or video for visual changes;
 - a before/after benchmark table when performance is a material claim;
 - a short compatibility, risk, limitation, or review-focus note;
+- **Review notes:** when a diff mixes core implementation with generated, lockfile, or other mechanical files, identify the core files a reviewer should read first and any non-obvious review focus;
 - focused validation evidence when the evidence itself is unusual, disputed, or central to the claim.
 
 Routine test commands, exact-head SHAs, CI check inventories, TDD RED/GREEN history, commit/file counts, and release-process narration belong in workflow evidence, merge-ready records, or full-review verdicts by default — not in the PR body.
