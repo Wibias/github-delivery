@@ -32,7 +32,6 @@ test("bot findings separate truth from action before code changes", () => {
   const triage = readFileSync(triageUrl, "utf8");
   const reviews = read("references/policy/reviews.md");
   const fixBots = read("references/fix-pr-bots.md");
-  const fullReview = read("references/full-review-pr.md");
 
   assert.match(triage, /confirmed \| false-positive \| stale \| unproven/);
   assert.match(triage, /must-fix \| worth-fixing \| decline \| human-decision/);
@@ -42,24 +41,26 @@ test("bot findings separate truth from action before code changes", () => {
   assert.match(triage, /scope creep/i);
   assert.match(reviews, /review-finding-triage\.md/);
   assert.match(fixBots, /review-finding-triage\.md/);
-  assert.match(fullReview, /review-finding-triage\.md/);
 });
 
-test("full review surfaces code quality and blast radius without new review engines", () => {
+test("full review surfaces code quality and blast radius through canonical review policy", () => {
   const specStandards = read("references/spec-standards-review.md");
+  const reviews = read("references/policy/reviews.md");
+  const outcome = read("references/review-outcome.md");
   const fullReview = read("references/full-review-pr.md");
-  const commentDepth = read("references/comment-depth.md");
 
   assert.match(specStandards, /Code quality/);
   assert.match(specStandards, /advisory/i);
-  assert.match(fullReview, /Code quality/);
-  assert.match(fullReview, /Blast radius/);
+  assert.match(reviews, /review-outcome\.md/);
+  assert.match(fullReview, /Policy modules:[\s\S]*- reviews/);
   assert.match(fullReview, /semantic-propagation-review\.md/);
-  assert.match(fullReview, /safety-invariant\.md/);
-  assert.match(fullReview, /local \| non-local|local.*non-local/is);
-  assert.match(fullReview, /unproven/i);
-  assert.match(commentDepth, /Code quality/);
-  assert.match(commentDepth, /Blast radius/);
+  assert.match(outcome, /Code quality/);
+  assert.match(outcome, /Blast radius/);
+  assert.match(outcome, /semantic-propagation-review\.md/);
+  assert.match(outcome, /safety-invariant\.md/);
+  assert.match(outcome, /local \| non-local/);
+  assert.match(outcome, /Executed/);
+  assert.match(outcome, /unproven/i);
 });
 
 test("PR review quality follow-up stays inside unreleased 1.4.7", () => {
