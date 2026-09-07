@@ -105,7 +105,9 @@ internal static partial class ScopeCanonicalizer
                 scope["idempotencyKey"] = RequiredString(request, "idempotencyKey");
                 scope["titleSha256"] = Sha256(RequiredString(request, "title"));
                 scope["bodySha256"] = BodySha256(request);
-                var labels = CanonicalStringSet(request, "labels", optional: true);
+                var labels = action == "create_issue"
+                    ? CanonicalStringSet(request, "labels", optional: true)
+                    : new JsonArray();
                 if (labels.Count > 0) scope["labels"] = labels;
                 break;
 
