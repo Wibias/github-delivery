@@ -211,7 +211,9 @@ export function authorityScopeForRequest(request = {}) {
     }
 
     case "create_issue": {
-      const labels = normalizedStringSet(request.labels, "labels", { optional: true });
+      const labels = scope.action === "create_issue"
+        ? normalizedStringSet(request.labels, "labels", { optional: true })
+        : [];
       return {
         ...scope,
         idempotencyKey: exactString(request.idempotencyKey, "idempotency_key"),
