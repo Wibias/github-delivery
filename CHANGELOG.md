@@ -4,6 +4,22 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.4.8] - 2026-09-08
+
+### Added
+
+- Added first-class `grok-trace`, `cursor-trace`, and `codex-trace` npm launchers for explicit per-invocation agent tracing. Grok keeps its headless `streaming-json` path with quoted-prompt shorthand, Cursor keeps its `stream-json` print path, and Codex keeps the protected App Server/watchdog path (PR #431).
+- Added optional `labels: string[]` support to `create_issue`, including validation, deterministic `gh issue create --label` emission, Node/Windows authority binding, and idempotent receipt verification (PR #431).
+
+### Changed
+
+- Bumped the package version from `1.4.7` to `1.4.8`.
+
+### Fixed
+
+- `codex-trace` now preserves child signal termination instead of converting signal exits into a generic exit code `1` (PR #431).
+- Issue-label identity is case-insensitive across CLI deduplication, Node/Windows authority scopes, and idempotency matching while preserving the first requested spelling for the actual GitHub CLI arguments (PR #431).
+
 ## [1.4.7] - 2026-09-07
 
 ### Added
@@ -872,21 +888,21 @@ All notable changes to `github-delivery` are documented here.
   focused failing excerpt before loading full raw output. Pending-only required
   CI is owned by `scripts/ci-wait.mjs` instead of parallel manual polling.
 - Refreshed the README with a faster natural-language quick start, repository
-  workflow visuals, clearer safety/value positioning, and user-facing setup
-  and architecture documentation for the progress watchdog.
+  workflow visuals, clearer safety/value positioning, consolidated installation/maintenance guidance, dedicated stack/competing-PR/backport explanation, updated workflow reference, and the current lean CI topology. Release-specific implementation detail is no longer embedded in the hero text.
+
+### Fixed
+
+- Fixed the v0.4 protected-stream blind spot where large loops emitted through
+  reasoning or plan channels could bypass a detector that watched only
+  `item/agentMessage/delta`.
 
 ## [0.1.1] - 2026-08-11
 
 ### Fixed
 
-- Prevented severe no-progress agent loops after a GitHub mutation is already
-  prepared by adding the global `GD-CORE-008` bounded forward-progress rule.
-- Prepared GitHub writes now cross directly into `github-mutate.mjs` once the
-  required evidence and authority are satisfied. Re-verification remains
-  required after relevant state changes, failed or ambiguous tool results, or
-  explicit workflow freshness requirements.
-- Added regression coverage that fails when unchanged-state re-planning can
-  replace the next required tool call or mutation.
+- Prevented severe no-progress agent loops after a GitHub mutation is already prepared by adding the global `GD-CORE-008` bounded forward-progress rule.
+- Prepared GitHub writes now cross directly into `github-mutate.mjs` once the required evidence and authority are satisfied. Re-verification remains required after relevant state changes, failed or ambiguous tool results, or explicit workflow freshness requirements.
+- Added regression coverage that fails when unchanged-state re-planning can replace the next required tool call or mutation.
 
 ## [0.1.0] - 2026-08-01
 
