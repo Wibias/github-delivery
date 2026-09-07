@@ -18,7 +18,7 @@ function requestedLabelSet(value) {
   const labels = [];
   for (const entry of value) {
     if (typeof entry !== "string" || !entry.trim()) return null;
-    labels.push(entry.trim());
+    labels.push(entry.trim().toLowerCase());
   }
   return [...new Set(labels)].sort();
 }
@@ -29,7 +29,7 @@ function recordLabelSet(record) {
     record.labels
       .map((entry) => typeof entry === "string" ? entry : entry?.name)
       .filter((entry) => typeof entry === "string" && entry.trim())
-      .map((entry) => entry.trim()),
+      .map((entry) => entry.trim().toLowerCase()),
   );
 }
 

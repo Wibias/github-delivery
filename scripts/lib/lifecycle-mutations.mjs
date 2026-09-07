@@ -208,11 +208,16 @@ function validateApprovedMediaRemovals(value) {
 function canonicalIssueLabels(value) {
   if (value === undefined) return [];
   if (!Array.isArray(value)) throw new Error("labels_invalid");
-  const labels = value.map((entry) => {
+  const labelsByIdentity = new Map();
+  for (const entry of value) {
     if (typeof entry !== "string" || !entry.trim()) throw new Error("label_invalid");
-    return entry.trim();
-  });
-  return [...new Set(labels)].sort();
+    const label = entry.trim();
+    const identity = label.toLowerCase();
+    if (!labelsByIdentity.has(identity)) labelsByIdentity.set(identity, label);
+  }
+  return [...labelsByIdentity.entries()]
+    .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+    .map(([, label]) => label);
 }
 
 function assertUpdatePrBodySafe(request, runner) {

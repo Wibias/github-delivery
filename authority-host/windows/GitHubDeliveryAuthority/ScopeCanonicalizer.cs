@@ -106,7 +106,7 @@ internal static partial class ScopeCanonicalizer
                 scope["titleSha256"] = Sha256(RequiredString(request, "title"));
                 scope["bodySha256"] = BodySha256(request);
                 var labels = action == "create_issue"
-                    ? CanonicalStringSet(request, "labels", optional: true)
+                    ? CanonicalStringSet(request, "labels", optional: true, caseInsensitive: true)
                     : new JsonArray();
                 if (labels.Count > 0) scope["labels"] = labels;
                 break;
@@ -252,7 +252,7 @@ internal static partial class ScopeCanonicalizer
         scope["expectedHead"] = RequiredString(request, "expectedHead");
     }
 
-    private static JsonArray CanonicalStringSet(JsonElement request, string name, bool optional = false)
+    private static JsonArray CanonicalStringSet(JsonElement request, string name, bool optional = false, bool caseInsensitive = false)
     {
         if (!request.TryGetProperty(name, out var values))
         {
@@ -276,7 +276,7 @@ internal static partial class ScopeCanonicalizer
             {
                 throw new AuthorityException($"authority_scope_{ToSnake(name)}_entry_invalid");
             }
-            normalized.Add(text);
+            normalized.Add(caseInsensitive ? text.ToLowerInvariant() : text);
         }
 
         var array = new JsonArray();

@@ -19,7 +19,8 @@ export async function main() {
     const result = await runCodexTrace();
     if (result.signal) {
       process.stderr.write(`github-delivery codex-trace exited on ${result.signal}\n`);
-      process.exitCode = 1;
+      process.kill(process.pid, result.signal);
+      return;
     } else {
       process.exitCode = Number.isInteger(result.code) ? result.code : 1;
     }
