@@ -1,8 +1,6 @@
 # Review Policy
 
-Cross-workflow review policy.
-
-Companions: `review-finding-triage.md`, `review-outcome.md`.
+Companions: `../review-finding-triage.md`, `../review-outcome.md`.
 
 ### GD-REVIEW-001 — Triage trusted humans first and verify bots
 
