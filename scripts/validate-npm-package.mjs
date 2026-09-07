@@ -12,9 +12,12 @@ const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 
 const RUNTIME_FILES = [
   "scripts/github-delivery-cli.mjs",
+  "scripts/grok-trace.mjs",
+  "scripts/grok-with-debug-trace.mjs",
   "scripts/install-codex-watchdog-hooks.mjs",
   "scripts/install-skill.mjs",
   "scripts/windows-install-locks.ps1",
+  "scripts/lib/agent-debug-trace.mjs",
   "scripts/lib/authority-host-client.mjs",
   "scripts/lib/authority-host-install.mjs",
   "scripts/lib/authority-host-release.mjs",
@@ -23,6 +26,8 @@ const RUNTIME_FILES = [
   "scripts/lib/bootstrap-install.mjs",
   "scripts/lib/bootstrap-maintenance.mjs",
   "scripts/lib/distribution.mjs",
+  "scripts/lib/grok-debug-trace.mjs",
+  "scripts/lib/grok-trace-launcher.mjs",
   "scripts/lib/install-lock.mjs",
   "scripts/lib/installation-backups.mjs",
   "scripts/lib/release-path-identity.mjs",
@@ -30,6 +35,7 @@ const RUNTIME_FILES = [
   "scripts/lib/subprocess-policy.mjs",
   "scripts/lib/release-zip.mjs",
   "scripts/lib/stable-release-update.mjs",
+  "scripts/lib/structured-debug-cli.mjs",
   "scripts/lib/update-user-experience.mjs",
   "scripts/lib/user-config.mjs",
   "scripts/lib/watchdog-activation.mjs",
@@ -54,6 +60,7 @@ try {
   assert.equal(pkg.private, undefined);
   assert.deepEqual(pkg.bin, {
     "github-delivery": "scripts/github-delivery-cli.mjs",
+    "grok-trace": "scripts/grok-trace.mjs",
   });
   assert.equal(pkg.license, "MIT");
   assert.deepEqual(pkg.repository, {
