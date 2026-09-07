@@ -47,3 +47,8 @@ test("all first-class trace launchers use the same explicit trace opt-in environ
     "1",
   );
 });
+
+test("codex trace preserves child signal termination", () => {
+  const source = readFileSync(join(ROOT, "scripts", "codex-trace.mjs"), "utf8");
+  assert.match(source, /process\.kill\(process\.pid,\s*result\.signal\)/);
+});
