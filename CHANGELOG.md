@@ -10,11 +10,13 @@ All notable changes to `github-delivery` are documented here.
 
 - Added opt-in provider-neutral agent debug tracing for Codex, Grok CLI, Cursor CLI, and Cursor IDE/Agent hooks. Grok `streaming-json` thoughts, Cursor `stream-json` thinking deltas, and sanitized tool lifecycle events are normalized into bounded local JSONL traces. Cursor hook files are scoped by a SHA-256 digest of the conversation identifier rather than the raw identifier (PR #429).
 - Added `references/agent-debug-trace.md` with setup and privacy guidance. Raw tool inputs/outputs plus Cursor user email, workspace roots, transcript paths, and tool payloads are excluded from normalized persisted events; reasoning-summary text remains diagnostic content and can itself contain sensitive data (PR #429).
+- Added evidence-backed review-finding triage that separates factual Truth (`confirmed | false-positive | stale | unproven`) from Action (`must-fix | worth-fixing | decline | human-decision`), plus compact Code quality and Blast radius outcomes that reuse the existing Spec/Standards, semantic-propagation, and safety-invariant review machinery instead of adding duplicate review engines (PR #430).
 
 ### Changed
 
 - Bumped the package version from `1.4.6` to `1.4.7`.
 - Existing Codex debug tracing now uses the shared provider-neutral recorder while preserving its compatibility trace kind and the default-off `GITHUB_DELIVERY_DEBUG_TRACE` opt-in contract (PR #429).
+- PR title/body guidance now prefers repository conventions and recent merged history, concise problem/result explanations, and optional diagrams, snippets, media, or benchmark evidence instead of routine CI/TDD/exact-head inventories, while preserving issue/media safety and draft-only initial publication (PR #430).
 
 ## [1.4.6] - 2026-09-05
 
@@ -360,7 +362,7 @@ All notable changes to `github-delivery` are documented here.
 ### Changed
 
 - Bound leftover GitHub and Git subprocesses on review, verdict, CI forensics, ship-gate, runtime, live-fixture, release, and npm helper paths so a stuck `gh`/`git` child cannot hang the delivery process indefinitely.
-- Bumped the package version from `0.8.5` to `0.8.6`.
+- Bumped the package version from `0.8.5` to `1.4.6`.
 
 ### Fixed
 
