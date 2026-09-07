@@ -1,3 +1,5 @@
+import { buildAgentTraceEnv } from "./agent-trace-launcher.mjs";
+
 function isHeadless(args) {
   return args.some((arg) =>
     arg === "-p" ||
@@ -27,8 +29,5 @@ export function buildGrokTraceLauncherArgs(args = []) {
 }
 
 export function buildGrokTraceEnv(env = process.env) {
-  return {
-    ...env,
-    GITHUB_DELIVERY_DEBUG_TRACE: "1",
-  };
+  return buildAgentTraceEnv(env);
 }
