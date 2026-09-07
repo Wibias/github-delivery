@@ -58,6 +58,25 @@ test("create_issue validates and emits a deterministic label set", () => {
   );
 });
 
+test("create_issue label execution deduplicates case-insensitively while preserving first spelling", () => {
+  const input = request({ labels: ["TRIAGE", "enhancement", "Enhancement"] });
+  assert.deepEqual(lifecycleCommandFor(input), [
+    "gh",
+    "issue",
+    "create",
+    "--repo",
+    "acme/widgets",
+    "--title",
+    "Add traced launcher UX",
+    "--body",
+    input.body,
+    "--label",
+    "enhancement",
+    "--label",
+    "TRIAGE",
+  ]);
+});
+
 test("create_issue labels are part of the exact authority scope", () => {
   const scope = authorityScopeForRequest(request());
   assert.deepEqual(scope.labels, ["enhancement", "triage"]);
@@ -79,7 +98,18 @@ test("create_issue labels are part of the exact authority scope", () => {
   );
 });
 
-test("Windows authority binds direct create_issue labels through the same canonical string-set path", () => {
+test("create_issue label authority identity is case-insensitive", () => {
+  assert.deepEqual(
+    authorityScopeForRequest(request({ labels: ["Bug", "bug"] })).labels,
+    ["bug"],
+  );
+  assert.equal(
+    authorityScopeSha256(request({ labels: ["Bug"] })),
+    authorityScopeSha256(request({ labels: ["bug"] })),
+  );
+});
+
+test("Windows authority binds direct create_issue labels through the same case-insensitive canonical string-set path", () => {
   const source = readFileSync(
     resolve(
       ROOT,
@@ -92,8 +122,9 @@ test("Windows authority binds direct create_issue labels through the same canoni
   );
   assert.match(
     source,
-    /case "create_issue":\s*case "create_follow_up_issue":[\s\S]*?var labels = action == "create_issue"[\s\S]*?CanonicalStringSet\(request, "labels", optional: true\)[\s\S]*?if \(labels\.Count > 0\) scope\["labels"\] = labels;/,
+    /case "create_issue":\s*case "create_follow_up_issue":[\s\S]*?var labels = action == "create_issue"[\s\S]*?CanonicalStringSet\(request, "labels", optional: true, caseInsensitive: true\)[\s\S]*?if \(labels\.Count > 0\) scope\["labels"\] = labels;/,
   );
+  assert.match(source, /caseInsensitive \? text\.ToLowerInvariant\(\) : text/);
 });
 
 test("create_issue idempotency requires every requested label but permits server-added labels", () => {
@@ -120,5 +151,13 @@ test("create_issue idempotency requires every requested label but permits server
       actorLogin: "Wibias",
     }),
     false,
+  );
+  assert.equal(
+    exactIdempotencyRecordMatches({
+      record: baseRecord,
+      request: request({ labels: ["Enhancement", "TRIAGE"] }),
+      actorLogin: "Wibias",
+    }),
+    true,
   );
 });
