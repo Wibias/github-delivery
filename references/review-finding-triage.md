@@ -84,7 +84,7 @@ Keep the two classifications separate. Examples:
 
 `confirmed` does not automatically mean `must-fix`. `false-positive` and `stale` normally lead to `decline`. `unproven` must not be treated as proof for a code change; escalate to `human-decision` only when the unresolved risk itself materially affects shipping.
 
-## 4. Scope-creep guard
+## 4. Scope creep guard
 
 Review feedback must not expand the PR beyond the user's original goal merely because the broader change would be “cleaner”. Fix real shortcomings owned by the current diff. For adjacent improvements, require a concrete current-PR consequence or leave them out.
 
