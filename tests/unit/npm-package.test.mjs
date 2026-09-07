@@ -12,9 +12,12 @@ const NPM = process.platform === "win32" ? "npm.cmd" : "npm";
 
 const REQUIRED_RUNTIME = new Set([
   "scripts/github-delivery-cli.mjs",
+  "scripts/grok-trace.mjs",
+  "scripts/grok-with-debug-trace.mjs",
   "scripts/install-codex-watchdog-hooks.mjs",
   "scripts/install-skill.mjs",
   "scripts/windows-install-locks.ps1",
+  "scripts/lib/agent-debug-trace.mjs",
   "scripts/lib/authority-host-client.mjs",
   "scripts/lib/authority-host-install.mjs",
   "scripts/lib/authority-host-release.mjs",
@@ -23,6 +26,8 @@ const REQUIRED_RUNTIME = new Set([
   "scripts/lib/bootstrap-install.mjs",
   "scripts/lib/bootstrap-maintenance.mjs",
   "scripts/lib/distribution.mjs",
+  "scripts/lib/grok-debug-trace.mjs",
+  "scripts/lib/grok-trace-launcher.mjs",
   "scripts/lib/install-lock.mjs",
   "scripts/lib/installation-backups.mjs",
   "scripts/lib/release-path-identity.mjs",
@@ -30,6 +35,7 @@ const REQUIRED_RUNTIME = new Set([
   "scripts/lib/subprocess-policy.mjs",
   "scripts/lib/release-zip.mjs",
   "scripts/lib/stable-release-update.mjs",
+  "scripts/lib/structured-debug-cli.mjs",
   "scripts/lib/update-user-experience.mjs",
   "scripts/lib/user-config.mjs",
   "scripts/lib/watchdog-activation.mjs",
@@ -73,13 +79,14 @@ test("npm pack parser accepts npm 11 array and npm 12 keyed-object output", () =
   assert.deepEqual(parseNpmPackJson(JSON.stringify({ "github-delivery": pack })), [pack]);
 });
 
-test("package metadata exposes only the supported public npx bootstrap", () => {
+test("package metadata exposes only the supported public CLI entrypoints", () => {
   const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
 
   assert.equal(pkg.name, "github-delivery");
   assert.equal(pkg.private, undefined);
   assert.deepEqual(pkg.bin, {
     "github-delivery": "scripts/github-delivery-cli.mjs",
+    "grok-trace": "scripts/grok-trace.mjs",
   });
   assert.equal(pkg.license, "MIT");
   assert.deepEqual(pkg.repository, {
@@ -104,7 +111,7 @@ test("package validator spawns npm through node, not a Windows shell", () => {
   assert.match(source, /process\.execPath/);
 });
 
-test("npm pack contains only bootstrap runtime files plus npm's mandatory docs/metadata", () => {
+test("npm pack contains only supported runtime files plus npm's mandatory docs/metadata", () => {
   const pack = dryRunPack();
   const paths = new Set(pack.files.map((entry) => entry.path));
 
@@ -119,7 +126,7 @@ test("npm pack contains only bootstrap runtime files plus npm's mandatory docs/m
   }
 });
 
-test("repository package validator accepts the exact packed bootstrap surface", () => {
+test("repository package validator accepts the exact packed runtime surface", () => {
   const result = spawnSync(process.execPath, [join(ROOT, "scripts", "validate-npm-package.mjs")], {
     cwd: ROOT,
     encoding: "utf8",
@@ -127,7 +134,7 @@ test("repository package validator accepts the exact packed bootstrap surface", 
   assert.equal(result.status, 0, result.stderr || result.stdout);
 });
 
-test("a real packed tarball runs --help after an offline local install", () => {
+test("a real packed tarball runs supported entrypoints after an offline local install", () => {
   const root = mkdtempSync(join(tmpdir(), "github-delivery-npm-package-test-"));
   try {
     const packDir = join(root, "pack");
@@ -172,6 +179,20 @@ test("a real packed tarball runs --help after an offline local install", () => {
     assert.equal(help.status, 0, help.stderr || help.stdout);
     assert.match(help.stdout, /github-delivery update/);
     assert.match(help.stdout, /guided setup/i);
+
+    const grokTrace = join(
+      installDir,
+      "node_modules",
+      "github-delivery",
+      "scripts",
+      "grok-trace.mjs",
+    );
+    const grokTraceUsage = spawnSync(process.execPath, [grokTrace], {
+      cwd: root,
+      encoding: "utf8",
+    });
+    assert.equal(grokTraceUsage.status, 1);
+    assert.match(grokTraceUsage.stderr, /grok-trace requires a prompt or --prompt-file/i);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
