@@ -11,7 +11,7 @@ GITHUB_DELIVERY_DEBUG_TRACE=1
 GITHUB_DELIVERY_DEBUG_TRACE=true
 ```
 
-Any other value leaves tracing disabled. The first-class `grok-trace` command is also an explicit opt-in: it enables tracing for that Grok invocation without changing the parent shell environment.
+Any other value leaves tracing disabled. The first-class `grok-trace`, `cursor-trace`, and `codex-trace` commands are also explicit opt-ins: each enables tracing only for that invocation without changing the parent shell environment.
 
 Traces are written under `debug-traces/` inside `GITHUB_DELIVERY_STATE_DIR` when that variable is set, otherwise under the normal `~/.github-delivery` state root. On Unix-like systems GitHub Delivery constrains trace directories to mode `0700` and trace files to `0600`. Existing symlinked or foreign-owned trace paths are rejected. Each trace is bounded to 2 MiB by default.
 
@@ -21,7 +21,15 @@ Reasoning-summary text is intentionally persisted when tracing is enabled. It ca
 
 ## Codex
 
-The existing protected Codex launcher records normalized app-server reasoning and lifecycle events when tracing is enabled:
+After installing the `github-delivery` npm package, start protected Codex with tracing through the first-class launcher:
+
+```bash
+codex-trace
+```
+
+Codex arguments pass through to the existing protected launcher. The launcher keeps the app-server watchdog and records normalized reasoning and lifecycle events. Invoking `codex-trace` is itself the trace opt-in for that process.
+
+The low-level checkout-local form remains available for development and diagnostics:
 
 ```bash
 GITHUB_DELIVERY_DEBUG_TRACE=1 node scripts/codex-with-watchdog.mjs <codex-args>
@@ -59,13 +67,13 @@ A plain interactive `grok` session is intentionally not intercepted. The complet
 
 ## Cursor CLI
 
-Use the Cursor debug wrapper for print-mode execution:
+After installing the `github-delivery` npm package, use the first-class launcher for traced print-mode execution:
 
 ```bash
-GITHUB_DELIVERY_DEBUG_TRACE=1 node scripts/cursor-with-debug-trace.mjs "inspect this repository"
+cursor-trace "inspect this repository"
 ```
 
-The wrapper owns these flags:
+Invoking `cursor-trace` is itself the trace opt-in for that process. The launcher delegates to the existing Cursor debug wrapper, which owns these flags:
 
 ```text
 --print
@@ -74,6 +82,12 @@ The wrapper owns these flags:
 ```
 
 Thinking deltas and sanitized tool lifecycle events are normalized into the shared trace schema.
+
+The low-level checkout-local form remains available for development and diagnostics:
+
+```bash
+GITHUB_DELIVERY_DEBUG_TRACE=1 node scripts/cursor-with-debug-trace.mjs "inspect this repository"
+```
 
 ## Cursor IDE / Agent hooks
 
