@@ -62,6 +62,13 @@ test("new remote branches use the broker's absent lease identity", () => {
   assert.equal(plan.requests[0].expectedRemoteTip, "absent");
 });
 
+test("planner rejects incomplete push requests before they can be locked", () => {
+  assert.throws(
+    () => buildCreatePrPublicationPlan(input({ expectedRemoteTip: undefined })),
+    /expected_remote_tip_required/,
+  );
+});
+
 test("planner rejects caller attempts to turn initial routed creation non-draft", () => {
   assert.throws(
     () => buildCreatePrPublicationPlan(input({ draft: false })),
