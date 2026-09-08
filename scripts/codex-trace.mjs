@@ -1,8 +1,7 @@
 #!/usr/bin/env node
-import { pathToFileURL } from "node:url";
-
 import { runProtectedCodex } from "./codex-with-watchdog.mjs";
 import { buildAgentTraceEnv } from "./lib/agent-trace-launcher.mjs";
+import { isDirectExecution } from "./lib/direct-execution.mjs";
 
 export function runCodexTrace({
   env = process.env,
@@ -30,6 +29,6 @@ export async function main() {
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectExecution(import.meta.url)) {
   await main();
 }

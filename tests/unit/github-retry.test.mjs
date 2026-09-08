@@ -28,6 +28,25 @@ test("classifies GitHub retry-after and reset guidance", () => {
   );
 });
 
+test("machine-readable GitHub commands disable ANSI color", () => {
+  let observedOptions;
+  const result = runGitHubCommandWithRetry(
+    "gh",
+    ["repo", "view", "acme/widgets", "--json", "url,sshUrl"],
+    {
+      options: { env: { TEST_MARKER: "kept" } },
+      runner(_command, _args, options) {
+        observedOptions = options;
+        return { status: 0, stdout: "{}", stderr: "" };
+      },
+    },
+  );
+
+  assert.equal(result.status, 0);
+  assert.equal(observedOptions.env.TEST_MARKER, "kept");
+  assert.equal(observedOptions.env.NO_COLOR, "1");
+});
+
 test("does not shorten a server-directed wait to the local retry budget", () => {
   const sleeps = [];
   let calls = 0;

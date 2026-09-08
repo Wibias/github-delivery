@@ -35,6 +35,7 @@ const REQUIRED_RUNTIME = new Set([
   "scripts/lib/codex-progress-watchdog.mjs",
   "scripts/lib/codex-watchdog-remote-bridge.mjs",
   "scripts/lib/cursor-debug-trace.mjs",
+  "scripts/lib/direct-execution.mjs",
   "scripts/lib/distribution.mjs",
   "scripts/lib/grok-debug-trace.mjs",
   "scripts/lib/grok-trace-launcher.mjs",

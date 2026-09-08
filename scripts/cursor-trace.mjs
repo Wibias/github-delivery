@@ -1,8 +1,7 @@
 #!/usr/bin/env node
-import { pathToFileURL } from "node:url";
-
 import { runCursorWithDebugTrace } from "./cursor-with-debug-trace.mjs";
 import { buildAgentTraceEnv } from "./lib/agent-trace-launcher.mjs";
+import { isDirectExecution } from "./lib/direct-execution.mjs";
 
 export function runCursorTrace({
   env = process.env,
@@ -14,7 +13,7 @@ export function runCursorTrace({
   });
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectExecution(import.meta.url)) {
   try {
     runCursorTrace();
   } catch (error) {

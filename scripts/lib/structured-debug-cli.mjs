@@ -33,6 +33,9 @@ export function runStructuredDebugCli({
     recorder = disabledRecorder();
     stderr.write(`github-delivery ${provider} debug trace unavailable: ${error?.message || error}\n`);
   }
+  if (recorder.enabled && recorder.path) {
+    stderr.write(`Trace: ${recorder.path}\n`);
+  }
 
   const child = spawnImpl(bin, args, {
     stdio: ["pipe", "pipe", "pipe"],

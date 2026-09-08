@@ -1,7 +1,6 @@
 #!/usr/bin/env node
-import { pathToFileURL } from "node:url";
-
 import { runGrokWithDebugTrace } from "./grok-with-debug-trace.mjs";
+import { isDirectExecution } from "./lib/direct-execution.mjs";
 import {
   buildGrokTraceEnv,
   buildGrokTraceLauncherArgs,
@@ -19,7 +18,7 @@ export function runGrokTrace({
   });
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectExecution(import.meta.url)) {
   try {
     runGrokTrace();
   } catch (error) {

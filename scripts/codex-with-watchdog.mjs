@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 import { randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
-import { pathToFileURL } from "node:url";
 
 import { createAppServerWatchdogRouter } from "./lib/codex-app-server-watchdog-proxy.mjs";
 import { createCodexDebugTraceRecorder } from "./lib/codex-debug-trace.mjs";
 import { startCodexWatchdogRemoteBridge } from "./lib/codex-watchdog-remote-bridge.mjs";
+import { isDirectExecution } from "./lib/direct-execution.mjs";
 
 const TOKEN_ENV = "GITHUB_DELIVERY_CODEX_REMOTE_TOKEN";
 
@@ -91,6 +91,9 @@ export async function runProtectedCodex({
         `github-delivery debug trace unavailable: ${error?.message || error}\n`,
       );
     }
+  }
+  if (trace.enabled && trace.path) {
+    stderr.write(`Trace: ${trace.path}\n`);
   }
   let traceClosed = false;
   const closeTrace = () => {
@@ -196,6 +199,6 @@ export async function main() {
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectExecution(import.meta.url)) {
   await main();
 }
