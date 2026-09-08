@@ -1,6 +1,6 @@
 {
   "name": "github-delivery",
-  "version": "1.4.8",
+  "version": "1.4.9",
   "description": "Guided installer and safety tooling for GitHub Delivery workflows",
   "type": "module",
   "engines": {
@@ -37,6 +37,7 @@
     "scripts/lib/codex-progress-watchdog.mjs",
     "scripts/lib/codex-watchdog-remote-bridge.mjs",
     "scripts/lib/cursor-debug-trace.mjs",
+    "scripts/lib/direct-execution.mjs",
     "scripts/lib/distribution.mjs",
     "scripts/lib/grok-debug-trace.mjs",
     "scripts/lib/grok-trace-launcher.mjs",
