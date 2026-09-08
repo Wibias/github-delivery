@@ -4,16 +4,19 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
-## [1.4.9] - 2026-09-08
+## [1.5.0] - 2026-09-08
 
 ### Changed
 
-- Bumped the package version from `1.4.8` to `1.4.9`.
+- Bumped the package version from `1.4.8` to `1.5.0`.
+- Normalized agent debug-trace events now include ISO 8601 timestamps, and trace-enabled Grok, Cursor, and protected Codex launchers print the exact local JSONL path when tracing starts (PR #432).
 
 ### Fixed
 
 - Fixed the first-class Grok, Cursor, and Codex trace launchers plus their shipped debug/watchdog wrappers on Windows when the installed package is reached through a junction or aliased path. Direct-execution detection now compares canonical real paths instead of raw file-URL strings (PR #432).
-- Trace-enabled Grok, Cursor, and protected Codex launchers now print the exact local JSONL trace path when tracing starts (PR #432).
+- Grok `streaming-json` progress updates no longer masquerade as completed tool calls; only terminal `completed`, `failed`, or `cancelled` updates close a traced tool item (PR #432).
+- Create-PR publication plans now validate their canonical mutation requests before they can be locked, preventing an incomplete push lease such as a missing `expectedRemoteTip` from poisoning the workflow checkpoint (PR #432).
+- GitHub CLI subprocesses now force colorless output while preserving the caller environment, preventing ANSI escape sequences from corrupting machine-readable `gh --json` preflight responses (PR #432).
 
 ## [1.4.8] - 2026-09-08
 
