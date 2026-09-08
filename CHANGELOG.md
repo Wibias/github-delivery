@@ -10,6 +10,7 @@ All notable changes to `github-delivery` are documented here.
 
 - Bumped the package version from `1.4.8` to `1.5.0`.
 - Normalized agent debug-trace events now include ISO 8601 timestamps, and trace-enabled Grok, Cursor, and protected Codex launchers print the exact local JSONL path when tracing starts (PR #432).
+- Local-work PR publication may now add exactly one branch-derived `Closes #N` reference after read-only verification that the issue is open in the same repository and materially matches the local work; missing, closed, ambiguous, or mismatched candidates remain unlinked and no issue-side mutation is inferred (PR #433).
 
 ### Fixed
 
@@ -17,6 +18,7 @@ All notable changes to `github-delivery` are documented here.
 - Grok `streaming-json` progress updates no longer masquerade as completed tool calls; only terminal `completed`, `failed`, or `cancelled` updates close a traced tool item (PR #432).
 - Create-PR publication plans now validate their canonical mutation requests before they can be locked, preventing an incomplete push lease such as a missing `expectedRemoteTip` from poisoning the workflow checkpoint (PR #432).
 - GitHub CLI subprocesses now force colorless output while preserving the caller environment, preventing ANSI escape sequences from corrupting machine-readable `gh --json` preflight responses (PR #432).
+- Windows installed trace-bin regression coverage no longer constructs `cmd.exe /c` command strings from temporary or package paths; npm and installed PowerShell shims are executed with explicit argv while preserving real installed-bin and junction coverage (PR #433).
 
 ## [1.4.8] - 2026-09-08
 
