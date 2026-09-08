@@ -276,7 +276,7 @@ All notable changes to `github-delivery` are documented here.
 ### Changed
 
 - Bumped the package version from `1.1.1` to `1.2.0`.
-- The npm bootstrap now ships the Windows install-lock probe and the lock-recovery / backup-management helpers required by the updater. Pull-request Windows Authority CI exercises the packaged lock probe on a real Windows runner (PR #376).
+- The npm bootstrap now ships the Windows install-lock probe and the lock-recovery / backup-management helpers required by the updater. Pull-request Windows CI exercises the packaged lock probe on a real Windows runner (PR #376).
 
 ### Fixed
 
@@ -463,7 +463,7 @@ All notable changes to `github-delivery` are documented here.
 ### Fixed
 
 - Fixed release ordering that could strand an npm-only release when GitHub publication failed later; GitHub Release assets are now the resumable first publication boundary and npm is the final irreversible cross-system write (PR #268).
-- Fixed merge transaction reporting so a successful merge is never converted into a generic failure solely because the post-merge thank-you failed, and later reconciliation does not attempt the merge again.
+- Fixed merge transaction reporting so a successful merge is never converted into a generic failure solely because the post-merge thank-you failed, and later reconciliation does not attempt the merge again (PR #268).
 
 ## [0.7.3] - 2026-08-16
 
@@ -557,7 +557,7 @@ All notable changes to `github-delivery` are documented here.
 
 ### Fixed
 
-- Repeated grid or malformed tool-protocol placeholder output now hard-stops immediately on the first stall instead of being retried, and the offending model is quarantined across turns and `SessionEnd` so a resume with the same model is blocked before inference until the model changes or a new task begins. Subagent protocol stalls no longer quarantine the parent task.
+- Repeated grid or malformed tool-protocol placeholder output now hard-stops immediately on the first stall instead of being retried, and the offending model is quarantined across turns and `SessionEnd` so a resume with the same model is blocked before inference until the model is changed. Subagent protocol stalls no longer quarantine the parent task.
 - Windows login auto-start is now opt-in (previously enabled by default); users explicitly consent via guided install or `npx github-delivery autostart`.
 
 ## [0.6.0] - 2026-08-14
