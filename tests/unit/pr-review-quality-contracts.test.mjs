@@ -63,10 +63,10 @@ test("full review surfaces code quality and blast radius through canonical revie
   assert.match(outcome, /unproven/i);
 });
 
-test("PR review quality follow-up stays inside unreleased 1.4.8", () => {
+test("PR review quality follow-up stays inside unreleased 1.4.9", () => {
   const pkg = JSON.parse(read("package.json"));
   const changelog = read("CHANGELOG.md");
 
-  assert.equal(pkg.version, "1.4.8");
-  assert.equal((changelog.match(/## \[1\.4\.8\]/g) ?? []).length, 1);
+  assert.equal(pkg.version, "1.4.9");
+  assert.equal((changelog.match(/## \[1\.4\.9\]/g) ?? []).length, 1);
 });
