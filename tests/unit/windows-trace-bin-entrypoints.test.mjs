@@ -35,7 +35,7 @@ test("installed Windows trace bins execute their CLI entrypoints", {
   const prefix = join(workspace, "prefix");
   mkdirSync(packDir, { recursive: true });
 
-  const pack = runCmd(`npm pack --json --pack-destination "${packDir}"`);
+  const pack = runCmd(`npm pack --json --pack-destination ${packDir}`);
   assertSuccess(pack, "npm pack");
   const packed = JSON.parse(pack.stdout);
   assert.equal(Array.isArray(packed), true);
@@ -43,7 +43,7 @@ test("installed Windows trace bins execute their CLI entrypoints", {
   const tarball = join(packDir, packed[0].filename);
 
   const install = runCmd(
-    `npm install --global --prefix "${prefix}" "${tarball}" --ignore-scripts --no-audit --no-fund`,
+    `npm install --global --prefix ${prefix} ${tarball} --ignore-scripts --no-audit --no-fund`,
   );
   assertSuccess(install, "temporary global npm install");
 
@@ -67,7 +67,7 @@ test("installed Windows trace bins execute their CLI entrypoints", {
 
   for (const probe of probes) {
     const shim = join(prefix, `${probe.name}.cmd`);
-    const command = `"${shim}" ${probe.args.join(" ")}`.trim();
+    const command = `${shim} ${probe.args.join(" ")}`.trim();
     const result = runCmd(command);
 
     assert.equal(
