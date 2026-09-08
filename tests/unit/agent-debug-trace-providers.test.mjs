@@ -46,6 +46,7 @@ test("agent debug tracing remains explicit opt-in and provider-tagged", () => {
   const persisted = readFileSync(enabled.path, "utf8");
   assert.match(persisted, /"provider":"grok"/);
   assert.match(persisted, /visible Grok thought/);
+  assert.equal(JSON.parse(persisted.trim()).timestamp, "2026-09-07T11:00:00.000Z");
 });
 
 test("Grok streaming-json normalizes thoughts and tool lifecycle without raw payloads", () => {
@@ -73,6 +74,19 @@ test("Grok streaming-json normalizes thoughts and tool lifecycle without raw pay
   assert.equal(started.itemType, "read_file");
   assert.doesNotMatch(JSON.stringify(started), /super-secret|secrets\.txt|rawInput/);
 
+  for (const status of [null, "pending", "in_progress"]) {
+    assert.equal(
+      normalizeGrokDebugTraceEvent({
+        type: "tool_call_update",
+        toolCallId: "call-secret",
+        status,
+        rawOutput: { content: "private-progress" },
+      }),
+      null,
+      `non-terminal Grok tool update must not complete the item: ${status}`,
+    );
+  }
+
   const completed = normalizeGrokDebugTraceEvent({
     type: "tool_call_update",
     toolCallId: "call-secret",
@@ -82,6 +96,18 @@ test("Grok streaming-json normalizes thoughts and tool lifecycle without raw pay
   assert.equal(completed.type, "item_completed");
   assert.equal(completed.itemId, "call-secret");
   assert.doesNotMatch(JSON.stringify(completed), /private-result|rawOutput/);
+
+  for (const status of ["failed", "cancelled"]) {
+    const terminal = normalizeGrokDebugTraceEvent({
+      type: "tool_call_update",
+      toolCallId: "call-secret",
+      status,
+      rawOutput: { content: "private-terminal-result" },
+    });
+    assert.equal(terminal.type, "item_completed");
+    assert.equal(terminal.itemId, "call-secret");
+    assert.doesNotMatch(JSON.stringify(terminal), /private-terminal-result|rawOutput/);
+  }
 
   const ended = normalizeGrokDebugTraceEvent({
     type: "end",
