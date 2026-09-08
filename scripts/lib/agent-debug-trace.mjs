@@ -32,7 +32,7 @@ function checkedProvider(value) {
   return provider;
 }
 
-function sanitizeEvent(event, provider, traceKind = TRACE_KIND) {
+function sanitizeEvent(event, provider, traceKind = TRACE_KIND, timestamp = new Date()) {
   if (!event || typeof event !== "object") return null;
   const type = cleanString(event.type);
   if (!type || !ALLOWED_EVENT_TYPES.has(type)) return null;
@@ -42,6 +42,7 @@ function sanitizeEvent(event, provider, traceKind = TRACE_KIND) {
     kind: traceKind,
     provider,
     type,
+    timestamp: timestamp.toISOString(),
   };
 
   for (const key of ["threadId", "turnId", "itemId", "itemType"]) {
@@ -157,7 +158,7 @@ export function createAgentDebugTraceRecorder({
 
   function record(event) {
     if (fd === null) return false;
-    const sanitized = sanitizeEvent(event, normalizedProvider, traceKind);
+    const sanitized = sanitizeEvent(event, normalizedProvider, traceKind, now());
     if (!sanitized) return false;
     const line = `${JSON.stringify(sanitized)}\n`;
     const bytes = Buffer.byteLength(line);
@@ -187,6 +188,7 @@ export function appendAgentDebugTraceEvent({
   event,
   env = process.env,
   stateDir = null,
+  now = () => new Date(),
   maxBytes = DEFAULT_MAX_BYTES,
   traceKind = TRACE_KIND,
 } = {}) {
@@ -194,7 +196,7 @@ export function appendAgentDebugTraceEvent({
   const normalizedProvider = checkedProvider(provider);
   const scope = cleanString(scopeId);
   if (!scope) return { recorded: false, path: null };
-  const sanitized = sanitizeEvent(event, normalizedProvider, traceKind);
+  const sanitized = sanitizeEvent(event, normalizedProvider, traceKind, now());
   if (!sanitized) return { recorded: false, path: null };
 
   const root = traceRoot(env, stateDir);
