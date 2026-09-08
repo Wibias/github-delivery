@@ -4,6 +4,22 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.4.8] - 2026-09-08
+
+### Added
+
+- Added first-class `grok-trace`, `cursor-trace`, and `codex-trace` npm launchers for explicit per-invocation agent tracing. Grok keeps its headless `streaming-json` path with quoted-prompt shorthand, Cursor keeps its `stream-json` print path, and Codex keeps the protected App Server/watchdog path (PR #431).
+- Added optional `labels: string[]` support to `create_issue`, including validation, deterministic `gh issue create --label` emission, Node/Windows authority binding, and idempotent receipt verification (PR #431).
+
+### Changed
+
+- Bumped the package version from `1.4.7` to `1.4.8`.
+
+### Fixed
+
+- `codex-trace` now preserves child signal termination instead of converting signal exits into a generic exit code `1` (PR #431).
+- Issue-label identity is case-insensitive across CLI deduplication, Node/Windows authority scopes, and idempotency matching while preserving the first requested spelling for the actual GitHub CLI arguments (PR #431).
+
 ## [1.4.7] - 2026-09-07
 
 ### Added

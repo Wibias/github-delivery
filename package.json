@@ -1,19 +1,30 @@
 {
   "name": "github-delivery",
-  "version": "1.4.7",
+  "version": "1.4.8",
   "description": "Guided installer and safety tooling for GitHub Delivery workflows",
   "type": "module",
   "engines": {
     "node": "^22 || ^24 || ^26"
   },
   "bin": {
-    "github-delivery": "scripts/github-delivery-cli.mjs"
+    "github-delivery": "scripts/github-delivery-cli.mjs",
+    "grok-trace": "scripts/grok-trace.mjs",
+    "cursor-trace": "scripts/cursor-trace.mjs",
+    "codex-trace": "scripts/codex-trace.mjs"
   },
   "files": [
     "scripts/github-delivery-cli.mjs",
+    "scripts/grok-trace.mjs",
+    "scripts/grok-with-debug-trace.mjs",
+    "scripts/cursor-trace.mjs",
+    "scripts/cursor-with-debug-trace.mjs",
+    "scripts/codex-trace.mjs",
+    "scripts/codex-with-watchdog.mjs",
     "scripts/install-codex-watchdog-hooks.mjs",
     "scripts/install-skill.mjs",
     "scripts/windows-install-locks.ps1",
+    "scripts/lib/agent-debug-trace.mjs",
+    "scripts/lib/agent-trace-launcher.mjs",
     "scripts/lib/authority-host-client.mjs",
     "scripts/lib/authority-host-install.mjs",
     "scripts/lib/authority-host-release.mjs",
@@ -21,7 +32,14 @@
     "scripts/lib/bootstrap-command.mjs",
     "scripts/lib/bootstrap-install.mjs",
     "scripts/lib/bootstrap-maintenance.mjs",
+    "scripts/lib/codex-app-server-watchdog-proxy.mjs",
+    "scripts/lib/codex-debug-trace.mjs",
+    "scripts/lib/codex-progress-watchdog.mjs",
+    "scripts/lib/codex-watchdog-remote-bridge.mjs",
+    "scripts/lib/cursor-debug-trace.mjs",
     "scripts/lib/distribution.mjs",
+    "scripts/lib/grok-debug-trace.mjs",
+    "scripts/lib/grok-trace-launcher.mjs",
     "scripts/lib/install-lock.mjs",
     "scripts/lib/installation-backups.mjs",
     "scripts/lib/release-path-identity.mjs",
@@ -29,10 +47,15 @@
     "scripts/lib/subprocess-policy.mjs",
     "scripts/lib/release-zip.mjs",
     "scripts/lib/stable-release-update.mjs",
+    "scripts/lib/structured-debug-cli.mjs",
     "scripts/lib/update-user-experience.mjs",
     "scripts/lib/user-config.mjs",
     "scripts/lib/watchdog-activation.mjs",
-    "scripts/lib/windows-install-locks.mjs"
+    "scripts/lib/windows-install-locks.mjs",
+    "scripts/lib/watchdog-investigation-progress.mjs",
+    "scripts/lib/agent-progress-watchdog.mjs",
+    "scripts/lib/watchdog-progress-classifier.mjs",
+    "scripts/lib/watchdog-evidence-registry.mjs"
   ],
   "license": "MIT",
   "repository": {

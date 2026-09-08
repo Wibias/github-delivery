@@ -68,14 +68,15 @@ function optionalRewriteExemption(value) {
   return parseRewriteExemption(value, "authority_scope_rewrite_exemption_invalid");
 }
 
-function normalizedStringSet(value, name, { optional = false } = {}) {
+function normalizedStringSet(value, name, { optional = false, caseInsensitive = false } = {}) {
   if (value === undefined && optional) return [];
   if (!Array.isArray(value)) throw new Error(`authority_scope_${name}_invalid`);
   const items = value.map((entry) => {
     if (typeof entry !== "string" || !entry.trim()) {
       throw new Error(`authority_scope_${name}_entry_invalid`);
     }
-    return entry.trim();
+    const text = entry.trim();
+    return caseInsensitive ? text.toLowerCase() : text;
   });
   return [...new Set(items)].sort();
 }
@@ -210,13 +211,18 @@ export function authorityScopeForRequest(request = {}) {
       };
     }
 
-    case "create_issue":
+    case "create_issue": {
+      const labels = scope.action === "create_issue"
+        ? normalizedStringSet(request.labels, "labels", { optional: true, caseInsensitive: true })
+        : [];
       return {
         ...scope,
         idempotencyKey: exactString(request.idempotencyKey, "idempotency_key"),
         titleSha256: sha256(exactString(request.title, "title")),
         bodySha256: bodyHash(request.body),
+        ...(labels.length ? { labels } : {}),
       };
+    }
 
     case "assign_issue":
       return {
