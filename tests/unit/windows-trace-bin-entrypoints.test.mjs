@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -27,7 +27,16 @@ function assertSuccess(result, label) {
   );
 }
 
-test("installed Windows trace bins execute their CLI entrypoints", {
+function assertRejected(result, probe, label = probe.name) {
+  assert.equal(
+    result.status,
+    1,
+    `${label} should execute and reject the probe arguments\nstdout:\n${result.stdout || ""}\nstderr:\n${result.stderr || ""}`,
+  );
+  assert.match(result.stderr || "", probe.stderr);
+}
+
+test("installed Windows trace bins execute through canonical and aliased package paths", {
   skip: process.platform !== "win32",
 }, () => {
   const workspace = mkdtempSync(join(tmpdir(), "github-delivery-trace-bin-"));
@@ -47,34 +56,65 @@ test("installed Windows trace bins execute their CLI entrypoints", {
   );
   assertSuccess(install, "temporary global npm install");
 
-  const probes = [
+  const publicProbes = [
     {
       name: "grok-trace",
+      script: "grok-trace.mjs",
       args: [],
       stderr: /grok-trace requires a prompt or --prompt-file/,
     },
     {
       name: "cursor-trace",
+      script: "cursor-trace.mjs",
       args: ["--output-format", "json"],
       stderr: /Cursor debug trace wrapper owns --output-format/,
     },
     {
       name: "codex-trace",
+      script: "codex-trace.mjs",
       args: ["--remote", "ws:\/\/127.0.0.1:1"],
       stderr: /protected Codex launcher owns --remote/,
     },
   ];
 
-  for (const probe of probes) {
+  for (const probe of publicProbes) {
     const shim = join(prefix, `${probe.name}.cmd`);
     const command = `${shim} ${probe.args.join(" ")}`.trim();
-    const result = runCmd(command);
+    assertRejected(runCmd(command), probe);
+  }
 
-    assert.equal(
-      result.status,
-      1,
-      `${probe.name} should execute and reject the probe arguments\nstdout:\n${result.stdout || ""}\nstderr:\n${result.stderr || ""}`,
+  const packageRoot = join(prefix, "node_modules", "github-delivery");
+  const aliasRoot = join(workspace, "github-delivery-alias");
+  symlinkSync(packageRoot, aliasRoot, "junction");
+
+  const directProbes = [
+    ...publicProbes,
+    {
+      name: "grok-with-debug-trace",
+      script: "grok-with-debug-trace.mjs",
+      args: [],
+      stderr: /Grok debug tracing requires a headless/,
+    },
+    {
+      name: "cursor-with-debug-trace",
+      script: "cursor-with-debug-trace.mjs",
+      args: ["--output-format", "json"],
+      stderr: /Cursor debug trace wrapper owns --output-format/,
+    },
+    {
+      name: "codex-with-watchdog",
+      script: "codex-with-watchdog.mjs",
+      args: ["--remote", "ws:\/\/127.0.0.1:1"],
+      stderr: /protected Codex launcher owns --remote/,
+    },
+  ];
+
+  for (const probe of directProbes) {
+    const script = join(aliasRoot, "scripts", probe.script);
+    assertRejected(
+      run(process.execPath, [script, ...probe.args]),
+      probe,
+      `${probe.name} via junction`,
     );
-    assert.match(result.stderr || "", probe.stderr);
   }
 });
