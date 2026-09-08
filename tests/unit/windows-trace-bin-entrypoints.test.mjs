@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -15,11 +15,15 @@ function run(command, args, options = {}) {
   });
 }
 
+function runCmd(command) {
+  return run(process.env.ComSpec || "cmd.exe", ["/d", "/s", "/c", command]);
+}
+
 function assertSuccess(result, label) {
   assert.equal(
     result.status,
     0,
-    `${label} failed\nstdout:\n${result.stdout || ""}\nstderr:\n${result.stderr || ""}`,
+    `${label} failed\nerror:\n${result.error?.stack || result.error || ""}\nstdout:\n${result.stdout || ""}\nstderr:\n${result.stderr || ""}`,
   );
 }
 
@@ -29,24 +33,18 @@ test("installed Windows trace bins execute their CLI entrypoints", {
   const workspace = mkdtempSync(join(tmpdir(), "github-delivery-trace-bin-"));
   const packDir = join(workspace, "pack");
   const prefix = join(workspace, "prefix");
+  mkdirSync(packDir, { recursive: true });
 
-  const pack = run("npm.cmd", ["pack", "--json", "--pack-destination", packDir]);
+  const pack = runCmd(`npm pack --json --pack-destination "${packDir}"`);
   assertSuccess(pack, "npm pack");
   const packed = JSON.parse(pack.stdout);
   assert.equal(Array.isArray(packed), true);
   assert.equal(packed.length, 1);
   const tarball = join(packDir, packed[0].filename);
 
-  const install = run("npm.cmd", [
-    "install",
-    "--global",
-    "--prefix",
-    prefix,
-    tarball,
-    "--ignore-scripts",
-    "--no-audit",
-    "--no-fund",
-  ]);
+  const install = runCmd(
+    `npm install --global --prefix "${prefix}" "${tarball}" --ignore-scripts --no-audit --no-fund`,
+  );
   assertSuccess(install, "temporary global npm install");
 
   const probes = [
@@ -70,7 +68,7 @@ test("installed Windows trace bins execute their CLI entrypoints", {
   for (const probe of probes) {
     const shim = join(prefix, `${probe.name}.cmd`);
     const command = `"${shim}" ${probe.args.join(" ")}`.trim();
-    const result = run(process.env.ComSpec || "cmd.exe", ["/d", "/s", "/c", command]);
+    const result = runCmd(command);
 
     assert.equal(
       result.status,
