@@ -57,6 +57,21 @@ test("local-work workflow is maintainer-compatible and declares safety boundarie
   assert.doesNotMatch(workflow, /Issue conversation intake/);
 });
 
+test("local-work workflow may close a branch-derived issue only after bounded verification", () => {
+  const workflow = readFileSync(
+    new URL("../../references/create-pr-from-local-work.md", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(workflow, /branch.*(?:issue|#).*candidate/i);
+  assert.match(workflow, /same repository/i);
+  assert.match(workflow, /issue.*(?:exists|open)|(?:exists|open).*issue/i);
+  assert.match(workflow, /scope.*match|match.*scope/i);
+  assert.match(workflow, /Closes #/i);
+  assert.match(workflow, /do not.*(?:assign|comment).*issue/i);
+  assert.match(workflow, /(?:ambiguous|mismatch|does not match).*do not.*link/i);
+});
+
 test("local-work workflow consumes one locked packet and deterministic publication plan", () => {
   const workflow = readFileSync(
     new URL("../../references/create-pr-from-local-work.md", import.meta.url),
