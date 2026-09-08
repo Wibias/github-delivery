@@ -102,6 +102,17 @@ function fallbackDelayMs(attempt, random) {
   return base + positiveJitter;
 }
 
+function githubCommandOptions(command, options) {
+  if (command !== "gh") return options;
+  return {
+    ...options,
+    env: {
+      ...(options.env ?? process.env),
+      NO_COLOR: "1",
+    },
+  };
+}
+
 export function runGitHubCommandWithRetry(
   command,
   args,
@@ -117,9 +128,10 @@ export function runGitHubCommandWithRetry(
 ) {
   const attempts = Math.max(1, Number(maxAttempts) || 1);
   const readOnly = isReadOnlyGitHubCommand(command, args);
+  const runtimeOptions = githubCommandOptions(command, options);
   let result;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    result = runner(command, args, options);
+    result = runner(command, args, runtimeOptions);
     if (result?.status === 0) {
       return { ...result, githubDeliveryAttempts: attempt };
     }
