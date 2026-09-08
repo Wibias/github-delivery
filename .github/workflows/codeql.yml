@@ -98,7 +98,7 @@ jobs:
   analyze-csharp:
     name: CodeQL / Analyze (csharp)
     needs: scope
-    if: always() && (needs.scope.result != 'success' || github.event_name != 'pull_request' || needs.scope.outputs.csharp == 'true')
+    if: always()
     runs-on: windows-latest
     timeout-minutes: 30
     permissions:
@@ -118,6 +118,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up .NET
+        if: github.event_name != 'pull_request' || needs.scope.outputs.csharp == 'true'
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           global-json-file: global.json
@@ -126,9 +127,10 @@ jobs:
         uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
         with:
           languages: csharp
-          build-mode: manual
+          build-mode: ${{ github.event_name == 'pull_request' && needs.scope.result == 'success' && needs.scope.outputs.csharp != 'true' && 'none' || 'manual' }}
 
       - name: Build C# authority host
+        if: github.event_name != 'pull_request' || needs.scope.outputs.csharp == 'true'
         shell: pwsh
         run: |
           $Project = 'authority-host/windows/GitHubDeliveryAuthority/GitHubDeliveryAuthority.csproj'

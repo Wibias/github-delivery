@@ -16,7 +16,15 @@ Policy modules:
 
 Publish exactly the intended local change as one pull request without inventing issue context or unrelated lifecycle work.
 
-This workflow is deliberately separate from `create-pr-for-issue.md`. **Do not infer an issue.** Do not run issue research, add `Fixes`/`Closes` linkage, assign an issue, or publish an issue comment unless the user separately asks for those effects.
+This workflow is deliberately separate from `create-pr-for-issue.md`. **Do not infer an issue from arbitrary numbers, commit text, or PR wording.** Do not run issue research, assign an issue, or publish an issue comment unless the user separately asks for those effects. A conventional current-branch name may provide one bounded branch-derived issue candidate only under the verified closing-link rule below; that does not switch this workflow into issue-owned delivery.
+
+### Verified branch-derived closing link
+
+Only derive a candidate from a branch whose entire name matches the accepted pattern `^[^/]+/([1-9][0-9]*)-[^/]+$`, where the capture is the issue number at the start of the work slug. The branch must contain no second standalone decimal token after that captured number. `feat/239-integrations-legacy-cleanup` therefore yields candidate `#239`; branches with zero matches, branches with multiple issue-like numbers such as `feat/239-fix-241`, or branches that merely contain a number elsewhere yield no candidate. Never choose the first or last number from an ambiguous branch.
+
+Before publication, fetch only the designated candidate from the already-resolved `OWNER/REPO` and read its `number`, `state`, `title`, `body`, and URL. Require `state=OPEN` and the same repository identity. Compare that issue evidence against the exact local base/head SHAs, changed paths, base-to-head diff summary, and commit subjects. Add a closing link only when those sources establish a material scope match; insufficient evidence is a mismatch, not permission to infer. Do not search arbitrary commit/body numbers for alternatives.
+
+Reject the candidate and add no inferred closing link when the branch has zero matches, the branch has multiple issue-like numbers, the issue is missing, the issue is closed, the issue belongs to a different repository, or the issue scope is mismatched/insufficient for the local work. If and only if the candidate passes every check, include exactly one `Closes #N` closing reference in the intended PR body before the publication plan is locked. Do not assign or comment on the issue, change its labels/state directly, or add any other issue-side effect unless the user separately requested that action. Keep the local-work route and all of its normal publication gates.
 
 ## Execution lock
 
@@ -48,12 +56,12 @@ If the active higher-priority instruction stack genuinely requires a GitHub writ
    - Write one `<review-result.json>` with `schemaVersion: 1`, `kind: "github-delivery/pre-open-review-result"`, the exact `headSha`, and `bug` / `security` objects containing `status: "clean"`, a bounded `method`, `coveredIds`, and the union of actually `reviewedFiles`; put the canonical required probe records under `probes`.
    - Run `node scripts/pre-open-review-evidence.mjs --summary <preopen-summary.json> --review <review-result.json> --output <preopen-evidence.json>`. This helper does **not** reduce coverage: it emits every existing schema-v2 lens/surface row only when its semantic ID and required files were covered by the corresponding axis review.
    - Rerun `node scripts/pre-open-gate.mjs OWNER/REPO <base> <head> --compact --checkpoint <workflow-checkpoint> --evidence-file <preopen-evidence.json> --hygiene-file <hygiene.json>`. Continue only on top-level `decision=ready` and exit `0`. Full gate output is diagnostic-only when compact output or evidence validation itself fails.
-7. **Check exact-head publication identity.** Before planning `create_pr`, prove whether an open PR already exists for the exact target repository + head identity + intended base. This is an identity check, not fuzzy title/body similarity. The `create_pr` lifecycle preflight independently repeats this live check immediately before execution.
-   - exactly one match → **reuse/report that PR**; do not create another;
-   - multiple matches → fail closed and report every matching PR;
-   - no match → continue.
+7. **Check exact-head publication identity and optional branch issue candidate.** Before planning `create_pr`, prove whether an open PR already exists for the exact target repository + head identity + intended base. This is an identity check, not fuzzy title/body similarity. The `create_pr` lifecycle preflight independently repeats this live check immediately before execution. At this same read-only stage, apply the verified branch-derived closing-link rule above when the branch conventionally encodes one issue candidate; perform no issue-side mutation.
+   - exactly one PR match → **reuse/report that PR**; do not create another;
+   - multiple PR matches → fail closed and report every matching PR;
+   - no PR match → continue.
    A PR on the same head branch but a different intended base is not a P0 duplicate; multi-base/port policy may govern it separately.
-8. **Build one canonical publication plan.** Write only the planner inputs (repo, remote, branch, base, exact local/remote tips, title/body, idempotency key, checkpoint) to a temporary JSON file. Run `node scripts/create-pr-publication-plan.mjs --input <input> --output <plan>`. The initial `create_pr` is always draft; the planner locks the exact `push_code` + initial draft `create_pr` operation identities into the checkpoint. Plain “open/create a PR” never means ready-for-review. If the user explicitly requested ready-for-review, initial creation still stays draft and any later `change_draft_state` is a separate explicit operation after creation and verification.
+8. **Build one canonical publication plan.** Write only the planner inputs (repo, remote, branch, base, exact local/remote tips, title/body, idempotency key, checkpoint) to a temporary JSON file. If a branch-derived issue candidate passed the bounded verification above, the body already contains exactly one `Closes #N`; otherwise it contains no inferred closing link. Run `node scripts/create-pr-publication-plan.mjs --input <input> --output <plan>`. The initial `create_pr` is always draft; the planner locks the exact `push_code` + initial draft `create_pr` operation identities into the checkpoint. Plain “open/create a PR” never means ready-for-review. If the user explicitly requested ready-for-review, initial creation still stays draft and any later `change_draft_state` is a separate explicit operation after creation and verification.
 9. **Execute the generated plan unchanged.** Pass the generated plan unchanged to `scripts/github-mutate.mjs --request <plan> --execute --checkpoint <workflow-checkpoint> [--audit <file>]`. Do not hand-build equivalent publication requests and do not fall back to `git push`, `gh pr create`, or a mutating connector. The workflow cannot leave `OPEN_PR` until matching successful broker receipts exist for both locked operations. If the `create_pr` preflight returns `create_pr_existing`, stop publication and reuse the named PR.
 10. **Verify publication.** Re-read the created or reused PR and confirm repository, base, head, title/body, draft state, and final branch head match the intended publication. Do not rewrite an existing PR body merely because it was reused unless the user’s requested workflow separately authorizes that update. Fail closed if the live body contains literal `\\n` / `\\t` escape sequences or collapsed markdown headings instead of real newlines; repair through `update_pr_body` rather than treating escaped markdown as successful publication.
 
@@ -64,7 +72,7 @@ If the active higher-priority instruction stack genuinely requires a GitHub writ
 - If trusted authority is required by the selected protection mode and unavailable, fail closed and report the exact missing authority capability/setup. Protection mode `off` does not require the Authority host or repository allowlist.
 - **Never offer or perform a bypass** with bare `git push`, `gh pr create`, a mutating connector call, or another write path outside the `github-delivery` mutation boundary.
 - Never treat a direct-write instruction conflict as permission to experiment with multiple write paths. Fail closed once and report the conflict.
-- Do not add issue linkage or issue-side effects merely because another create-PR workflow supports them.
+- Do not invent issue linkage from arbitrary numbers. A branch-derived `Closes #N` is allowed only after the same-repository open-issue and scope-match verification above; do not add issue-side effects merely because another create-PR workflow supports them.
 - Do not defeat exact-head duplicate prevention by changing the title/body, inventing another local branch name for the same remote head, or weakening repository identity.
 - Do not reduce a large compact evidence worklist by omitting required IDs. Aggregation removes repetitive record construction, not required review coverage.
 
@@ -75,6 +83,7 @@ If the active higher-priority instruction stack genuinely requires a GitHub writ
 - the PR contains no unrelated files or commits;
 - current-head hygiene evidence came from the deterministic orchestration boundary;
 - the candidate diff passed the compact pre-open gate with top-level `decision=ready` using complete semantic-ID/file coverage and required probes;
+- any verified branch-derived issue candidate produced exactly one closing reference in the PR body, while an unverified/mismatched candidate produced none and no issue-side effects were invented;
 - any remote branch/PR publication was performed from the canonical generated plan through the authorized mutation boundary;
 - the resulting PR repository/base/head/draft state were verified; and
-- no issue research, linkage, assignment, or issue comment was invented.
+- no issue assignment, issue comment, or other issue-side mutation was invented.

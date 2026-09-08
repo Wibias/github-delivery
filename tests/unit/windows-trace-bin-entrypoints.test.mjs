@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, symlinkSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
+
+import { resolveNpmCli } from "../../scripts/lib/npm-cli.mjs";
 
 const ROOT = resolve(import.meta.dirname, "../..");
 
@@ -15,8 +17,21 @@ function run(command, args, options = {}) {
   });
 }
 
-function runCmd(command) {
-  return run(process.env.ComSpec || "cmd.exe", ["/d", "/s", "/c", command]);
+function runNpm(args) {
+  return run(process.execPath, [resolveNpmCli(), ...args]);
+}
+
+function runPowerShellFile(path, args = []) {
+  return run("powershell.exe", [
+    "-NoLogo",
+    "-NoProfile",
+    "-NonInteractive",
+    "-ExecutionPolicy",
+    "Bypass",
+    "-File",
+    path,
+    ...args,
+  ]);
 }
 
 function assertSuccess(result, label) {
@@ -44,16 +59,23 @@ test("installed Windows trace bins execute through canonical and aliased package
   const prefix = join(workspace, "prefix");
   mkdirSync(packDir, { recursive: true });
 
-  const pack = runCmd(`npm pack --json --pack-destination ${packDir}`);
+  const pack = runNpm(["pack", "--json", "--pack-destination", packDir]);
   assertSuccess(pack, "npm pack");
   const packed = JSON.parse(pack.stdout);
   assert.equal(Array.isArray(packed), true);
   assert.equal(packed.length, 1);
   const tarball = join(packDir, packed[0].filename);
 
-  const install = runCmd(
-    `npm install --global --prefix ${prefix} ${tarball} --ignore-scripts --no-audit --no-fund`,
-  );
+  const install = runNpm([
+    "install",
+    "--global",
+    "--prefix",
+    prefix,
+    tarball,
+    "--ignore-scripts",
+    "--no-audit",
+    "--no-fund",
+  ]);
   assertSuccess(install, "temporary global npm install");
 
   const publicProbes = [
@@ -78,9 +100,9 @@ test("installed Windows trace bins execute through canonical and aliased package
   ];
 
   for (const probe of publicProbes) {
-    const shim = join(prefix, `${probe.name}.cmd`);
-    const command = `${shim} ${probe.args.join(" ")}`.trim();
-    assertRejected(runCmd(command), probe);
+    const shim = join(prefix, `${probe.name}.ps1`);
+    assert.equal(existsSync(shim), true, `expected installed PowerShell shim: ${shim}`);
+    assertRejected(runPowerShellFile(shim, probe.args), probe);
   }
 
   const packageRoot = join(prefix, "node_modules", "github-delivery");
