@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
+
+import { resolveNpmCli } from "../../scripts/lib/npm-cli.mjs";
 
 const ROOT = resolve(import.meta.dirname, "../..");
 
@@ -13,16 +15,6 @@ function run(command, args, options = {}) {
     encoding: "utf8",
     ...options,
   });
-}
-
-function resolveNpmCli() {
-  const candidates = [
-    process.env.npm_execpath,
-    join(dirname(process.execPath), "node_modules", "npm", "bin", "npm-cli.js"),
-  ].filter(Boolean);
-  const npmCli = candidates.find((candidate) => existsSync(candidate));
-  assert.ok(npmCli, `unable to resolve npm CLI from: ${candidates.join(", ")}`);
-  return npmCli;
 }
 
 function runNpm(args) {

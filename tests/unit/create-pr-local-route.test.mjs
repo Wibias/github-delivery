@@ -57,19 +57,50 @@ test("local-work workflow is maintainer-compatible and declares safety boundarie
   assert.doesNotMatch(workflow, /Issue conversation intake/);
 });
 
-test("local-work workflow may close a branch-derived issue only after bounded verification", () => {
+test("local-work workflow pins deterministic branch-derived issue linking", () => {
   const workflow = readFileSync(
     new URL("../../references/create-pr-from-local-work.md", import.meta.url),
     "utf8",
   );
 
-  assert.match(workflow, /branch.*(?:issue|#).*candidate/i);
-  assert.match(workflow, /same repository/i);
-  assert.match(workflow, /issue.*(?:exists|open)|(?:exists|open).*issue/i);
-  assert.match(workflow, /scope.*match|match.*scope/i);
-  assert.match(workflow, /Closes #/i);
-  assert.match(workflow, /do not.*(?:assign|comment).*issue/i);
-  assert.match(workflow, /(?:ambiguous|mismatch|does not match).*do not.*link/i);
+  assert.equal(
+    workflow.includes("`^[^/]+/([1-9][0-9]*)-[^/]+$`"),
+    true,
+  );
+  assert.match(workflow, /branches with zero matches.*yield no candidate/i);
+  assert.match(workflow, /multiple issue-like numbers.*yield no candidate/i);
+  assert.match(workflow, /Never choose the first or last number from an ambiguous branch/i);
+});
+
+test("local-work workflow requires read-only same-repo open issue evidence and local scope evidence", () => {
+  const workflow = readFileSync(
+    new URL("../../references/create-pr-from-local-work.md", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(workflow, /read its `number`, `state`, `title`, `body`, and URL/i);
+  assert.match(workflow, /Require `state=OPEN` and the same repository identity/i);
+  assert.match(workflow, /exact local base\/head SHAs/i);
+  assert.match(workflow, /changed paths/i);
+  assert.match(workflow, /base-to-head diff summary/i);
+  assert.match(workflow, /commit subjects/i);
+  assert.match(workflow, /insufficient evidence is a mismatch/i);
+});
+
+test("local-work workflow rejects each invalid branch-derived candidate class independently", () => {
+  const workflow = readFileSync(
+    new URL("../../references/create-pr-from-local-work.md", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(workflow, /branch has zero matches/i);
+  assert.match(workflow, /branch has multiple issue-like numbers/i);
+  assert.match(workflow, /issue is missing/i);
+  assert.match(workflow, /issue is closed/i);
+  assert.match(workflow, /issue belongs to a different repository/i);
+  assert.match(workflow, /issue scope is mismatched\/insufficient/i);
+  assert.match(workflow, /exactly one `Closes #N`/i);
+  assert.match(workflow, /Do not assign or comment on the issue/i);
 });
 
 test("local-work workflow consumes one locked packet and deterministic publication plan", () => {
