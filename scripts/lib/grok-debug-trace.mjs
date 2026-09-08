@@ -49,6 +49,8 @@ export function normalizeGrokDebugTraceEvent(event) {
   }
 
   if (type === "tool_call_update") {
+    const status = text(event.status);
+    if (!["completed", "failed", "cancelled"].includes(status || "")) return null;
     return {
       provider: "grok",
       type: "item_completed",
