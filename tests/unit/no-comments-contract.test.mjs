@@ -115,12 +115,12 @@ test("apply vs report, encodings, and merge-ready blockers", () => {
   assert.match(workflow, /Do not encode an alibi/i);
 });
 
-test("composed workflows load no-comments then simplify unless opted out", () => {
+test("composed workflows load no-comments and simplify with explicit opt-out policy", () => {
   for (const path of COMPOSED) {
     const text = read(path);
     assert.match(text, /references\/no-comments\.md/, path);
     assert.match(text, /references\/simplify-pr\.md/, path);
-    assert.match(text, /skip no-comments|without simplify|opt(?:s|ed)? out/i, path);
+    assert.match(text, /skip no-comments|without simplify|opt(?:s|ed)?[- ]out/i, path);
   }
 });
 
