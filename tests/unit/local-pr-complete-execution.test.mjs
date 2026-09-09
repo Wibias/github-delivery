@@ -65,7 +65,51 @@ function aggregateReview(overrides = {}) {
   };
 }
 
-test("local PR execution contract exposes the deterministic hygiene and aggregated evidence helpers", () => {
+function perRequirementReview(overrides = {}) {
+  return {
+    schemaVersion: 2,
+    kind: "github-delivery/pre-open-review-result",
+    headSha: HEAD,
+    lenses: {
+      edge_cases: {
+        status: "done",
+        headSha: HEAD,
+        method: "focused edge-case review",
+        reviewedFiles: ["src/ui.ts"],
+      },
+      ui_accessibility: {
+        status: "done",
+        headSha: HEAD,
+        method: "focused accessibility review",
+        reviewedFiles: ["src/ui.ts", "src/a11y.ts"],
+      },
+    },
+    surfaces: {
+      authn: {
+        status: "done",
+        headSha: HEAD,
+        method: "focused authn review",
+        reviewedFiles: ["src/session.ts"],
+      },
+      injection: {
+        status: "done",
+        headSha: HEAD,
+        method: "focused injection review",
+        reviewedFiles: ["src/ui.ts"],
+      },
+    },
+    probes: {
+      "ui-accessibility": {
+        probeId: "ui-accessibility",
+        status: "clean",
+        files: ["src/ui.ts"],
+      },
+    },
+    ...overrides,
+  };
+}
+
+test("local PR execution contract exposes the deterministic hygiene and review evidence helpers", () => {
   const contract = executionContractForWorkflow("create-pr-from-local-work");
   assert.equal(contract.helpers.hygieneOrchestrator, "scripts/create-pr-hygiene.mjs");
   assert.equal(contract.helpers.preOpenEvidenceAssembler, "scripts/pre-open-review-evidence.mjs");
@@ -74,9 +118,16 @@ test("local PR execution contract exposes the deterministic hygiene and aggregat
   assert.equal(contract.workflowPlan.publication.directWriteGuard, "runtime-after-workflow-selection");
 });
 
-test("one bug review and one security review expand into current schema-v2 evidence", () => {
+test("aggregate clean review declarations cannot mint per-requirement pre-open evidence", () => {
   assert.equal(typeof preOpenEvidence.expandAggregatePreOpenEvidence, "function");
-  const output = preOpenEvidence.expandAggregatePreOpenEvidence(compactSummary(), aggregateReview());
+  assert.throws(
+    () => preOpenEvidence.expandAggregatePreOpenEvidence(compactSummary(), aggregateReview()),
+    /pre_open_review_aggregate_not_authoritative/,
+  );
+});
+
+test("explicit per-requirement review rows assemble into current schema-v2 evidence", () => {
+  const output = preOpenEvidence.expandAggregatePreOpenEvidence(compactSummary(), perRequirementReview());
 
   assert.equal(output.schemaVersion, 2);
   assert.deepEqual(Object.keys(output.lenses).sort(), ["edge_cases", "ui_accessibility"]);
@@ -84,29 +135,28 @@ test("one bug review and one security review expand into current schema-v2 evide
   assert.deepEqual(output.lenses.edge_cases, {
     status: "done",
     headSha: HEAD,
-    method: "focused candidate bug review",
+    method: "focused edge-case review",
     reviewedFiles: ["src/ui.ts"],
   });
   assert.deepEqual(output.surfaces.authn.reviewedFiles, ["src/session.ts"]);
   assert.equal(output.probes["ui-accessibility"].status, "clean");
 });
 
-test("aggregated evidence fails when the axis review did not cover a required file", () => {
-  assert.equal(typeof preOpenEvidence.expandAggregatePreOpenEvidence, "function");
-  const review = aggregateReview();
-  review.bug = { ...review.bug, reviewedFiles: ["src/ui.ts"] };
+test("per-requirement evidence fails when a required row omits a required file", () => {
+  const review = perRequirementReview();
+  review.lenses.edge_cases.reviewedFiles = ["src/a11y.ts"];
   assert.throws(
     () => preOpenEvidence.expandAggregatePreOpenEvidence(compactSummary(), review),
-    /pre_open_review_bug_scope_incomplete/,
+    /pre_open_review_lens_edge_cases_scope_mismatch/,
   );
 });
 
-test("aggregated evidence fails when the axis review did not cover a required semantic ID", () => {
-  const review = aggregateReview();
-  review.security = { ...review.security, coveredIds: ["authn"] };
+test("per-requirement evidence fails when a required semantic ID is absent", () => {
+  const review = perRequirementReview();
+  delete review.surfaces.injection;
   assert.throws(
     () => preOpenEvidence.expandAggregatePreOpenEvidence(compactSummary(), review),
-    /pre_open_review_security_ids_incomplete/,
+    /pre_open_review_surface_injection_missing/,
   );
 });
 
