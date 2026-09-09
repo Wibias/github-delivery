@@ -151,6 +151,36 @@ function normalizeHygienePasses(value) {
   };
 }
 
+function normalizePhaseReceipts(value, graph, completedPhases) {
+  if (!Array.isArray(value)) return [];
+  const completed = new Set(completedPhases);
+  const receipts = [];
+  const seen = new Set();
+  for (const entry of value) {
+    const phase = String(entry?.phase || "");
+    if (!phase || seen.has(phase) || !completed.has(phase) || !Object.hasOwn(graph, phase)) continue;
+    if (entry?.authority !== "controller-transition") continue;
+    receipts.push({
+      phase,
+      authority: "controller-transition",
+      stateGeneration: nonNegativeInteger(entry?.stateGeneration),
+      baseSha: entry?.baseSha ? String(entry.baseSha) : null,
+      headSha: entry?.headSha ? String(entry.headSha) : null,
+      issue: entry?.issue ?? null,
+      pr: entry?.pr ?? null,
+      completedAt: Number.isFinite(entry?.completedAt) ? entry.completedAt : null,
+    });
+    seen.add(phase);
+  }
+  return receipts;
+}
+
+function nextActionForPhase(phase) {
+  return phase === "DONE"
+    ? { action: "stop", phase: "DONE", authority: "controller-checkpoint" }
+    : { action: "execute_phase", phase, authority: "controller-checkpoint" };
+}
+
 function sameIdentity(left, right) {
   return String(left || "").toLowerCase() === String(right || "").toLowerCase();
 }
@@ -234,6 +264,7 @@ export function createDeliveryWorkflowController(options = {}) {
   );
   let stateGeneration = nonNegativeInteger(snapshot?.stateGeneration);
   const completedPhases = [...(snapshot?.completedPhases || [])].map(String);
+  const phaseReceipts = normalizePhaseReceipts(snapshot?.phaseReceipts, graph, completedPhases);
   const blockers = new Set((snapshot?.blockers || []).map(String));
   const attempts = {
     workflowSteps: nonNegativeInteger(snapshot?.attempts?.workflowSteps),
@@ -269,8 +300,10 @@ export function createDeliveryWorkflowController(options = {}) {
       publicationPlan: publicationPlan ? structuredClone(publicationPlan) : null,
       publicationReceipts: structuredClone(publicationReceipts),
       phase,
+      nextAction: nextActionForPhase(phase),
       graph,
       completedPhases: [...completedPhases],
+      phaseReceipts: phaseReceipts.map((entry) => structuredClone(entry)),
       blockers: [...blockers].sort(),
       stateGeneration,
       attempts: { ...attempts },
@@ -309,7 +342,19 @@ export function createDeliveryWorkflowController(options = {}) {
     if (phase === "OPEN_PR" && workflow === "create-pr-from-local-work") {
       assertCreatePrPublicationComplete(snapshotState());
     }
-    if (!completedPhases.includes(phase)) completedPhases.push(phase);
+    if (!completedPhases.includes(phase)) {
+      completedPhases.push(phase);
+      phaseReceipts.push({
+        phase,
+        authority: "controller-transition",
+        stateGeneration,
+        baseSha: baseSha ? String(baseSha) : null,
+        headSha: headSha ? String(headSha) : null,
+        issue,
+        pr,
+        completedAt: now(),
+      });
+    }
     phase = target;
     attempts.noProgressSteps = 0;
     attempts.phaseRetries = 0;
