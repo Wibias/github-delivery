@@ -63,10 +63,14 @@ test("full review surfaces code quality and blast radius through canonical revie
   assert.match(outcome, /unproven/i);
 });
 
-test("trace and PR reliability follow-up stays inside unreleased 1.5.0", () => {
+test("reliability hardening release is complete in 1.5.1", () => {
   const pkg = JSON.parse(read("package.json"));
   const changelog = read("CHANGELOG.md");
+  const release = changelog.split("## [1.5.1] - 2026-09-09")[1]?.split("## [1.5.0]")[0] ?? "";
 
-  assert.equal(pkg.version, "1.5.0");
-  assert.equal((changelog.match(/## \[1\.5\.0\]/g) ?? []).length, 1);
+  assert.equal(pkg.version, "1.5.1");
+  assert.ok(release, "expected a dated 1.5.1 changelog section");
+  for (const pr of [434, 435, 436, 437, 438]) {
+    assert.match(release, new RegExp(`PR #${pr}\\b`));
+  }
 });
