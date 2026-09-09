@@ -62,7 +62,7 @@ function sanitizeEvent(event, provider, traceKind = TRACE_KIND, timestamp = new 
     timestamp: timestamp.toISOString(),
   };
 
-  for (const key of ["threadId", "turnId", "itemId", "itemType"]) {
+  for (const key of ["threadId", "turnId", "itemId", "itemType", "parentItemId"]) {
     const value = cleanString(event[key]);
     if (value) sanitized[key] = value;
   }
@@ -145,7 +145,12 @@ function byteLimit(value) {
 }
 
 function reasoningIdentity(event) {
-  return [event.threadId || "", event.turnId || "", event.itemId || ""].join("\0");
+  return [
+    event.threadId || "",
+    event.turnId || "",
+    event.itemId || "",
+    event.parentItemId || "",
+  ].join("\0");
 }
 
 function disabledRecorder() {
