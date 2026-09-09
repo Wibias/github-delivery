@@ -104,12 +104,15 @@ function fallbackDelayMs(attempt, random) {
 
 function githubCommandOptions(command, options) {
   if (command !== "gh") return options;
+  const env = { ...(options.env ?? process.env) };
+  delete env.CLICOLOR_FORCE;
+  delete env.FORCE_COLOR;
+  delete env.GH_FORCE_TTY;
+  env.CLICOLOR = "0";
+  env.NO_COLOR = "1";
   return {
     ...options,
-    env: {
-      ...(options.env ?? process.env),
-      NO_COLOR: "1",
-    },
+    env,
   };
 }
 
