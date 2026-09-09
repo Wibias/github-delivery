@@ -84,5 +84,5 @@ test("issue open-only completion still requires successful locked publication re
     publicationReceipts: {},
   });
 
-  assert.throws(() => controller.transition("DONE"), /create_pr_publication_.*missing/);
+  assert.throws(() => controller.transition("DONE"), /create_pr_publication_incomplete/);
 });
