@@ -23,7 +23,6 @@ const USAGE = `Usage:
   node scripts/delivery-controller.mjs retry CHECKPOINT
   node scripts/delivery-controller.mjs evidence-action CHECKPOINT
   node scripts/delivery-controller.mjs usage CHECKPOINT --workflow-tokens N --phase-tokens N
-  node scripts/delivery-controller.mjs refs CHECKPOINT [--base SHA] [--head SHA]
   node scripts/delivery-controller.mjs authorize-mutation CHECKPOINT --request FILE [--workflow-intent] [--exact-text-confirmed]
   node scripts/delivery-controller.mjs blocker-add CHECKPOINT BLOCKER
   node scripts/delivery-controller.mjs blocker-remove CHECKPOINT BLOCKER
@@ -177,6 +176,8 @@ try {
     if (!checkpoint) throw new Error(USAGE);
     assertEmpty(argv);
     print(readDeliveryWorkflowCheckpoint(resolve(checkpoint)));
+  } else if (command === "refs") {
+    throw new Error("controller_refs_are_internal_only");
   } else {
     const checkpointValue = argv.shift();
     if (!checkpointValue) throw new Error(USAGE);
@@ -210,14 +211,6 @@ try {
       result = loaded.controller.observeResourceUsage({
         workflowTokens: workflowTokens === null ? undefined : nonNegativeInteger(workflowTokens, "--workflow-tokens"),
         phaseTokens: phaseTokens === null ? undefined : nonNegativeInteger(phaseTokens, "--phase-tokens"),
-      });
-    } else if (command === "refs") {
-      const baseSha = takeOption(argv, "--base");
-      const headSha = takeOption(argv, "--head");
-      assertEmpty(argv);
-      result = loaded.controller.updateRefs({
-        ...(baseSha !== null ? { baseSha } : {}),
-        ...(headSha !== null ? { headSha } : {}),
       });
     } else if (command === "authorize-mutation") {
       const requestPath = takeOption(argv, "--request");
