@@ -24,7 +24,7 @@ const NEGATED_APPROVE_INTENT = /\b(?:do not|don't|dont|never|without)\s+approv(?
 const DELIBERATIVE_APPROVE = /\b(?:should|can|could|would)\s+(?:i|we)\b[\s\S]*\bapprove\b|\b(?:why can't|why can’t|when should)\s+(?:i|we)\b[\s\S]*\bapprove\b/;
 const FULL_REVIEW_REQUEST = /\b(full review|review .* for real bugs|usefulness verdict)\b/;
 const REVIEW_PREPARATION_REQUEST = /\b(review|re-review|review again|look over|look through)\b/;
-const REVIEW_PUBLICATION_REQUEST = /\b(?:post|publish|leave|submit)\b[\s\S]{0,80}\b(?:verdict|review(?: comment)?)\b|\b(?:verdict|review(?: comment)?)\b[\s\S]{0,50}\b(?:on|to)\s+(?:github|the\s+(?:pr|pull request)|(?:pr|pull request)\s*#?\d+)\b/;
+const REVIEW_PUBLICATION_REQUEST = /\b(?:post|publish|leave|submit)\b[\s\S]{0,80}\b(?:verdict|review(?: comment)?)\b/;
 const FIX_REVIEW_REQUEST = /\b(fix|address)\b[\s\S]*(review|coderabbit|codex|comment|feedback)/;
 const EXPLICIT_GREEN_REQUEST = /\b(?:make|get)\s+(?:pr|pull request)\s*#?\d+\s+green\b|\bfix\s+(?:the\s+)?(?:ci|failing checks?)\s+(?:on|for)\s+(?:pr|pull request)\s*#?\d+\b/;
 const WATCH_PR_REQUEST = /\b(watch|monitor|babysit|keep an eye on)\b[\s\S]*\b(?:pr|pull request)\b/;
@@ -323,9 +323,6 @@ export function routeShippingGithubPrompt(prompt, context = {}) {
   if (hasExplicitSimplifyIntent(text) && PR_REFERENCE.test(text)) return result("references/simplify-pr.md", "maintainer", ["push_code"]);
   if (/\b(?:security review|review security)\b/.test(text)) return result("references/security-review.md", "review");
   if (/\b(re-review|review again|recheck .*review)\b/.test(text)) return result("references/re-review-pr.md", "review");
-  if (REVIEW_PREPARATION_REQUEST.test(text) && PR_REFERENCE.test(text)) {
-    return result("references/full-review-pr.md", "read-only", []);
-  }
   if (WATCH_PR_REQUEST.test(text)) {
     return result("references/watch-pr.md", AUTONOMOUS_WATCH_WORDING.test(text) ? "autonomous" : "read-only");
   }
@@ -357,6 +354,9 @@ export function routeShippingGithubPrompt(prompt, context = {}) {
     /\bmake\b[\s\S]*\b(?:pr|pull request)\b[\s\S]*\bmerge[- ]?ready\b/.test(text)
   ) {
     return result("references/fix-pr-bots.md", "maintainer", ["push_code"]);
+  }
+  if (REVIEW_PREPARATION_REQUEST.test(text) && PR_REFERENCE.test(text)) {
+    return result("references/full-review-pr.md", "read-only", []);
   }
   if (/\b(what(?:'s| is) left|status|merge[- ]?ready\?|is .* ready)\b/.test(text) && PR_WORD.test(text)) return result("references/status.md", "read-only");
   return null;
