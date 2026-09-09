@@ -16,7 +16,7 @@ test("simplify opt-outs do not grant push_code on a bare full review", () => {
   ]) {
     const route = routeShippingGithubPrompt(prompt);
     assert.equal(route.workflow, "references/full-review-pr.md", prompt);
-    assert.equal(route.mutationMode, "review", prompt);
+    assert.equal(route.mutationMode, "read-only", prompt);
     assert.deepEqual(route.explicitActions, [], prompt);
   }
 });
