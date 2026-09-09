@@ -11,6 +11,10 @@ import {
   readDeliveryWorkflowCheckpoint,
   writeDeliveryWorkflowCheckpoint,
 } from "../../scripts/lib/delivery-workflow-controller.mjs";
+import {
+  bootstrapLocalPrWorkflow,
+  localPrWorkflowCheckpointPath,
+} from "../../scripts/lib/workflow-bootstrap.mjs";
 import { executionContractForWorkflow } from "../../scripts/lib/workflow-execution-contract.mjs";
 
 const DELIVERY_CONTROLLER = fileURLToPath(
@@ -94,6 +98,62 @@ test("checkpoint resume preserves receipts and the same singular next action", (
     assert.deepEqual(resumed.snapshot().completedPhases, ["ROUTE"]);
   } finally {
     rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("show re-derives controller state instead of trusting raw checkpoint guidance", () => {
+  const directory = mkdtempSync(join(tmpdir(), "github-delivery-show-grounding-"));
+  const checkpoint = join(directory, "checkpoint.json");
+  try {
+    const snapshot = controller().snapshot();
+    snapshot.nextAction = { action: "stop", phase: "DONE", authority: "model-prose" };
+    writeDeliveryWorkflowCheckpoint(checkpoint, snapshot);
+
+    const result = spawnSync(process.execPath, [DELIVERY_CONTROLLER, "show", checkpoint], {
+      encoding: "utf8",
+    });
+    assert.equal(result.status, 0, result.stderr);
+    const shown = JSON.parse(result.stdout);
+    assert.deepEqual(shown.nextAction, {
+      action: "execute_phase",
+      phase: "ROUTE",
+      authority: "controller-checkpoint",
+    });
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("local workflow bootstrap upgrades reused raw checkpoint guidance", () => {
+  const stateDir = mkdtempSync(join(tmpdir(), "github-delivery-bootstrap-grounding-"));
+  try {
+    const initial = controller();
+    initial.transition("PREFLIGHT");
+    const legacy = initial.snapshot();
+    delete legacy.phaseReceipts;
+    legacy.nextAction = { action: "stop", phase: "DONE", authority: "model-prose" };
+    const checkpointPath = localPrWorkflowCheckpointPath({
+      repo: "acme/widgets",
+      headSha: HEAD,
+      stateDir,
+    });
+    writeDeliveryWorkflowCheckpoint(checkpointPath, legacy);
+
+    const bootstrapped = bootstrapLocalPrWorkflow({
+      repo: "acme/widgets",
+      headSha: HEAD,
+      baseSha: BASE,
+      stateDir,
+    });
+    assert.equal(bootstrapped.reused, true);
+    assert.deepEqual(bootstrapped.snapshot.nextAction, {
+      action: "execute_phase",
+      phase: "PREFLIGHT",
+      authority: "controller-checkpoint",
+    });
+    assert.deepEqual(bootstrapped.snapshot.phaseReceipts, []);
+  } finally {
+    rmSync(stateDir, { recursive: true, force: true });
   }
 });
 
