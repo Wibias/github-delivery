@@ -39,28 +39,24 @@ test("agent debug tracing remains explicit opt-in and provider-tagged", () => {
     now: () => new Date("2026-09-07T11:00:00.000Z"),
     pid: 147,
   });
-  enabled.record({ type: "reasoning_summary_delta", text: "visible Grok thought" });
+  enabled.record({ type: "reasoning_summary_delta", text: "synthetic diagnostic summary" });
   enabled.close();
 
   assert.match(enabled.path, /grok-/);
   const persisted = readFileSync(enabled.path, "utf8");
   assert.match(persisted, /"provider":"grok"/);
-  assert.match(persisted, /visible Grok thought/);
+  assert.match(persisted, /synthetic diagnostic summary/);
   assert.equal(JSON.parse(persisted.trim()).timestamp, "2026-09-07T11:00:00.000Z");
 });
 
-test("Grok streaming-json normalizes thoughts and tool lifecycle without raw payloads", () => {
+test("Grok normalization drops thoughts and keeps sanitized legacy tool lifecycle", () => {
   const thought = normalizeGrokDebugTraceEvent({
     type: "thought",
     data: "Inspecting the controller checkpoint before retrying.",
   });
-  assert.deepEqual(thought, {
-    provider: "grok",
-    type: "reasoning_summary_delta",
-    text: "Inspecting the controller checkpoint before retrying.",
-  });
+  assert.deepEqual(thought, []);
 
-  const started = normalizeGrokDebugTraceEvent({
+  const [started] = normalizeGrokDebugTraceEvent({
     type: "tool_call",
     toolCallId: "call-secret",
     toolName: "read_file",
@@ -75,19 +71,19 @@ test("Grok streaming-json normalizes thoughts and tool lifecycle without raw pay
   assert.doesNotMatch(JSON.stringify(started), /super-secret|secrets\.txt|rawInput/);
 
   for (const status of [null, "pending", "in_progress"]) {
-    assert.equal(
+    assert.deepEqual(
       normalizeGrokDebugTraceEvent({
         type: "tool_call_update",
         toolCallId: "call-secret",
         status,
         rawOutput: { content: "private-progress" },
       }),
-      null,
+      [],
       `non-terminal Grok tool update must not complete the item: ${status}`,
     );
   }
 
-  const completed = normalizeGrokDebugTraceEvent({
+  const [completed] = normalizeGrokDebugTraceEvent({
     type: "tool_call_update",
     toolCallId: "call-secret",
     status: "completed",
@@ -98,7 +94,7 @@ test("Grok streaming-json normalizes thoughts and tool lifecycle without raw pay
   assert.doesNotMatch(JSON.stringify(completed), /private-result|rawOutput/);
 
   for (const status of ["failed", "cancelled"]) {
-    const terminal = normalizeGrokDebugTraceEvent({
+    const [terminal] = normalizeGrokDebugTraceEvent({
       type: "tool_call_update",
       toolCallId: "call-secret",
       status,
@@ -109,7 +105,7 @@ test("Grok streaming-json normalizes thoughts and tool lifecycle without raw pay
     assert.doesNotMatch(JSON.stringify(terminal), /private-terminal-result|rawOutput/);
   }
 
-  const ended = normalizeGrokDebugTraceEvent({
+  const [ended] = normalizeGrokDebugTraceEvent({
     type: "end",
     sessionId: "grok-session",
     requestId: "request-private",
@@ -122,12 +118,12 @@ test("Grok streaming-json normalizes thoughts and tool lifecycle without raw pay
   });
 });
 
-test("Grok trace wrapper owns streaming-json but only for headless invocations", () => {
+test("Grok trace wrapper owns message stream output but only for headless invocations", () => {
   assert.deepEqual(buildGrokDebugTraceArgs(["-p", "inspect this repo"]), [
     "-p",
     "inspect this repo",
     "--output-format",
-    "streaming-json",
+    "streaming-messages-json",
   ]);
   assert.throws(() => buildGrokDebugTraceArgs([]), /headless/i);
   assert.throws(
