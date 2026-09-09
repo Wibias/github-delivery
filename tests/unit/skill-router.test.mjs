@@ -201,10 +201,10 @@ test("issue creation routing does not steal existing-issue or create-PR requests
   );
 });
 
-test("routes a bare full review with verdict-comment authority", () => {
+test("routes a bare full review without implicit verdict-comment authority", () => {
   const route = routeShippingGithubPrompt("full review on PR #32");
   assert.equal(route.workflow, "references/full-review-pr.md");
-  assert.equal(route.mutationMode, "review");
+  assert.equal(route.mutationMode, "read-only");
   assert.deepEqual(route.explicitActions, []);
 });
 
