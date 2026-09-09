@@ -57,7 +57,7 @@ Review author-provided screenshots/images before implementation. If required scr
 - **Still needs fix:** continue.
 - **Evidence incomplete:** restore it; do not guess.
 
-Reuse a matching `research-issue.md` verdict when development tip and issue conversation are unchanged. Re-enter preflight only when a new fact invalidates that decision.
+If `research-issue.md` produced the same verdict on the same development tip and unchanged issue conversation, reuse it. Do not restart broad research merely because implementation reveals another call site, adapter, UI surface, test, or documentation consumer. Re-enter preflight only when a new fact invalidates that decision.
 
 ## B. Confirm scope
 
@@ -91,7 +91,7 @@ Carry completed gate/review evidence into PR validation notes.
 
 1. Resolve canonical repository identity from the **issue** and the correct base branch.
 2. Build the PR description from `references/pr-description.md`, final diff, issue contract, and completed validation; never claim planned work as done.
-3. Resolve exact tips/identity. Run `node scripts/create-pr-publication-plan.mjs --input <input> --output <plan>` to lock `push_code` plus draft `create_pr` to the checkpoint.
+3. Resolve exact tips/identity. Run `node scripts/create-pr-publication-plan.mjs --input <input> --output <plan>` to lock broker action `push_code` plus draft broker action `create_pr` to the checkpoint.
 4. Execute that plan unchanged via `node scripts/github-mutate.mjs --request <plan> --execute --checkpoint <workflow-checkpoint>`. No direct `git push` / `gh pr create`; force-with-lease is planner-owned.
 5. Re-check canonical repo + head + base. Reuse one exact open PR; multiple or none after successful publication fail closed. `create_pr_existing` names reuse.
 6. Require canonical repo/base/head and successful receipts for both locked operations.
