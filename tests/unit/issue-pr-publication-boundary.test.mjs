@@ -5,6 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { buildCreatePrPublicationPlan } from "../../scripts/lib/create-pr-publication-plan.mjs";
+import { createPrPublicationPlanLock } from "../../scripts/lib/create-pr-publication-state.mjs";
 import {
   createDeliveryWorkflowController,
   readDeliveryWorkflowCheckpoint,
@@ -67,4 +68,21 @@ test("issue create-PR checkpoints can lock the same validated publication plan a
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test("issue open-only completion still requires successful locked publication receipts", () => {
+  const profile = resolveDeliveryWorkflowProfile("create-pr-for-issue");
+  const publicationPlan = createPrPublicationPlanLock(plan("checkpoint.json"), { headSha: HEAD });
+  const controller = createDeliveryWorkflowController({
+    workflow: "create-pr-for-issue",
+    repo: "acme/widgets",
+    baseSha: BASE,
+    headSha: HEAD,
+    graph: profile.graph,
+    startPhase: "OPEN_PR",
+    publicationPlan,
+    publicationReceipts: {},
+  });
+
+  assert.throws(() => controller.transition("DONE"), /create_pr_publication_.*missing/);
 });
