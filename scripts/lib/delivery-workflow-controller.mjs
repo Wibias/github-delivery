@@ -306,7 +306,7 @@ export function createDeliveryWorkflowController(options = {}) {
       assertPreOpenHygieneEvidence(snapshotState());
       assertPreOpenPublicationEvidence(snapshotState());
     }
-    if (phase === "OPEN_PR" && workflow === "create-pr-from-local-work") {
+    if (phase === "OPEN_PR" && PRE_OPEN_WORKFLOWS.has(workflow)) {
       assertCreatePrPublicationComplete(snapshotState());
     }
     if (!completedPhases.includes(phase)) completedPhases.push(phase);
