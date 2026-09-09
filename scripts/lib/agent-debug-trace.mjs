@@ -12,6 +12,7 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 
 const DEFAULT_MAX_BYTES = 2 * 1024 * 1024;
+const DEFAULT_REASONING_COALESCE_BYTES = 16 * 1024;
 const TRACE_KIND = "github-delivery/agent-debug-trace-event";
 const PROVIDERS = new Set(["codex", "grok", "cursor"]);
 const ALLOWED_EVENT_TYPES = new Set([
@@ -21,6 +22,8 @@ const ALLOWED_EVENT_TYPES = new Set([
   "turn_started",
   "turn_completed",
 ]);
+const ALLOWED_OUTCOMES = new Set(["succeeded", "failed", "cancelled"]);
+const ERROR_KIND_RE = /^[a-z0-9][a-z0-9_.-]{0,63}$/i;
 
 function cleanString(value) {
   return typeof value === "string" && value.length > 0 ? value : null;
@@ -30,6 +33,20 @@ function checkedProvider(value) {
   const provider = String(value || "").trim().toLowerCase();
   if (!PROVIDERS.has(provider)) throw new Error(`unsupported_agent_debug_trace_provider:${provider || "missing"}`);
   return provider;
+}
+
+function safeDuration(value) {
+  return Number.isFinite(value) && value >= 0 ? Math.round(value) : null;
+}
+
+function safeOutcome(value) {
+  const outcome = String(value || "").trim().toLowerCase();
+  return ALLOWED_OUTCOMES.has(outcome) ? outcome : null;
+}
+
+function safeErrorKind(value) {
+  const kind = String(value || "").trim();
+  return ERROR_KIND_RE.test(kind) ? kind : null;
 }
 
 function sanitizeEvent(event, provider, traceKind = TRACE_KIND, timestamp = new Date()) {
@@ -52,6 +69,15 @@ function sanitizeEvent(event, provider, traceKind = TRACE_KIND, timestamp = new 
 
   if (type === "reasoning_summary_delta") {
     sanitized.text = typeof event.text === "string" ? event.text : "";
+  }
+
+  if (type === "item_completed") {
+    const outcome = safeOutcome(event.outcome);
+    const durationMs = safeDuration(event.durationMs);
+    const errorKind = safeErrorKind(event.errorKind);
+    if (outcome) sanitized.outcome = outcome;
+    if (durationMs !== null) sanitized.durationMs = durationMs;
+    if (errorKind) sanitized.errorKind = errorKind;
   }
 
   const decision = cleanString(event.watchdogDecision);
@@ -118,6 +144,10 @@ function byteLimit(value) {
   return Number.isInteger(value) && value > 0 ? value : DEFAULT_MAX_BYTES;
 }
 
+function reasoningIdentity(event) {
+  return [event.threadId || "", event.turnId || "", event.itemId || ""].join("\0");
+}
+
 function disabledRecorder() {
   return {
     enabled: false,
@@ -140,11 +170,13 @@ export function createAgentDebugTraceRecorder({
   pid = process.pid,
   maxBytes = DEFAULT_MAX_BYTES,
   traceKind = TRACE_KIND,
+  reasoningCoalesceBytes = DEFAULT_REASONING_COALESCE_BYTES,
 } = {}) {
   if (!debugTraceEnabled(env)) return disabledRecorder();
 
   const normalizedProvider = checkedProvider(provider);
   const limit = byteLimit(maxBytes);
+  const coalesceLimit = byteLimit(reasoningCoalesceBytes);
   const root = traceRoot(env, stateDir);
   const directory = join(root, "debug-traces");
   ensurePrivateDirectory(root, "debug trace state directory");
@@ -155,11 +187,10 @@ export function createAgentDebugTraceRecorder({
 
   let fd = opened.fd;
   let bytesWritten = 0;
+  let pendingReasoning = null;
 
-  function record(event) {
+  function writeSanitized(sanitized) {
     if (fd === null) return false;
-    const sanitized = sanitizeEvent(event, normalizedProvider, traceKind, now());
-    if (!sanitized) return false;
     const line = `${JSON.stringify(sanitized)}\n`;
     const bytes = Buffer.byteLength(line);
     if (bytesWritten + bytes > limit) return false;
@@ -168,8 +199,40 @@ export function createAgentDebugTraceRecorder({
     return true;
   }
 
+  function flushReasoning() {
+    if (!pendingReasoning) return true;
+    const pending = pendingReasoning;
+    pendingReasoning = null;
+    return writeSanitized(pending);
+  }
+
+  function record(event) {
+    if (fd === null) return false;
+    const sanitized = sanitizeEvent(event, normalizedProvider, traceKind, now());
+    if (!sanitized) return false;
+
+    if (sanitized.type === "reasoning_summary_delta") {
+      const identity = reasoningIdentity(sanitized);
+      if (pendingReasoning && reasoningIdentity(pendingReasoning) === identity) {
+        const combined = `${pendingReasoning.text}${sanitized.text}`;
+        if (Buffer.byteLength(combined, "utf8") <= coalesceLimit) {
+          pendingReasoning.text = combined;
+          pendingReasoning.deltaCount += 1;
+          return true;
+        }
+      }
+      flushReasoning();
+      pendingReasoning = { ...sanitized, deltaCount: 1 };
+      return true;
+    }
+
+    flushReasoning();
+    return writeSanitized(sanitized);
+  }
+
   function close() {
     if (fd === null) return;
+    flushReasoning();
     closeSync(fd);
     fd = null;
   }
