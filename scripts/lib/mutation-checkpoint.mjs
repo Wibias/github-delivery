@@ -24,6 +24,7 @@ const EMPTY_EXECUTION_CONTEXT = Object.freeze({
 const ROUTED_WORKFLOW_INTENT = Object.freeze({
   "create-pr-for-issue": Object.freeze({
     OPEN_PR: Object.freeze(new Set(["create_pr"])),
+    FINAL_GATE: Object.freeze(new Set(["update_pr_body"])),
   }),
   "create-pr-from-local-work": Object.freeze({
     OPEN_PR: Object.freeze(new Set(["create_pr"])),
@@ -47,6 +48,23 @@ function routedWorkflowIntentSlot(snapshot, request) {
     return null;
   }
   return `${workflow}:${phase}:${action}`;
+}
+
+function assertRoutedWorkflowIntentBinding(snapshot, request) {
+  const slot = routedWorkflowIntentSlot(snapshot, request);
+  if (slot !== "create-pr-for-issue:FINAL_GATE:update_pr_body") return;
+
+  const checkpointPr = Number(snapshot?.pr);
+  const requestPr = Number(request?.pr);
+  if (!Number.isInteger(checkpointPr) || checkpointPr <= 0 || requestPr !== checkpointPr) {
+    throw new Error("mutation_workflow_intent_pr_mismatch");
+  }
+
+  const checkpointHead = String(snapshot?.headSha || "").trim().toLowerCase();
+  const requestHead = String(request?.expectedHead || "").trim().toLowerCase();
+  if (!checkpointHead || requestHead !== checkpointHead) {
+    throw new Error("mutation_workflow_intent_head_mismatch");
+  }
 }
 
 function routedWorkflowIntentMarkerKey(slot) {
@@ -153,6 +171,7 @@ export function mutationExecutionContextFromCheckpoint({ path, request } = {}) {
     throw new Error("mutation_checkpoint_repo_mismatch");
   }
   assertPublicationCheckpoint(snapshot, request);
+  assertRoutedWorkflowIntentBinding(snapshot, request);
   const operationKey = mutationOperationKey(request);
   const routedWorkflowIntent = ensureRoutedWorkflowIntent({
     path,
