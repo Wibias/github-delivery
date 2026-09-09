@@ -28,13 +28,20 @@ test("classifies GitHub retry-after and reset guidance", () => {
   );
 });
 
-test("machine-readable GitHub commands disable ANSI color", () => {
+test("machine-readable GitHub commands disable ANSI color even when the parent forces color", () => {
   let observedOptions;
   const result = runGitHubCommandWithRetry(
     "gh",
     ["repo", "view", "acme/widgets", "--json", "url,sshUrl"],
     {
-      options: { env: { TEST_MARKER: "kept" } },
+      options: {
+        env: {
+          TEST_MARKER: "kept",
+          CLICOLOR_FORCE: "1",
+          FORCE_COLOR: "3",
+          GH_FORCE_TTY: "120",
+        },
+      },
       runner(_command, _args, options) {
         observedOptions = options;
         return { status: 0, stdout: "{}", stderr: "" };
@@ -45,6 +52,10 @@ test("machine-readable GitHub commands disable ANSI color", () => {
   assert.equal(result.status, 0);
   assert.equal(observedOptions.env.TEST_MARKER, "kept");
   assert.equal(observedOptions.env.NO_COLOR, "1");
+  assert.equal(observedOptions.env.CLICOLOR, "0");
+  assert.equal(Object.hasOwn(observedOptions.env, "CLICOLOR_FORCE"), false);
+  assert.equal(Object.hasOwn(observedOptions.env, "FORCE_COLOR"), false);
+  assert.equal(Object.hasOwn(observedOptions.env, "GH_FORCE_TTY"), false);
 });
 
 test("does not shorten a server-directed wait to the local retry budget", () => {

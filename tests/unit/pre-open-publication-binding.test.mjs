@@ -6,6 +6,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
+import { buildCreatePrPublicationPlan } from "../../scripts/lib/create-pr-publication-plan.mjs";
 import {
   createDeliveryWorkflowController,
   readDeliveryWorkflowCheckpoint,
@@ -16,7 +17,10 @@ import {
   executeMutationDocument,
   mutationOperationKey,
 } from "../../scripts/lib/mutation-document-execution.mjs";
-import { mutationExecutionContextFromCheckpoint } from "../../scripts/lib/mutation-checkpoint.mjs";
+import {
+  lockCreatePrPublicationPlanCheckpoint,
+  mutationExecutionContextFromCheckpoint,
+} from "../../scripts/lib/mutation-checkpoint.mjs";
 
 const PRE_OPEN_GATE = fileURLToPath(
   new URL("../../scripts/pre-open-gate.mjs", import.meta.url),
@@ -70,16 +74,24 @@ function completeHygiene(current) {
   });
 }
 
-function pushRequest(newTip = HEAD) {
-  return {
-    schemaVersion: 1,
-    action: "push_code",
-    mutationMode: "maintainer",
-    explicitInstruction: false,
+function publicationPlan(checkpoint, newTip = HEAD) {
+  return buildCreatePrPublicationPlan({
     repo: "acme/widgets",
+    remote: "origin",
     branch: "task",
+    base: "dev",
+    expectedRemoteTip: "absent",
+    originalLocalTip: HEAD,
     newTip,
-  };
+    title: "Fix task",
+    body: "Refs #1",
+    idempotencyKey: "issue-1-create-pr",
+    checkpoint,
+  });
+}
+
+function pushRequest(newTip = HEAD) {
+  return publicationPlan("checkpoint.json", newTip).requests[0];
 }
 
 function run(cwd, command, args) {
@@ -129,6 +141,10 @@ test("mutation boundary independently rejects missing, changed, or stale pre-ope
     current.recordPreOpenGate(readyGate());
     current.transition("OPEN_PR");
     writeDeliveryWorkflowCheckpoint(checkpoint, current.snapshot());
+    lockCreatePrPublicationPlanCheckpoint({
+      path: checkpoint,
+      plan: publicationPlan(checkpoint),
+    });
     assert.deepEqual(
       mutationExecutionContextFromCheckpoint({ path: checkpoint, request: pushRequest() }),
       {

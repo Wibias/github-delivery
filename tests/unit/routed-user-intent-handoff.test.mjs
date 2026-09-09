@@ -6,11 +6,17 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
+import { buildCreatePrPublicationPlan } from "../../scripts/lib/create-pr-publication-plan.mjs";
+import { createPrPublicationPlanLock } from "../../scripts/lib/create-pr-publication-state.mjs";
 import {
   createDeliveryWorkflowController,
+  readDeliveryWorkflowCheckpoint,
   writeDeliveryWorkflowCheckpoint,
 } from "../../scripts/lib/delivery-workflow-controller.mjs";
-import { mutationExecutionContextFromCheckpoint } from "../../scripts/lib/mutation-checkpoint.mjs";
+import {
+  lockCreatePrPublicationPlanCheckpoint,
+  mutationExecutionContextFromCheckpoint,
+} from "../../scripts/lib/mutation-checkpoint.mjs";
 import { executeMutationDocument } from "../../scripts/lib/mutation-document-execution.mjs";
 
 const DELIVERY_CONTROLLER = fileURLToPath(
@@ -24,7 +30,6 @@ function createPrRequest(overrides = {}) {
     schemaVersion: 1,
     action: "create_pr",
     mutationMode: "maintainer",
-    explicitInstruction: false,
     repo: "acme/widgets",
     base: "main",
     head: "fix/issue-95",
@@ -34,6 +39,23 @@ function createPrRequest(overrides = {}) {
     idempotencyKey: "issue-95-pr",
     ...overrides,
   };
+}
+
+function publicationPlan(checkpoint, createOverrides = {}) {
+  const create = createPrRequest(createOverrides);
+  return buildCreatePrPublicationPlan({
+    repo: create.repo,
+    remote: "origin",
+    branch: create.head,
+    base: create.base,
+    expectedRemoteTip: "absent",
+    originalLocalTip: HEAD,
+    newTip: HEAD,
+    title: create.title,
+    body: create.body,
+    idempotencyKey: create.idempotencyKey,
+    checkpoint,
+  });
 }
 
 function createCheckpoint() {
@@ -62,6 +84,7 @@ function createCheckpoint() {
   const directory = mkdtempSync(join(tmpdir(), "github-delivery-routed-intent-"));
   const checkpoint = join(directory, "controller.json");
   writeDeliveryWorkflowCheckpoint(checkpoint, controller.snapshot());
+  lockCreatePrPublicationPlanCheckpoint({ path: checkpoint, plan: publicationPlan(checkpoint) });
   return { directory, checkpoint };
 }
 
@@ -162,13 +185,21 @@ test("Protection Off executes the routed create_pr document without Authority-ho
   }
 });
 
-test("routed create_pr intent cannot be rebound to a changed mutation payload", () => {
+test("routed create_pr intent cannot be rebound even if the publication lock is tampered", () => {
   const { directory, checkpoint } = createCheckpoint();
   try {
     mutationExecutionContextFromCheckpoint({
       path: checkpoint,
       request: createPrRequest(),
     });
+
+    const snapshot = readDeliveryWorkflowCheckpoint(checkpoint);
+    snapshot.publicationPlan = createPrPublicationPlanLock(
+      publicationPlan(checkpoint, { title: "Different effect" }),
+      { headSha: HEAD },
+    );
+    writeDeliveryWorkflowCheckpoint(checkpoint, snapshot);
+
     assert.throws(
       () => mutationExecutionContextFromCheckpoint({
         path: checkpoint,
