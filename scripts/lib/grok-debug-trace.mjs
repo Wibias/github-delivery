@@ -2,6 +2,21 @@ function text(value) {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
+function durationMs(event) {
+  const value = Number.isFinite(event?.durationMs) ? event.durationMs : event?.duration_ms;
+  return Number.isFinite(value) && value >= 0 ? Math.round(value) : null;
+}
+
+function terminalDiagnostics(event, status) {
+  const outcome = status === "completed" ? "succeeded" : status;
+  const duration = durationMs(event);
+  return {
+    outcome,
+    ...(duration !== null ? { durationMs: duration } : {}),
+    ...(status === "failed" ? { errorKind: "tool_failed" } : {}),
+  };
+}
+
 function hasOwnedOutputFormat(args) {
   return args.some((arg) => arg === "--output-format" || String(arg).startsWith("--output-format="));
 }
@@ -56,6 +71,7 @@ export function normalizeGrokDebugTraceEvent(event) {
       type: "item_completed",
       ...(text(event.toolCallId) ? { itemId: event.toolCallId } : {}),
       ...(text(event.toolName) ? { itemType: event.toolName } : {}),
+      ...terminalDiagnostics(event, status),
     };
   }
 
