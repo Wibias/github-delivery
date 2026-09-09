@@ -11,6 +11,14 @@ const NORMAL_HELPERS = Object.freeze({
   shipGate: "scripts/ship-gate.mjs",
 });
 
+const CONTROLLER_STATE_CONTRACT = Object.freeze({
+  source: "controller-checkpoint",
+  nextAction: "authoritative",
+  completedPhaseReceipts: "authoritative",
+  reasoningClaims: "non-authoritative",
+  externalStateClaims: "structured-evidence-only",
+});
+
 const DECLARED_ACTIONS = Object.freeze({
   "create-pr-for-issue": Object.freeze([
     "assign_issue",
@@ -65,9 +73,10 @@ export function executionContractForWorkflow(workflow) {
     helpers: { ...NORMAL_HELPERS },
     declaredActions: [...(DECLARED_ACTIONS[workflow] || [])],
     sourceDiscovery: "diagnostic-only",
+    controllerState: { ...CONTROLLER_STATE_CONTRACT },
     ...(workflowPlan ? { workflowPlan: structuredClone(workflowPlan) } : {}),
     normalOperation:
-      "Use this packet and its declared helpers/actions for normal workflow execution. Do not re-decide a locked route, publication path, or initial PR state after packet/controller resolution. Read or grep github-delivery implementation source only after a concrete internal contract/helper failure requires diagnostic escalation. If a higher-priority instruction genuinely conflicts with the locked safe write path, fail closed once; do not fall back to a different GitHub write path.",
+      "Use this packet and its controller checkpoint for normal workflow execution. Treat checkpoint nextAction and completed phase receipts as authoritative progress state; reasoning prose, remembered SHAs/PRs/checks, and unstamped claims are non-authoritative. Do not re-decide a locked route, publication path, initial PR state, or already completed phase. Read or grep github-delivery implementation source only after a concrete internal contract/helper failure requires diagnostic escalation. If a higher-priority instruction genuinely conflicts with the locked safe write path, fail closed once; do not fall back to a different GitHub write path.",
   };
 }
 

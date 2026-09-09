@@ -2,6 +2,21 @@ function text(value) {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
+function durationMs(event) {
+  const value = Number.isFinite(event?.durationMs) ? event.durationMs : event?.duration_ms;
+  return Number.isFinite(value) && value >= 0 ? Math.round(value) : null;
+}
+
+function terminalDiagnostics(event, status) {
+  const outcome = ["completed", "complete"].includes(status) ? "succeeded" : status;
+  const duration = durationMs(event);
+  return {
+    outcome,
+    ...(duration !== null ? { durationMs: duration } : {}),
+    ...(status === "failed" ? { errorKind: "tool_failed" } : {}),
+  };
+}
+
 function commonCursorIds(event) {
   const threadId = text(event?.conversation_id) || text(event?.session_id);
   const turnId = text(event?.generation_id);
@@ -78,6 +93,7 @@ export function normalizeCursorCliDebugTraceEvent(event) {
       type: "item_completed",
       ...ids,
       ...toolIdentity(event),
+      ...terminalDiagnostics(event, subtype),
     };
   }
 
@@ -116,11 +132,13 @@ export function normalizeCursorHookDebugTraceEvent(event) {
   }
 
   if (hook === "postToolUse" || hook === "postToolUseFailure") {
+    const status = hook === "postToolUseFailure" ? "failed" : "completed";
     return {
       provider: "cursor",
       type: "item_completed",
       ...ids,
       ...toolIdentity(event),
+      ...terminalDiagnostics(event, status),
     };
   }
 

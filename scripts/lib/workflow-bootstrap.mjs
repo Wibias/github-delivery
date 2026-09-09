@@ -6,6 +6,7 @@ import { dirname, join, resolve } from "node:path";
 import {
   createDeliveryWorkflowController,
   readDeliveryWorkflowCheckpoint,
+  writeDeliveryWorkflowCheckpoint,
 } from "./delivery-workflow-controller.mjs";
 import { resolveDeliveryWorkflowProfile } from "./delivery-workflow-profiles.mjs";
 
@@ -94,18 +95,24 @@ export function bootstrapLocalPrWorkflow({ repo, headSha, baseSha = null, stateD
     reused = true;
   }
 
-  const snapshot = readDeliveryWorkflowCheckpoint(checkpointPath);
-  assertCheckpointIdentity(snapshot, {
+  const storedSnapshot = readDeliveryWorkflowCheckpoint(checkpointPath);
+  assertCheckpointIdentity(storedSnapshot, {
     repo: normalizedRepo,
     headSha: normalizedHead,
   });
   if (
     baseSha &&
-    snapshot.baseSha &&
-    String(snapshot.baseSha).toLowerCase() !== String(baseSha).toLowerCase()
+    storedSnapshot.baseSha &&
+    String(storedSnapshot.baseSha).toLowerCase() !== String(baseSha).toLowerCase()
   ) {
     throw new Error("workflow_bootstrap_checkpoint_base_mismatch");
   }
+
+  const snapshot = createDeliveryWorkflowController({
+    snapshot: storedSnapshot,
+    graph: profile.graph,
+  }).snapshot();
+  if (reused) writeDeliveryWorkflowCheckpoint(checkpointPath, snapshot);
 
   return {
     checkpointPath,
