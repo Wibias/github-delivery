@@ -123,6 +123,19 @@ try {
     [IO.File]::WriteAllText($recordTemp, $recordJson, $utf8NoBom)
     Move-Item -Force $recordTemp $recordPath
 
+    # Version directories are release-owned and self-contained. Once the new
+    # version is active, remove obsolete release versions so updates do not
+    # accumulate full runtimes. Root state and unknown app content are preserved.
+    $targetName = 'v' + $ExpectedVersion
+    $obsoleteVersionDirs = @(
+        Get-ChildItem -LiteralPath $appRoot -Directory -Force | Where-Object {
+            $_.Name -match '^v\d+\.\d+\.\d+$' -and $_.Name -ne $targetName
+        }
+    )
+    foreach ($obsoleteVersionDir in $obsoleteVersionDirs) {
+        Remove-Item -LiteralPath $obsoleteVersionDir.FullName -Recurse -Force
+    }
+
     # Remove only the obsolete root-level launcher from the legacy layout. State
     # (`authority.db`, trust-store.json) and unknown user files are deliberately preserved.
     $legacyExe = Join-Path $InstallDir 'GitHubDeliveryAuthority.exe'
