@@ -17,6 +17,27 @@ function messageThreadId(message) {
   return message?.params?.threadId || null;
 }
 
+function completionDiagnostics(message) {
+  const item = message?.params?.item || {};
+  const rawStatus = String(item?.status || message?.params?.status || "completed").toLowerCase();
+  const outcome = ["failed", "error"].includes(rawStatus)
+    ? "failed"
+    : ["cancelled", "canceled"].includes(rawStatus)
+      ? "cancelled"
+      : "succeeded";
+  const rawDuration = Number.isFinite(item?.durationMs)
+    ? item.durationMs
+    : Number.isFinite(message?.params?.durationMs)
+      ? message.params.durationMs
+      : item?.duration_ms;
+  const durationMs = Number.isFinite(rawDuration) && rawDuration >= 0 ? Math.round(rawDuration) : null;
+  return {
+    outcome,
+    ...(durationMs !== null ? { durationMs } : {}),
+    ...(outcome === "failed" ? { errorKind: "tool_failed" } : {}),
+  };
+}
+
 function emitTelemetry(options, message, outcome = null) {
   if (typeof options.onTelemetry !== "function" || !message?.method) return;
   const event = {
@@ -61,6 +82,7 @@ function debugTraceEvent(message, outcome = null) {
       type: method === "item/started" ? "item_started" : "item_completed",
       itemId: message?.params?.item?.id || message?.params?.itemId || null,
       itemType: message?.params?.item?.type || null,
+      ...(method === "item/completed" ? completionDiagnostics(message) : {}),
     };
   }
 
