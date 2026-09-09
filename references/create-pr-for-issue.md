@@ -20,6 +20,8 @@ Policy modules:
 
 Open only the requested PRs, normally one, on the issue's canonical repository. Fix the verified issue, preserve unrelated work, pass the required gates, link/assign/notify as permitted, and stop before merge.
 
+If the higher-priority user request explicitly narrows the task to **commit + PR creation only**, **open the PR and stop**, or equivalent publication-only wording, preserve this issue-owned preflight/implementation/publication route but stop after the created/reused PR is live-verified. In that explicit open-only mode, `OPEN_PR -> DONE` is the terminal controller transition; do not enter issue assignment/comment, review-feedback, CI, or merge-ready phases. The transition is allowed only after the locked push/create publication receipts are complete.
+
 ## Runtime contract
 
 - Load policy modules.
@@ -27,6 +29,7 @@ Open only the requested PRs, normally one, on the issue's canonical repository. 
 - `create_pr` intent is controller-owned/operation-bound. Never repair via manual `--workflow-intent`, checkpoint edits, or `explicitInstruction`; changed payloads need fresh intent.
 - `github-mutate.mjs` owns authority; `off` skips only Hello/Authority, protected modes retain it.
 - Local work is not publication; broker remote writes.
+- Use the execution packet's canonical `scripts/create-pr-publication-plan.mjs` helper for issue publication. Do not grep github-delivery source or hand-construct mutation request schemas during normal operation.
 - **Do not merge.**
 
 ## A. Need-to-fix preflight
@@ -87,11 +90,12 @@ Carry completed gate/review evidence into the PR validation notes.
 ## E. Publish the canonical PR
 
 1. Resolve repository identity from the **issue**, not whichever remote is convenient, and resolve the correct base branch.
-2. Publish the exact commit using broker action `push_code`. Bind the observed remote generation; use force-with-lease only when the selected Git workflow permits rewriting that branch.
-3. Build the PR description from `references/pr-description.md`, the final candidate diff, issue acceptance criteria, thread clarifications, and completed validation. Do not narrate planned work as completed work.
-4. After push, re-check exact publication identity: canonical repository + pushed head identity + intended base. One exact open PR → reuse it; multiple → fail closed and report them; none → create. This is narrower than A's semantic covering-PR check, and `create_pr` preflight repeats it immediately before execution.
-5. Create with broker action `create_pr`, a stable idempotency key, and exact base/head/title/body. `create_pr_existing` names the publication result; do not bypass it or retry under another title.
-6. Confirm the created/reused PR has the canonical issue repository and intended base/head. Wrong topology is a hard stop.
+2. Build the PR description from `references/pr-description.md`, the final candidate diff, issue acceptance criteria, thread clarifications, and completed validation. Do not narrate planned work as completed work.
+3. After resolving exact remote/local tips and exact publication identity, write only the canonical planner inputs: repo, remote, branch, base, `expectedRemoteTip`, `originalLocalTip`, `newTip`, title/body, idempotency key, and checkpoint. Run `node scripts/create-pr-publication-plan.mjs --input <input> --output <plan>`. The helper validates both `push_code` and initial draft `create_pr` request shapes before locking them into the issue workflow checkpoint.
+4. Execute the generated plan unchanged with `node scripts/github-mutate.mjs --request <plan> --execute --checkpoint <workflow-checkpoint>`. Do not hand-build equivalent requests or fall back to direct `git push` / `gh pr create`. Bind the observed remote generation; force-with-lease semantics remain planner-owned.
+5. Re-check exact publication identity: canonical repository + pushed head identity + intended base. One exact open PR → reuse it; multiple → fail closed and report them; none after a successful publication result → fail closed. `create_pr_existing` names the canonical reused publication; do not retry under another title.
+6. Confirm the created/reused PR has the canonical issue repository and intended base/head and that the checkpoint contains successful receipts for both locked publication operations. Wrong topology or incomplete receipts is a hard stop.
+7. **Open-only completion:** when the user's trusted instruction explicitly says to stop after PR creation, transition the controller `OPEN_PR -> DONE` now and stop. Do not perform section F or G. Without that explicit narrowing, continue to F/G for the normal merge-ready workflow.
 
 ## F. Link, assign, notify
 
@@ -124,13 +128,16 @@ Before final reporting, apply `references/completion-claims.md` to current autho
 
 ## Done when
 
+For normal merge-ready delivery:
 - Only requested PRs; canonical issue repository and intended base/head.
 - Full issue thread and screenshot gate complete; preflight has evidence-backed outcome.
 - Non-empty implementation diff existed before the pre-open gate; bug/security publication requirements cleared.
 - Exact-head/base publication was reused instead of duplicated.
-- Network writes used `github-mutate.mjs` with required authority.
+- Network writes used the canonical publication planner plus `github-mutate.mjs` with required authority.
 - PR description matches final head/issue contract; linkage and protected-media rules are satisfied.
 - Self-assignment when possible; one opened-PR issue comment; no duplicates.
 - Reviews, feedback, required CI, freshness, applicable runtime verification, and final ship gate pass on final head.
 - Final report satisfies `references/completion-claims.md`.
 - Merge-ready was published and **the PR was not merged**.
+
+For an explicit open-only request, completion is narrower: the same issue/pre-open/publication requirements through E are satisfied, both locked publication receipts are present, the live PR identity is verified, the controller is `DONE`, and no F/G side effects were attempted.
