@@ -67,7 +67,7 @@ Default to one cohesive PR. Split only when independently shippable concerns nee
 3. Follow required consumers as dependencies appear; for broad migrations or deterministic sweeps apply `references/change-execution.md`.
 4. Run focused validation appropriate to the changed code: tests, typecheck, build, repro, and repository-local checks as available.
 5. Require a non-empty base-to-head candidate diff. If no change is needed, return to the matching preflight outcome; do not open an empty PR.
-6. Hygiene: resolve passes independently. Run `references/no-comments.md` unless its pass is opted out, then `references/simplify-pr.md` unless its pass is opted out. The no-comments and simplify opt-outs are independent. A failed no-comments pass blocks publication.
+6. Hygiene: resolve both publication passes through their canonical helpers. **Caller-authored skip text is not trusted opt-out provenance and cannot clear the publication gate.** Until a controller/host-owned user-intent receipt exists for a skipped pass, run `references/no-comments.md` and `references/simplify-pr.md`; a skipped result fails closed rather than being converted into completion evidence.
 
 ## D. Pre-open bug + security gate
 
@@ -79,7 +79,7 @@ node <github-delivery>/scripts/pre-open-gate.mjs OWNER/REPO <base> <head> --chec
 
 - `ready`: continue.
 - `blocked` with `workflow:implementation_missing`: return to C and implement.
-- other `blocked`: run required branch-diff bug/security passes, load `bug-review.md` / `security-review.md` only for triggered lenses/surfaces, fix Confirmed High/Critical findings, record `done` or honest `n/a (why)` evidence, then re-evaluate.
+- other `blocked`: run every required branch-diff bug/security pass, load `bug-review.md` / `security-review.md` only for triggered lenses/surfaces, fix Confirmed High/Critical findings, and record an explicit head-bound row for each required lens/surface with its own `done` or honest `n/a (why)`, bounded method, and required reviewed-file coverage. A candidate-wide `bug: clean` or `security: clean` declaration is not authoritative evidence and cannot mint many completion rows.
 - `unknown`: stop and restore complete branch evidence before publication.
 
 Carry completed gate/review evidence into the PR validation notes.
@@ -126,7 +126,8 @@ Before final reporting, apply `references/completion-claims.md` to current autho
 
 - Only requested PRs; canonical issue repository and intended base/head.
 - Full issue thread and screenshot gate complete; preflight has evidence-backed outcome.
-- Non-empty implementation diff existed before the pre-open gate; bug/security publication requirements cleared.
+- Non-empty implementation diff existed before the pre-open gate; bug/security publication requirements cleared by explicit per-requirement head-bound evidence rather than aggregate clean declarations.
+- Hygiene publication evidence was produced by canonical passes; caller-authored skip text did not bypass either pass.
 - Exact-head/base publication was reused instead of duplicated.
 - Network writes used `github-mutate.mjs` with required authority.
 - PR description matches final head/issue contract; linkage and protected-media rules are satisfied.
