@@ -5,6 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { createAgentDebugTraceRecorder } from "../../scripts/lib/agent-debug-trace.mjs";
+import { createAppServerWatchdogRouter } from "../../scripts/lib/codex-app-server-watchdog-proxy.mjs";
 import {
   normalizeGrokDebugTraceEvent,
 } from "../../scripts/lib/grok-debug-trace.mjs";
@@ -31,34 +32,10 @@ test("stream recorder coalesces adjacent reasoning deltas with the same identity
       now: () => new Date("2026-09-09T05:00:00.000Z"),
       pid: 437,
     });
-    recorder.record({
-      type: "reasoning_summary_delta",
-      threadId: "thread-1",
-      turnId: "turn-1",
-      itemId: "reasoning-1",
-      text: "Inspect ",
-    });
-    recorder.record({
-      type: "reasoning_summary_delta",
-      threadId: "thread-1",
-      turnId: "turn-1",
-      itemId: "reasoning-1",
-      text: "the controller ",
-    });
-    recorder.record({
-      type: "reasoning_summary_delta",
-      threadId: "thread-1",
-      turnId: "turn-1",
-      itemId: "reasoning-1",
-      text: "once.",
-    });
-    recorder.record({
-      type: "item_started",
-      threadId: "thread-1",
-      turnId: "turn-1",
-      itemId: "call-1",
-      itemType: "read_file",
-    });
+    recorder.record({ type: "reasoning_summary_delta", threadId: "thread-1", turnId: "turn-1", itemId: "reasoning-1", text: "Inspect " });
+    recorder.record({ type: "reasoning_summary_delta", threadId: "thread-1", turnId: "turn-1", itemId: "reasoning-1", text: "the controller " });
+    recorder.record({ type: "reasoning_summary_delta", threadId: "thread-1", turnId: "turn-1", itemId: "reasoning-1", text: "once." });
+    recorder.record({ type: "item_started", threadId: "thread-1", turnId: "turn-1", itemId: "call-1", itemType: "read_file" });
     recorder.close();
 
     const events = traceEvents(recorder.path);
@@ -145,6 +122,33 @@ test("Cursor terminal events expose safe outcome duration and failure class", ()
   assert.equal(failed.durationMs, 90);
   assert.equal(failed.errorKind, "tool_failed");
   assert.doesNotMatch(JSON.stringify(failed), /private failure text/);
+});
+
+test("Codex item completion exposes bounded outcome and duration without payloads", () => {
+  const trace = [];
+  const router = createAppServerWatchdogRouter({ onDebugTrace: (event) => trace.push(event) });
+  router.onServerMessage({
+    method: "item/completed",
+    params: {
+      threadId: "thread-1",
+      turnId: "turn-1",
+      item: {
+        id: "call-1",
+        type: "commandExecution",
+        status: "failed",
+        durationMs: 77,
+        error: { message: "private token", stack: "C:/private/path" },
+        output: "private output",
+      },
+    },
+  });
+
+  assert.equal(trace.length, 1);
+  assert.equal(trace[0].type, "item_completed");
+  assert.equal(trace[0].outcome, "failed");
+  assert.equal(trace[0].durationMs, 77);
+  assert.equal(trace[0].errorKind, "tool_failed");
+  assert.doesNotMatch(JSON.stringify(trace[0]), /private token|private output|C:\/private/);
 });
 
 test("recorder persists only allowlisted completion diagnostics", () => {
