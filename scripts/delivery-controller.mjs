@@ -175,7 +175,7 @@ try {
     const checkpoint = argv.shift();
     if (!checkpoint) throw new Error(USAGE);
     assertEmpty(argv);
-    print(readDeliveryWorkflowCheckpoint(resolve(checkpoint)));
+    print(load(checkpoint).controller.snapshot());
   } else if (command === "refs") {
     throw new Error("controller_refs_are_internal_only");
   } else {
