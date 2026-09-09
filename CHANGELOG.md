@@ -4,6 +4,20 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-09-09
+
+### Changed
+
+- Bumped the package version from `1.5.0` to `1.5.1`.
+- Workflow checkpoints now expose controller-owned next actions and completed-phase receipts, ignore model-authored SHA, PR, check, and phase completion claims, reject caller-authored ref injection, and re-derive actionable state when legacy checkpoints resume without fabricating historical receipts (PR #436).
+- Agent debug traces now coalesce adjacent same-identity reasoning deltas and add bounded completion outcome, duration, and failure-class metadata without persisting raw tool payloads or error text (PR #437).
+
+### Fixed
+
+- Pre-open review completion now requires explicit head-bound structured evidence for each required review lens, and hygiene skips require trusted user-intent provenance instead of caller-authored reason text (PR #434).
+- Issue PR publication now keeps machine-readable GitHub CLI output colourless under forced colour environments, uses the validated deterministic publication planner, and supports a verified publication-only terminal state that still requires locked push and create-PR receipts (PR #435).
+- Windows Authority updates now remove obsolete release-owned `app\vX.Y.Z` runtime directories after the new version becomes active, so successful updates retain only the current runtime while preserving `authority.db`, `trust-store.json`, and unknown root/app data (PR #438).
+
 ## [1.5.0] - 2026-09-08
 
 ### Changed
