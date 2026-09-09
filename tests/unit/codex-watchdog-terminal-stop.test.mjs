@@ -127,6 +127,44 @@ test("Stop ends active recovery when the corrective continuation reports an expl
   assert.equal(terminal.state.narrationRecoveryAttempts, 0);
 });
 
+test("Stop ends active recovery for the Grok trace wording 'not authorized'", () => {
+  const first = beginNarrationRecovery();
+
+  const terminal = evaluateCodexHook(
+    {
+      hook_event_name: "Stop",
+      session_id: "grok-s1",
+      turn_id: "grok-t1",
+      stop_hook_active: true,
+      last_assistant_message:
+        "Blocked: creating the selected programme-owner authority is not authorized because the governing request explicitly says, ‘Do not create a new authority yet.’",
+    },
+    first.state,
+  );
+
+  assert.equal(terminal.output, null);
+  assert.equal(terminal.state.narrationRecoveryAttempts, 0);
+});
+
+test("Stop ends active recovery for the Grok trace wording 'Cannot proceed: ... prohibited'", () => {
+  const first = beginNarrationRecovery();
+
+  const terminal = evaluateCodexHook(
+    {
+      hook_event_name: "Stop",
+      session_id: "grok-s2",
+      turn_id: "grok-t2",
+      stop_hook_active: true,
+      last_assistant_message:
+        "Cannot proceed: the selected repository write is expressly prohibited until the user grants new authority.",
+    },
+    first.state,
+  );
+
+  assert.equal(terminal.output, null);
+  assert.equal(terminal.state.narrationRecoveryAttempts, 0);
+});
+
 test("terminal wording does not end recovery when the same response announces another tool action", () => {
   const first = beginNarrationRecovery();
 
