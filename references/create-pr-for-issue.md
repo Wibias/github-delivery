@@ -18,7 +18,7 @@ Policy modules:
 
 ## Goal
 
-Open only the requested PRs, normally one, on the issue's canonical repository. Fix the verified issue, preserve unrelated work, pass the required gates, link/assign/notify as permitted, and stop before merge.
+Open only requested PRs on the issue's canonical repository. Fix the verified issue, preserve unrelated work, pass required gates, link/assign/notify as permitted, and stop before merge.
 
 ## Runtime contract
 
@@ -44,7 +44,7 @@ Read the issue body, **every comment** with pagination, labels, linked PRs, and 
 
 ### Screenshot gate
 
-Review author-provided screenshots/images before implementation. If required screenshots cannot be reviewed, stop instead of opening a speculative PR.
+Review author-provided screenshots/images before implementation. If required screenshots cannot be reviewed, stop.
 
 ### Preflight outcome
 
@@ -58,7 +58,7 @@ If `research-issue.md` just produced the same verdict on the same development ti
 
 ## B. Confirm scope
 
-Default to one cohesive PR. Split only when independently shippable concerns need separate validation/review boundaries or acceptance criteria conflict. Batches over three issues use fan-out.
+Default to one cohesive PR. Split only for independently shippable concerns with separate validation/review boundaries or conflicting acceptance criteria. Batches over three issues use fan-out.
 
 ## C. Implement locally
 
@@ -67,7 +67,7 @@ Default to one cohesive PR. Split only when independently shippable concerns nee
 3. Follow required consumers as dependencies appear; for broad migrations or deterministic sweeps apply `references/change-execution.md`.
 4. Run focused validation appropriate to the changed code: tests, typecheck, build, repro, and repository-local checks as available.
 5. Require a non-empty base-to-head candidate diff. If no change is needed, return to the matching preflight outcome; do not open an empty PR.
-6. Hygiene: resolve passes independently. Run `references/no-comments.md` unless its pass is opted out, then `references/simplify-pr.md` unless its pass is opted out. The no-comments and simplify opt-outs are independent. A failed no-comments pass blocks publication.
+6. Hygiene: use the canonical helpers for both passes. Caller text cannot opt out of a pass or supply trusted skip provenance. Until a controller/host-owned user-intent receipt can prove a skip, run `references/no-comments.md` and `references/simplify-pr.md`; skipped results fail closed.
 
 ## D. Pre-open bug + security gate
 
@@ -79,7 +79,7 @@ node <github-delivery>/scripts/pre-open-gate.mjs OWNER/REPO <base> <head> --chec
 
 - `ready`: continue.
 - `blocked` with `workflow:implementation_missing`: return to C and implement.
-- other `blocked`: run required branch-diff bug/security passes, load `bug-review.md` / `security-review.md` only for triggered lenses/surfaces, fix Confirmed High/Critical findings, record `done` or honest `n/a (why)` evidence, then re-evaluate.
+- other `blocked`: run each required bug/security pass. Load `bug-review.md` / `security-review.md` only for triggered lenses/surfaces, fix Confirmed High/Critical findings, and record one head-bound row per required lens/surface with status, bounded method, and required file coverage. Candidate-wide `bug: clean` / `security: clean` declarations are non-authoritative.
 - `unknown`: stop and restore complete branch evidence before publication.
 
 Carry completed gate/review evidence into the PR validation notes.
@@ -120,13 +120,14 @@ Work on the current PR head until the authoritative merge-ready bar is satisfied
 
 ## H. Completion report
 
-Before final reporting, apply `references/completion-claims.md` to current authoritative evidence; re-measure material counts and preserve unknown, blocked, not-run, and partial states.
+Before final reporting, apply `references/completion-claims.md`; re-measure material counts and preserve unknown, blocked, not-run, and partial states.
 
 ## Done when
 
 - Only requested PRs; canonical issue repository and intended base/head.
 - Full issue thread and screenshot gate complete; preflight has evidence-backed outcome.
-- Non-empty implementation diff existed before the pre-open gate; bug/security publication requirements cleared.
+- Non-empty implementation diff existed before pre-open; each required bug/security row is head- and file-bound, not aggregate clean evidence.
+- Hygiene evidence came from canonical passes; caller text did not bypass them.
 - Exact-head/base publication was reused instead of duplicated.
 - Network writes used `github-mutate.mjs` with required authority.
 - PR description matches final head/issue contract; linkage and protected-media rules are satisfied.

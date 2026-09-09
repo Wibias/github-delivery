@@ -107,7 +107,7 @@ test("create-pr hygiene CLI prepares guarded diff scope and finalizes current-he
   }
 });
 
-test("create-pr hygiene CLI records an explicit no-comments opt-out without a reviewer snapshot", () => {
+test("caller-authored no-comments opt-out text cannot mint routed publication evidence", () => {
   const root = mkdtempSync(join(tmpdir(), "github-delivery-hygiene-skip-"));
   const simplifyPath = join(root, "simplify.json");
   const outputPath = join(root, "hygiene.json");
@@ -118,18 +118,17 @@ test("create-pr hygiene CLI records an explicit no-comments opt-out without a re
       method: "opt-out",
       reason: "without simplify",
     }, null, 2)}\n`, "utf8");
-    run(root, process.execPath, [
+    const result = spawnSync(process.execPath, [
       CLI,
       "skip-no-comments",
       "--head", head,
       "--reason", "keep source comments",
       "--simplify", simplifyPath,
       "--output", outputPath,
-    ]);
-    const evidence = JSON.parse(readFileSync(outputPath, "utf8"));
-    assert.equal(evidence.passes["no-comments"].outcome, "skipped");
-    assert.equal(evidence.passes["no-comments"].reason, "keep source comments");
-    assert.equal(evidence.passes.simplify.outcome, "skipped");
+    ], { cwd: root, encoding: "utf8" });
+    assert.notEqual(result.status, 0);
+    assert.match(`${result.stderr}\n${result.stdout}`, /pre_open_hygiene_skip_requires_trusted_user_intent/);
+    assert.equal(existsSync(outputPath), false);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
