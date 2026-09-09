@@ -91,7 +91,7 @@ Carry completed gate/review evidence into the PR validation notes.
 
 1. Resolve repository identity from the **issue**, not whichever remote is convenient, and resolve the correct base branch.
 2. Build the PR description from `references/pr-description.md`, final diff, issue contract, and completed validation; never claim planned work as done.
-3. Resolve exact tips/identity, then run `node scripts/create-pr-publication-plan.mjs --input <input> --output <plan>`. It locks broker action `push_code` plus draft `create_pr` to the checkpoint.
+3. Resolve exact tips/identity, then run `node scripts/create-pr-publication-plan.mjs --input <input> --output <plan>`. It locks broker action `push_code` plus draft broker action `create_pr` to the checkpoint.
 4. Execute the plan unchanged via `node scripts/github-mutate.mjs --request <plan> --execute --checkpoint <workflow-checkpoint>`. No direct `git push` / `gh pr create`; force-with-lease remains planner-owned.
 5. Re-check canonical repo + head + base. Reuse one exact open PR; multiple or none after successful publication fail closed. `create_pr_existing` names reuse.
 6. Require canonical repo/base/head and successful receipts for both locked operations; otherwise stop.
