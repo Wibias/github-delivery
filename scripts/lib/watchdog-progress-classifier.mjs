@@ -28,6 +28,66 @@ function hasOutputRedirection(value) {
   return />{1,2}/.test(value);
 }
 
+function isGraphQlWordChar(char) {
+  if (!char) return false;
+  const code = char.charCodeAt(0);
+  return (
+    (code >= 48 && code <= 57) ||
+    (code >= 97 && code <= 122) ||
+    char === "_"
+  );
+}
+
+function isShellWhitespace(char) {
+  return (
+    char === " " ||
+    char === "\t" ||
+    char === "\r" ||
+    char === "\n" ||
+    char === "\f" ||
+    char === "\v"
+  );
+}
+
+function skipShellWhitespace(value, index) {
+  let cursor = index;
+  while (cursor < value.length && isShellWhitespace(value[cursor])) cursor += 1;
+  return cursor;
+}
+
+function hasGraphQlQueryField(value) {
+  let searchFrom = 0;
+  while (searchFrom < value.length) {
+    const index = value.indexOf("query", searchFrom);
+    if (index < 0) return false;
+
+    const before = index > 0 ? value[index - 1] : "";
+    const after = value[index + 5] || "";
+    if (isGraphQlWordChar(before) || isGraphQlWordChar(after)) {
+      searchFrom = index + 5;
+      continue;
+    }
+
+    let cursor = skipShellWhitespace(value, index + 5);
+    if (value[cursor] !== "=") {
+      searchFrom = index + 5;
+      continue;
+    }
+
+    cursor = skipShellWhitespace(value, cursor + 1);
+    if (value[cursor] === "'" || value[cursor] === '"') cursor += 1;
+    cursor = skipShellWhitespace(value, cursor);
+
+    if (value.slice(cursor, cursor + 5) === "query") {
+      const queryAfter = value[cursor + 5] || "";
+      if (!isGraphQlWordChar(queryAfter)) return true;
+    }
+
+    searchFrom = index + 5;
+  }
+  return false;
+}
+
 function classifyGhApi(value) {
   if (!/\bgh(?:\.exe)?\s+api\b/i.test(value)) return null;
   const explicitGet = /(?:--method(?:=|\s+)get\b|-x\s*get\b)/i.test(value);
@@ -35,10 +95,11 @@ function classifyGhApi(value) {
 
   if (/\bgh(?:\.exe)?\s+api\s+graphql\b/i.test(value)) {
     if (/\bmutation\b/i.test(value)) return { kind: "state-change" };
-    if (explicitMutationMethod && !/\bquery\s*=\s*['"]?\s*query\b/i.test(value)) {
+    const hasQueryField = hasGraphQlQueryField(value);
+    if (explicitMutationMethod && !hasQueryField) {
       return { kind: "neutral" };
     }
-    if (explicitGet || /\bquery\s*=\s*['"]?\s*query\b/i.test(value)) {
+    if (explicitGet || hasQueryField) {
       return { kind: "evidence", volatility: "volatile" };
     }
     return { kind: "neutral" };

@@ -33,6 +33,10 @@ const PRE_OPEN_WORKFLOWS = new Set([
   "create-pr-for-issue",
   "create-pr-from-local-work",
 ]);
+const CREATE_PR_PUBLICATION_PLAN_WORKFLOWS = new Set([
+  "create-pr-for-issue",
+  "create-pr-from-local-work",
+]);
 const PRE_OPEN_PUBLICATION_ACTIONS = new Set(["push_code", "create_pr"]);
 
 function routedWorkflowIntentSlot(snapshot, request) {
@@ -119,7 +123,7 @@ function samePublicationLock(left, right) {
 export function lockCreatePrPublicationPlanCheckpoint({ path, plan } = {}) {
   if (!path) throw new Error("checkpoint path is required");
   const snapshot = readDeliveryWorkflowCheckpoint(path);
-  if (String(snapshot.workflow || "") !== "create-pr-from-local-work") {
+  if (!CREATE_PR_PUBLICATION_PLAN_WORKFLOWS.has(String(snapshot.workflow || ""))) {
     throw new Error("create_pr_publication_plan_not_required");
   }
   if (!["PREOPEN_GATE", "OPEN_PR"].includes(String(snapshot.phase || ""))) {
