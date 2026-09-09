@@ -3,7 +3,10 @@ import {
   mutationReceiptCompleted,
 } from "./mutation-document-execution.mjs";
 
-const LOCAL_WORKFLOW = "create-pr-from-local-work";
+const CREATE_PR_PUBLICATION_WORKFLOWS = new Set([
+  "create-pr-for-issue",
+  "create-pr-from-local-work",
+]);
 const ACTIONS = Object.freeze(["push_code", "create_pr"]);
 
 function plainObject(value) {
@@ -83,7 +86,7 @@ export function createPrPublicationPlanLock(plan, { headSha = null, now = Date.n
 }
 
 export function assertCreatePrPublicationRequest(snapshot, request) {
-  if (String(snapshot?.workflow || "") !== LOCAL_WORKFLOW) return null;
+  if (!CREATE_PR_PUBLICATION_WORKFLOWS.has(String(snapshot?.workflow || ""))) return null;
   const action = String(request?.action || "");
   if (!ACTIONS.includes(action)) return null;
   const lock = normalizeCreatePrPublicationPlanLock(snapshot?.publicationPlan);
@@ -99,7 +102,7 @@ export function assertCreatePrPublicationRequest(snapshot, request) {
 }
 
 export function reconcileCreatePrPublicationReceipts(snapshot, output, { now = Date.now } = {}) {
-  if (String(snapshot?.workflow || "") !== LOCAL_WORKFLOW) {
+  if (!CREATE_PR_PUBLICATION_WORKFLOWS.has(String(snapshot?.workflow || ""))) {
     return { changed: false, receipts: normalizeCreatePrPublicationReceipts(snapshot?.publicationReceipts) };
   }
   const lock = normalizeCreatePrPublicationPlanLock(snapshot?.publicationPlan);
@@ -128,7 +131,7 @@ export function reconcileCreatePrPublicationReceipts(snapshot, output, { now = D
 }
 
 export function assertCreatePrPublicationComplete(snapshot) {
-  if (String(snapshot?.workflow || "") !== LOCAL_WORKFLOW) return null;
+  if (!CREATE_PR_PUBLICATION_WORKFLOWS.has(String(snapshot?.workflow || ""))) return null;
   const lock = normalizeCreatePrPublicationPlanLock(snapshot?.publicationPlan);
   if (!lock) throw new Error("create_pr_publication_plan_missing");
   const receipts = normalizeCreatePrPublicationReceipts(snapshot?.publicationReceipts);

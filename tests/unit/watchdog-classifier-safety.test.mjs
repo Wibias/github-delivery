@@ -41,6 +41,18 @@ test("GraphQL reads remain evidence while literal mutations are state changes", 
   );
 });
 
+test("GraphQL query-field detection handles long whitespace without changing semantics", () => {
+  const padding = " ".repeat(16_384);
+  assert.equal(
+    classify(`gh api graphql --method POST -f query${padding}=${padding}'${padding}query { viewer { login } }'`).kind,
+    "evidence",
+  );
+  assert.equal(
+    classify(`gh api graphql --method POST -f query${padding}=${padding}'${padding}queryish { viewer { login } }'`).kind,
+    "neutral",
+  );
+});
+
 test("opaque GraphQL input files stay neutral instead of falsely resetting progress", () => {
   assert.equal(classify("gh api graphql --input request.json").kind, "neutral");
 });
