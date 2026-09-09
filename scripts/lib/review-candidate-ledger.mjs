@@ -103,6 +103,9 @@ export function addReviewCandidate(ledger, candidate) {
   const fingerprint = candidateFingerprint(candidate);
   const existing = ledger.candidates.find((item) => item.fingerprint === fingerprint);
   if (existing) {
+    if (existing.arbitration) {
+      throw new Error(`candidate ${existing.findingId} is terminal after arbitration`);
+    }
     if (!existing.producers.includes(candidate.producer)) existing.producers.push(candidate.producer);
     existing.evidence.push(...clone(candidate.evidence));
     appendHistory(ledger, {
@@ -144,8 +147,15 @@ function findCandidate(ledger, findingId) {
   return candidate;
 }
 
+function assertCandidateMutable(candidate) {
+  if (candidate.arbitration) {
+    throw new Error(`candidate ${candidate.findingId} is terminal after arbitration`);
+  }
+}
+
 export function recordCandidateValidation(ledger, findingId, validation) {
   const candidate = findCandidate(ledger, findingId);
+  assertCandidateMutable(candidate);
   requireString(validation?.validator, "validation.validator");
   if (!VALIDATION_VERDICTS.includes(validation.verdict)) {
     throw new TypeError(`unknown validation verdict: ${validation?.verdict}`);
@@ -190,6 +200,7 @@ export function enqueueValidationDiscovery(ledger, parentFindingId, candidate, v
 
 export function recordCandidateArbitration(ledger, findingId, arbitration) {
   const candidate = findCandidate(ledger, findingId);
+  assertCandidateMutable(candidate);
   requireString(arbitration?.arbiter, "arbitration.arbiter");
   if (!candidate.validation) throw new Error(`cannot arbitrate ${findingId} before validation`);
   if (candidate.producers.includes(arbitration.arbiter) || candidate.validation.validator === arbitration.arbiter) {
@@ -231,5 +242,47 @@ export function candidateLedgerSummary(ledger) {
     unresolved: ledger.candidates
       .filter((item) => ["candidate", "needs-more-evidence", "manual-review"].includes(item.state))
       .map((item) => item.findingId),
+  };
+}
+
+export function finalizeCandidateLedgerForVerdict(ledger, expectedHeadSha) {
+  assertCandidateLedgerHead(ledger, expectedHeadSha);
+  const confirmed = [];
+  const dismissed = [];
+  const unresolved = [];
+
+  for (const candidate of ledger.candidates) {
+    const verdict = candidate.arbitration?.verdict || null;
+    if (verdict === "confirmed") confirmed.push(candidate.findingId);
+    else if (verdict === "dismissed") dismissed.push(candidate.findingId);
+    else unresolved.push(candidate.findingId);
+  }
+
+  confirmed.sort();
+  dismissed.sort();
+  unresolved.sort();
+  const summary = candidateLedgerSummary(ledger);
+  return {
+    schemaVersion: 1,
+    kind: "github-delivery/review-candidate-verdict-state",
+    repo: ledger.repo,
+    baseSha: ledger.baseSha,
+    headSha: ledger.headSha,
+    runId: ledger.runId,
+    ready: unresolved.length === 0,
+    confirmed,
+    dismissed,
+    unresolved,
+    digest: sha256({
+      repo: ledger.repo,
+      baseSha: ledger.baseSha,
+      headSha: ledger.headSha,
+      runId: ledger.runId,
+      confirmed,
+      dismissed,
+      unresolved,
+      historyLength: ledger.history.length,
+    }),
+    summary,
   };
 }
