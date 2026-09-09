@@ -12,10 +12,12 @@ test("plain PR review routes to a read-only full review", () => {
 });
 
 test("full review alone does not imply public verdict publication", () => {
-  const route = routeShippingGithubPrompt("full review PR #191");
-  assert.equal(route?.workflow, "references/full-review-pr.md");
-  assert.equal(route?.mutationMode, "read-only");
-  assert.deepEqual(route?.explicitActions, []);
+  for (const prompt of ["full review PR #191", "full review on PR #191"]) {
+    const route = routeShippingGithubPrompt(prompt);
+    assert.equal(route?.workflow, "references/full-review-pr.md", prompt);
+    assert.equal(route?.mutationMode, "read-only", prompt);
+    assert.deepEqual(route?.explicitActions, [], prompt);
+  }
 });
 
 test("explicit verdict publication grants only review-comment authority", () => {
