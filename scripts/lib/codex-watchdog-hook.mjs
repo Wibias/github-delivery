@@ -12,7 +12,7 @@ const TERMINAL_STOP_DISPOSITION_PATTERNS = [
   /\bno (?:further|additional) (?:tool\/action |tool |repository )?actions? (?:is|are|was|were) (?:authori[sz]ed|required|needed|available|possible)\b/i,
   /\bnothing (?:else|more) (?:is|was) (?:authori[sz]ed|required|needed)\b/i,
   /\b(?:cannot|can't|can not) (?:run|execute|perform|take|continue|proceed with) (?:the |that |this )?(?:selected next |selected |next )?(?:tool|action|step)\b/i,
-  /\bblocked\b[^.\n]{0,240}\b(?:unauthori[sz]ed|prohibited|forbidden|not (?:permitted|allowed))\b/i,
+  /\b(?:blocked|cannot proceed)\b[^.\n]{0,240}\b(?:unauthori[sz]ed|not authori[sz]ed|prohibited|forbidden|not (?:permitted|allowed))\b/i,
 ];
 const STRUCTURED_STOP_RECOMMENDATION_HEADING = /(?:^|\n)\s*#{1,6}\s+(?:[A-Z]\.\s*)?Recommendation\s*$/im;
 const STRUCTURED_STOP_RECOMMENDATION_VALUE = /(?:^|\n)\s*`?NEXT_ACTION\s*=\s*[A-Z][A-Z0-9_]*`?\s*$/i;
