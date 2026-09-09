@@ -30,7 +30,30 @@ const DECLARED_ACTIONS = Object.freeze({
   ]),
 });
 
+const CREATE_PR_PUBLICATION_PLAN = Object.freeze({
+  initialCreate: "draft-only",
+  planner: "scripts/create-pr-publication-plan.mjs",
+  mutationEntrypoint: "scripts/github-mutate.mjs",
+  directWriteFallback: "forbidden",
+  completion: "broker-receipts",
+});
+
 const WORKFLOW_PLANS = Object.freeze({
+  "create-pr-for-issue": Object.freeze({
+    decisionAuthority: "workflow-packet+controller-checkpoint",
+    sourceDiscovery: "diagnostic-only-on-helper-failure",
+    instructionConflict: "fail-closed",
+    preOpen: Object.freeze({
+      decisionField: "decision",
+      readyValue: "ready",
+      evidenceAssembler: "scripts/pre-open-review-evidence.mjs",
+    }),
+    publication: Object.freeze({
+      ...CREATE_PR_PUBLICATION_PLAN,
+      openOnlyTerminalPhase: "OPEN_PR",
+      openOnlyCondition: "explicit-user-stop-after-pr-creation",
+    }),
+  }),
   "create-pr-from-local-work": Object.freeze({
     decisionAuthority: "workflow-packet+controller-checkpoint",
     sourceDiscovery: "diagnostic-only-on-helper-failure",
@@ -49,12 +72,8 @@ const WORKFLOW_PLANS = Object.freeze({
       orchestrator: "scripts/create-pr-hygiene.mjs",
     }),
     publication: Object.freeze({
-      initialCreate: "draft-only",
-      planner: "scripts/create-pr-publication-plan.mjs",
-      mutationEntrypoint: "scripts/github-mutate.mjs",
-      directWriteFallback: "forbidden",
+      ...CREATE_PR_PUBLICATION_PLAN,
       directWriteGuard: "runtime-after-workflow-selection",
-      completion: "broker-receipts",
     }),
   }),
 });
