@@ -21,6 +21,7 @@ function validateNoComments(entry) {
     if (method !== "opt-out" || !String(entry?.reason || "").trim()) {
       throw new Error("pre_open_hygiene_no_comments_skip_invalid");
     }
+    throw new Error("pre_open_hygiene_skip_requires_trusted_user_intent");
   } else {
     if (entry?.scopeKind !== "diff-added-lines") {
       throw new Error("pre_open_hygiene_no_comments_scope_invalid");
@@ -35,13 +36,9 @@ function validateNoComments(entry) {
   return {
     outcome,
     method,
-    ...(outcome === "skipped"
-      ? { reason: String(entry.reason).trim() }
-      : {
-          scopeKind: "diff-added-lines",
-          resultValid: true,
-          workspaceVerified: true,
-        }),
+    scopeKind: "diff-added-lines",
+    resultValid: true,
+    workspaceVerified: true,
   };
 }
 
@@ -53,15 +50,15 @@ function validateSimplify(entry) {
     if (method !== "opt-out" || !String(entry?.reason || "").trim()) {
       throw new Error("pre_open_hygiene_simplify_skip_invalid");
     }
-  } else if (entry?.validationPassed !== true) {
+    throw new Error("pre_open_hygiene_skip_requires_trusted_user_intent");
+  }
+  if (entry?.validationPassed !== true) {
     throw new Error("pre_open_hygiene_simplify_validation_required");
   }
   return {
     outcome,
     method,
-    ...(outcome === "skipped"
-      ? { reason: String(entry.reason).trim() }
-      : { validationPassed: true }),
+    validationPassed: true,
   };
 }
 
@@ -96,6 +93,10 @@ export function validatePreOpenHygieneEvidence(value, { headSha = null } = {}) {
  * A reviewer DELETE cannot be converted into a clean receipt: the parent must
  * apply the accepted change, revalidate the candidate, and rerun hygiene on the
  * new head. This keeps the builder from turning a finding into completion.
+ *
+ * Skipped passes are deliberately not accepted at this boundary. Until a host or
+ * controller can supply provenance for the user's opt-out, caller-authored text
+ * is not authoritative enough to bypass a publication hygiene pass.
  */
 export function buildPreOpenHygieneEvidence({
   scope,
