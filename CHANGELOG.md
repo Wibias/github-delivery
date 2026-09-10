@@ -4,6 +4,25 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.5.2] - 2026-09-10
+
+### Changed
+
+- Bumped the package version from `1.5.1` to `1.5.2`.
+- Full reviews now default to a complete read-only verdict in chat; publishing the verdict to GitHub requires explicit routed user intent while preserving fix/watch/merge route precedence and same-head anti-noise behavior (PR #444).
+
+### Fixed
+
+- Final `create-pr-for-issue` PR-body reconciliation now receives controller-owned workflow intent only at `FINAL_GATE`, bound to the canonical PR, controller head, and exact mutation payload (PR #440).
+- Terminal authorization/prohibition blockers now stop watchdog narration recovery after the first concrete blocker instead of incorrectly advancing through recovery 2/3 and 3/3 (PR #441).
+- Review-scope planning no longer treats ordinary `Home Assistant` compatibility text or generic application `model` vocabulary as sufficient evidence to require the AI-agent/MCP security path, while real agent/tool-call changes remain covered (PR #443).
+- Review verdicts now derive from terminal candidate-ledger state: arbitration is terminal and exact-head finalization prevents later contradictory prose from resurrecting dismissed findings (PR #445).
+- All shared `gh` subprocess launches now force deterministic colourless output while preserving unrelated environment state; review guidance also requires inspecting first-failure output before retrying and avoids duplicating specialist-owned analysis in the parent (PR #446).
+
+### Security
+
+- Grok debug tracing no longer persists raw `thought` content, and nested activity now carries stable session/parent attribution without storing raw tool inputs or outputs (PR #442).
+
 ## [1.5.1] - 2026-09-09
 
 ### Changed
@@ -842,10 +861,8 @@ All notable changes to `github-delivery` are documented here.
 - Fixed the read-exploration failure where every completed non-write tool was
   treated as progress, allowing dozens or hundreds of different reads to evade
   the stall detector indefinitely.
-- Fixed cross-turn contamination in both hook persistence and the App Server
-  router.
-- Hardened protected stream mode to fail closed when required notifications are
-  disabled or disappear, the watchdog router fails, or a private
+- Fixed cross-turn contamination in both hook persistence and the App Server router.
+- Hardened protected stream mode to fail closed when required notifications are disabled or disappear, the watchdog router fails, or a private
   `turn/interrupt` is rejected or not acknowledged within the bounded timeout.
   The protected launcher terminates its Codex process tree rather than
   continuing under a false `stream` protection claim.
@@ -918,8 +935,7 @@ All notable changes to `github-delivery` are documented here.
   focused failing excerpt before loading full raw output. Pending-only required
   CI is owned by `scripts/ci-wait.mjs` instead of parallel manual polling.
 - Refreshed the README with a faster natural-language quick start, repository
-  workflow visuals, clearer safety/value positioning, and user-facing setup
-  and architecture documentation for the progress watchdog.
+  workflow visuals, clearer safety/value positioning, consolidated installation/maintenance guidance, dedicated stack/competing-PR/backport explanation, updated workflow reference, and the current lean CI topology. Release-specific implementation detail is no longer embedded in the hero text.
 
 ## [0.1.1] - 2026-08-11
 
