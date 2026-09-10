@@ -139,21 +139,19 @@ no GitHub write authority. Run routine deterministic tooling quietly; narrate on
 - Repository code does not magically apply live GitHub protection; verify live
   branch/environment drift with `scripts/verify-live-repository-policy.mjs`.
 
-## Full-review contracts that remain entrypoint-visible
+## Full-review completion lock
 
 A full review is complete only after **Deliver final verdict** is no longer
-pending/in_progress. A bare full review is read-only and completes by delivering
-that verdict in chat. GitHub publication requires explicit routed intent and,
+pending/in_progress. A bare full review is read-only and completes by delivering that verdict in chat. GitHub publication requires explicit routed intent and,
 when authorized, `scripts/verify-verdict-published.mjs`. Blockers change the
 verdict, not the delivery requirement. **Only explicit user cancellation** may
 omit it. Never self-elevate the routed mode to gain publication authority.
 
-Each run has a `full-review-run-id`. For authorized publication, same-head
-anti-noise compares the strict label/TLDR **material delta**; do not post a
+Each run has a `full-review-run-id`. For authorized publication, same-head anti-noise compares the strict label/TLDR **material delta**; do not post a
 second top-level verdict when there is no material change. `planVerdictPublication`
 is the machine decision.
 
-Full review also performs a **Semantic propagation audit**: Search beyond the changed files, trace canonical/derived forms and material variant families, prove parity or test each partition, including expected absences/rejected values. One representative member is insufficient unless equivalence is proved. Method: `references/semantic-propagation-review.md`.
+Full review also performs a **Semantic propagation audit**: Search the repository beyond the changed files, trace canonical/derived forms and material variant families, prove parity or test each partition, including expected absences/rejected values. One representative member is insufficient unless equivalence is proved. Method: `references/semantic-propagation-review.md`.
 
 ## Safety precedence
 
