@@ -151,7 +151,7 @@ Each run has a `full-review-run-id`. For authorized publication, same-head anti-
 second top-level verdict when there is no material change. `planVerdictPublication`
 is the machine decision.
 
-Full review also performs a **Semantic propagation audit**: Search the repository beyond the changed files, trace canonical/derived forms and material variant families, prove parity or test each partition, including expected absences/rejected values. One representative member is insufficient unless equivalence is proved. Method: `references/semantic-propagation-review.md`.
+Full review also performs a **Semantic propagation audit**: Search the repository beyond the changed files, trace canonical/derived forms and material variant families, prove parity or test each partition, including expected absences and rejected values. One representative member is insufficient unless equivalence is proved. Method: `references/semantic-propagation-review.md`.
 
 ## Safety precedence
 
