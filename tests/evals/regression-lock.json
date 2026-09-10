@@ -169,7 +169,7 @@
   },
   {
     "id": "R-full-review-verdict-mode-2026-08-03",
-    "sha256": "9725e182218edfa8f52a10f41d47c72ee0ecfb45f83e2e0f27e6b0e04ac19a7e"
+    "sha256": "9dfd86781973ad7aaf848485e9a03fec9ae1e130e4244b2c0c90e0a5c7fa0a18"
   },
   {
     "id": "R-foreign-pr-owner-instructions-2026-08-03",
@@ -181,7 +181,7 @@
   },
   {
     "id": "R-full-review-no-self-read-only-2026-08-04",
-    "sha256": "54c0cc67567fbca3328c216c62955ae65be1265ca9f20193c6decdcdcdfb3434"
+    "sha256": "3b4eb7bcd5c9311c997fb112ff7343ce6a33706ba6fac23825e370c2e57e8b03"
   },
   {
     "id": "R-bot-defer-fabric-2026-08-05",

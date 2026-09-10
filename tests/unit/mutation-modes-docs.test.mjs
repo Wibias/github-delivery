@@ -57,12 +57,13 @@ test("documented high-assurance actions exactly match the executable registry", 
   assert.equal(new Set(documented).size, documented.length, "documented actions must be unique");
 });
 
-test("bare full review selects review mode and follows configured authority protection", () => {
+test("bare full review is read-only and publication requires explicit intent", () => {
   const reference = read("references/mutation-modes.md");
   assert.match(reference, /full review PR #32/);
-  assert.match(reference, /full review PR #32[\s\S]*→ `review`/);
-  assert.match(reference, /full-review workflow publishes its verdict comment when its normal publication policy is satisfied/i);
-  assert.match(reference, /When `authorityMode` is explicitly `off`[\s\S]*may publish its verdict/i);
+  assert.match(reference, /full review PR #32[\s\S]*→ `read-only`/);
+  assert.match(reference, /post the verdict[\s\S]*→ `review`/i);
+  assert.match(reference, /publication authority[\s\S]*explicit/i);
+  assert.match(reference, /When `authorityMode` is explicitly `off`[\s\S]*publication is already authorized/i);
   assert.match(reference, /without obtaining a Windows Hello grant/i);
 });
 
@@ -78,7 +79,9 @@ test("router authority and verdict verification are documented", () => {
   assert.match(reference, /## Router authority/);
   assert.match(reference, /router output is authoritative/i);
   assert.match(reference, /Gate invocations must pass the routed mutation mode plus `--workflow`/);
-  assert.match(reference, /self-selected mode is a workflow violation/i);
+  assert.match(reference, /self-selected elevated mode is a workflow violation/i);
+  assert.match(reference, /read-only full-review run normally completes[\s\S]*chat/i);
+  assert.match(helpers, /bare\/read-only full review[\s\S]*does not run a GitHub publication check/i);
   assert.match(helpers, /verify-verdict-published\.mjs/);
   assert.match(helpers, /--workflow references\/full-review-pr\.md/);
 });

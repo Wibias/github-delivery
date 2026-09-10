@@ -435,7 +435,7 @@ test("isBotLogin recognizes bot logins and rejects humans", () => {
   assert.equal(isBotLogin(""), false);
 });
 
-test("read-only mode is rejected for the full-review workflow", () => {
+test("read-only full review cannot mutate review threads", () => {
   const result = run([
     "--resolve",
     "PRRT_example",
@@ -445,6 +445,7 @@ test("read-only mode is rejected for the full-review workflow", () => {
     "read-only",
   ]);
   assert.equal(result.status, 2);
-  assert.match(result.stderr, /mode_denied_by_workflow/);
+  assert.match(result.stderr, /mode_denied/);
+  assert.doesNotMatch(result.stderr, /mode_denied_by_workflow/);
   assert.doesNotMatch(result.stderr, /ENOENT|spawn gh/i);
 });

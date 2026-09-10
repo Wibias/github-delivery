@@ -6,32 +6,22 @@ import {
   validateWorkflowMutationMode,
 } from "../../scripts/lib/workflow-mode.mjs";
 
-test("full review accepts review and maintainer but never read-only", () => {
+test("full review accepts read-only, review, and maintainer modes", () => {
   assert.deepEqual(allowedMutationModes("references/full-review-pr.md"), [
+    "read-only",
     "review",
     "maintainer",
   ]);
-  assert.equal(
-    validateWorkflowMutationMode({
-      workflow: "references/full-review-pr.md",
-      mutationMode: "review",
-    }).valid,
-    true,
-  );
-  assert.equal(
-    validateWorkflowMutationMode({
-      workflow: "references/full-review-pr.md",
-      mutationMode: "maintainer",
-    }).valid,
-    true,
-  );
-  const denied = validateWorkflowMutationMode({
-    workflow: "references/full-review-pr.md",
-    mutationMode: "read-only",
-  });
-  assert.equal(denied.valid, false);
-  assert.equal(denied.reason, "mode_denied_by_workflow");
-  assert.deepEqual(denied.allowedModes, ["review", "maintainer"]);
+  for (const mutationMode of ["read-only", "review", "maintainer"]) {
+    assert.equal(
+      validateWorkflowMutationMode({
+        workflow: "references/full-review-pr.md",
+        mutationMode,
+      }).valid,
+      true,
+      mutationMode,
+    );
+  }
 });
 
 test("read-only workflows reject elevated modes", () => {

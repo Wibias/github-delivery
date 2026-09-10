@@ -1,6 +1,6 @@
 # Publication Policy
 
-Canonical rules for where/how durable GitHub communication is published and verified.
+Canonical rules for durable GitHub communication and its verification.
 
 ### GD-PUB-001 — Publish to the correct surface
 
@@ -8,15 +8,15 @@ Issue conversation belongs on issue comments; PR conversation belongs on PR conv
 
 ### GD-PUB-002 — Repair the current publication identity first
 
-For run-identified publications, the exact current run marker is checked first. If that publication exists but is incomplete/malformed, edit that owned current-run comment; if complete, reuse it rather than posting a duplicate.
+For run-identified publications, check the exact current run marker first. Repair an owned malformed/incomplete marker; reuse it when complete instead of posting a duplicate.
 
 ### GD-PUB-003 — Enforce same-head anti-noise
 
-For full-review verdicts on the exact same head, do not post a second top-level verdict when the strict verdict label and required TLDR values have no material delta. Reuse the completed same-head verdict; wording-only changes are not material.
+For full-review verdicts on the same head, do not post another top-level verdict when the strict label/TLDR has no material delta. Reuse the completed same-head verdict; wording-only changes are not material.
 
-### GD-PUB-004 — Verify verdict identity and format
+### GD-PUB-004 — Deliver every verdict; verify authorized publication
 
-`verify-verdict-published.mjs` is the normal completion proof for full review. `published: true` plus `format.valid: true` is required; a self-selected stricter mutation mode is not publication unavailability. A blocker changes the verdict; it does not authorize omitting the verdict. Only explicit user cancellation permits ending a required full-review run without its final verdict.
+Every full review delivers its final verdict. A bare/read-only review delivers it in chat and publishes nothing. GitHub verdict publication requires explicit routed user intent; when authorized, `verify-verdict-published.mjs` must report `published: true` and `format.valid: true`. Never self-elevate the routed mode to gain publication authority. Blockers change the verdict, not the delivery requirement; only explicit user cancellation permits omitting it.
 
 ### GD-PUB-005 — Make social publication idempotent
 

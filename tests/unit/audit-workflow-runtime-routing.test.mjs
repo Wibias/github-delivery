@@ -24,7 +24,7 @@ test("explicit full review outranks git and version words in attributed reposito
   ]) {
     const routed = routeShippingGithubPrompt(prompt);
     assert.equal(routed?.workflow, "references/full-review-pr.md", prompt);
-    assert.equal(routed?.mutationMode, "review", prompt);
+    assert.equal(routed?.mutationMode, "read-only", prompt);
   }
 });
 
