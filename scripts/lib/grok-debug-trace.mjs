@@ -7,6 +7,36 @@ function durationMs(event) {
   return Number.isFinite(value) && value >= 0 ? Math.round(value) : null;
 }
 
+function safeCount(value) {
+  return Number.isFinite(value) && value >= 0 ? Math.round(value) : null;
+}
+
+function normalizedUsage(event) {
+  const source = event?.usage;
+  if (!source || typeof source !== "object" || Array.isArray(source)) return null;
+  const inputTokens = safeCount(source.input_tokens ?? source.inputTokens);
+  const cachedInputTokens = safeCount(
+    source.cache_read_input_tokens ?? source.cached_input_tokens ?? source.cachedInputTokens,
+  );
+  const cacheCreationInputTokens = safeCount(
+    source.cache_creation_input_tokens ?? source.cacheCreationInputTokens,
+  );
+  const outputTokens = safeCount(source.output_tokens ?? source.outputTokens);
+  const reasoningTokens = safeCount(
+    source.reasoning_tokens ?? source.reasoningTokens,
+  );
+  const totalTokens = safeCount(source.total_tokens ?? source.totalTokens);
+  const usage = {
+    ...(inputTokens !== null ? { inputTokens } : {}),
+    ...(cachedInputTokens !== null ? { cachedInputTokens } : {}),
+    ...(cacheCreationInputTokens !== null ? { cacheCreationInputTokens } : {}),
+    ...(outputTokens !== null ? { outputTokens } : {}),
+    ...(reasoningTokens !== null ? { reasoningTokens } : {}),
+    ...(totalTokens !== null ? { totalTokens } : {}),
+  };
+  return Object.keys(usage).length > 0 ? usage : null;
+}
+
 function terminalDiagnostics(event, status) {
   const outcome = status === "completed" ? "succeeded" : status;
   const duration = durationMs(event);
@@ -105,10 +135,12 @@ export function normalizeGrokDebugTraceEvent(event) {
   if (type === "user") return normalizeUserMessage(event);
 
   if (type === "result") {
+    const usage = normalizedUsage(event);
     return [{
       provider: "grok",
       type: "turn_completed",
       ...(text(event.session_id) ? { threadId: event.session_id } : {}),
+      ...(usage ? { usage } : {}),
     }];
   }
 
@@ -142,10 +174,12 @@ export function normalizeGrokDebugTraceEvent(event) {
   }
 
   if (type === "end") {
+    const usage = normalizedUsage(event);
     return [{
       provider: "grok",
       type: "turn_completed",
       ...(text(event.sessionId) ? { threadId: event.sessionId } : {}),
+      ...(usage ? { usage } : {}),
     }];
   }
 

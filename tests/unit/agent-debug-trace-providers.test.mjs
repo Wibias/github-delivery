@@ -38,6 +38,7 @@ test("agent debug tracing remains explicit opt-in and provider-tagged", () => {
     provider: "grok",
     now: () => new Date("2026-09-07T11:00:00.000Z"),
     pid: 147,
+    idSalt: "test-salt",
   });
   enabled.record({ type: "reasoning_summary_delta", text: "synthetic diagnostic summary" });
   enabled.close();
@@ -46,7 +47,9 @@ test("agent debug tracing remains explicit opt-in and provider-tagged", () => {
   const persisted = readFileSync(enabled.path, "utf8");
   assert.match(persisted, /"provider":"grok"/);
   assert.match(persisted, /synthetic diagnostic summary/);
-  assert.equal(JSON.parse(persisted.trim()).timestamp, "2026-09-07T11:00:00.000Z");
+  const events = persisted.trim().split("\n").map((line) => JSON.parse(line));
+  assert.equal(events[0].type, "trace_metadata");
+  assert.equal(events.at(-1).timestamp, "2026-09-07T11:00:00.000Z");
 });
 
 test("Grok normalization drops thoughts and keeps sanitized legacy tool lifecycle", () => {
@@ -115,6 +118,7 @@ test("Grok normalization drops thoughts and keeps sanitized legacy tool lifecycl
     provider: "grok",
     type: "turn_completed",
     threadId: "grok-session",
+    usage: { inputTokens: 999 },
   });
 });
 

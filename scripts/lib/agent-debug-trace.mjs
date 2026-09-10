@@ -1,21 +1,24 @@
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import {
   chmodSync,
   closeSync,
   lstatSync,
   mkdirSync,
   openSync,
+  readFileSync,
   statSync,
   writeSync,
 } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const DEFAULT_MAX_BYTES = 2 * 1024 * 1024;
 const DEFAULT_REASONING_COALESCE_BYTES = 16 * 1024;
 const TRACE_KIND = "github-delivery/agent-debug-trace-event";
 const PROVIDERS = new Set(["codex", "grok", "cursor"]);
 const ALLOWED_EVENT_TYPES = new Set([
+  "trace_metadata",
   "reasoning_summary_delta",
   "item_started",
   "item_completed",
@@ -24,6 +27,36 @@ const ALLOWED_EVENT_TYPES = new Set([
 ]);
 const ALLOWED_OUTCOMES = new Set(["succeeded", "failed", "cancelled"]);
 const ERROR_KIND_RE = /^[a-z0-9][a-z0-9_.-]{0,63}$/i;
+const ATTRIBUTION_KEYS = ["threadId", "turnId", "itemId", "parentItemId"];
+const USAGE_KEYS = [
+  "inputTokens",
+  "cachedInputTokens",
+  "cacheCreationInputTokens",
+  "outputTokens",
+  "reasoningTokens",
+  "totalTokens",
+];
+
+function packageVersion() {
+  try {
+    const packageUrl = new URL("../../package.json", import.meta.url);
+    return String(JSON.parse(readFileSync(packageUrl, "utf8"))?.version || "").trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+function traceImplementationDigest() {
+  try {
+    const bytes = readFileSync(fileURLToPath(import.meta.url));
+    return `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+  } catch {
+    return null;
+  }
+}
+
+const GITHUB_DELIVERY_VERSION = packageVersion();
+const TRACE_IMPLEMENTATION_DIGEST = traceImplementationDigest();
 
 function cleanString(value) {
   return typeof value === "string" && value.length > 0 ? value : null;
@@ -39,6 +72,20 @@ function safeDuration(value) {
   return Number.isFinite(value) && value >= 0 ? Math.round(value) : null;
 }
 
+function safeTokenCount(value) {
+  return Number.isFinite(value) && value >= 0 ? Math.round(value) : null;
+}
+
+function safeUsage(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const usage = {};
+  for (const key of USAGE_KEYS) {
+    const count = safeTokenCount(value[key]);
+    if (count !== null) usage[key] = count;
+  }
+  return Object.keys(usage).length > 0 ? usage : null;
+}
+
 function safeOutcome(value) {
   const outcome = String(value || "").trim().toLowerCase();
   return ALLOWED_OUTCOMES.has(outcome) ? outcome : null;
@@ -49,10 +96,64 @@ function safeErrorKind(value) {
   return ERROR_KIND_RE.test(kind) ? kind : null;
 }
 
-function sanitizeEvent(event, provider, traceKind = TRACE_KIND, timestamp = new Date()) {
+function createIdPseudonymizer(salt) {
+  const key = Buffer.isBuffer(salt) ? salt : Buffer.from(String(salt || ""), "utf8");
+  return (value) => {
+    const text = cleanString(value);
+    if (!text) return null;
+    const digest = createHash("sha256")
+      .update(key)
+      .update("\0")
+      .update(text, "utf8")
+      .digest("hex")
+      .slice(0, 24);
+    return `id:${digest}`;
+  };
+}
+
+function traceMetadata(provider, env, traceKind = TRACE_KIND) {
+  const metadata = {
+    schemaVersion: 1,
+    kind: traceKind,
+    provider,
+    type: "trace_metadata",
+  };
+  if (GITHUB_DELIVERY_VERSION) metadata.githubDeliveryVersion = GITHUB_DELIVERY_VERSION;
+  if (TRACE_IMPLEMENTATION_DIGEST) metadata.traceImplementationDigest = TRACE_IMPLEMENTATION_DIGEST;
+  const commit = cleanString(env?.GITHUB_DELIVERY_BUILD_COMMIT);
+  if (commit) metadata.githubDeliveryCommit = commit;
+  const workflow = cleanString(env?.GITHUB_DELIVERY_WORKFLOW);
+  if (workflow) metadata.workflow = workflow;
+  return metadata;
+}
+
+function sanitizeEvent(
+  event,
+  provider,
+  traceKind = TRACE_KIND,
+  timestamp = new Date(),
+  pseudonymizeId = createIdPseudonymizer("default"),
+) {
   if (!event || typeof event !== "object") return null;
   const type = cleanString(event.type);
   if (!type || !ALLOWED_EVENT_TYPES.has(type)) return null;
+
+  if (type === "trace_metadata") {
+    return {
+      ...traceMetadata(provider, event.env || {}, traceKind),
+      timestamp: timestamp.toISOString(),
+      ...(cleanString(event.githubDeliveryVersion)
+        ? { githubDeliveryVersion: event.githubDeliveryVersion }
+        : {}),
+      ...(cleanString(event.traceImplementationDigest)
+        ? { traceImplementationDigest: event.traceImplementationDigest }
+        : {}),
+      ...(cleanString(event.githubDeliveryCommit)
+        ? { githubDeliveryCommit: event.githubDeliveryCommit }
+        : {}),
+      ...(cleanString(event.workflow) ? { workflow: event.workflow } : {}),
+    };
+  }
 
   const sanitized = {
     schemaVersion: 1,
@@ -62,10 +163,12 @@ function sanitizeEvent(event, provider, traceKind = TRACE_KIND, timestamp = new 
     timestamp: timestamp.toISOString(),
   };
 
-  for (const key of ["threadId", "turnId", "itemId", "itemType", "parentItemId"]) {
-    const value = cleanString(event[key]);
+  for (const key of ATTRIBUTION_KEYS) {
+    const value = pseudonymizeId(event[key]);
     if (value) sanitized[key] = value;
   }
+  const itemType = cleanString(event.itemType);
+  if (itemType) sanitized.itemType = itemType;
 
   if (type === "reasoning_summary_delta") {
     sanitized.text = typeof event.text === "string" ? event.text : "";
@@ -78,6 +181,11 @@ function sanitizeEvent(event, provider, traceKind = TRACE_KIND, timestamp = new 
     if (outcome) sanitized.outcome = outcome;
     if (durationMs !== null) sanitized.durationMs = durationMs;
     if (errorKind) sanitized.errorKind = errorKind;
+  }
+
+  if (type === "turn_completed") {
+    const usage = safeUsage(event.usage);
+    if (usage) sanitized.usage = usage;
   }
 
   const decision = cleanString(event.watchdogDecision);
@@ -176,6 +284,7 @@ export function createAgentDebugTraceRecorder({
   maxBytes = DEFAULT_MAX_BYTES,
   traceKind = TRACE_KIND,
   reasoningCoalesceBytes = DEFAULT_REASONING_COALESCE_BYTES,
+  idSalt = randomBytes(32),
 } = {}) {
   if (!debugTraceEnabled(env)) return disabledRecorder();
 
@@ -193,6 +302,7 @@ export function createAgentDebugTraceRecorder({
   let fd = opened.fd;
   let bytesWritten = 0;
   let pendingReasoning = null;
+  const pseudonymizeId = createIdPseudonymizer(idSalt);
 
   function writeSanitized(sanitized) {
     if (fd === null) return false;
@@ -204,6 +314,11 @@ export function createAgentDebugTraceRecorder({
     return true;
   }
 
+  writeSanitized({
+    ...traceMetadata(normalizedProvider, env, traceKind),
+    timestamp: now().toISOString(),
+  });
+
   function flushReasoning() {
     if (!pendingReasoning) return true;
     const pending = pendingReasoning;
@@ -213,7 +328,13 @@ export function createAgentDebugTraceRecorder({
 
   function record(event) {
     if (fd === null) return false;
-    const sanitized = sanitizeEvent(event, normalizedProvider, traceKind, now());
+    const sanitized = sanitizeEvent(
+      event,
+      normalizedProvider,
+      traceKind,
+      now(),
+      pseudonymizeId,
+    );
     if (!sanitized) return false;
 
     if (sanitized.type === "reasoning_summary_delta") {
@@ -264,7 +385,15 @@ export function appendAgentDebugTraceEvent({
   const normalizedProvider = checkedProvider(provider);
   const scope = cleanString(scopeId);
   if (!scope) return { recorded: false, path: null };
-  const sanitized = sanitizeEvent(event, normalizedProvider, traceKind, now());
+  const scopeDigest = createHash("sha256").update(scope).digest();
+  const pseudonymizeId = createIdPseudonymizer(scopeDigest);
+  const sanitized = sanitizeEvent(
+    event,
+    normalizedProvider,
+    traceKind,
+    now(),
+    pseudonymizeId,
+  );
   if (!sanitized) return { recorded: false, path: null };
 
   const root = traceRoot(env, stateDir);
@@ -274,8 +403,17 @@ export function appendAgentDebugTraceEvent({
   const digest = createHash("sha256").update(scope).digest("hex");
   const path = join(directory, `${normalizedProvider}-hook-${digest}.jsonl`);
   const existing = existingRegularFile(path);
-  const line = `${JSON.stringify(sanitized)}\n`;
-  const bytes = Buffer.byteLength(line);
+  const records = existing
+    ? [sanitized]
+    : [
+        {
+          ...traceMetadata(normalizedProvider, env, traceKind),
+          timestamp: now().toISOString(),
+        },
+        sanitized,
+      ];
+  const payload = records.map((record) => `${JSON.stringify(record)}\n`).join("");
+  const bytes = Buffer.byteLength(payload);
   const currentBytes = existing?.size || 0;
   if (currentBytes + bytes > byteLimit(maxBytes)) return { recorded: false, path };
 
@@ -284,7 +422,7 @@ export function appendAgentDebugTraceEvent({
     const postOpen = statSync(path);
     assertOwnedByCurrentUser(postOpen, path);
     if (!postOpen.isFile()) throw new Error(`Debug trace path is not a regular file: ${path}`);
-    writeSync(fd, line, null, "utf8");
+    writeSync(fd, payload, null, "utf8");
   } finally {
     closeSync(fd);
   }
