@@ -18,17 +18,18 @@ function normalizedUsage(event) {
   const cachedInputTokens = safeCount(
     source.cache_read_input_tokens ?? source.cached_input_tokens ?? source.cachedInputTokens,
   );
+  const cacheCreationInputTokens = safeCount(
+    source.cache_creation_input_tokens ?? source.cacheCreationInputTokens,
+  );
   const outputTokens = safeCount(source.output_tokens ?? source.outputTokens);
   const reasoningTokens = safeCount(
     source.reasoning_tokens ?? source.reasoningTokens,
   );
-  let totalTokens = safeCount(source.total_tokens ?? source.totalTokens);
-  if (totalTokens === null && inputTokens !== null && outputTokens !== null) {
-    totalTokens = inputTokens + outputTokens;
-  }
+  const totalTokens = safeCount(source.total_tokens ?? source.totalTokens);
   const usage = {
     ...(inputTokens !== null ? { inputTokens } : {}),
     ...(cachedInputTokens !== null ? { cachedInputTokens } : {}),
+    ...(cacheCreationInputTokens !== null ? { cacheCreationInputTokens } : {}),
     ...(outputTokens !== null ? { outputTokens } : {}),
     ...(reasoningTokens !== null ? { reasoningTokens } : {}),
     ...(totalTokens !== null ? { totalTokens } : {}),
