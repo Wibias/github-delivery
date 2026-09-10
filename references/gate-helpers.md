@@ -13,18 +13,19 @@ Run exactly one authoritative decision first:
 node "<github-delivery>/scripts/ship-gate.mjs" OWNER/REPO N \
   --mutation-mode read-only
 
-# full review (review, or maintainer with fix/simplify):
+# full review: use the router-derived read-only, review, or maintainer mode:
 node "<github-delivery>/scripts/ship-gate.mjs" OWNER/REPO N \
-  --mutation-mode review \
+  --mutation-mode <routed-mode> \
   --workflow references/full-review-pr.md
 ```
 
 The command captures one evidence snapshot and evaluates required checks, base health, review policy, unresolved threads, trusted feedback, merge state, and advisory CODEOWNERS against that same head SHA. Its output also includes the active mutation profile.
 
 Gate invocation contract: pass the router-derived mutation mode plus the
-matched `--workflow`. The gate rejects an incompatible combination, for example
-`--mutation-mode read-only --workflow references/full-review-pr.md`, because a
-stricter self-selected mode is a workflow violation, not a publication excuse.
+matched `--workflow`. `references/full-review-pr.md` accepts its declared
+`read-only`, `review`, and `maintainer` routes. The gate rejects incompatible
+combinations; a self-selected mode that differs from the router output is a
+workflow violation and cannot manufacture publication authority.
 
 Decision contract:
 
@@ -36,28 +37,31 @@ Known blockers outrank unknown evidence. Unknown evidence outranks readiness. No
 
 ## Verdict publication check
 
-Full-review runs must verify the verdict landed before marking
-`Publish final verdict` complete:
+A bare/read-only full review delivers its format-complete verdict in chat and
+does not run a GitHub publication check. When the routed request explicitly
+authorizes verdict publication, verify that publication before marking the
+publication step complete:
 
 ```bash
 node "<github-delivery>/scripts/verify-verdict-published.mjs" OWNER/REPO N \
   --run-id fr-<PR>-<head-short-sha>-<UTC-start-time> \
   --head <40-char-reviewed-head-sha> \
-  --mutation-mode review
+  --mutation-mode <routed-review-or-maintainer-mode>
 ```
 
-Exit `0` requires `published: true` **and** `format.valid: true` — the only
-normal completion proof. Exit `1` means the verdict is not published or fails
-the verdict format gate (strict `[GD] Verdict:` label, `### TLDR` with every
+For an authorized publication, exit `0` requires `published: true` **and**
+`format.valid: true`. Exit `1` means the verdict is not published or fails the
+verdict format gate (strict `[GD] Verdict:` label, `### TLDR` with every
 required bullet, full verdict inside a `<details>` dropdown after the TLDR);
-exit `2` means the check itself failed. Chat-only delivery never satisfies this
-check unless GitHub publication was genuinely unavailable and that hard blocker
-is recorded.
+exit `2` means the check itself failed. If explicitly requested publication is
+genuinely unavailable, record that hard blocker and deliver the complete
+verdict in chat; do not elevate the mutation mode to bypass the blocker.
 
-Same-head anti-noise (PR #1066): when `planVerdictPublication` returns
-`reuse_same_head`, re-verify with `--allow-same-head-reuse --body-file <draft>`
-so exit `0` can report `reused: true` against the existing completed same-head
-verdict instead of requiring a second post under the new run ID.
+Same-head anti-noise (PR #1066) applies only on the authorized publication path:
+when `planVerdictPublication` returns `reuse_same_head`, re-verify with
+`--allow-same-head-reuse --body-file <draft>` so exit `0` can report
+`reused: true` against the existing completed same-head verdict instead of
+requiring a second post under the new run ID.
 
 ## Adaptive readiness settle
 
