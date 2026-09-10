@@ -19,10 +19,13 @@ Policy modules:
 At the start of every full-review run, create or maintain an explicit execution
 plan. Its final required item MUST be named exactly:
 
-`Publish final verdict`
+`Deliver final verdict`
 
 That item starts as `pending` and may be marked `completed` only after the final
-verdict has actually been delivered for the currently reviewed PR head.
+verdict has actually been delivered for the currently reviewed PR head. A bare
+full review delivers that verdict in chat. GitHub publication is an additional
+mutation and occurs only when the routed request explicitly grants the relevant
+publication action.
 
 The required plan must include, at minimum:
 
@@ -33,16 +36,16 @@ The required plan must include, at minimum:
 5. Complete bug review.
 6. Complete security review.
 7. Complete Spec and Standards review.
-8. Triage human and bot feedback. **After pushing fixes for a human (owner/maintainer) comment, post the `[GD] Addressed feedback` resolution record** referencing that comment's exact key plus the fix commit — the wake gate only credits a human comment as addressed via such a record, and a bare push leaves it `unaddressed` so the gate re-flags it on every run (the PR #1068 loop). Use `addressedFeedbackPlan` from `watch-wake-gate.mjs` (or `scripts/lib/addressed-feedback-dedup.mjs`) for the edit-vs-post decision, and `--resolve-bot` for bot threads.
+8. Triage human and bot feedback. **After pushing fixes for a human (owner/maintainer) comment, post the `[GD] Addressed feedback` resolution record only when the routed request authorizes that publication mutation.** The wake gate credits a human comment as addressed via such a record; when publication is not authorized, record the owner action in the verdict instead of escalating authority. Use `addressedFeedbackPlan` from `watch-wake-gate.mjs` (or `scripts/lib/addressed-feedback-dedup.mjs`) for an authorized edit-vs-post decision, and `--resolve-bot` only when the routed mode permits that mutation.
 9. Run `references/simplify-pr.md` unless this request opts out (`without simplify`, `skip simplify`, `don't simplify`). Nothing worth simplifying is valid. Auto-apply eligible contract-card candidates only on our PR when `push_code` is already allowed; foreign and read-only stay report-only.
 10. Validate the current head and required CI.
 11. Refresh the authoritative ship gate.
-12. Publish final verdict.
+12. Deliver the final verdict. Publish it to GitHub only when the routed request explicitly authorizes verdict publication.
 
 If no-comments or simplify changed the head, re-run the remaining review on that head with both passes disabled. There is no recursive hygiene pass.
 
 The run **MUST NOT stop, return, hand off, emit a final response, or report
-completion** while `Publish final verdict` or any required prerequisite is
+completion** while `Deliver final verdict` or any required prerequisite is
 `pending` or `in_progress`.
 
 ## Token-efficient review flow (start here)
@@ -129,28 +132,14 @@ Before every attempted stop:
 3. Refresh the PR head.
 4. Invalidate stale evidence when the head changed.
 5. Obtain the authoritative `ship-gate.mjs` result for that head.
-6. Publish exactly one final verdict:
+6. Produce exactly one final verdict:
    - `approve-comment`;
    - `changes-requested`;
    - `not-useful`;
    - `gated`.
-7. Mark `Publish final verdict` complete only after delivery.
-8. Run `scripts/verify-verdict-published.mjs` with the run ID and reviewed head
-   and require `published: true` **and `format.valid: true`**, unless a
-   publication-unavailable hard blocker was recorded (see below). A verdict
-   that fails the format gate (missing strict label, `### TLDR`, or `<details>`
-   dropdown) is an incomplete publication: repair the current-run comment with
-   `edit_own_comment` and re-run the verifier until both fields pass.
-9. **Freshness gate before publishing** (PR #1108 lesson): re-check the review
-   threads on the exact reviewed head immediately before posting. If any
-   unresolved, non-outdated **bot-authored** thread is present (or landed after
-   your evidence was gathered), do **not** publish the verdict yet — address or
-   rebut those findings on the head first, then re-verify. Use
-   `assessVerdictFreshness` from `scripts/lib/verdict-publication.mjs` (or run
-   `scripts/review-threads.mjs --resolve-bot` to clear bot threads you already
-   verified). A verdict published while a fresh bot review is actionable on the
-   same head is stale and will be rejected by the human reviewer (see Ingwannu
-   on #1108).
+7. If verdict publication is explicitly authorized, run the publication freshness gate, publish/reuse exactly one format-valid GitHub verdict, verify it, then mark `Deliver final verdict` complete. Otherwise deliver the same complete verdict in chat and mark `Deliver final verdict` complete without a GitHub mutation.
+8. When publication is authorized, run `scripts/verify-verdict-published.mjs` with the run ID and reviewed head and require `published: true` **and `format.valid: true`**. A verdict that fails the format gate (missing strict label, `### TLDR`, or `<details>` dropdown) is an incomplete authorized publication: repair the current-run comment with `edit_own_comment` and re-run the verifier until both fields pass.
+9. **Freshness gate before authorized publication** (PR #1108 lesson): re-check the review threads on the exact reviewed head immediately before posting. If any unresolved, non-outdated **bot-authored** thread is present (or landed after your evidence was gathered), do not publish yet — address or rebut those findings on the head first, then re-verify. Use `assessVerdictFreshness` from `scripts/lib/verdict-publication.mjs` (or run `scripts/review-threads.mjs --resolve-bot` when that mutation is authorized) to clear bot threads you already verified. A verdict published while a fresh bot review is actionable on the same head is stale.
 
 A blocker is input to the final verdict, not permission to skip it.
 
@@ -164,14 +153,14 @@ The following are never terminal full-review states:
 - unavailable optional tooling;
 - incomplete or unavailable API evidence;
 - waiting for another continuation prompt;
-- completion of review work without publication of the verdict.
+- completion of review work without delivery of the final verdict.
 
-If GitHub publication is unavailable for a genuine auth, network, or API
-reason, record the exact failure as a hard publication blocker, then provide
-the complete verdict in chat, including the reviewed head, findings, blockers,
-evidence limitations, and next action. That is the only chat-only completion
-path. Choosing a stricter mutation mode on your own is not publication
-unavailability and never satisfies this item.
+For a read-only full review, chat delivery is the normal completion path. If
+GitHub publication was explicitly requested but is unavailable for a genuine
+auth, network, or API reason, record the exact failure as a hard publication
+blocker and provide the complete verdict in chat, including the reviewed head,
+findings, blockers, evidence limitations, and next action. Never elevate the
+mutation mode merely to make publication possible.
 
 The only permitted exit without a verdict is explicit user cancellation.
 
@@ -254,21 +243,23 @@ The identifier remains unchanged throughout this same run, including:
 - Bugbot fallback;
 - context compaction or resumed execution;
 - head refreshes;
-- correction of a partial verdict publication.
+- correction of an authorized partial verdict publication.
 
 A later explicit full-review request creates a new `full-review-run-id` for
 tracking, even when it targets the same PR and the same head. That does **not**
-automatically authorize a second top-level PR comment — see same-head reuse
-below.
+authorize any top-level PR comment. Publication authority comes only from the
+routed user request.
 
-### Final verdict publication
+### Final verdict delivery and optional publication
 
-Every completed full-review run MUST end with a published format-valid verdict
-for the reviewed head. Publication uses:
+Every completed full-review run MUST end with a format-complete verdict for the
+reviewed head. A bare full review is `read-only` and delivers the verdict in
+chat. Only an explicit publication request such as `post the verdict` grants
+GitHub verdict-comment authority. When publication is authorized, use:
 
 `<!-- github-delivery:full-review-verdict run:<full-review-run-id> head:<reviewed-head-sha> -->`
 
-Before publishing, call `planVerdictPublication` from
+Before an authorized publication, call `planVerdictPublication` from
 `scripts/lib/verdict-publication.mjs` (or apply the same rules manually) against
 the PR conversation comments and the draft verdict body:
 
@@ -278,8 +269,8 @@ the PR conversation comments and the draft verdict body:
    (`already_published`).
 3. Completed same-head verdict exists and material delta is empty (same label +
    same required TLDR bullet values after normalization) → **reuse** that
-   comment; do **not** `post_comment` again (`reuse_same_head`). Report
-   `reused same-head verdict comment`. This is the PR #1066 anti-noise rule.
+   comment; do not `post_comment` again (`reuse_same_head`). Report
+   `reused same-head verdict comment`.
 4. Completed same-head verdict exists and material delta is non-empty →
    `post_comment` a **new** top-level verdict with the new run ID. Prior
    same-head verdicts stay immutable historical evidence.
@@ -292,13 +283,17 @@ Material delta = verdict label change **or** any required TLDR bullet value
 change. Wording-only churn in the details dropdown, or a second agent finishing
 the same tip with the same gate, is **not** material.
 
-The mutation mode for this workflow is derived by the router: `review` for a
-bare full review, `maintainer` when `fix` or `simplify` is explicitly requested.
-Run the authoritative gate with the routed mode plus
-`--workflow references/full-review-pr.md`; the gate rejects `read-only` for this
-workflow. A self-selected stricter mode is a workflow violation.
+The mutation mode for this workflow is derived by the router: `read-only` for a
+bare full review, `review` when verdict publication is explicitly requested,
+and `maintainer` when `fix` or `simplify` is explicitly requested. Explicit
+publication can add `post_comment` to an authorized maintainer route. Run the
+authoritative gate with the routed mode plus
+`--workflow references/full-review-pr.md`; all three declared modes are valid.
+Never self-elevate from the routed mode to gain publication authority.
 
-After posting or deciding to reuse, verify publication before marking the plan item complete. On `reuse_same_head`, verification is against the reused comment's run marker / format (already published), not a missing current-run marker:
+After an authorized post or reuse, verify publication before marking the plan
+item complete. On `reuse_same_head`, verification is against the reused
+comment's run marker / format:
 
 ```bash
 node scripts/verify-verdict-published.mjs OWNER/REPO PR_NUMBER \
@@ -306,13 +301,12 @@ node scripts/verify-verdict-published.mjs OWNER/REPO PR_NUMBER \
   --mutation-mode <routed-mode>
 ```
 
-`published: true` **and** `format.valid: true` are required, unless a
-publication-unavailable hard blocker was recorded as described above.
-`format.valid: false` lists the exact missing structure
+`published: true` **and** `format.valid: true` are required for an authorized
+GitHub publication. `format.valid: false` lists the exact missing structure
 (`verdict_heading_missing` / `verdict_label_invalid`,
 `tldr_heading_missing`, `tldr_bullets_missing:<keys>`,
 `details_dropdown_missing`, `tldr_not_before_details`); repair the current-run
-comment and re-verify before marking the plan item complete.
+comment and re-verify before marking the authorized publication complete.
 
 <!-- assertion-anchors -->
 <!-- assertion: verdict-requires-tldr -->
@@ -322,31 +316,34 @@ comment and re-verify before marking the plan item complete.
 <!-- assertion: tldr-covers-all-axes -->
 <!-- assertion: full-verdict-in-details -->
 <!-- assertion: no-detail-dropped -->
-<!-- assertion: verdict-publication-intrinsic -->
-<!-- assertion: verdict-publication-verified -->
-<!-- assertion: full-review-verdict-authority -->
-<!-- assertion: read-only-not-default-for-full-review -->
+<!-- assertion: verdict-publication-explicit-intent -->
+<!-- assertion: verdict-publication-verified-when-authorized -->
+<!-- assertion: bare-full-review-read-only -->
 <!-- assertion: router-mode-authority -->
-<!-- assertion: no-self-read-only-for-full-review -->
-<!-- assertion: chat-only-requires-unavailable-blocker -->
+<!-- assertion: no-self-elevation-for-full-review -->
+<!-- assertion: chat-delivery-read-only -->
 <!-- /assertion-anchors -->
 
-Once `Publish final verdict` is marked complete, that comment becomes immutable
+Once an authorized verdict comment is complete, that comment becomes immutable
 historical review evidence.
 
-The final chat report must use:
+When publication was authorized, the final chat report must use:
 
 - `posted new verdict comment` when this run created a new top-level verdict;
 - `repaired current-run verdict comment` only when this run repaired its own
   incomplete publication;
 - `reused same-head verdict comment` when a completed same-head verdict was
-  reused because the material delta was empty (no second post).
+  reused because the material delta was empty.
 
-It must never describe a non-material same-head re-run as a second publication.
+For a read-only run, report that the verdict was delivered in chat and that no
+GitHub verdict publication was authorized.
 
 ## Goal
 
-Same babysit bar as **make merge-ready**: clear useful human + bot comments, own bug + security + **spec/standards**, fix in-PR, **required CI green**, then a **verdict** comment (usefulness included). Do **not** merge unless asked.
+Same babysit bar as **make merge-ready**: clear useful human + bot comments as
+authorized, own bug + security + **spec/standards**, verify **required CI
+green**, then deliver a complete **verdict**. Publish that verdict to GitHub
+only when explicitly requested. Do **not** merge unless asked.
 
 **Keep going on each targeted PR** until that bar (or a **hard blocker**). Soft opinions are not stop conditions.
 
@@ -371,20 +368,20 @@ A normal full review runs **no-comments** then, after correctness work, **simpli
 
 `changes-requested` also covers owner actions on a foreign PR: update from the latest base and apply the listed simplification candidates.
 
-**Forbidden stop excuses** (report in chat if relevant, but **keep fixing CI + comments**):
+**Forbidden stop excuses** (report in chat if relevant, but **keep fixing CI + comments when those mutations are authorized**):
 
 - “Needs maintainer security ack” / “should get human OK first”
 - “Security relevance possible” without a concrete unfixed finding
 - Treating shared/infra CI noise as done while **this PR’s** required checks are still red (classify + flake retries per shared rules; if budget exhausted → hard-blocker row, not a fake `gated`)
-- Skipping a required CI failure as “unrelated / introduced elsewhere” instead of a minimal harden/fix (shared scope lock)
+- Skipping a required CI failure as “unrelated / introduced elsewhere” instead of a minimal harden/fix when the request authorizes that fix (shared scope lock)
 
 ## Steps
 
 1. Identify PR(s); checkout head (subagent preflight); note base, linked issues, draft/WIP gates, and the PR author vs authenticated viewer (shared **PR ownership boundary**). If draft and user wanted green/merge-ready: ask once about **Draft → ready**.
 2. Usefulness pass: real bug / claimed value? If not → `not-useful` verdict and stop that PR only.
 3. Parallel where useful: **Bug** via **`references/bug-review.md`** (scope → Bugbot when Cursor → static analysis leads + complementary). On Cursor, use that file's literal `review-bugbot` prompt contract; do not construct or paraphrase a replacement prompt in this workflow. **Security** via **`references/security-review.md`** (never Cursor harness `security-review` / `review-security`). Run **Spec + Standards** through the bundled **`references/spec-standards-review.md`** method. It owns the fixed comparison, source discovery, two independent axes, and advisory `references/code-smells.md` baseline; do not depend on an optional external review skill.
-4. Triage open human + bot comments (shared rules — owners/maintainers first). Fix useful; decline nits with rationale. Inline replies in-thread only. **After verifying a bot-authored thread is addressed on the current head (fix or durable decline), resolve it yourself** via `scripts/review-threads.mjs --resolve-bot` — do **not** punt bot-thread bookkeeping to the PR owner. Human threads stay an owner action unless explicit resolution is authorized.
-5. Update from base and push the base sync **only when the PR is ours** (shared **PR ownership boundary**); on a foreign PR, record the owner actions (update from latest base / resolve conflicts) for the verdict and do not push the base sync.
+4. Triage open human + bot comments (shared rules — owners/maintainers first). Fix useful or decline nits with rationale only when the routed request grants the required mutation. Otherwise report the action in the verdict. Inline replies in-thread only. Resolve bot threads via `scripts/review-threads.mjs --resolve-bot` only when review-thread mutation is authorized. Human threads stay an owner action unless explicit resolution is authorized.
+5. Update from base and push the base sync **only when the PR is ours and `push_code` is authorized** (shared **PR ownership boundary**); on a foreign or read-only PR, record the owner actions for the verdict and do not push the base sync.
 
 <!-- assertion-anchors -->
 <!-- assertion: foreign-pr-no-base-push -->
@@ -393,23 +390,29 @@ A normal full review runs **no-comments** then, after correctness work, **simpli
 <!-- assertion: owner-updates-base -->
 <!-- /assertion-anchors -->
 
- Push scoped fixes under the existing fork-head/push rules; **verify compile/tests against tip**; **wait and recheck** until useful threads quiet **and** required CI green on that tip SHA, or a hard blocker. Use **rate-limit backoff** (Composio → gh) on dense polls. **Doomed-run guard:** if a bot review (CodeRabbit/Codex) is still in progress or an actionable human thread is open, finish triage and patch/push **before** settling into the CI poll; if a bot review lands during the wait with findings on this diff, stop waiting, fix + push, and restart the CI wait on the new SHA.
+Push scoped fixes only under the existing fork-head/push rules and when
+`push_code` is authorized; verify compile/tests against tip; wait and recheck
+until useful threads are understood and required CI is green on that tip SHA,
+or a hard blocker. Use **rate-limit backoff** (Composio → gh) on dense polls.
+**Doomed-run guard:** if a bot review is still in progress or an actionable
+human thread is open, finish the permitted triage before settling into the CI
+poll. In read-only mode, record actionable feedback rather than mutating it.
 6. Changelog nudge if user-facing.
-7. **Hygiene simplify:** unless this request opts out (`without simplify`, `skip simplify`, `don't simplify`), run `references/simplify-pr.md` after the concrete bug, security, spec, review, base, and CI work above is clean but before posting the verdict. No-comments already ran at plan item 2 unless skipped.
-   - **Foreign PRs (not ours):** run the candidate pass, then **do not edit or push**; include the complete bounded candidate list in the verdict for the PR owner and skip the apply, validation, push, and re-review flow.
+7. **Hygiene simplify:** unless this request opts out (`without simplify`, `skip simplify`, `don't simplify`), run `references/simplify-pr.md` after the concrete bug, security, spec, review, base, and CI work above is clean but before final verdict delivery. No-comments already ran at plan item 2 unless skipped.
+   - **Foreign PRs (not ours) or read-only runs:** run the candidate pass, then **do not edit or push**; include the complete bounded candidate list in the verdict for the PR owner and skip the apply, validation, push, and re-review flow.
    - Keep simplification findings separate from required review findings.
    - If the simplify pass reports **nothing worth simplifying**, continue to the normal verdict without changing code.
-   - If it reports eligible contract-card candidates on **our own PR** and `push_code` is already allowed, apply them without a second yes. Bare full review stays report-only.
+   - If it reports eligible contract-card candidates on **our own PR** and `push_code` is already allowed, apply them without a second yes.
    - After a head-changing apply, run the remaining review on the exact **post-simplification head** with no-comments and simplify disabled. Re-run usefulness, bug, security, Spec/Standards, comments, base synchronization, compile/tests, required CI, thin settle, and `ship-gate.mjs`; do not merely review the cleanup diff.
-   - Publish the final verdict only from that post-hygiene head. Any regression is a blocker and must be fixed or the responsible candidate rolled back.
+   - Deliver the final verdict only from that post-hygiene head. Any regression is a blocker and must be fixed or the responsible candidate rolled back.
    - There is **no recursive simplification** pass during the mandatory re-review. There is **no second continuation prompt**.
-8. If concrete necessary issues remain: GitHub **changes requested** with those blockers only.
-9. Before `approve-comment` (or merge-ready notify): **thin settle** (`references/policy/ci.md`) — ~3–5 min quiet + recheck; activity resets; two-window cap. Skip settle for `changes-requested` / `not-useful` / draft `gated`. **Docs-only fast path:** a docs/markdown-only head uses the **~30–60s** settle in `references/policy/ci.md`. **Doomed-run abort:** if a bot review lands during the settle with findings on this diff (or an actionable human thread appears), fix + push and re-enter the settle on the new head instead of burning the old window.
-10. Post a **detailed** verdict comment **only after** CI+comments are handled (and settle, when approving) or a real hard blocker / `not-useful` / draft `gated` applies. Use the **Full-review / re-review verdict** template in `references/comment-depth.md` — lead with the **TLDR** (decision, every axis outcome, blockers, owner actions, bottom line) and keep the complete verdict in a `<details>` dropdown. Fill Usefulness, Bugs, Security, Spec, Reviews, Base/CI, Gate, Bottom line with paths/SHAs/checks; the TLDR never drops a blocker, owner action, or required next step. Do not post a bullet stub of “bots: addressed / CI: green.” When simplification ran, include the approved candidates, rollback status, validation evidence, and exact post-simplification head. When the PR is not ours, also fill the **Base sync (for the PR owner)** line and **Simplification (for the PR owner)** section with the owner actions. The publication verifier rejects a verdict missing the TLDR or `<details>` structure — repair the current-run comment and re-verify; a format failure never counts as published.
+8. If concrete necessary issues remain, use `changes-requested`; submit a GitHub Request changes review only when that mutation is explicitly authorized.
+9. Before `approve-comment` (or an authorized merge-ready notify): **thin settle** (`references/policy/ci.md`) — ~3–5 min quiet + recheck; activity resets; two-window cap. Skip settle for `changes-requested` / `not-useful` / draft `gated`. **Docs-only fast path:** a docs/markdown-only head uses the **~30–60s** settle in `references/policy/ci.md`. **Doomed-run abort:** if a bot review lands during the settle with findings on this diff (or an actionable human thread appears), reassess and, when fixes are authorized, fix + push and re-enter the settle on the new head.
+10. Deliver a **detailed** final verdict only after CI+comments are handled or a real hard blocker / `not-useful` / draft `gated` applies. Use the **Full-review / re-review verdict** template in `references/comment-depth.md` — lead with the **TLDR** (decision, every axis outcome, blockers, owner actions, bottom line) and keep the complete evidence in the required structured form. Fill Usefulness, Bugs, Security, Spec, Reviews, Base/CI, Gate, Bottom line with paths/SHAs/checks; the TLDR never drops a blocker, owner action, or required next step. When simplification ran, include the candidates, rollback status, validation evidence, and exact post-simplification head. When the PR is not ours or the run is read-only, include the owner actions instead of performing unauthorized mutations. If GitHub verdict publication is explicitly authorized, use the format-valid `[GD] Verdict` comment contract and verify it after posting/reuse.
 
-Keep the `[GD] Verdict` comment as the format-valid published verdict. After it posts, run `planNativeReviewSidecar` and execute its broker operations through `github-mutate.mjs`. Request changes when the label is `changes-requested`, the viewer is not the PR author, and write permission exists; otherwise skip the native review and still treat the comment as published. On a later pass, dismiss our pending Request changes first, then submit a new Request changes if findings remain. For `approve-comment`, dismiss our pending Request changes only. Never submit GitHub Approve unless the user explicitly asked. Native review bodies stay short and point at the `[GD]` comment; they never dump the full verdict.
+When an authorized `[GD] Verdict` comment posts, run `planNativeReviewSidecar` and execute its broker operations through `github-mutate.mjs` only if the routed request also authorizes the required native-review mutation. Never submit GitHub Approve unless the user explicitly asked.
 
-If the verdict is `approve-comment` (clean): also post merge-ready PR + linked-issue notify per `fix-pr-bots` (idempotent) unless the user asked for verdict-only.
+If the verdict is `approve-comment`, post merge-ready PR + linked-issue notifications only when those publication actions are authorized by the routed request. Otherwise report merge readiness in the chat verdict without mutating GitHub.
 
 ## Done when
 
@@ -418,12 +421,12 @@ For **every** targeted PR:
 - Usefulness assessed
 - Bug + security reviews done
 - Bundled Spec + Standards method completed on the recorded base/head comparison, with sources and both axis results preserved
-- Useful bots/humans handled or declined with rationale
+- Useful bots/humans handled or recorded as owner actions according to the routed mutation authority
 - Required CI green **or** hard-blocker reported (flake budget exhausted / permissions / etc.) — **never** “done” with unexplained red CI
 - When no-comments or simplify ran: findings were reported or applied per ownership/`push_code`, validation passed, and the remaining review reran on the post-hygiene head with both passes disabled and no recursive hygiene
-- Foreign PRs: no base-sync push and no simplification edits; the verdict delivered the owner actions (update from latest base / apply the listed simplification candidates)
-- Thin settle completed before `approve-comment` / merge-ready (not for reject/gated labels)
-- Verdict posted with a **valid** label (see table)
-- Verdict verified published via `scripts/verify-verdict-published.mjs`
-  (`published: true` and `format.valid: true`), or a recorded publication-unavailable hard blocker exists
+- Foreign/read-only PRs: no unauthorized base-sync push, simplification edit, thread resolution, review submission, or comment publication
+- Thin settle completed before `approve-comment` / authorized merge-ready publication (not for reject/gated labels)
+- Final verdict delivered with a **valid** label (see table)
+- If verdict publication was explicitly authorized: the verdict is published and verified via `scripts/verify-verdict-published.mjs` (`published: true` and `format.valid: true`), or a recorded publication-unavailable hard blocker exists
+- If publication was not authorized: no GitHub verdict/comment mutation was attempted
 - No invented maintainer-ack / soft-security stop
