@@ -170,7 +170,7 @@ delta is empty. The idempotency boundary is **current run marker first**, then
 
 Canonical: `GD-PUB-004`.
 
-`Deliver final verdict` remaining pending or in_progress is never a completed state. A bare/read-only full review completes by delivering the format-complete verdict in chat. When the routed request explicitly authorizes GitHub verdict publication, `verify-verdict-published.mjs` must show `published: true` plus `format.valid: true` before that publication is complete. A blocker changes the verdict; it does not permit the workflow to omit the verdict. Never self-elevate the routed mutation mode to gain publication authority. Only explicit user cancellation may end the required full-review run without the verdict.
+`Deliver final verdict` remaining pending or in_progress is never a completed state. A bare/read-only full review completes by delivering the format-complete verdict in chat. When the routed request explicitly authorizes GitHub verdict publication, `verify-verdict-published.mjs` must show `published: true` plus `format.valid: true` before that publication is complete. A blocker changes the verdict. It does not permit the workflow to omit the verdict. Never self-elevate the routed mutation mode to gain publication authority. Only explicit user cancellation may end the required full-review run without the verdict.
 
 ## Full-review semantic completeness
 
