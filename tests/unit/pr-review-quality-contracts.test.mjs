@@ -70,7 +70,8 @@ test("re-review approve-comment clears owned stale Request changes before comple
   assert.match(rereview, /dismiss_review/);
   assert.match(rereview, /re-fetch.*reviews|refresh.*reviews/is);
   assert.match(rereview, /re-run.*ship-gate|refresh.*ship gate/is);
-  assert.match(rereview, /approve-comment[\s\S]*must not complete[\s\S]*blocked/i);
+  assert.match(rereview, /approve-comment[\s\S]*must not complete[\s\S]*owned[\s\S]*CHANGES_REQUESTED/i);
+  assert.match(rereview, /Never report `Gate: none`[\s\S]*authoritative gate is blocked/i);
 });
 
 test("review-integrity follow-up release is complete in 1.5.2", () => {
