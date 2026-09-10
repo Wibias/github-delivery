@@ -13,6 +13,7 @@ const WINDOWS_PROTECTED_COMMANDS = new Set([
   "git.com",
   "git.exe",
 ]);
+const GITHUB_CLI_COMMANDS = new Set(["gh", "gh.com", "gh.exe"]);
 
 function positiveTimeout(value, fallback) {
   const number = Number(value);
@@ -32,6 +33,25 @@ function assertDirectSpawnArgv(command, args) {
       }
       return String(value);
     }),
+  };
+}
+
+function commandBasename(command) {
+  const normalized = String(command || "").replaceAll("\\", "/");
+  return normalized.slice(normalized.lastIndexOf("/") + 1).toLowerCase();
+}
+
+function deterministicGitHubOptions(command, options, fallbackEnv) {
+  if (!GITHUB_CLI_COMMANDS.has(commandBasename(command))) return options;
+  const env = { ...(options.env ?? fallbackEnv ?? process.env) };
+  delete env.CLICOLOR_FORCE;
+  delete env.FORCE_COLOR;
+  delete env.GH_FORCE_TTY;
+  env.CLICOLOR = "0";
+  env.NO_COLOR = "1";
+  return {
+    ...options,
+    env,
   };
 }
 
@@ -144,8 +164,12 @@ export function boundedSpawnSync(
           canonicalizePath,
         })
       : argv.command;
-  const timeout = positiveTimeout(options.timeout, positiveTimeout(timeoutMs, DEFAULT_SUBPROCESS_TIMEOUT_MS));
-  const { shell: _ignoredShell, timeout: _ignoredTimeout, killSignal, ...rest } = options;
+  const runtimeOptions = deterministicGitHubOptions(argv.command, options, env);
+  const timeout = positiveTimeout(
+    runtimeOptions.timeout,
+    positiveTimeout(timeoutMs, DEFAULT_SUBPROCESS_TIMEOUT_MS),
+  );
+  const { shell: _ignoredShell, timeout: _ignoredTimeout, killSignal, ...rest } = runtimeOptions;
   const result = spawn(executable, argv.args, {
     ...rest,
     timeout,
