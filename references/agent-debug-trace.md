@@ -15,9 +15,9 @@ Any other value leaves tracing disabled. The first-class `grok-trace`, `cursor-t
 
 Traces are written under `debug-traces/` inside `GITHUB_DELIVERY_STATE_DIR` when that variable is set, otherwise under the normal `~/.github-delivery` state root. On Unix-like systems GitHub Delivery constrains trace directories to mode `0700` and trace files to `0600`. Existing symlinked or foreign-owned trace paths are rejected. Each trace is bounded to 2 MiB by default. Trace-enabled CLI launchers print the exact JSONL path when tracing starts.
 
-The trace format is JSON Lines. Every normalized event includes an ISO 8601 timestamp. Events may also contain provider, lifecycle identifiers, tool type/name, and reasoning-summary text. Raw tool inputs and outputs are not persisted by the provider adapters. Cursor hook normalization also excludes user email, workspace roots, transcript paths, model metadata, and tool payloads.
+The trace format is JSON Lines. Every normalized event includes an ISO 8601 timestamp. Events may also contain provider, lifecycle identifiers, tool type/name, nested parent-tool identity, and provider-specific safe diagnostics. Raw tool inputs and outputs are not persisted by the provider adapters. Cursor hook normalization also excludes user email, workspace roots, transcript paths, model metadata, and tool payloads.
 
-Reasoning-summary text is intentionally persisted when tracing is enabled. It can itself mention sensitive data. Treat debug traces as private diagnostic material and delete them when they are no longer needed.
+Provider-internal chain-of-thought is not a supported trace payload. Adapters that receive a distinct internal-thinking surface must discard it before recording. Some other provider surfaces expose user-enabled reasoning summaries rather than raw chain-of-thought; those remain private diagnostic material and can still mention sensitive data. Treat debug traces as private and delete them when they are no longer needed.
 
 ## Codex
 
@@ -55,7 +55,7 @@ grok-trace --prompt-file task.txt
 
 When additional Grok options are needed, use an explicit `-p`, `--prompt`, or `--prompt-file` form so the launcher does not guess which option value is the prompt.
 
-The launcher delegates to the existing Grok debug wrapper, which owns `--output-format streaming-json`. It records Grok `thought` events as reasoning-summary deltas and sanitizes tool lifecycle events without retaining `rawInput` or `rawOutput`. Intermediate `tool_call_update` progress is ignored; only terminal `completed`, `failed`, or `cancelled` updates close a traced tool item.
+The launcher delegates to the Grok debug wrapper, which owns `--output-format streaming-messages-json`. That transport exposes `session_id` and `parent_tool_use_id` on assistant/user messages so nested tool activity can be attributed to the spawning tool. Grok `thinking` blocks are discarded before normalization. Sanitized `tool_use` / `tool_result` lifecycle events retain identifiers and outcomes but never tool input/result payloads.
 
 The low-level checkout-local form remains available for development and diagnostics:
 
@@ -63,7 +63,7 @@ The low-level checkout-local form remains available for development and diagnost
 GITHUB_DELIVERY_DEBUG_TRACE=1 node scripts/grok-with-debug-trace.mjs -p "inspect this repository"
 ```
 
-A plain interactive `grok` session is intentionally not intercepted. The complete structured `thought` stream used by this adapter is available through Grok's headless `streaming-json` path, so `grok-trace` fails closed instead of pretending interactive thought tracing is available.
+A plain interactive `grok` session is intentionally not intercepted. `grok-trace` uses the headless message stream because the older `streaming-json` form exposes internal `thought` text while omitting the parent-tool identity needed to distinguish nested/subagent work.
 
 ## Cursor CLI
 

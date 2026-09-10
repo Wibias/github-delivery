@@ -64,12 +64,16 @@ export function runStructuredDebugCli({
     } catch {
       return;
     }
-    const event = normalize(message);
-    if (!event) return;
-    try {
-      recorder.record(event);
-    } catch {
-      // An individual trace write must never change the wrapped CLI execution.
+    const normalized = normalize(message);
+    if (!normalized) return;
+    const events = Array.isArray(normalized) ? normalized : [normalized];
+    for (const event of events) {
+      if (!event) continue;
+      try {
+        recorder.record(event);
+      } catch {
+        // An individual trace write must never change the wrapped CLI execution.
+      }
     }
   });
 
