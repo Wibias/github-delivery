@@ -30,15 +30,20 @@ test("approve-comment completion fails when our stale Request changes is still p
 });
 
 test("Gate none is rejected when the authoritative gate is blocked", () => {
-  const result = verifyReviewVerdictCompletion({
-    body: body("none"),
-    reviews: [],
-    viewerLogin: "reviewer",
-    shipGate: { decision: "blocked", blocked: true, unknown: false, blockers: ["reviewPolicy:review_required"] },
-  });
+  for (const gate of [
+    "none",
+    "none (not draft/WIP). Merge stays blocked by the previous CHANGES_REQUESTED review",
+  ]) {
+    const result = verifyReviewVerdictCompletion({
+      body: body(gate),
+      reviews: [],
+      viewerLogin: "reviewer",
+      shipGate: { decision: "blocked", blocked: true, unknown: false, blockers: ["reviewPolicy:review_required"] },
+    });
 
-  assert.equal(result.valid, false);
-  assert.ok(result.problems.includes("verdict_gate_summary_contradicts_ship_gate"));
+    assert.equal(result.valid, false, gate);
+    assert.ok(result.problems.includes("verdict_gate_summary_contradicts_ship_gate"), gate);
+  }
 });
 
 test("approve-comment may report an independent approval blocker after owned stale review cleanup", () => {
