@@ -86,7 +86,6 @@ test("re-review is delta-first and avoids repeated helper-contract discovery", (
 });
 
 test("review-integrity follow-up release is complete in 1.5.2", () => {
-  const pkg = JSON.parse(read("package.json"));
   const changelog = read("CHANGELOG.md");
   const release = changelog.split("## [1.5.2] - 2026-09-10")[1]?.split("## [1.5.1]")[0] ?? "";
 
