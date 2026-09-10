@@ -63,6 +63,16 @@ test("full review surfaces code quality and blast radius through canonical revie
   assert.match(outcome, /unproven/i);
 });
 
+test("re-review approve-comment clears owned stale Request changes before completion", () => {
+  const rereview = read("references/re-review-pr.md");
+
+  assert.match(rereview, /planNativeReviewSidecar/);
+  assert.match(rereview, /dismiss_review/);
+  assert.match(rereview, /re-fetch.*reviews|refresh.*reviews/is);
+  assert.match(rereview, /re-run.*ship-gate|refresh.*ship gate/is);
+  assert.match(rereview, /approve-comment[\s\S]*must not complete[\s\S]*blocked/i);
+});
+
 test("review-integrity follow-up release is complete in 1.5.2", () => {
   const pkg = JSON.parse(read("package.json"));
   const changelog = read("CHANGELOG.md");
