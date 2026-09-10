@@ -22,6 +22,74 @@ function traceEvents(path) {
     .map((line) => JSON.parse(line));
 }
 
+test("stream recorder starts with self-identifying trace metadata", () => {
+  const stateDir = mkdtempSync(join(tmpdir(), "gd-trace-metadata-"));
+  try {
+    const recorder = createAgentDebugTraceRecorder({
+      provider: "grok",
+      env: { GITHUB_DELIVERY_DEBUG_TRACE: "1", GITHUB_DELIVERY_WORKFLOW: "references/re-review-pr.md" },
+      stateDir,
+      now: () => new Date("2026-09-10T05:00:00.000Z"),
+      pid: 440,
+      idSalt: "test-salt",
+    });
+    recorder.close();
+
+    const [metadata] = traceEvents(recorder.path);
+    assert.equal(metadata.type, "trace_metadata");
+    assert.equal(metadata.githubDeliveryVersion, "1.5.2");
+    assert.match(metadata.traceImplementationDigest, /^sha256:[a-f0-9]{64}$/);
+    assert.equal(metadata.workflow, "references/re-review-pr.md");
+  } finally {
+    rmSync(stateDir, { recursive: true, force: true });
+  }
+});
+
+test("turn completion preserves numeric usage counters without raw provider payloads", () => {
+  const stateDir = mkdtempSync(join(tmpdir(), "gd-trace-usage-"));
+  try {
+    const recorder = createAgentDebugTraceRecorder({
+      provider: "grok",
+      env: { GITHUB_DELIVERY_DEBUG_TRACE: "1" },
+      stateDir,
+      now: () => new Date("2026-09-10T05:00:00.000Z"),
+      pid: 441,
+      idSalt: "test-salt",
+    });
+    recorder.record({
+      type: "turn_completed",
+      threadId: "private-session-id",
+      usage: {
+        inputTokens: 1000,
+        cachedInputTokens: 700,
+        cacheCreationInputTokens: 50,
+        outputTokens: 250,
+        reasoningTokens: 80,
+        totalTokens: 1330,
+      },
+      totalCostUsd: 12.34,
+      rawResult: "private answer",
+    });
+    recorder.close();
+
+    const events = traceEvents(recorder.path);
+    const completion = events.find((event) => event.type === "turn_completed");
+    assert.deepEqual(completion.usage, {
+      inputTokens: 1000,
+      cachedInputTokens: 700,
+      cacheCreationInputTokens: 50,
+      outputTokens: 250,
+      reasoningTokens: 80,
+      totalTokens: 1330,
+    });
+    assert.notEqual(completion.threadId, "private-session-id");
+    assert.match(completion.threadId, /^id:[a-f0-9]{24}$/);
+    assert.doesNotMatch(JSON.stringify(completion), /12\.34|private answer|totalCostUsd|rawResult/);
+  } finally {
+    rmSync(stateDir, { recursive: true, force: true });
+  }
+});
+
 test("stream recorder coalesces adjacent reasoning deltas with the same identity", () => {
   const stateDir = mkdtempSync(join(tmpdir(), "gd-trace-coalesce-"));
   try {
@@ -31,6 +99,7 @@ test("stream recorder coalesces adjacent reasoning deltas with the same identity
       stateDir,
       now: () => new Date("2026-09-09T05:00:00.000Z"),
       pid: 437,
+      idSalt: "test-salt",
     });
     recorder.record({ type: "reasoning_summary_delta", threadId: "thread-1", turnId: "turn-1", itemId: "reasoning-1", text: "Inspect " });
     recorder.record({ type: "reasoning_summary_delta", threadId: "thread-1", turnId: "turn-1", itemId: "reasoning-1", text: "the controller " });
@@ -38,7 +107,7 @@ test("stream recorder coalesces adjacent reasoning deltas with the same identity
     recorder.record({ type: "item_started", threadId: "thread-1", turnId: "turn-1", itemId: "call-1", itemType: "read_file" });
     recorder.close();
 
-    const events = traceEvents(recorder.path);
+    const events = traceEvents(recorder.path).filter((event) => event.type !== "trace_metadata");
     assert.equal(events.length, 2);
     assert.equal(events[0].type, "reasoning_summary_delta");
     assert.equal(events[0].text, "Inspect the controller once.");
@@ -58,12 +127,13 @@ test("reasoning coalescing stops at an identity boundary", () => {
       stateDir,
       now: () => new Date("2026-09-09T05:00:00.000Z"),
       pid: 438,
+      idSalt: "test-salt",
     });
     recorder.record({ type: "reasoning_summary_delta", turnId: "a", text: "first" });
     recorder.record({ type: "reasoning_summary_delta", turnId: "b", text: "second" });
     recorder.close();
 
-    const events = traceEvents(recorder.path);
+    const events = traceEvents(recorder.path).filter((event) => event.type === "reasoning_summary_delta");
     assert.deepEqual(events.map((event) => event.text), ["first", "second"]);
     assert.deepEqual(events.map((event) => event.deltaCount), [1, 1]);
   } finally {
@@ -96,6 +166,42 @@ test("Grok terminal tool updates expose only safe outcome duration and error met
   assert.equal(failed.durationMs, 330);
   assert.equal(failed.errorKind, "tool_failed");
   assert.doesNotMatch(JSON.stringify(failed), /token=private|C:\/private|rawOutput|stack/);
+});
+
+test("Grok result normalizes provider-reported usage without inventing a total", () => {
+  const [completed] = normalizeGrokDebugTraceEvent({
+    type: "result",
+    session_id: "session-1",
+    usage: {
+      input_tokens: 1200,
+      cache_read_input_tokens: 800,
+      cache_creation_input_tokens: 40,
+      output_tokens: 300,
+    },
+    result: "private final answer",
+    total_cost_usd: 4.2,
+  });
+
+  assert.deepEqual(completed.usage, {
+    inputTokens: 1200,
+    cachedInputTokens: 800,
+    cacheCreationInputTokens: 40,
+    outputTokens: 300,
+  });
+  assert.equal(completed.usage.totalTokens, undefined);
+  assert.doesNotMatch(JSON.stringify(completed), /private final answer|4\.2|total_cost/);
+});
+
+test("Grok result keeps an explicit provider total when supplied", () => {
+  const [completed] = normalizeGrokDebugTraceEvent({
+    type: "result",
+    usage: {
+      input_tokens: 1200,
+      output_tokens: 300,
+      total_tokens: 2340,
+    },
+  });
+  assert.equal(completed.usage.totalTokens, 2340);
 });
 
 test("Cursor terminal events expose safe outcome duration and failure class", () => {
@@ -160,6 +266,7 @@ test("recorder persists only allowlisted completion diagnostics", () => {
       stateDir,
       now: () => new Date("2026-09-09T05:00:00.000Z"),
       pid: 439,
+      idSalt: "test-salt",
     });
     recorder.record({
       type: "item_completed",
@@ -173,7 +280,8 @@ test("recorder persists only allowlisted completion diagnostics", () => {
     });
     recorder.close();
 
-    const [event] = traceEvents(recorder.path);
+    const events = traceEvents(recorder.path).filter((event) => event.type === "item_completed");
+    const [event] = events;
     assert.equal(event.outcome, "failed");
     assert.equal(event.durationMs, 101);
     assert.equal(event.errorKind, "tool_failed");

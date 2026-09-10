@@ -67,7 +67,7 @@ test("Grok tool events retain session and nested-parent attribution without raw 
   assert.doesNotMatch(JSON.stringify(normalized), /private nested reasoning|secrets\.txt|secret-token|input/);
 });
 
-test("trace recorder preserves parent item attribution", () => {
+test("trace recorder preserves parent attribution while pseudonymising raw IDs", () => {
   const stateDir = mkdtempSync(join(tmpdir(), "gd-grok-parent-attribution-"));
   const recorder = createAgentDebugTraceRecorder({
     provider: "grok",
@@ -75,6 +75,7 @@ test("trace recorder preserves parent item attribution", () => {
     stateDir,
     now: () => new Date("2026-09-10T00:00:00.000Z"),
     pid: 42,
+    idSalt: "test-salt",
   });
 
   recorder.record({
@@ -87,6 +88,14 @@ test("trace recorder preserves parent item attribution", () => {
   });
   recorder.close();
 
-  const event = JSON.parse(readFileSync(recorder.path, "utf8").trim());
-  assert.equal(event.parentItemId, "spawn-subagent-1");
+  const events = readFileSync(recorder.path, "utf8")
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line));
+  const event = events.find((entry) => entry.type === "item_started");
+  assert.match(event.parentItemId, /^id:[a-f0-9]{24}$/);
+  assert.match(event.threadId, /^id:[a-f0-9]{24}$/);
+  assert.notEqual(event.parentItemId, "spawn-subagent-1");
+  assert.notEqual(event.threadId, "session-1");
+  assert.doesNotMatch(JSON.stringify(event), /spawn-subagent-1|session-1|message-2|call-1/);
 });
