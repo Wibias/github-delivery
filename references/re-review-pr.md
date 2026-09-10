@@ -54,7 +54,7 @@ Resolve the two passes independently:
 10. Else if clean enough for a re-review-only ask: prepare a **detailed** review verdict using the **Verdict** template in `references/comment-depth.md` (or a condensed version that still covers concerns vs new commits with paths/SHAs). Approve only if asked. Do **not** post `[GD] Merge ready` unless the full merge-ready bar was completed.
 11. If verdict publication is authorized, run `planVerdictPublication` first. After a new or reused format-valid `[GD] Verdict`, run `planNativeReviewSidecar` with the exact verdict label, current reviews, authenticated viewer, author, repository, PR, expected head, and routed mutation mode. Execute every authorized broker operation through `github-mutate.mjs`.
 12. For `approve-comment` and `changes-requested`, execute all planned `dismiss_review` operations before considering the re-review complete. Re-fetch the PR reviews after the broker operations and prove the owned superseded `CHANGES_REQUESTED` reviews are `DISMISSED` or absent from the pending set.
-13. Refresh the authoritative ship gate after those review-state mutations. For `approve-comment`, re-run `ship-gate.mjs` on the exact reviewed head. An `approve-comment` **must not complete** while that refreshed gate is `blocked` or `unknown`. If a blocker remains, change the verdict to `gated` or `changes-requested` as supported by the evidence and publish/repair consistently. Never report `Gate: none` while the authoritative gate is blocked.
+13. Refresh the authoritative ship gate after those review-state mutations. For `approve-comment`, the verdict **must not complete while an owned superseded `CHANGES_REQUESTED` review remains pending**. Other policy blockers, such as a required independent approval, may still exist and must be reported accurately. Never report `Gate: none` while the authoritative gate is blocked or unknown.
 
 ### Native review postcondition
 
@@ -65,9 +65,9 @@ For an authorized `approve-comment`:
 - plan and execute owned `dismiss_review` operations;
 - refresh reviews and verify the stale Request changes are gone;
 - refresh the exact-head ship gate;
-- only then accept `approve-comment` as complete.
+- report any remaining independent policy blocker accurately in the verdict.
 
-If any of these postconditions fail, the run remains incomplete and must report the concrete blocker. Never claim that a later GitHub Approve is required merely to clear this workflow's own superseded Request changes when the routed request already authorizes the native-review dismissal.
+If the owned stale-review cleanup fails, the run remains incomplete and must report the concrete blocker. Never claim that a later GitHub Approve is required merely to clear this workflow's own superseded Request changes when the routed request already authorizes the native-review dismissal.
 
 ## Done when
 
@@ -76,5 +76,6 @@ If any of these postconditions fail, the run remains incomplete and must report 
 - Changes requested only for real remaining blockers
 - No drive-by follow-up PR created for in-scope fixes
 - Authorized verdict publication has completed its native-review sidecar and exact-head postconditions
-- `approve-comment` has a refreshed authoritative ship gate that is not blocked or unknown
+- `approve-comment` has no owned superseded `CHANGES_REQUESTED` review still pending
+- The verdict's Gate text agrees with the refreshed authoritative ship gate
 - If merge-ready was requested: `fix-pr-bots` done-when also satisfied
