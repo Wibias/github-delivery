@@ -22,6 +22,10 @@ function traceEvents(path) {
     .map((line) => JSON.parse(line));
 }
 
+function currentPackageVersion() {
+  return JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")).version;
+}
+
 test("stream recorder starts with self-identifying trace metadata", () => {
   const stateDir = mkdtempSync(join(tmpdir(), "gd-trace-metadata-"));
   try {
@@ -37,7 +41,7 @@ test("stream recorder starts with self-identifying trace metadata", () => {
 
     const [metadata] = traceEvents(recorder.path);
     assert.equal(metadata.type, "trace_metadata");
-    assert.equal(metadata.githubDeliveryVersion, "1.5.2");
+    assert.equal(metadata.githubDeliveryVersion, currentPackageVersion());
     assert.match(metadata.traceImplementationDigest, /^sha256:[a-f0-9]{64}$/);
     assert.equal(metadata.workflow, "references/re-review-pr.md");
   } finally {
