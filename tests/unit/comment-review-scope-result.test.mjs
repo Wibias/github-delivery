@@ -52,6 +52,33 @@ test("final comment result accepts unique classifications inside added-line scop
   assert.equal(result.deletionCount, 1);
 });
 
+test("run-bound scope rejects a result from another inspector invocation even on the same head", () => {
+  const scope = parseCommentReviewScopePatch(PATCH, {
+    baseRef: "base",
+    headRef: "head",
+    runId: "rr-191-current",
+  });
+  const previousRun = {
+    schemaVersion: 1,
+    kind: "github-delivery/comment-review-result",
+    scopeDigest: scope.scopeDigest,
+    runId: "rr-191-previous",
+    classifications: [],
+    rootCauseFlags: [],
+  };
+
+  assert.throws(
+    () => validateCommentReviewResult(scope, previousRun),
+    /comment_review_result_run_mismatch/,
+  );
+
+  const current = validateCommentReviewResult(scope, {
+    ...previousRun,
+    runId: "rr-191-current",
+  });
+  assert.equal(current.runId, "rr-191-current");
+});
+
 test("final comment result rejects pre-existing lines, duplicate classifications, and detached flags", () => {
   const scope = parseCommentReviewScopePatch(PATCH);
   const base = {
