@@ -14,9 +14,9 @@ For run-identified publications, the exact current run marker is checked first. 
 
 For full-review verdicts on the exact same head, do not post a second top-level verdict when the strict verdict label and required TLDR values have no material delta. Reuse the completed same-head verdict; wording-only changes are not material.
 
-### GD-PUB-004 — Verify verdict identity and format
+### GD-PUB-004 — Deliver every verdict; verify authorized publication
 
-`verify-verdict-published.mjs` is the normal completion proof for full review. `published: true` plus `format.valid: true` is required; a self-selected stricter mutation mode is not publication unavailability. A blocker changes the verdict; it does not authorize omitting the verdict. Only explicit user cancellation permits ending a required full-review run without its final verdict.
+Every required full-review run must deliver its final verdict for the reviewed head. A bare/read-only full review completes by delivering the format-complete verdict in chat and performs no GitHub publication. When the routed user request explicitly authorizes verdict publication, `verify-verdict-published.mjs` is the publication completion proof and requires `published: true` plus `format.valid: true`. Never self-elevate the routed mutation mode merely to gain publication authority. A blocker changes the verdict; it does not authorize omitting the verdict. Only explicit user cancellation permits ending a required full-review run without its final verdict.
 
 ### GD-PUB-005 — Make social publication idempotent
 
