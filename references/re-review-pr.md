@@ -19,6 +19,25 @@ Re-evaluate the PR from the user’s review comment(s), the author’s subsequen
 
 If the user also wants **merge-ready**, continue into `fix-pr-bots` after re-review (own bug+security+spec, tip compile, merge-ready comments) — do not stop at a soft “looks good” without that bar.
 
+## Delta-first execution
+
+A re-review is not a fresh full review. Start from the last human review boundary and inspect only:
+
+1. the concerns raised by owners/maintainers and useful bot findings at that boundary;
+2. commits after that boundary and the files/symbols they touch;
+3. new or changed review threads and bot summaries since that boundary;
+4. current head/base/CI and any evidence invalidated by the new commits.
+
+Run `scripts/review-brief.mjs OWNER/REPO PR` once per unchanged head to establish compact scope facts. Do not re-read unchanged diff hunks, policy files, PR metadata, review lists, or CI payloads after they have produced valid head-bound evidence. Open a full file only when a required lens, changed symbol, unresolved concern, or failed check needs more context.
+
+Do not repeat specialist-owned analysis or re-read unchanged full-review evidence unless the new delta can affect that axis. Reuse current-session evidence only when it is bound to the same repository and head. Historical conclusions may be used as comparison evidence, never as an independent reviewer result.
+
+### Tool and retry discipline
+
+Use canonical helper output as the contract. Do not rediscover helper JSON shapes by opening implementation source after a normal argument mistake. In particular, pass generated scope/evidence objects through the documented wrapper that owns them instead of hand-building `--files`, probe-evidence, review-thread, or mutation-authorisation payloads.
+
+When a deterministic command fails, inspect its first failure stdout/stderr before changing quoting, arguments, wrappers, or retrying. Retry only when that evidence identifies a transient failure or a specific corrected input. Do not issue equivalent reads under different commands merely because the first result was inconvenient. One valid current-head result supersedes duplicate discovery calls.
+
 ## Hygiene passes
 
 Resolve the two passes independently:
@@ -40,7 +59,24 @@ Resolve the two passes independently:
 7. Do not auto-reply on human threads without exact-text confirmation (shared social policy).
 8. Security-offer + changelog nudge when applicable.
 9. If the user asked merge-ready / “then make it ready”: continue with `fix-pr-bots` (full own reviews + evidence sweep).
-10. Else if clean enough for a re-review-only ask: post a **detailed** review comment using the **Verdict** template in `references/comment-depth.md` (or a condensed version that still covers concerns vs new commits with paths/SHAs). Approve only if asked. Do **not** post `[GD] Merge ready` unless the full merge-ready bar was completed.
+10. Else if clean enough for a re-review-only ask: prepare a **detailed** review verdict using the **Verdict** template in `references/comment-depth.md` (or a condensed version that still covers concerns vs new commits with paths/SHAs). Approve only if asked. Do **not** post `[GD] Merge ready` unless the full merge-ready bar was completed.
+11. If verdict publication is authorized, run `planVerdictPublication` first. After a new or reused format-valid `[GD] Verdict`, run `planNativeReviewSidecar` with the exact verdict label, current reviews, authenticated viewer, author, repository, PR, expected head, and routed mutation mode. Execute every authorized broker operation through `github-mutate.mjs`.
+12. For `approve-comment` and `changes-requested`, execute all planned `dismiss_review` operations before considering the re-review complete. Re-fetch the PR reviews after the broker operations and prove the owned superseded `CHANGES_REQUESTED` reviews are `DISMISSED` or absent from the pending set.
+13. Refresh the authoritative ship gate after those review-state mutations. For `approve-comment`, the verdict **must not complete while an owned superseded `CHANGES_REQUESTED` review remains pending**. Other policy blockers, such as a required independent approval, may still exist and must be reported accurately. Never report `Gate: none` while the authoritative gate is blocked or unknown.
+14. After `verify-verdict-published.mjs` succeeds, run `scripts/verify-review-verdict-completion.mjs OWNER/REPO PR --run-id <id> --head <sha> --mutation-mode <mode> --workflow references/re-review-pr.md`. Completion requires `complete: true`. This deterministic postcondition re-fetches reviews, refreshes the exact-head ship gate, rejects an owned stale Request changes review, and rejects a `Gate: none` verdict that contradicts a blocked/unknown ship gate.
+
+### Native review postcondition
+
+The native review sidecar is part of the authorized verdict transaction, not optional cleanup. A successful verdict comment alone is insufficient evidence of completion.
+
+For an authorized `approve-comment`:
+
+- plan and execute owned `dismiss_review` operations;
+- refresh reviews and verify the stale Request changes are gone;
+- refresh the exact-head ship gate;
+- report any remaining independent policy blocker accurately in the verdict.
+
+If the owned stale-review cleanup fails, the run remains incomplete and must report the concrete blocker. Never claim that a later GitHub Approve is required merely to clear this workflow's own superseded Request changes when the routed request already authorizes the native-review dismissal.
 
 ## Done when
 
@@ -48,4 +84,8 @@ Resolve the two passes independently:
 - Fixable issues landed in this PR (or explicitly declined)
 - Changes requested only for real remaining blockers
 - No drive-by follow-up PR created for in-scope fixes
+- Authorized verdict publication has completed its native-review sidecar and exact-head postconditions
+- `approve-comment` has no owned superseded `CHANGES_REQUESTED` review still pending
+- The verdict's Gate text agrees with the refreshed authoritative ship gate
+- `verify-review-verdict-completion.mjs` returns `complete: true` for an authorized publication
 - If merge-ready was requested: `fix-pr-bots` done-when also satisfied
