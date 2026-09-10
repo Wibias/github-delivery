@@ -31,6 +31,7 @@ const ATTRIBUTION_KEYS = ["threadId", "turnId", "itemId", "parentItemId"];
 const USAGE_KEYS = [
   "inputTokens",
   "cachedInputTokens",
+  "cacheCreationInputTokens",
   "outputTokens",
   "reasoningTokens",
   "totalTokens",
