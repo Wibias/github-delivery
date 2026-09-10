@@ -44,6 +44,13 @@ export function validateCommentReviewResult(scope, value) {
   if (requiredString(value.scopeDigest, "comment_review_result_scope_digest_required") !== scope.scopeDigest) {
     throw new Error("comment_review_result_scope_mismatch");
   }
+  const scopeRunId = String(scope.runId || "").trim();
+  if (scopeRunId) {
+    const resultRunId = requiredString(value.runId, "comment_review_result_run_id_required");
+    if (resultRunId !== scopeRunId) {
+      throw new Error("comment_review_result_run_mismatch");
+    }
+  }
   const classifications = Array.isArray(value.classifications) ? value.classifications : null;
   if (!classifications) throw new Error("comment_review_result_classifications_required");
   const seen = new Set();
@@ -73,6 +80,7 @@ export function validateCommentReviewResult(scope, value) {
     schemaVersion: 1,
     kind: "github-delivery/comment-review-result",
     scopeDigest: scope.scopeDigest,
+    ...(scopeRunId ? { runId: scopeRunId } : {}),
     classifications: validated,
     rootCauseFlags: flags,
     deletionCount: validated.filter((entry) => entry.disposition === "DELETE").length,
