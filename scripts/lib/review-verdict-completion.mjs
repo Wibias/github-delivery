@@ -21,6 +21,10 @@ function authoritativeGateNotReady(shipGate) {
   );
 }
 
+function claimsNoGateBlocker(summary) {
+  return /^(?:none|clear|ready|no blockers?)\b/.test(summary);
+}
+
 export function verifyReviewVerdictCompletion({
   body,
   reviews = [],
@@ -48,7 +52,7 @@ export function verifyReviewVerdictCompletion({
     problems.push("verdict_gate_summary_missing");
   } else if (
     authoritativeGateNotReady(shipGate) &&
-    /^(none|clear|ready|no blockers?)\.?$/.test(gateSummary)
+    claimsNoGateBlocker(gateSummary)
   ) {
     problems.push("verdict_gate_summary_contradicts_ship_gate");
   }
