@@ -4,6 +4,23 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.5.3] - 2026-09-10
+
+### Changed
+
+- Bumped the package version from `1.5.2` to `1.5.3`.
+- Re-review execution is now delta-first: one compact current-head review brief establishes scope, unchanged evidence is reused instead of repeatedly re-read, specialist-owned analysis is not duplicated, and deterministic helper failures must be inspected before a corrected retry (PR #448).
+- Agent debug traces now self-identify the github-delivery version and tracing implementation, can include the owning workflow/build identity, and preserve allowlisted numeric token-usage counters without storing provider result bodies or cost payloads (PR #450).
+
+### Fixed
+
+- Authorized re-review `approve-comment` completion now runs the native-review sidecar, dismisses the viewer's superseded `CHANGES_REQUESTED` reviews, re-fetches review state, refreshes the exact-head ship gate, and rejects a verdict that claims no gate blocker while the authoritative gate is blocked or unknown. This cleanup does not submit a GitHub Approve (PR #448).
+- Comment Inspector evidence is isolated per invocation with a unique run ID and run directory. Run-bound results must carry the exact current `runId`, and previous-run result files are forbidden as classification input even for the same repository, PR, head, or scope digest (PR #449).
+
+### Security
+
+- Persisted debug-trace thread, turn, item, and parent identifiers are now pseudonymized per trace while raw tool inputs/outputs, provider result bodies, costs, and private Grok thinking remain excluded (PR #450).
+
 ## [1.5.2] - 2026-09-10
 
 ### Changed
