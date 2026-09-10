@@ -63,6 +63,28 @@ test("full review surfaces code quality and blast radius through canonical revie
   assert.match(outcome, /unproven/i);
 });
 
+test("re-review approve-comment clears owned stale Request changes before completion", () => {
+  const rereview = read("references/re-review-pr.md");
+
+  assert.match(rereview, /planNativeReviewSidecar/);
+  assert.match(rereview, /dismiss_review/);
+  assert.match(rereview, /re-fetch.*reviews|refresh.*reviews/is);
+  assert.match(rereview, /re-run.*ship-gate|refresh.*ship gate/is);
+  assert.match(rereview, /approve-comment[\s\S]*must not complete[\s\S]*owned[\s\S]*CHANGES_REQUESTED/i);
+  assert.match(rereview, /Never report `Gate: none`[\s\S]*authoritative gate is blocked/i);
+});
+
+test("re-review is delta-first and avoids repeated helper-contract discovery", () => {
+  const rereview = read("references/re-review-pr.md");
+
+  assert.match(rereview, /review-brief\.mjs/);
+  assert.match(rereview, /once per unchanged head/i);
+  assert.match(rereview, /do not re-read unchanged/i);
+  assert.match(rereview, /do not rediscover.*JSON shapes|never rediscover.*JSON shapes/is);
+  assert.match(rereview, /first failure.*stdout|first failure.*stderr/is);
+  assert.match(rereview, /specialist-owned analysis/i);
+});
+
 test("review-integrity follow-up release is complete in 1.5.2", () => {
   const pkg = JSON.parse(read("package.json"));
   const changelog = read("CHANGELOG.md");

@@ -13,7 +13,7 @@ function reviewNodeId(review) {
   return null;
 }
 
-function ownedPendingChangesRequested(reviews, viewerLogin) {
+export function ownedPendingChangesRequested(reviews, viewerLogin) {
   const viewer = normalizeLogin(viewerLogin);
   if (!viewer) return [];
   return (Array.isArray(reviews) ? reviews : []).filter((review) => {
@@ -24,6 +24,27 @@ function ownedPendingChangesRequested(reviews, viewerLogin) {
       Boolean(reviewNodeId(review))
     );
   });
+}
+
+export function verifyNativeReviewSidecarPostcondition({
+  label,
+  viewerLogin,
+  reviews = [],
+} = {}) {
+  if (label !== "approve-comment") {
+    return { valid: true, reason: null, pendingReviewIds: [] };
+  }
+  const pendingReviewIds = ownedPendingChangesRequested(reviews, viewerLogin)
+    .map((review) => reviewNodeId(review))
+    .filter(Boolean);
+  return {
+    valid: pendingReviewIds.length === 0,
+    reason:
+      pendingReviewIds.length === 0
+        ? null
+        : "owned_changes_requested_still_pending",
+    pendingReviewIds,
+  };
 }
 
 export function nativeReviewSidecarBody({ label, expectedHead } = {}) {
