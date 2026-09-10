@@ -30,6 +30,12 @@ Deep does **not** mean automatically launching every external reviewer. External
 
 After the first pass, use the scope/coverage evidence to target missing `(file/surface/lens/probe)` cells. Do not rescan already-covered low-risk areas merely to add more agents. The goal is independent evidence where uncertainty remains, not reviewer count.
 
+When a specialist/subagent owns a scope or analysis pass and returns valid, current, complete evidence for it, the parent consumes that evidence and fills only material gaps. Do not repeat the same scope analysis in the parent merely for reassurance.
+
+## Deterministic command failure evidence
+
+When a deterministic review command fails, inspect and preserve its first stdout/stderr result before changing quoting or retrying. Malformed or decorated output is failure evidence, not proof that the command syntax was wrong.
+
 ## Fail-closed rules
 
 A deeper depth cannot be satisfied by:

@@ -72,7 +72,7 @@ test("reasoning coalescing stops at an identity boundary", () => {
 });
 
 test("Grok terminal tool updates expose only safe outcome duration and error metadata", () => {
-  const succeeded = normalizeGrokDebugTraceEvent({
+  const [succeeded] = normalizeGrokDebugTraceEvent({
     type: "tool_call_update",
     toolCallId: "call-1",
     toolName: "shell",
@@ -84,7 +84,7 @@ test("Grok terminal tool updates expose only safe outcome duration and error met
   assert.equal(succeeded.durationMs, 125);
   assert.equal(succeeded.errorKind, undefined);
 
-  const failed = normalizeGrokDebugTraceEvent({
+  const [failed] = normalizeGrokDebugTraceEvent({
     type: "tool_call_update",
     toolCallId: "call-2",
     toolName: "shell",
