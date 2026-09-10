@@ -79,7 +79,9 @@ test("router authority and verdict verification are documented", () => {
   assert.match(reference, /## Router authority/);
   assert.match(reference, /router output is authoritative/i);
   assert.match(reference, /Gate invocations must pass the routed mutation mode plus `--workflow`/);
-  assert.match(reference, /self-selected mode is a workflow violation/i);
+  assert.match(reference, /self-selected elevated mode is a workflow violation/i);
+  assert.match(reference, /read-only full-review run normally completes[\s\S]*chat/i);
+  assert.match(helpers, /bare\/read-only full review[\s\S]*does not run a GitHub publication check/i);
   assert.match(helpers, /verify-verdict-published\.mjs/);
   assert.match(helpers, /--workflow references\/full-review-pr\.md/);
 });
