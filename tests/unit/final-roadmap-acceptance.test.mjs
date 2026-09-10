@@ -124,7 +124,7 @@ test("Cursor full review uses Bugbot's exact two-line prompt and nothing else", 
   );
 });
 
-test("full review refuses to stop while its verdict plan item is pending", () => {
+test("full review refuses to stop while its verdict delivery item is pending", () => {
   const skill = readFileSync(
     new URL("../../SKILL.md", import.meta.url),
     "utf8",
@@ -143,12 +143,12 @@ test("full review refuses to stop while its verdict plan item is pending", () =>
   );
 
   assert.match(skill, /Full-review completion lock/);
-  assert.match(skill, /Publish final verdict/);
+  assert.match(skill, /Deliver final verdict/);
   assert.match(skill, /pending.*in_progress/is);
   assert.match(skill, /Only explicit user cancellation/i);
 
   assert.match(sharedRules, /Full-review verdict completion lock/);
-  assert.match(sharedRules, /Publish final verdict/);
+  assert.match(sharedRules, /Deliver final verdict/);
   assert.match(sharedRules, /pending.*in_progress.*never a completed state/is);
   assert.match(
     sharedRules,
@@ -158,7 +158,7 @@ test("full review refuses to stop while its verdict plan item is pending", () =>
 
   const requiredFullReviewContracts = [
     "## Mandatory execution plan and completion lock",
-    "`Publish final verdict`",
+    "`Deliver final verdict`",
     "The run **MUST NOT stop, return, hand off, emit a final response, or report",
     "A blocker is input to the final verdict, not permission to skip it.",
     "The only permitted exit without a verdict is explicit user cancellation.",
@@ -174,7 +174,7 @@ test("full review refuses to stop while its verdict plan item is pending", () =>
   assert.match(fullReview, /Planning next moves/i);
   assert.match(fullReview, /pending CI/i);
   assert.match(fullReview, /failed Bugbot invocation/i);
-  assert.match(fullReview, /GitHub publication is unavailable/i);
+  assert.match(fullReview, /publication was explicitly requested but is unavailable/i);
   assert.match(fullReview, /complete verdict in chat/i);
 
   assert.match(bugReview, /Cursor Bugbot liveness rule/);
@@ -182,11 +182,11 @@ test("full review refuses to stop while its verdict plan item is pending", () =>
   assert.match(bugReview, /Bugbot unavailable/i);
   assert.match(
     bugReview,
-    /Never keep `Publish final verdict` pending.*wait indefinitely/is,
+    /Never keep `(?:Publish|Deliver) final verdict` pending.*wait indefinitely/is,
   );
 });
 
-test("full review cannot complete via chat after self-selecting read-only", () => {
+test("full review honors routed read-only completion and verifies only authorized publication", () => {
   const skill = readFileSync(
     new URL("../../SKILL.md", import.meta.url),
     "utf8",
@@ -204,33 +204,26 @@ test("full review cannot complete via chat after self-selecting read-only", () =
     "utf8",
   );
 
-  assert.match(skill, /verify-verdict-published\.mjs/);
-  assert.match(
-    skill,
-    /self-selected stricter mutation mode is not publication unavailability/i,
-  );
+  assert.match(skill, /bare full review is read-only[\s\S]*delivering that verdict in chat/i);
+  assert.match(skill, /Never self-elevate the routed mode to gain publication/i);
 
-  assert.match(sharedRules, /verify-verdict-published\.mjs/);
+  assert.match(sharedRules, /bare\/read-only full review completes[\s\S]*verdict in chat/i);
   assert.match(
     sharedRules,
-    /published: true` plus `format\.valid: true` is the only normal completion proof/,
-  );
-  assert.match(sharedRules, /self-selected stricter mutation mode/i);
-  assert.match(
-    sharedRules,
-    /not publication unavailability/i,
+    /explicitly authorizes GitHub verdict publication[\s\S]*published: true[\s\S]*format\.valid: true/i,
   );
 
   assert.match(fullReview, /--workflow references\/full-review-pr\.md/);
   assert.match(
     fullReview,
-    /`published: true` \*\*and\*\* `format\.valid: true` are required/,
+    /`published: true` \*\*and\*\* `format\.valid: true` are required for an authorized\s+GitHub publication/,
   );
   assert.match(fullReview, /verify-verdict-published\.mjs/);
-  assert.match(fullReview, /only chat-only completion\s+path/);
+  assert.match(fullReview, /read-only full review[\s\S]*chat/i);
 
   assert.match(mutationModes, /## Router authority/);
-  assert.match(mutationModes, /rejects incompatible combinations/);
+  assert.match(mutationModes, /self-selected elevated mode is a workflow violation/i);
+  assert.match(mutationModes, /read-only full-review run normally completes[\s\S]*chat/i);
 });
 
 test("full-review verdict publication supports same-head anti-noise", () => {
@@ -266,7 +259,7 @@ test("full-review verdict publication supports same-head anti-noise", () => {
   );
 
   assert.match(fullReview, /### Full-review run and publication identity/);
-  assert.match(fullReview, /### Final verdict publication/);
+  assert.match(fullReview, /### Final verdict delivery and optional publication/);
   assert.match(fullReview, /planVerdictPublication/);
   assert.match(fullReview, /reuse_same_head/);
   assert.match(fullReview, /reused same-head verdict comment/);

@@ -29,7 +29,7 @@ Turning trusted-authority protection off never broadens the mutation profile or 
 | Merge PR / close linked issue | no | no | explicit instruction | yes, only inside the governing workflow |
 | Create a follow-up issue | no | no | explicit instruction | yes |
 
-The profile is an upper bound, not a waiver. Draft/WIP gates, exact-text confirmation, linked-issue thanks, stack handling, thread ownership, expected-head checks, idempotency, and workflow-specific requirements still apply in every authority-protection mode.
+The profile is an upper bound, not a waiver. Draft/WIP gates, exact-text confirmation, linked-issue thanks, stack handling, thread ownership, expected-head checks, idempotency, and workflow-specific requirements still apply in every authority-protection mode. In particular, a profile that permits `post_comment` does not itself create publication authority; the routed user intent must authorize that action.
 
 ## Trusted-authority protection
 
@@ -95,16 +95,16 @@ Legacy pre-metadata claims cannot be assigned a trustworthy creation time after 
 
 ### Durable full-review verdict provenance
 
-A full-review verdict is never merge evidence merely because arbitrary repository text copied the `[GD]` format. Publisher ownership, exact reviewed head, required verdict structure, workflow routing, and publication checks always apply.
+A full-review verdict is never merge evidence merely because arbitrary repository text copied the `[GD]` format. Publisher ownership, exact reviewed head, required verdict structure, workflow routing, explicit publication intent, and publication checks always apply.
 
-When `authorityMode` is `high-assurance` or `all`, the full-review publication path additionally must:
+A bare full review is read-only and therefore does not enter the GitHub publication path. When the routed request explicitly authorizes verdict publication and `authorityMode` is `high-assurance` or `all`, the full-review publication path additionally must:
 
 1. build the normal `post_comment` request for the exact reviewed head and verdict body;
 2. obtain scoped trusted authority through the normal mutation execution path;
 3. publish the authorized request with the hidden `github-delivery:review-authority` marker that binds the exact scope without changing the human-visible body hash;
 4. run `scripts/verify-verdict-published.mjs`, which re-verifies the signed grant at the GitHub comment creation time and requires Windows Hello approval, `scopeSha256`, and the one-time redemption claim.
 
-When `authorityMode` is explicitly `off`, the full-review workflow may publish its verdict when the ordinary `review` mutation policy and current workflow intent authorize the write, without obtaining a Windows Hello grant. The absence of trusted authority must remain explicit; a verifier inspecting an existing comment must never manufacture signed provenance that was not used.
+When `authorityMode` is explicitly `off` and publication is already authorized by the routed user request, the full-review workflow may publish its verdict under the ordinary mutation policy without obtaining a Windows Hello grant. The absence of trusted authority must remain explicit; a verifier inspecting an existing comment must never manufacture signed provenance that was not used.
 
 Offline security fixtures that explicitly provide `--authority-public-key-file` remain strict regardless of local user config so verifier regression tests cannot be weakened by a developer machine setting.
 
@@ -114,9 +114,10 @@ A generic `post_comment` that does not satisfy the full-review publication contr
 
 Examples:
 
-- `full review PR #32` → `review` (the full-review workflow publishes its verdict comment when its normal publication policy is satisfied; the selected protection mode only determines whether trusted authority is additionally required)
+- `full review PR #32` → `read-only` (perform the full review and deliver the verdict in chat; no GitHub comment mutation is implied)
 - `what is left on PR #32?` → `read-only`
 - `review PR #32 and post the findings` → `review`
+- `full review PR #32 and post the verdict` → `review` with explicit `post_comment` publication authority
 - `fix PR #32 and make it merge ready` → `maintainer`
 - `merge PR #32` → `maintainer` with explicit mutation authority for the merge workflow; the default protection mode also requires trusted authority
 - `supersede PR #12 with #45` → `maintainer` with explicit authority for the close/comment actions
@@ -128,9 +129,9 @@ Do not ask users to run scripts. These mappings are agent behavior.
 
 ## Router authority
 
-The router output is authoritative. A full review resolves to `review` (bare) or `maintainer` (when `fix` or `simplify` is explicitly requested); both profiles permit ordinary `post_comment`. The full-review verdict remains intrinsically high assurance, while whether that classification triggers trusted authority at execution is controlled by `authorityMode`.
+The router output is authoritative. A full review resolves to `read-only` when the request asks only for review, to `review` when the user explicitly requests verdict publication, or to `maintainer` when `fix` or `simplify` is explicitly requested. The routed `explicitActions` determine whether a public verdict mutation is authorized; selecting a profile that could technically perform `post_comment` does not grant that action by itself. The full-review verdict remains intrinsically high assurance when it is published, while whether that classification triggers trusted authority at execution is controlled by `authorityMode`.
 
-Gate invocations must pass the routed mutation mode plus `--workflow`, and the gate rejects incompatible combinations (for example `--mutation-mode read-only --workflow references/full-review-pr.md`). A stricter self-selected mode is a workflow violation, never a publication excuse: a full-review run may complete with a chat-only verdict only when GitHub publication is genuinely unavailable and that hard blocker is recorded.
+Gate invocations must pass the routed mutation mode plus `--workflow`; `references/full-review-pr.md` accepts its declared `read-only`, `review`, and `maintainer` modes. A self-selected elevated mode is a workflow violation and cannot manufacture publication authority. A read-only full-review run normally completes by delivering the full verdict in chat without a GitHub write.
 
 ## Machine-readable policy
 

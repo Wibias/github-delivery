@@ -173,16 +173,19 @@ test("ship-gate reports the selected mutation profile on a non-authoritative rep
   assert.equal(output.authoritative, false);
 });
 
-test("ship-gate rejects a self-selected read-only mode for the full-review workflow", () => {
+test("ship-gate accepts routed read-only mode for the full-review workflow", () => {
   const result = runShipGate(writeSnapshot(), [
     "--mutation-mode",
     "read-only",
     "--workflow",
     "references/full-review-pr.md",
   ]);
-  assert.equal(result.status, 2);
-  assert.match(result.stderr, /mode_denied_by_workflow/);
-  assert.match(result.stderr, /allowed: review, maintainer/);
+  assert.equal(result.status, 2, result.stderr);
+  const output = JSON.parse(result.stdout);
+  assert.equal(output.mutationMode, "read-only");
+  assert.equal(output.workflow, "references/full-review-pr.md");
+  assert.equal(output.mutationProfile.actions.post_comment.allowed, false);
+  assert.equal(output.authoritative, false);
 });
 
 test("ship-gate accepts routed review mode but keeps replay non-authoritative", () => {
