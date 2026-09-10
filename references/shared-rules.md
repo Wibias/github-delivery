@@ -161,7 +161,7 @@ not itself authorize merge.
 
 Canonical: `GD-PUB-002`, `GD-PUB-003`, and `GD-PUB-004`.
 
-The full-review run uses `full-review-run-id`; the **Same-head anti-noise rule (PR #1066)** uses `planVerdictPublication`. Repair the current run marker first,
+When verdict publication is explicitly authorized, the full-review run uses `full-review-run-id`; the **Same-head anti-noise rule (PR #1066)** uses `planVerdictPublication`. Repair the current run marker first,
 then **reuse** a completed same-head verdict when the strict label/TLDR material
 delta is empty. The idempotency boundary is **current run marker first**, then
 **same head + material TLDR/label delta**.
@@ -170,8 +170,7 @@ delta is empty. The idempotency boundary is **current run marker first**, then
 
 Canonical: `GD-PUB-004`.
 
-`Publish final verdict` remaining pending or in_progress is never a completed state. `verify-verdict-published.mjs` must show `published: true` plus `format.valid: true` is the only normal completion proof. A blocker changes the verdict. It does not permit the workflow to omit the verdict.
-A self-selected stricter mutation mode is not publication unavailability. Only explicit user cancellation may end the required publication workflow without the verdict.
+`Deliver final verdict` remaining pending or in_progress is never a completed state. A bare/read-only full review completes by delivering the format-complete verdict in chat. When the routed request explicitly authorizes GitHub verdict publication, `verify-verdict-published.mjs` must show `published: true` plus `format.valid: true` before that publication is complete. A blocker changes the verdict; it does not permit the workflow to omit the verdict. Never self-elevate the routed mutation mode to gain publication authority. Only explicit user cancellation may end the required full-review run without the verdict.
 
 ## Full-review semantic completeness
 
