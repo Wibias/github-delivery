@@ -308,9 +308,9 @@ All notable changes to `github-delivery` are documented here.
 ### Changed
 
 - Bumped the package version from `1.2.0` to `1.3.0`.
-- Removed the public handoff to `git-workflow-and-versioning`. Explicit branch/commit and SemVer/changelog/release-preparation requests now route inside github-delivery, while the existing stricter `GD-GIT-*` safety rules and repository-local conventions remain authoritative (PR #377).
-- Issue-linked and local-work PR publication now compose the Git-workflow reference when branch/commit preparation is needed, preserving progressive disclosure instead of loading Git/versioning guidance into unrelated GitHub reads (PR #377).
-- Git/versioning routes now resolve through the mandatory workflow-packet/controller runtime. Explicit full-review intent keeps precedence over broad Git/version keywords in attributed repository text, and workflow execution packets advertise only actions that exist in the public mutation registry (PR #379).
+- Removed the public handoff to `git-workflow-and-versioning`. Explicit branch/commit and SemVer/changelog/release-preparation requests now route inside github-delivery, while repository conventions and the stricter existing `GD-GIT-*` safety rules and repository-local conventions remain authoritative.
+- Issue-linked and local-work PR publication compose the Git-workflow reference when branch/commit preparation is needed, preserving progressive disclosure instead of loading Git/versioning guidance into unrelated GitHub reads.
+- Git/versioning requests now enter the mandatory one-shot workflow-packet/controller runtime. Explicit full-review intent keeps precedence over broad Git/version keywords in attributed repository text, and execution packets advertise only actions that exist in the public mutation registry.
 
 ### Fixed
 
@@ -545,8 +545,8 @@ All notable changes to `github-delivery` are documented here.
 ### Changed
 
 - `npx github-delivery start` now ensures the Authority host is running and brings the Control Center into view even when an existing instance is already in the notification area. Successful output identifies the installed host location, explains that closing the window leaves Authority running in the tray, and points to tray right-click → `Exit` for a complete shutdown (PR #262).
-- `npx github-delivery autostart` remains the backwards-compatible enable form and now has explicit `autostart on`, `autostart off`, and `autostart status` variants. The Control Center Settings switch reads and writes the same current-user Windows Run registration, so CLI and GUI stay synchronized (PR #262).
-- The Control Center now uses only the useful `Overview` navigation plus native `Settings`, uses the full available content width, hides to the notification area on normal close, and has three deliberate responsive layouts: Compact below 900 px, Medium from 900 px, and Wide from 1360 px. Windows enforces a best-effort 720 × 620 minimum window size, while the five summary metrics keep the same symmetric 3+2 geometry at every size (PR #262).
+- `npx github-delivery autostart` remains the backwards-compatible enable form and now has explicit `autostart on`, `autostart off`, and `autostart status` variants. The Control Center Settings switch reads and writes the same current-user Windows Run registration, so CLI and GUI stay synchronized.
+- The Control Center now uses only the useful `Overview` navigation plus native `Settings`, uses the full available content width, hides to the notification area on normal close, and has three deliberate responsive layouts: Compact below 900 px, Medium from 900 px, and Wide from 1360 px. Windows enforces a best-effort 720 × 620 minimum window size, while the five summary metrics keep the same symmetric 3+2 geometry at every size.
 
 ### Fixed
 
@@ -612,7 +612,7 @@ All notable changes to `github-delivery` are documented here.
 
 ### Fixed
 
-- Repeated grid or malformed tool-protocol placeholder output now hard-stops immediately on the first stall instead of being retried, and the offending model is quarantined across turns and `SessionEnd` so a resume with the same model is blocked before inference until the model is changed or a new task begins. Subagent protocol stalls no longer quarantine the parent task.
+- Repeated grid or malformed tool-protocol placeholder output now hard-stops immediately on the first stall instead of being retried, and the offending model is quarantined across turns and `SessionEnd` so a resume with the same model is blocked before inference until the model is changed. Subagent protocol stalls no longer quarantine the parent task.
 - Windows login auto-start is now opt-in (previously enabled by default); users explicitly consent via guided install or `npx github-delivery autostart`.
 
 ## [0.6.0] - 2026-08-14
