@@ -55,6 +55,7 @@ Resolve the two passes independently:
 11. If verdict publication is authorized, run `planVerdictPublication` first. After a new or reused format-valid `[GD] Verdict`, run `planNativeReviewSidecar` with the exact verdict label, current reviews, authenticated viewer, author, repository, PR, expected head, and routed mutation mode. Execute every authorized broker operation through `github-mutate.mjs`.
 12. For `approve-comment` and `changes-requested`, execute all planned `dismiss_review` operations before considering the re-review complete. Re-fetch the PR reviews after the broker operations and prove the owned superseded `CHANGES_REQUESTED` reviews are `DISMISSED` or absent from the pending set.
 13. Refresh the authoritative ship gate after those review-state mutations. For `approve-comment`, the verdict **must not complete while an owned superseded `CHANGES_REQUESTED` review remains pending**. Other policy blockers, such as a required independent approval, may still exist and must be reported accurately. Never report `Gate: none` while the authoritative gate is blocked or unknown.
+14. After `verify-verdict-published.mjs` succeeds, run `scripts/verify-review-verdict-completion.mjs OWNER/REPO PR --run-id <id> --head <sha> --mutation-mode <mode> --workflow references/re-review-pr.md`. Completion requires `complete: true`. This deterministic postcondition re-fetches reviews, refreshes the exact-head ship gate, rejects an owned stale Request changes review, and rejects a `Gate: none` verdict that contradicts a blocked/unknown ship gate.
 
 ### Native review postcondition
 
@@ -78,4 +79,5 @@ If the owned stale-review cleanup fails, the run remains incomplete and must rep
 - Authorized verdict publication has completed its native-review sidecar and exact-head postconditions
 - `approve-comment` has no owned superseded `CHANGES_REQUESTED` review still pending
 - The verdict's Gate text agrees with the refreshed authoritative ship gate
+- `verify-review-verdict-completion.mjs` returns `complete: true` for an authorized publication
 - If merge-ready was requested: `fix-pr-bots` done-when also satisfied
