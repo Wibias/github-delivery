@@ -111,14 +111,15 @@ Detail: `references/github-mutation-broker.md`, `references/mutation-modes.md`.
 
 A full review is not complete merely because analysis is complete.
 
-- Keep the `Publish final verdict` plan item pending until the verdict is actually delivered and verified.
+- Keep the `Deliver final verdict` plan item pending until the format-complete verdict for the reviewed head is actually delivered.
 - Pending CI, optional reviewer/tool unavailability, a progress update, or an evidence blocker is not permission to stop without a verdict.
 - A blocker changes the verdict; it does not remove the verdict requirement.
-- Immediately before publication, re-check the exact reviewed head and unresolved current review threads. Fresh actionable bot feedback on that head must be addressed or rebutted before publication.
-- Publish one final verdict using the required TLDR + details structure and the run/head publication identity.
-- Reuse/repair same-head verdict publication according to anti-noise rules rather than posting duplicate top-level verdicts.
-- Run `scripts/verify-verdict-published.mjs`; normal completion requires both `published: true` and `format.valid: true`.
-- If GitHub publication is genuinely unavailable because of auth/network/API failure, record the hard blocker and provide the complete verdict in chat. Self-selecting a stricter mutation mode is not publication unavailability.
+- A bare/read-only full review delivers the complete verdict in chat and performs no GitHub publication.
+- Publish a verdict to GitHub only when the routed user request explicitly authorizes that mutation.
+- Immediately before an authorized publication, re-check the exact reviewed head and unresolved current review threads. Fresh actionable bot feedback on that head must be addressed or rebutted before publication.
+- For authorized publication, use the required TLDR + details structure and run/head publication identity; reuse/repair same-head publication according to anti-noise rules instead of posting duplicates.
+- When publication is authorized, run `scripts/verify-verdict-published.mjs`; completion of that publication requires both `published: true` and `format.valid: true`.
+- If explicitly authorized GitHub publication becomes genuinely unavailable because of auth/network/API failure, record the hard blocker and provide the complete verdict in chat. Never self-elevate the routed mutation mode to make publication possible.
 - Only explicit user cancellation permits exit without the required verdict.
 
 Detail: `references/full-review-pr.md`, `references/comment-depth.md`, `references/policy/publication.md`.
@@ -131,7 +132,7 @@ Load this compact contract once. Then load detail references only when their met
 - bug detail: load `bug-review.md` for triggered bug lenses/probes;
 - security detail: load `security-review.md` for triggered security surfaces/probes;
 - spec/standards: load `spec-standards-review.md` when evaluating standards/spec conclusions;
-- final publication: load the relevant full-review/comment-depth sections before publishing;
+- final delivery: load the relevant full-review/comment-depth sections; load publication detail when GitHub publication is explicitly authorized;
 - mutation authority: load broker/mutation-mode detail before any write.
 
-Do not save tokens by skipping final recapture, required-check/rules/review evidence, semantic propagation, mutation authority, or verdict verification.
+Do not save tokens by skipping final recapture, required-check/rules/review evidence, semantic propagation, mutation authority, or — when publication is authorized — verdict publication verification.
