@@ -28,7 +28,15 @@ A re-review is not a fresh full review. Start from the last human review boundar
 3. new or changed review threads and bot summaries since that boundary;
 4. current head/base/CI and any evidence invalidated by the new commits.
 
+Run `scripts/review-brief.mjs OWNER/REPO PR` once per unchanged head to establish compact scope facts. Do not re-read unchanged diff hunks, policy files, PR metadata, review lists, or CI payloads after they have produced valid head-bound evidence. Open a full file only when a required lens, changed symbol, unresolved concern, or failed check needs more context.
+
 Do not repeat specialist-owned analysis or re-read unchanged full-review evidence unless the new delta can affect that axis. Reuse current-session evidence only when it is bound to the same repository and head. Historical conclusions may be used as comparison evidence, never as an independent reviewer result.
+
+### Tool and retry discipline
+
+Use canonical helper output as the contract. Do not rediscover helper JSON shapes by opening implementation source after a normal argument mistake. In particular, pass generated scope/evidence objects through the documented wrapper that owns them instead of hand-building `--files`, probe-evidence, review-thread, or mutation-authorisation payloads.
+
+When a deterministic command fails, inspect its first failure stdout/stderr before changing quoting, arguments, wrappers, or retrying. Retry only when that evidence identifies a transient failure or a specific corrected input. Do not issue equivalent reads under different commands merely because the first result was inconvenient. One valid current-head result supersedes duplicate discovery calls.
 
 ## Hygiene passes
 
