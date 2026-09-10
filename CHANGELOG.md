@@ -192,7 +192,7 @@ All notable changes to `github-delivery` are documented here.
 
 - Bumped the package version from `1.3.8` to `1.4.0`.
 - README current-state now keeps only the documented fail-closed limits and the still-expanding list, and release notes point at `CHANGELOG.md` instead of duplicating version history.
-- Pull-request Windows Authority, JavaScript CodeQL, and C# CodeQL jobs now run only when the trusted base-SHA path classifier says those lanes are in scope. Scope detection failure still fail-closes into running the lane. The Windows rewrite-baseline workflow is path-filtered to the files it actually exercises.
+- Pull-request Windows Authority, JavaScript CodeQL, and C# CodeQL jobs now run only when the trusted base-SHA path classifier says those lanes are in scope. Scope detection failure still fail-closes into running the lane. The Windows rewrite-baseline workflow is path-filtered to the files it exercises.
 
 ## [1.3.8] - 2026-08-30
 
@@ -612,7 +612,7 @@ All notable changes to `github-delivery` are documented here.
 
 ### Fixed
 
-- Repeated grid or malformed tool-protocol placeholder output now hard-stops immediately on the first stall instead of being retried, and the offending model is quarantined across turns and `SessionEnd` so a resume with the same model is blocked before inference until the model is changed. Subagent protocol stalls no longer quarantine the parent task.
+- Repeated grid or malformed tool-protocol placeholder output now hard-stops immediately on the first stall instead of being retried, and the offending model is quarantined across turns and `SessionEnd` so a resume with the same model is blocked before inference until the model is changed or a new task begins. Subagent protocol stalls no longer quarantine the parent task.
 - Windows login auto-start is now opt-in (previously enabled by default); users explicitly consent via guided install or `npx github-delivery autostart`.
 
 ## [0.6.0] - 2026-08-14
@@ -975,3 +975,6 @@ All notable changes to `github-delivery` are documented here.
 - Snapshot-backed authoritative ship decisions with base-health isolation.
 - Guarded GitHub mutation profiles and runtime capability discovery.
 - Executable offline routing and retained-regression evaluations.
+- Deterministic versioned skill bundles with checksums, installation planning, backups, and restore.
+- Tag-bound GitHub Releases with checksum verification, SPDX SBOMs, and artifact attestations.
+- Dependabot, Dependency Review, CodeQL, Scorecard, and executable repository workflow policy checks.
