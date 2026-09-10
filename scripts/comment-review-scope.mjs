@@ -9,6 +9,7 @@ function parseArgs(argv) {
   let base = null;
   let head = null;
   let output = null;
+  let runId = null;
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];
     if (value === "--base") {
@@ -20,14 +21,17 @@ function parseArgs(argv) {
     } else if (value === "--output") {
       output = argv[++index];
       if (!output) throw new Error("--output requires a file path");
+    } else if (value === "--run-id") {
+      runId = argv[++index];
+      if (!runId) throw new Error("--run-id requires a value");
     } else {
       throw new Error(`unknown option: ${value}`);
     }
   }
   if (!base || !head) {
-    throw new Error("Usage: node scripts/comment-review-scope.mjs --base REF --head REF [--output FILE]");
+    throw new Error("Usage: node scripts/comment-review-scope.mjs --base REF --head REF [--run-id ID] [--output FILE]");
   }
-  return { base, head, output };
+  return { base, head, output, runId };
 }
 
 function decodePatchPath(raw) {
@@ -54,7 +58,10 @@ function appendLine(file, line) {
   ranges.push({ start: line, end: line });
 }
 
-export function parseCommentReviewScopePatch(patch, { baseRef = null, headRef = null } = {}) {
+export function parseCommentReviewScopePatch(
+  patch,
+  { baseRef = null, headRef = null, runId = null } = {},
+) {
   const files = [];
   let current = null;
   let nextLine = null;
@@ -89,6 +96,7 @@ export function parseCommentReviewScopePatch(patch, { baseRef = null, headRef = 
     kind: "github-delivery/comment-review-scope",
     baseRef: baseRef ? String(baseRef) : null,
     headRef: headRef ? String(headRef) : null,
+    ...(runId ? { runId: String(runId) } : {}),
     files: scopedFiles,
   };
   const digest = createHash("sha256")
@@ -124,6 +132,7 @@ async function main() {
   const scope = parseCommentReviewScopePatch(gitDiff(args.base, args.head), {
     baseRef: args.base,
     headRef: args.head,
+    runId: args.runId,
   });
   const json = `${JSON.stringify(scope, null, 2)}\n`;
   process.stdout.write(json);

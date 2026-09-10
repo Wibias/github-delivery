@@ -48,13 +48,21 @@ Do not polish an alibi into a shorter comment. Delete it. The comment inspector 
 
 When the host can spawn a subagent, the parent **must spawn** the **comment inspector** with one immutable scope. The parent must not restate the inspector rules. Load `agents/comment-inspector.md` as that agent's prompt. Do not hunt comments in the same agent that wrote the code.
 
+### Per-run isolation
+
+Every spawned inspector invocation gets one unique review-run ID and one unique temporary run directory outside the repository. Generate the scope into that directory and pass the same ID with `--run-id` when `scripts/comment-review-scope.mjs` is used directly. The resulting scope digest therefore binds repository diff scope and invocation identity.
+
+The parent and inspector **must not discover, open, grep, import, copy, or otherwise read a previous run's `comment-review-result`**, even when it belongs to the same PR and exact same head. Previous inspector conclusions may be retained as historical audit evidence by the owning workflow, but they are not input to a new independent classification. Do not use broad directory scans to find a convenient result file. The parent supplies the exact current-run scope path and accepts only the exact current-run result path.
+
+When a generated scope contains `runId`, the final `github-delivery/comment-review-result` must contain the identical `runId`. `validateCommentReviewResult` rejects missing or mismatched run identity before semantic inspection. This prevents a previous result from being reused on a later invocation even when the base/head and added-line scope are otherwise identical.
+
 For `create-pr-from-local-work`, scope is executable rather than model-selected: run `scripts/create-pr-hygiene.mjs prepare` exactly as that workflow specifies. It derives `github-delivery/comment-review-scope` from the candidate's **new-side added diff lines**, writes the scope file, and captures the guarded byte snapshot. Give the inspector that generated scope file; do not substitute whole changed files, an independently grepped comment list, or a newly reconstructed diff. The inspector may read nearby context outside the generated ranges only to judge an in-scope comment.
 
-For other workflows that compose no-comments, retain their declared exact parent file/diff scope and create the pre-spawn byte snapshot with `scripts/comment-review-guard.mjs capture --root <repo-root> --files <scope-json> --snapshot <temp-file>` unless their owning workflow supplies an equivalent deterministic wrapper.
+For other workflows that compose no-comments, retain their declared exact parent file/diff scope and create the pre-spawn byte snapshot with `scripts/comment-review-guard.mjs capture --root <repo-root> --files <scope-json> --snapshot <temp-file>` unless their owning workflow supplies an equivalent deterministic wrapper. When `comment-review-scope.mjs` builds the scope, use `--run-id <current-review-run-id>` and write both scope and result under the unique current-run directory.
 
 The inspector is report-only. It must never edit files, delete comments, reformat code, or otherwise mutate the workspace. It must not classify comments or raise root-cause flags outside that scope. Its durable output is one final structured result, never progress narration or provisional classifications.
 
-For the local create-PR path, the final result must be `schemaVersion: 1`, `kind: "github-delivery/comment-review-result"`, carry the exact generated `scopeDigest`, and contain unique `{ path, line, disposition, reason }` classifications plus any root-cause flags. `scripts/create-pr-hygiene.mjs finalize` validates this through the canonical `comment-review-result` boundary. A pre-existing line, duplicate/reversed classification, detached root-cause flag, wrong scope digest, or non-KEEP/DELETE disposition is rejected structurally.
+For the local create-PR path, the final result must be `schemaVersion: 1`, `kind: "github-delivery/comment-review-result"`, carry the exact generated `scopeDigest`, and contain unique `{ path, line, disposition, reason }` classifications plus any root-cause flags. A run-bound scope additionally requires the exact scope `runId`. `scripts/create-pr-hygiene.mjs finalize` validates this through the canonical `comment-review-result` boundary. A pre-existing line, duplicate/reversed classification, detached root-cause flag, wrong scope digest, wrong run ID, or non-KEEP/DELETE disposition is rejected structurally.
 
 Before trusting any reviewer result, the owning workflow must verify the byte boundary. For local create-PR, `create-pr-hygiene.mjs finalize` performs that verification. For other workflows, run `scripts/comment-review-guard.mjs verify --root <repo-root> --snapshot <temp-file>` directly.
 
@@ -66,23 +74,24 @@ After an unchanged reviewer window is proven, discard the temporary byte copy be
 
 ## Parent inspector
 
-Inspect only the final report after the byte guard verifies an unchanged reviewer window. Reject:
+Inspect only the exact current-run final report after the byte guard verifies an unchanged reviewer window. Reject:
 
 - any claimed or observed reviewer workspace mutation
 - scope escapes, including any classification or flag outside the immutable scope
+- a missing or mismatched run ID when the scope is run-bound
 - provisional or contradictory classifications in the report
 - exception-protected deletions (innocent-list comments marked DELETE without proof)
 - misstated root-cause flag reasons
 - root-cause flags not directly covered by the deleted alibi
 - flags that treat kept intentional code as guilty
 
-For local create-PR, the structured result validator handles scope escape, duplicate classification, digest, disposition, and detached-flag mechanics; the parent still owns the semantic innocent-list judgment and every resulting mutation.
+For local create-PR, the structured result validator handles scope escape, duplicate classification, digest, run identity, disposition, and detached-flag mechanics; the parent still owns the semantic innocent-list judgment and every resulting mutation.
 
 The parent applies accepted comment deletions only after the report passes inspection. The parent also owns every in-scope root-cause fix or cheap encoding allowed by the current mutation mode. Reviewer output is evidence, never a workspace mutation boundary.
 
 Root-cause flags on our-code surprises stay actionable. Do not retain those comments merely because the reviewer was report-only.
 
-One rejected report may be rerun with the failure named. A **second rejected report fails** the pass.
+One rejected report may be rerun with the failure named. A **second rejected report fails** the pass. A rerun gets a new run ID and new run directory; the rejected result is never used as the rerun's classification input.
 
 ## Apply vs report
 
@@ -105,6 +114,7 @@ A failed no-comments pass **blocks the review verdict**, merge-ready claim, and 
 - the reviewer claims workspace mutation, escapes scope, or still produces an invalid final report after one rerun
 - the byte guard cannot verify or restore the exact scoped pre-spawn state
 - a concurrent writer touched scoped files during the reviewer window
+- a run-bound result is missing its current run ID or carries another invocation's run ID
 - own PR with `push_code` already allowed, and an accepted in-scope kill or root-cause flag was not landed by the parent
 - an unproven alibi comment was left in place
 - a leftover workaround after a deleted alibi remains (in-scope unlanded, or out-of-scope named as a merge-ready blocker)
