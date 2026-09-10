@@ -4,6 +4,23 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.5.3] - 2026-09-10
+
+### Changed
+
+- Bumped the package version from `1.5.2` to `1.5.3`.
+- Re-review execution is now delta-first: one compact current-head review brief establishes scope, unchanged evidence is reused instead of repeatedly re-read, specialist-owned analysis is not duplicated, and deterministic helper failures must be inspected before a corrected retry (PR #448).
+- Agent debug traces now self-identify the github-delivery version and tracing implementation, can include the owning workflow/build identity, and preserve allowlisted numeric token-usage counters without storing provider result bodies or cost payloads (PR #450).
+
+### Fixed
+
+- Authorized re-review `approve-comment` completion now runs the native-review sidecar, dismisses the viewer's superseded `CHANGES_REQUESTED` reviews, re-fetches review state, refreshes the exact-head ship gate, and rejects a verdict that claims no gate blocker while the authoritative gate is blocked or unknown. This cleanup does not submit a GitHub Approve (PR #448).
+- Comment Inspector evidence is isolated per invocation with a unique run ID and run directory. Run-bound results must carry the exact current `runId`, and previous-run result files are forbidden as classification input even for the same repository, PR, head, or scope digest (PR #449).
+
+### Security
+
+- Persisted debug-trace thread, turn, item, and parent identifiers are now pseudonymized per trace while raw tool inputs/outputs, provider result bodies, costs, and private Grok thinking remain excluded (PR #450).
+
 ## [1.5.2] - 2026-09-10
 
 ### Changed
@@ -175,7 +192,7 @@ All notable changes to `github-delivery` are documented here.
 
 - Bumped the package version from `1.3.8` to `1.4.0`.
 - README current-state now keeps only the documented fail-closed limits and the still-expanding list, and release notes point at `CHANGELOG.md` instead of duplicating version history.
-- Pull-request Windows Authority, JavaScript CodeQL, and C# CodeQL jobs now run only when the trusted base-SHA path classifier says those lanes are in scope. Scope detection failure still fail-closes into running the lane. The Windows rewrite-baseline workflow is path-filtered to the files it exercises.
+- Pull-request Windows Authority, JavaScript CodeQL, and C# CodeQL jobs now run only when the trusted base-SHA path classifier says those lanes are in scope. Scope detection failure still fail-closes into running the lane. The Windows rewrite-baseline workflow is path-filtered to the files it actually exercises.
 
 ## [1.3.8] - 2026-08-30
 
@@ -958,6 +975,3 @@ All notable changes to `github-delivery` are documented here.
 - Snapshot-backed authoritative ship decisions with base-health isolation.
 - Guarded GitHub mutation profiles and runtime capability discovery.
 - Executable offline routing and retained-regression evaluations.
-- Deterministic versioned skill bundles with checksums, installation planning, backups, and restore.
-- Tag-bound GitHub Releases with checksum verification, SPDX SBOMs, and artifact attestations.
-- Dependabot, Dependency Review, CodeQL, Scorecard, and executable repository workflow policy checks.
