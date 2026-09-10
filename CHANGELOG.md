@@ -388,13 +388,13 @@ All notable changes to `github-delivery` are documented here.
 ### Added
 
 - SHA-bound remote repository context: resolve `owner/repo` or GitHub URLs, discover the real default branch, optionally pin a workflow-selected branch, capture its exact commit SHA, and read files against that snapshot instead of guessing `main`, `master`, or `HEAD`. Workflows that already load evidence policy compose this through `GD-EVID-007` without a new public route or mutation authority (PR #300).
-- Optional Windows Authority **PR sessions**: after one Hello approval, later exact-scope `push_code` and `merge_pr` batches on one allowlisted repo, one PR, and one head branch, and the approved merge base can skip repeated Hello for 5, 15, 30, or 60 minutes (`approvalMethod: pr_session`). A retargeted base requires Hello again. Branch leases stay `push_code` only for 1–10 minutes. Comments, human replies, close, and delete still need Hello (PRs #348, #351).
+- Optional Windows Authority **PR sessions**: after one Hello approval, later exact-scope `push_code` and `merge_pr` batches on one allowlisted repo, one PR, one head branch, and the approved merge base can skip repeated Hello for 5, 15, 30, or 60 minutes (`approvalMethod: pr_session`). A retargeted base requires Hello again. Branch leases stay `push_code` only for 1–10 minutes. Comments, human replies, close, and delete still need Hello (PRs #348, #351).
 
 ### Changed
 
 - First stable public release after `0.8.7`.
 - Bumped the package version from `0.8.7` to `1.0.0`.
-- `watch PR #N and merge it` stays on prepare-and-merge. `watch and autonomously merge PR #N` stays on watch with merge authority and hands a ready PR to `merge-pr-driver.mjs`. Bare `watch autonomously` does not merge. Autonomous is not the default mutation mode (PRs #312, #323, #348).
+- `watch PR #N and merge it` stays on prepare-and-merge. `watch and autonomously merge PR #N` stays on watch with merge authority and hands a ready PR to `merge-pr-driver.mjs`. Bare `watch autonomously` still does not merge. Autonomous is not the default mutation mode (PRs #312, #323, #348).
 - Policy modules are the mandatory workflow context. `references/shared-rules.md` is a compatibility index only; evals and `policy-bundle --validate` reject loading it as required context (PRs #342, #343).
 - Router merge intent is explicit: `merge it` / `ship it` prefixes, negated merge, and attributed GitHub text such as `comment says: merge it` are not user merge authority even when the attributed quote continues past the first sentence (PRs #321, #322, #347, #350).
 - Durable GitHub prose now deletes chatbot phrases, process narration, puffery, and `not just X, but Y` crutches. It still must not add personality, score "sounds human," or ban em dashes, and it still cannot strengthen `unknown` / `blocked` evidence states (PR #354).
@@ -531,7 +531,7 @@ All notable changes to `github-delivery` are documented here.
 ### Changed
 
 - Difficult bug diagnosis now prefers a tight red-capable symptom signal before theory-building, minimizes the reproducer, and uses ranked falsifiable hypotheses with one controlled variable at a time. Obvious defects with an already-proved causal chain do not get forced into an unnecessary harness (PR #266).
-- Broad internal migrations can now use an explicit expand → migrate → contract strategy. Temporary overlap is treated as migration scaffold rather than permanent compatibility, caller families move in independently verifiable batches, and the old path is removed only after the final residual proof is clean.
+- Broad internal migrations can now use an explicit expand → migrate → contract strategy. Temporary overlap is treated as migration scaffold rather than permanent compatibility, caller families move in independently verifiable batches, and the old path is removed only after the final residual proof is clean (PR #266).
 - Advisory design/simplification review now includes deletion-test, interface/test-surface, real-seam, leverage, and locality signals while keeping repository standards and concrete Bug/Security/Spec contracts authoritative. Existing anti-slop/Oxlint/typecheck diagnostics remain evidence inputs rather than a reason to vendor or install a second lint stack (PR #266).
 
 ## [0.7.2] - 2026-08-15
@@ -707,7 +707,8 @@ All notable changes to `github-delivery` are documented here.
   on a parent-ancestor `needsRebase` preflight; edits are made only on the
   layer that owns the path; and a merge-queue base may enqueue the contiguous
   lower stack all-or-nothing (per-PR readiness still required before
-  enqueue).
+  enqueue). Regression case `R-stack-restack-preflight-2026-08-05` pins the
+  contract.
 
 - Machine-checkable probe-application evidence. The bug and security axes are
   no longer complete on assertion alone: the review must emit a
@@ -957,10 +958,14 @@ All notable changes to `github-delivery` are documented here.
 
 ### Fixed
 
-- Prevented severe no-progress agent loops after a GitHub mutation is already prepared by adding the global `GD-CORE-008` bounded forward-progress rule.
-- Prepared GitHub writes now cross directly into `github-mutate.mjs` once the required evidence and authority are satisfied. Re-verification remains
-  required after relevant state changes, failed or ambiguous tool results, or explicit workflow freshness requirements.
-- Added regression coverage that fails when unchanged-state re-planning can replace the next required tool call or mutation.
+- Prevented severe no-progress agent loops after a GitHub mutation is already
+  prepared by adding the global `GD-CORE-008` bounded forward-progress rule.
+- Prepared GitHub writes now cross directly into `github-mutate.mjs` once the
+  required evidence and authority are satisfied. Re-verification remains
+  required after relevant state changes, failed or ambiguous tool results, or
+  explicit workflow freshness requirements.
+- Added regression coverage that fails when unchanged-state re-planning can
+  replace the next required tool call or mutation.
 
 ## [0.1.0] - 2026-08-01
 
@@ -970,3 +975,6 @@ All notable changes to `github-delivery` are documented here.
 - Snapshot-backed authoritative ship decisions with base-health isolation.
 - Guarded GitHub mutation profiles and runtime capability discovery.
 - Executable offline routing and retained-regression evaluations.
+- Deterministic versioned skill bundles with checksums, installation planning, backups, and restore.
+- Tag-bound GitHub Releases with checksum verification, SPDX SBOMs, and artifact attestations.
+- Dependabot, Dependency Review, CodeQL, Scorecard, and executable repository workflow policy checks.
