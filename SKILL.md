@@ -143,15 +143,20 @@ no GitHub write authority. Run routine deterministic tooling quietly; narrate on
 
 ## Full-review contracts that remain entrypoint-visible
 
-A full review is not complete merely because analysis stopped. **Full-review completion lock:** the plan item **Publish final verdict** remains pending or
-in_progress until the required verdict is actually published and verified. A
-blocker changes the verdict; it does not remove the verdict requirement. **Only explicit user cancellation** permits ending the required publication workflow
-without it. Verify normal publication using `scripts/verify-verdict-published.mjs`.
-A self-selected stricter mutation mode is not publication unavailability.
+A full review is not complete merely because analysis stopped. **Full-review completion lock:** the plan item **Deliver final verdict** remains pending or
+in_progress until a format-complete verdict for the reviewed head is delivered.
+A bare full review is read-only and completes by delivering that verdict in chat.
+GitHub publication is a separate mutation that requires explicit routed user
+intent; when it is authorized, verify it with `scripts/verify-verdict-published.mjs`.
+A blocker changes the verdict; it does not remove the verdict requirement.
+**Only explicit user cancellation** permits ending the required full-review run
+without its final verdict. Never self-elevate the routed mode to gain publication
+authority.
 
-Each full-review run has a `full-review-run-id`. Apply the **same-head anti-noise**
-rule: compare the strict label/TLDR **material delta** and do not post a second top-level verdict when there is no material change. `planVerdictPublication`
-remains the machine decision.
+Each full-review run has a `full-review-run-id`. When GitHub publication is
+authorized, apply the **same-head anti-noise** rule: compare the strict label/TLDR
+**material delta** and do not post a second top-level verdict when there is no
+material change. `planVerdictPublication` remains the machine decision.
 
 Full review also performs a **Semantic propagation audit**: Search the repository beyond the changed files, trace canonical/derived representations and material
 variant families, prove parity or test every relevant partition, including
