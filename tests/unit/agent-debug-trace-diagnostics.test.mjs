@@ -62,6 +62,7 @@ test("turn completion preserves numeric usage counters without raw provider payl
       usage: {
         inputTokens: 1000,
         cachedInputTokens: 700,
+        cacheCreationInputTokens: 50,
         outputTokens: 250,
         reasoningTokens: 80,
         totalTokens: 1330,
@@ -76,6 +77,7 @@ test("turn completion preserves numeric usage counters without raw provider payl
     assert.deepEqual(completion.usage, {
       inputTokens: 1000,
       cachedInputTokens: 700,
+      cacheCreationInputTokens: 50,
       outputTokens: 250,
       reasoningTokens: 80,
       totalTokens: 1330,
@@ -166,13 +168,14 @@ test("Grok terminal tool updates expose only safe outcome duration and error met
   assert.doesNotMatch(JSON.stringify(failed), /token=private|C:\/private|rawOutput|stack/);
 });
 
-test("Grok result normalizes safe usage counters", () => {
+test("Grok result normalizes provider-reported usage without inventing a total", () => {
   const [completed] = normalizeGrokDebugTraceEvent({
     type: "result",
     session_id: "session-1",
     usage: {
       input_tokens: 1200,
       cache_read_input_tokens: 800,
+      cache_creation_input_tokens: 40,
       output_tokens: 300,
     },
     result: "private final answer",
@@ -182,10 +185,23 @@ test("Grok result normalizes safe usage counters", () => {
   assert.deepEqual(completed.usage, {
     inputTokens: 1200,
     cachedInputTokens: 800,
+    cacheCreationInputTokens: 40,
     outputTokens: 300,
-    totalTokens: 1500,
   });
+  assert.equal(completed.usage.totalTokens, undefined);
   assert.doesNotMatch(JSON.stringify(completed), /private final answer|4\.2|total_cost/);
+});
+
+test("Grok result keeps an explicit provider total when supplied", () => {
+  const [completed] = normalizeGrokDebugTraceEvent({
+    type: "result",
+    usage: {
+      input_tokens: 1200,
+      output_tokens: 300,
+      total_tokens: 2340,
+    },
+  });
+  assert.equal(completed.usage.totalTokens, 2340);
 });
 
 test("Cursor terminal events expose safe outcome duration and failure class", () => {
