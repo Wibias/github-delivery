@@ -28,9 +28,9 @@ Use when the user asks for a PRD or wants the current conversation turned into p
 2. Restate the problem before accepting a proposed solution. Separate:
    - verified current behavior and constraints;
    - the user's desired outcome or product intent;
-   - any proposed implementation, which remains a hypothesis until repository evidence supports it;
+   - any proposed implementation, which remains a hypothesis until repository evidence supports it unless the user explicitly makes that implementation part of the requirement;
    - unresolved product decisions that evidence cannot settle.
-   If the proposed implementation solves a different problem than the stated outcome, surface that mismatch before encoding it as a requirement.
+   If the proposed implementation solves a different problem than the stated outcome, surface that mismatch before encoding it as a requirement. When the user explicitly mandates the implementation, preserve it as a constraint and surface the mismatch or tradeoff rather than silently replacing it.
 3. Identify major modules or contracts likely to change only after the problem statement is grounded.
 4. Ask only for high-impact missing decisions, especially test scope.
 5. Produce and publish a PRD with:
@@ -131,9 +131,9 @@ For breakdowns, create blocker issues first and mark dependency relationships.
 
 Use when the user wants a refactor request, refactoring RFC, or tiny-commit plan.
 
-1. Capture the problem and any solution ideas already offered. Treat the solution ideas as candidates, not requirements.
+1. Capture the problem and any solution ideas already offered. Treat solution ideas as candidates unless the user explicitly makes one part of the requirement.
 2. Verify the current codebase shape before accepting assumptions.
-3. Restate the refactor contract from evidence: current behavior or structural cost, desired outcome, constraints that must remain true, and the proposed implementation ideas kept separate. Reject or revise a proposed solution when the verified problem does not require it.
+3. Restate the refactor contract from evidence: current behavior or structural cost, desired outcome, constraints that must remain true, and the proposed implementation ideas kept separate. Reject or revise a candidate solution when the verified problem does not require it. Preserve an explicitly mandated implementation as a constraint and surface its tradeoffs instead of silently replacing it.
 4. Apply `references/minimal-solution.md` before inventing new architecture: check whether the goal is best met by deletion, existing repository capability, standard library/runtime, native platform behavior, an already-installed dependency, or only then custom structure. Present genuinely credible alternatives and tradeoffs; do not manufacture options for ceremony.
 5. Interview until scope, non-scope, and testing expectations are explicit.
 6. Inspect existing test coverage in the area.
