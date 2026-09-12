@@ -157,3 +157,10 @@ Full review also performs a **Semantic propagation audit**: Search the repositor
 Kernel/modules and executable gates override workflow prose; workflows cannot
 waive canonical rules. If runtime instructions genuinely conflict and the
 stricter safe behavior is unclear, fail closed and surface the contradiction.
+
+## Evaluation resources
+<!-- eval:references -->
+- tests/evals/cases.jsonl -- when to read: as canonical acceptance criteria during qualification review
+- tests/evals/regression-cases.jsonl -- when to read: when reviewing retained failures and successors
+- tests/evals/regression-lock.json -- when to read: when validating immutable retained regressions
+<!-- /eval:references -->
