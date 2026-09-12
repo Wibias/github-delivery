@@ -154,19 +154,12 @@ Full review also performs a **Semantic propagation audit**: Search the repositor
 
 ## Safety precedence
 
-Kernel/modules and executable gates override workflow prose; workflows cannot
-waive canonical rules. If runtime instructions genuinely conflict and the
-stricter safe behavior is unclear, fail closed and surface the contradiction.
+Kernel/modules and executable gates override workflow prose. Fail closed on
+unclear conflicts, missing required targets/references, failed helpers, or denied
+writes; surface the failure and never claim a dependent effect succeeded.
 
-Missing targets or declared resources, failed required helpers, and denied
-local or remote writes are blockers for the affected step. Surface the concrete
-failure instead of silently skipping it, and never claim a file, comment, PR
-state change, verification result, or other downstream effect succeeded when it
-did not. Read-only findings that were already established remain reportable.
-
-## Evaluation resources
 <!-- eval:references -->
-- tests/evals/cases.jsonl -- when to read: as canonical acceptance criteria during qualification review
-- tests/evals/regression-cases.jsonl -- when to read: when reviewing retained failures and successors
-- tests/evals/regression-lock.json -- when to read: when validating immutable retained regressions
+- tests/evals/cases.jsonl
+- tests/evals/regression-cases.jsonl
+- tests/evals/regression-lock.json
 <!-- /eval:references -->
