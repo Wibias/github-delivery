@@ -50,6 +50,8 @@ const STACKED_PR_REQUEST = /\b(?:stacked prs?|pr stack|restack|open pr stack|bot
 const AGENT_BRIEF_REQUEST = /\b(?:ready[- ]for[- ]agent|agent brief|issue contract)\b/;
 const ISSUE_TRIAGE_REQUEST = /\btriage\b[\s\S]{0,80}\b(?:issue|issues|ticket|tickets)\b|\b(?:issue|issues|ticket|tickets)\b[\s\S]{0,80}\btriage\b/;
 const QA_INTAKE_REQUEST = /\bqa intake\b|\bfile\b[\s\S]{0,80}\breproducible\b[\s\S]{0,80}\bbug report/;
+const PRD_REQUEST = /\b(?:create|write|draft|prepare)\b[\s\S]{0,120}\b(?:prd|product requirements? document)\b/;
+const REFACTOR_PLAN_REQUEST = /\b(?:create|write|draft|prepare)\b[\s\S]{0,120}\b(?:refactor(?:ing)? (?:request|rfc|plan)|tiny[- ]commit plan)\b/;
 const CONFLICT_REQUEST = /\b(?:merge conflicts?|git conflicts?|resolve(?:\s+the)?(?:\s+merge)?\s+conflicts?)\b/;
 const OUT_OF_SCOPE_REQUEST = /\b(?:out of scope|rejected enhancement|not now)\b/;
 const SKILL_AUTHORING_REQUEST = /\b(?:create|author|write|edit|update|modify|change|fix|harden|extend|refactor|test|validate|debug|repair|audit)\b[\s\S]{0,160}\b(?:agent\s+)?skill\b|\b(?:agent\s+)?skill\b[\s\S]{0,160}\b(?:create|author|write|edit|update|modify|change|fix|harden|extend|refactor|test|validate|debug|repair|audit)\b/;
@@ -331,6 +333,9 @@ export function routeShippingGithubPrompt(prompt, context = {}) {
   }
   if (CREATE_PR_REQUEST.test(text) && !PR_REFERENCE.test(text)) return result("references/create-pr-from-local-work.md", "maintainer", ["push_code", "create_pr"]);
   if (RESEARCH_ISSUE_REQUEST.test(text)) return result("references/research-issue.md", "review");
+  if (PRD_REQUEST.test(text) || REFACTOR_PLAN_REQUEST.test(text)) {
+    return result("references/issue-workflows.md", "maintainer");
+  }
 
   const issueCreationAction = issueCreationActionForPrompt(text);
   if (issueCreationAction) return result("references/issue-workflows.md", "maintainer", [issueCreationAction]);
