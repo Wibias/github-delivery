@@ -158,6 +158,12 @@ Kernel/modules and executable gates override workflow prose; workflows cannot
 waive canonical rules. If runtime instructions genuinely conflict and the
 stricter safe behavior is unclear, fail closed and surface the contradiction.
 
+Missing targets or declared resources, failed required helpers, and denied
+local or remote writes are blockers for the affected step. Surface the concrete
+failure instead of silently skipping it, and never claim a file, comment, PR
+state change, verification result, or other downstream effect succeeded when it
+did not. Read-only findings that were already established remain reportable.
+
 ## Evaluation resources
 <!-- eval:references -->
 - tests/evals/cases.jsonl -- when to read: as canonical acceptance criteria during qualification review
