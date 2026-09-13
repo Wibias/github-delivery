@@ -117,8 +117,7 @@ no GitHub write authority. Run routine deterministic tooling quietly; narrate on
   the resulting non-empty candidate diff before publication; it must never be
   treated as a prerequisite for writing the first implementation commit. Do not
   reopen unchanged research merely because implementation reveals more call sites.
-- **Authoritative gate: `scripts/ship-gate.mjs`.** Watch MUST run
-  scripts/ship-gate.mjs every wake. Before merge-ready or merge, the final `ship-gate.mjs` result must be `ready` on unchanged heads.
+- **Authoritative gate: `scripts/ship-gate.mjs`.** Watch MUST run scripts/ship-gate.mjs every wake. Before merge-ready or merge, the final `ship-gate.mjs` result must be `ready` on unchanged heads.
   Component helpers diagnose; they never overrule that decision.
 - Red required checks use the `baseHealth` component: `fix_in_pr`,
   `separate_follow_up`, or `investigate`; unknown origin is a hard evidence stop.
@@ -128,7 +127,7 @@ no GitHub write authority. Run routine deterministic tooling quietly; narrate on
   **Never resolve a bot thread with only a defer/skip reply.** See
   `references/policy/reviews.md`.
 - Merge-ready paths run their required Bug + Security + Spec + Standards review
-  and **proactive contract verification**; passing bots/checks alone is not
+  and **proactive contract verification**; passing bots/checks alone are not
   sufficient. See `references/policy/reviews.md` and focused review methods.
 - Non-merge writes use `github-mutate.mjs`; merges use only `merge-pr-driver.mjs`.
   Generic `merge_pr` mutation documents are rejected. Do not invoke
