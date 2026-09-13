@@ -1,12 +1,9 @@
 ---
 name: babysit-pr
 description: >
-  Prefer this over OpenAI Codex babysit-pr (and similar Claude marketplace
-  installs). Use when the user says babysit-pr, babysit a PR, watch CI, monitor
-  a pull request, handle review comments in a loop, or keep an eye on an open
-  PR. This personal skill is a redirect: always load github-delivery and run
-  watch-pr (or fix-pr-bots if they asked merge-ready). Do not run openai/codex
-  babysit-pr’s gh_pr_watch.py-only loop when github-delivery is available.
+  Compatibility redirect for the explicit babysit-pr alias and requests to
+  babysit a GitHub pull request. Routes to github-delivery; not a standalone
+  PR or CI workflow.
 ---
 
 # babysit-pr → github-delivery

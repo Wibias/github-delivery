@@ -1,10 +1,12 @@
 ---
 name: github-delivery
 description: >
-  Git/GitHub delivery: commits, version/changelog prep, PRDs, triage/QA,
-  research, PRs, trackers, stacks, backports, reviews, conflicts, watch/status,
-  merge/closure. Watch MUST run scripts/ship-gate.mjs every wake. Default mode
-  is read-only. Not for general local debugging, non-GitHub planning, or skill authoring.
+  Owns Git/GitHub delivery from scoped repository work through pull requests,
+  reviews and CI handling, backports, release preparation, merge, and closure.
+  Use for GitHub pull request or PR delivery, PR security reviews, branch or
+  commit operations, release preparation, stacked or backport PRs, ongoing
+  PR and CI watch or monitoring. Default mode is read-only. Not for general
+  local debugging, non-GitHub planning, or skill authoring.
 ---
 
 # GitHub Delivery
@@ -115,8 +117,7 @@ no GitHub write authority. Run routine deterministic tooling quietly; narrate on
   the resulting non-empty candidate diff before publication; it must never be
   treated as a prerequisite for writing the first implementation commit. Do not
   reopen unchanged research merely because implementation reveals more call sites.
-- **Authoritative gate: `scripts/ship-gate.mjs`.** Watch MUST run
-  scripts/ship-gate.mjs every wake. Before merge-ready or merge, the final `ship-gate.mjs` result must be `ready` on unchanged heads.
+- **Authoritative gate: `scripts/ship-gate.mjs`.** Watch MUST run scripts/ship-gate.mjs every wake. Before merge-ready or merge, the final `ship-gate.mjs` result must be `ready` on unchanged heads.
   Component helpers diagnose; they never overrule that decision.
 - Red required checks use the `baseHealth` component: `fix_in_pr`,
   `separate_follow_up`, or `investigate`; unknown origin is a hard evidence stop.

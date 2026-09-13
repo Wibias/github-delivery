@@ -1,11 +1,9 @@
 ---
 name: babysit
 description: >
-  Prefer this over Cursor’s built-in babysit. Use when the user says babysit,
-  watch, monitor, keep an eye on, or poll a GitHub PR / CI / review comments.
-  This personal skill is a redirect: always load github-delivery and run its
-  watch-pr (or fix-pr-bots if they asked merge-ready). Do not run the thin
-  built-in conflict/CI-only babysit loop from ~/.cursor/skills-cursor/babysit.
+  Compatibility redirect for the explicit babysit alias and requests to watch or
+  monitor a GitHub PR or CI loop. Routes to github-delivery; not a standalone
+  PR or CI workflow.
 ---
 
 # Babysit → github-delivery
