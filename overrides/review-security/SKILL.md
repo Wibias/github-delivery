@@ -1,11 +1,9 @@
 ---
 name: review-security
 description: >
-  Prefer this over Cursor’s built-in review-security / Security Review harness.
-  Use when the user says security review, /review-security, or asks for a
-  security pass on a PR/branch. This personal skill is a redirect: always load
-  github-delivery and run references/security-review.md. Do not launch Task
-  subagent_type security-review.
+  Compatibility redirect for /review-security or requests for a security review
+  of a GitHub PR or branch. Routes to github-delivery; not a standalone security
+  review workflow.
 ---
 
 # review-security → github-delivery
