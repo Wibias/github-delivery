@@ -3,10 +3,10 @@ name: github-delivery
 description: >
   Owns Git/GitHub delivery from scoped repository work through pull requests,
   reviews and CI handling, backports, release preparation, merge, and closure.
-  Use for GitHub pull request or PR delivery, branch or commit operations,
-  release preparation, stacked or backport PRs, or ongoing PR and CI watch or
-  monitoring. Default mode is read-only. Not for general local debugging,
-  non-GitHub planning, or skill authoring.
+  Use for GitHub pull request or PR delivery, PR security reviews, branch or
+  commit operations, release preparation, stacked or backport PRs, or ongoing
+  PR and CI watch or monitoring. Default mode is read-only. Not for general
+  local debugging, non-GitHub planning, or skill authoring.
 ---
 
 # GitHub Delivery
