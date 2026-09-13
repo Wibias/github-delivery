@@ -127,7 +127,7 @@ no GitHub write authority. Run routine deterministic tooling quietly; narrate on
   **Never resolve a bot thread with only a defer/skip reply.** See
   `references/policy/reviews.md`.
 - Merge-ready paths run their required Bug + Security + Spec + Standards review
-  and **proactive contract verification**; passing bots/checks alone are not
+  and **proactive contract verification**; passing bots/checks alone is not
   sufficient. See `references/policy/reviews.md` and focused review methods.
 - Non-merge writes use `github-mutate.mjs`; merges use only `merge-pr-driver.mjs`.
   Generic `merge_pr` mutation documents are rejected. Do not invoke
