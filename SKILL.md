@@ -1,10 +1,11 @@
 ---
 name: github-delivery
 description: >
-  Git/GitHub delivery: commits, version/changelog prep, PRDs, triage/QA,
-  research, PRs, trackers, stacks, backports, reviews, conflicts, watch/status,
-  merge/closure. Watch MUST run scripts/ship-gate.mjs every wake. Default mode
-  is read-only. Not for general local debugging, non-GitHub planning, or skill authoring.
+  Owns Git/GitHub delivery from scoped repository work through pull requests,
+  review and CI handling, backports, release preparation, merge, and closure.
+  Use for GitHub PR delivery, branch or commit operations, release preparation,
+  stacked or backport PRs, or ongoing PR and CI monitoring. Default mode is
+  read-only. Not for general local debugging, non-GitHub planning, or skill authoring.
 ---
 
 # GitHub Delivery
