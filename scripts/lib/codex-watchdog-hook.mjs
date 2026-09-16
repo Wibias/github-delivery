@@ -16,6 +16,7 @@ const TERMINAL_STOP_DISPOSITION_PATTERNS = [
 ];
 const STRUCTURED_STOP_RECOMMENDATION_HEADING = /(?:^|\n)\s*#{1,6}\s+(?:[A-Z]\.\s*)?Recommendation\s*$/im;
 const STRUCTURED_STOP_RECOMMENDATION_VALUE = /(?:^|\n)\s*`?NEXT_ACTION\s*=\s*[A-Z][A-Z0-9_]*`?\s*$/i;
+const EXPLICIT_STOP_ACTION_COMMITMENT = /^\s*(?:(?:let me|i(?:'|’)ll|i will|i need to|i(?:'|’)m going to|i am going to)\s+(?:just\s+|actually\s+)?(?:run|execute|invoke|call|issue|emit|grep|search|read|open|inspect|apply|patch|use|add|wire|edit|write|modify|update|remove|delete|fix|change)\b|(?:now|next|then|finally)[,:.!]?\s+(?:(?:let me|i(?:'|’)ll|i will|i need to|i(?:'|’)m going to|i am going to)\s+)?(?:just\s+|actually\s+)?(?:run|execute|invoke|call|issue|emit|grep|search|read|open|inspect|apply|patch|use|add|wire|edit|write|modify|update|remove|delete|fix|change)\b)/i;
 
 export function classifyCodexTool(toolName, toolInput = {}) {
   const classification = classifyHookTool({ tool_name: toolName, tool_input: toolInput });
@@ -147,9 +148,14 @@ function hasStopFinalizationDisposition(message) {
   return hasTerminalStopDisposition(message) || hasStructuredStopRecommendation(message);
 }
 
+function hasExplicitStopActionCommitment(message) {
+  return String(message || "")
+    .split(/\r?\n/)
+    .some((line) => EXPLICIT_STOP_ACTION_COMMITMENT.test(line));
+}
+
 function stopDecision(watchdog, input, recoveryAttempts, maxRecoveryAttempts) {
   const message = input.last_assistant_message || "";
-  const priorToolIntentCount = watchdog.snapshot().toolEmissionIntentCount;
   const decision = watchdog.observeAssistantDelta(message);
   if (decision.reason === "tool_protocol_emission_stall") {
     return {
@@ -162,7 +168,7 @@ function stopDecision(watchdog, input, recoveryAttempts, maxRecoveryAttempts) {
     };
   }
 
-  const announcedToolAction = watchdog.snapshot().toolEmissionIntentCount > priorToolIntentCount;
+  const announcedToolAction = hasExplicitStopActionCommitment(message);
   const finalizationDisposition = hasStopFinalizationDisposition(message);
   if (
     finalizationDisposition
