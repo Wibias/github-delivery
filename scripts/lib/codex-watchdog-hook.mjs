@@ -150,8 +150,9 @@ function hasStopFinalizationDisposition(message) {
 
 function hasExplicitStopActionCommitment(message) {
   return String(message || "")
-    .split(/\r?\n/)
-    .some((line) => EXPLICIT_STOP_ACTION_COMMITMENT.test(line));
+    .split(/\r?\n+/)
+    .flatMap((line) => line.split(/(?<=[.!?])\s+/))
+    .some((clause) => EXPLICIT_STOP_ACTION_COMMITMENT.test(clause));
 }
 
 function stopDecision(watchdog, input, recoveryAttempts, maxRecoveryAttempts) {
@@ -179,11 +180,10 @@ function stopDecision(watchdog, input, recoveryAttempts, maxRecoveryAttempts) {
   }
 
   const recoveryActive = recoveryAttempts > 0;
-  const contradictoryFinalizationAction = finalizationDisposition && announcedToolAction;
   if (
     decision.action !== "interrupt"
     && !recoveryActive
-    && !contradictoryFinalizationAction
+    && !announcedToolAction
   ) {
     return { output: null, recoveryAttempts: 0 };
   }
