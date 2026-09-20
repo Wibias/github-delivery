@@ -296,6 +296,7 @@ test("doctor is read-only and reports integrity, activation, config, authority h
     codexHome: CODEX_HOME,
     dependencies: {
       checkBootstrapEnvironment: () => ({ ok: true, node: { ok: true }, git: { ok: true }, gh: { ok: true }, ghAuth: { ok: true } }),
+      runtimeVersion: () => "9.9.9",
       discoverInstallations: () => validInstallation(),
       readInstalledManifest: () => manifest,
       compareInstalledManifest: () => ({ clean: false, modifications: [{ path: "SKILL.md", reason: "changed" }] }),
@@ -314,6 +315,7 @@ test("doctor is read-only and reports integrity, activation, config, authority h
 
   assert.deepEqual(mutations, []);
   assert.equal(report.target, TARGET);
+  assert.deepEqual(report.runtime, { packageVersion: "9.9.9", relationToLatest: "already_ahead" });
   assert.equal(report.installed.version, "0.4.0");
   assert.equal(report.integrity.clean, false);
   assert.equal(report.config.ok, true);
