@@ -95,6 +95,19 @@ test("pre-open output carries generator version and implementation digests", () 
   assert.deepEqual(compactPreOpenGateReport(report).generator, generator);
 });
 
+test("unknown compact report names the incomplete review-scope cause", () => {
+  const report = blockedReport();
+  report.decision = "unknown";
+  report.complete = false;
+  report.blockers = [];
+  report.incompleteReasons = ["review_scope:patch_missing"];
+
+  const compact = compactPreOpenGateReport(report);
+  assert.equal(compact.decision, "unknown");
+  assert.deepEqual(compact.incompleteReasons, ["review_scope:patch_missing"]);
+  assert.equal(compact.nextAction, "inspect_missing_patch_evidence");
+});
+
 test("ready compact report has one unambiguous publication disposition", () => {
   const report = blockedReport();
   report.decision = "ready";
