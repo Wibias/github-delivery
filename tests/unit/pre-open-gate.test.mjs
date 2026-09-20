@@ -174,6 +174,39 @@ test("pre-open gate: evidence covering every required lens/surface clears blocke
   assert.equal(clearedByEvidence.length, 9);
 });
 
+test("pre-open gate: reviewed large diff can reach ready after complete enumeration", () => {
+  const files = Array.from(
+    { length: 100 },
+    (_, index) => file(`src/mod-${index}.ts`, "+const value = 1;"),
+  );
+  const plan = planReviewScope({
+    repo: "acme/widget",
+    pr: null,
+    headRefOid: "a".repeat(40),
+    files,
+  });
+  const evidence = {
+    schemaVersion: 1,
+    lenses: {
+      silent_failures: "done",
+      resource_leaks: "done",
+      edge_cases: "done",
+    },
+    surfaces: {
+      authn: "n/a no auth boundary touched",
+      authz: "n/a no authorization boundary touched",
+      secrets_config: "n/a no secrets or config touched",
+      injection: "n/a no untrusted input or shell execution",
+    },
+  };
+
+  const result = evaluate(plan, evidence);
+  assert.ok(plan.uncertainty.some((item) => item.code === "large_diff"));
+  assert.equal(result.decision, "ready");
+  assert.equal(result.complete, true);
+  assert.deepEqual(result.blockers, []);
+});
+
 test("pre-open gate: partial evidence stays blocked and lists the remaining blockers", () => {
   const plan = planReviewScope({ repo: "acme/widget", pr: null, headRefOid: "abc", files: [file("src/worker.ts", "+const worker = new Worker(url);\n+worker.terminate();")] });
   const evidence = {

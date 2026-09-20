@@ -247,10 +247,13 @@ test("records missing patch uncertainty instead of pretending precision", () => 
   assert.equal(result.securityReview.depth, "baseline");
 });
 
-test("flags large diffs for partitioned review", () => {
+test("flags large diffs for partitioned review without making verified enumeration permanently incomplete", () => {
   const files = Array.from({ length: 100 }, (_, index) => file(`src/file-${index}.ts`, "+export const value = 1;"));
   const result = plan(files);
-  assert.ok(result.uncertainty.some((item) => item.code === "large_diff"));
+  const largeDiff = result.uncertainty.find((item) => item.code === "large_diff");
+  assert.ok(largeDiff);
+  assert.equal(largeDiff.blocksCompletion, false);
+  assert.equal(result.complete, true);
 });
 
 test("fails closed when GitHub changed-file enumeration is incomplete", () => {

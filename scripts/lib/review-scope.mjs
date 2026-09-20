@@ -320,7 +320,12 @@ export function planReviewScope(input = {}) {
   const bugDepth = docsOnly ? "skip" : criticalBug || requiredBug.length >= 2 ? "deep" : requiredBug.length ? "targeted" : logicFiles.length ? "baseline" : "skip";
   const uncertainty = [];
   if (missingPatches.length) uncertainty.push({ code: "patch_missing", files: missingPatches, effect: "Do not downgrade path-only signals below baseline without manual inspection." });
-  if (files.length >= 100) uncertainty.push({ code: "large_diff", fileCount: files.length, effect: "Partition review by domain and verify pagination completeness." });
+  if (files.length >= 100) uncertainty.push({
+    code: "large_diff",
+    fileCount: files.length,
+    blocksCompletion: false,
+    effect: "Partition review by domain and verify pagination completeness.",
+  });
 
   const registryErrors = validateProbeRegistry(
     KNOWN_LENS_IDS,
@@ -351,7 +356,7 @@ export function planReviewScope(input = {}) {
     probeEvidence,
     baselineScreens: logicFiles.length ? ["authn", "authz", "secrets_config", "injection", "error_propagation", "boundary_conditions"] : [],
     uncertainty,
-    complete: uncertainty.length === 0,
+    complete: !uncertainty.some((item) => item.blocksCompletion !== false),
     instructions: [
       "Review every high- and medium-confidence required domain; low-confidence signals are residual leads, not findings.",
       "Removed controls and broadened workflow permissions require proof that the original invariant still holds.",
