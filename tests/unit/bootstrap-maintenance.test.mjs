@@ -315,7 +315,7 @@ test("doctor is read-only and reports integrity, activation, config, authority h
 
   assert.deepEqual(mutations, []);
   assert.equal(report.target, TARGET);
-  assert.deepEqual(report.runtime, { packageVersion: "9.9.9", relationToLatest: "update" });
+  assert.deepEqual(report.runtime, { packageVersion: "9.9.9", relationToLatest: "already_ahead" });
   assert.equal(report.installed.version, "0.4.0");
   assert.equal(report.integrity.clean, false);
   assert.equal(report.config.ok, true);
