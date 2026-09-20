@@ -79,6 +79,9 @@ export function evaluate(plan, evidence = null) {
     }
   }
 
+  const incompleteReasons = (plan?.uncertainty || [])
+    .filter((item) => item?.blocksCompletion !== false)
+    .map((item) => `review_scope:${String(item?.code || "unknown")}`);
   const complete = implementationDiffPresent && plan.complete && bugScope.complete && securityScope.complete;
   const finalBlockers = implementationDiffPresent
     ? blockers
@@ -97,6 +100,7 @@ export function evaluate(plan, evidence = null) {
     probeEvidenceErrors: probes.errors,
     blockers: finalBlockers,
     clearedByEvidence,
+    incompleteReasons,
     decision,
     complete,
     implementationDiffPresent,
@@ -104,7 +108,7 @@ export function evaluate(plan, evidence = null) {
   };
 }
 
-function report({ repo, baseRef, headRef, baseRefOid, headRefOid, diffIdentity, fileCount, bugScope, securityScope, requiredProbes, probeEvidenceErrors, blockers, clearedByEvidence, decision, complete, implementationDiffPresent, evidenceApplied }) {
+function report({ repo, baseRef, headRef, baseRefOid, headRefOid, diffIdentity, fileCount, bugScope, securityScope, requiredProbes, probeEvidenceErrors, blockers, clearedByEvidence, incompleteReasons, decision, complete, implementationDiffPresent, evidenceApplied }) {
   return {
     schemaVersion: 1,
     kind: "github-delivery/pre-open-gate",
@@ -125,6 +129,7 @@ function report({ repo, baseRef, headRef, baseRefOid, headRefOid, diffIdentity, 
     probeEvidenceErrors,
     blockers,
     clearedByEvidence,
+    incompleteReasons: Array.isArray(incompleteReasons) ? incompleteReasons : [],
     instructions: [
       "workflow:implementation_missing: this pre-open gate requires a non-empty candidate implementation diff; implement first, then rerun the gate before publication.",
       "decision=blocked: complete every remaining required bug lens, security surface, and deterministic probe on this branch diff (with --evidence-file), fix Confirmed High/Critical findings, then rerun before opening the PR.",
@@ -202,12 +207,17 @@ export function compactPreOpenGateReport(result) {
     };
   }
 
+  const incompleteReasons = sortedUnique(result?.incompleteReasons || []);
   const nextAction =
     result?.decision === "ready"
       ? "proceed_to_publication"
       : result?.decision === "blocked"
         ? "complete_evidence"
-        : "restore_branch_evidence";
+        : incompleteReasons.includes("review_scope:patch_missing")
+          ? "inspect_missing_patch_evidence"
+          : incompleteReasons.some((reason) => reason.startsWith("review_scope:probe_registry_invalid"))
+            ? "repair_probe_registry"
+            : "resolve_incomplete_review_scope";
 
   return {
     schemaVersion: 1,
@@ -224,6 +234,7 @@ export function compactPreOpenGateReport(result) {
     implementationDiffPresent: result?.implementationDiffPresent,
     evidenceApplied: result?.evidenceApplied,
     blockerCount: blockers.length,
+    incompleteReasons,
     remaining,
     evidenceRequirements: {
       schemaVersion: PRE_OPEN_EVIDENCE_SCHEMA_VERSION,
