@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -28,6 +29,14 @@ import { readActivationReceipt } from "./watchdog-activation.mjs";
 
 function fail(code) {
   throw new Error(code);
+}
+
+function currentPackageVersion() {
+  try {
+    return String(JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8"))?.version || "").trim() || null;
+  } catch {
+    return null;
+  }
 }
 
 function defaultCodexHome() {
@@ -258,6 +267,9 @@ export async function runBootstrapDoctor({
   const readAuthority = dependencies.readInstalledAuthorityHost || readInstalledAuthorityHost;
   const readReceipt = dependencies.readActivationReceipt || readActivationReceipt;
   const latestRelease = dependencies.latestRelease || (() => createGitHubReleaseClient().latestRelease());
+  const runtimeVersion = typeof dependencies.runtimeVersion === "function"
+    ? dependencies.runtimeVersion()
+    : currentPackageVersion();
 
   const environment = checkEnvironment();
   const found = discover(target ? { explicitTarget: target } : {});
@@ -269,6 +281,7 @@ export async function runBootstrapDoctor({
 
   const report = {
     action: "doctor",
+    runtime: { packageVersion: runtimeVersion, relationToLatest: null },
     environment,
     target: selected?.target || (target ? resolve(target) : null),
     installations: found,
@@ -355,6 +368,7 @@ export async function runBootstrapDoctor({
     const match = /^v(\d+\.\d+\.\d+)$/.exec(tag);
     if (!match) fail("stable_release_tag_invalid");
     report.latest.version = match[1];
+    if (runtimeVersion) report.runtime.relationToLatest = relation(runtimeVersion, match[1]);
     if (selected?.version) report.latest.relation = relation(selected.version, match[1]);
     if (
       report.authorityHost.ok &&
