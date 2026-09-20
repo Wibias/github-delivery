@@ -44,7 +44,7 @@ Security depth is `skip`, `baseline`, `targeted`, or `full`. Bug depth is `skip`
 
 ## Uncertainty
 
-Missing patches and very large diffs are reported explicitly. An incomplete plan cannot be used to downgrade path-only evidence without manual inspection. Large diffs must be partitioned by domain and checked for pagination completeness.
+Missing patches and very large diffs are reported explicitly. Missing patches and other blocking uncertainties keep the plan incomplete and cannot be used to downgrade path-only evidence without manual inspection. A large diff is an explicit review obligation rather than permanent incompleteness once the changed-file enumeration is complete: it must still be partitioned by domain, checked for pagination completeness where applicable, and satisfy the normal pre-open lens, surface, and probe evidence before publication.
 
 ## Reviewer obligations
 
