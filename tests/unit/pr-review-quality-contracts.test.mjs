@@ -96,17 +96,14 @@ test("review-integrity follow-up release is complete in 1.5.2", () => {
 });
 
 test("re-review trace follow-up release is complete in 1.5.3", () => {
-  const pkg = JSON.parse(read("package.json"));
   const changelog = read("CHANGELOG.md");
   const release = changelog.split("## [1.5.3] - 2026-09-10")[1]?.split("## [1.5.2]")[0] ?? "";
 
-  assert.equal(pkg.version, "1.5.3");
   assert.ok(release, "expected a dated 1.5.3 changelog section");
   for (const pr of [448, 449, 450]) {
     assert.match(release, new RegExp(`PR #${pr}\\b`));
   }
 });
-
 
 test("post-1.5.3 follow-up release is complete in 1.5.4", () => {
   const pkg = JSON.parse(read("package.json"));
