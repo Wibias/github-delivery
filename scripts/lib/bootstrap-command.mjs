@@ -110,7 +110,7 @@ export async function runBootstrap(argv = [], dependencies = {}) {
     return update({
       target,
       apply: options.apply,
-      replaceLocalModifications: options.replaceLocalModifications === true,
+      ...(options.replaceLocalModifications === true ? { replaceLocalModifications: true } : {}),
       ...(typeof dependencies.onProgress === "function" ? { onProgress: dependencies.onProgress } : {}),
     });
   }
