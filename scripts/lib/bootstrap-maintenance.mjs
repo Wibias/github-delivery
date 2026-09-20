@@ -64,6 +64,7 @@ function authorityProviderGuidance() {
 export async function runBootstrapUpdate({
   target,
   apply = false,
+  replaceLocalModifications = false,
   onProgress = undefined,
   dependencies = {},
 } = {}) {
@@ -72,6 +73,7 @@ export async function runBootstrapUpdate({
   const run = dependencies.runInstallCommand || runInstallCommand;
   const argv = ["--update", "--target", resolve(target)];
   if (apply) argv.push("--apply");
+  if (replaceLocalModifications) argv.push("--replace-local-modifications");
   const options = parse(argv);
   const runDependencies = typeof onProgress === "function"
     ? { ...dependencies, onProgress }
