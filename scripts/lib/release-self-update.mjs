@@ -499,7 +499,11 @@ export async function prepareVerifiedReleaseCandidate({
   if (!payload?.verified || !payload?.releaseMetadata) {
     fail("stable_release_candidate_invalid");
   }
-  const updatePlan = plan({ releases: [payload.releaseMetadata], target });
+  const updatePlan = plan({
+    releases: [payload.releaseMetadata],
+    target,
+    targetManifest: payload.manifest,
+  });
   const { releaseMetadata, ...verifiedPayload } = payload;
 
   return {
