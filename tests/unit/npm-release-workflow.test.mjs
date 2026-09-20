@@ -69,9 +69,13 @@ test("npm publication remains fail-visible and resumable after GitHub publicatio
   );
   assert.doesNotMatch(publishJob, /continue-on-error|\|\| true/);
   const existingCheck = publisher.indexOf("const existingIntegrity = publishedPackageIntegrity");
+  const existingVersionCheck = publisher.indexOf("const existingVersion = publishedPackageVersion");
   const publishCall = publisher.indexOf('run(npmCli, ["publish", "--access", "public", "--ignore-scripts"]);');
-  assert.ok(existingCheck >= 0, "publisher must inspect an existing package version");
-  assert.ok(publishCall > existingCheck, "publisher must verify/reuse before attempting publish");
+  assert.ok(existingCheck >= 0, "publisher must inspect existing package integrity");
+  assert.ok(existingVersionCheck > existingCheck, "publisher must detect an existing version even when integrity is not yet visible");
+  assert.ok(publishCall > existingVersionCheck, "publisher must verify/reuse before attempting publish");
+  assert.match(publisher, /allowMissingAfterRetries:\s*true/);
   assert.match(publisher, /npm_existing_version_integrity_mismatch/);
+  assert.match(publisher, /npm_existing_version_integrity_missing/);
   assert.match(publisher, /npm_publish_verification_failed/);
 });
