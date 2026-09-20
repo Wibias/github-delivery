@@ -4,6 +4,20 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.5.4] - 2026-09-20
+
+### Changed
+
+- Bumped the package version from `1.5.3` to `1.5.4`.
+- Issue and refactor planning now ground the requested outcome in verified current repository behavior before accepting a proposed implementation, keep implementation proposals as hypotheses unless repository evidence or explicit user authority requires them, and surface mismatches without overriding explicit user intent (PR #452).
+- Skill discovery metadata is narrower and routing-focused: executable GitHub Delivery procedures remain in selected skill bodies instead of leaking into always-visible discovery descriptions for the main skill and compatibility overrides (PR #453).
+- GitHub Actions CodeQL dependencies were updated from 4.37.9 to 4.38.0, including the CodeQL 2.27.0 bundle and upstream runner/toolcache improvements (PR #454).
+
+### Fixed
+
+- Codex Stop-hook recovery no longer mistakes descriptive `Running ...` / `Executing ...` review prose for an explicitly selected next tool action, while genuine first-person action commitments and contradictory post-terminal actions still trigger recovery (PR #455).
+- Pre-open review no longer deadlocks every 100+ file candidate as permanently incomplete: `large_diff` remains an explicit partitioned-review obligation, but complete changed-file enumeration plus the normal required lens, security-surface, and probe evidence can now reach `ready`; genuinely incomplete uncertainties remain fail-closed (PR #456).
+
 ## [1.5.3] - 2026-09-10
 
 ### Changed
