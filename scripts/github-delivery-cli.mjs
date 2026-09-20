@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { parseBootstrapArgs } from "./lib/bootstrap-cli.mjs";
 import { runBootstrap } from "./lib/bootstrap-command.mjs";
 
-export const HELP_TEXT = `GitHub Delivery\n\nUsage:\n  github-delivery\n  github-delivery install [--target PATH]\n  github-delivery setup [--target PATH]\n  github-delivery start\n  github-delivery autostart [on|off|status]\n  github-delivery doctor [--target PATH] [--json]\n  github-delivery update [--target PATH] [--apply]\n\nBare invocation launches guided setup.\nDoctor is human-readable by default; add --json for the raw machine report.\nUpdate is dry-run by default; add --apply only after reviewing the plan.\n`;
+export const HELP_TEXT = `GitHub Delivery\n\nUsage:\n  github-delivery\n  github-delivery install [--target PATH]\n  github-delivery setup [--target PATH]\n  github-delivery start\n  github-delivery autostart [on|off|status]\n  github-delivery doctor [--target PATH] [--json]\n  github-delivery update [--target PATH] [--apply [--replace-local-modifications]]\n\nBare invocation launches guided setup.\nDoctor is human-readable by default; add --json for the raw machine report.\nUpdate is dry-run by default; add --apply only after reviewing the plan. If reviewed local changes intentionally need to be replaced by the verified release, add --replace-local-modifications together with --apply; the old installation is backed up first.\n`;
 
 function value(value, fallback = "unknown") {
   if (value === null || value === undefined || value === "") return fallback;
