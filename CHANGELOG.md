@@ -4,6 +4,23 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-09-21
+
+### Added
+
+- `doctor --json` now reports the currently executing npm package under `runtime.packageVersion` plus its `relationToLatest`, separating runtime identity from the managed installed skill and latest stable release so stale `npx` execution is directly diagnosable (PR #461).
+- Full and compact pre-open gate artifacts now carry generator provenance with the github-delivery version plus SHA-256 digests of the pre-open gate and review-scope implementations that produced them, making stale semantic artifacts identifiable without implementation rediscovery (PR #463).
+
+### Changed
+
+- Unknown pre-open decisions now expose machine-readable `incompleteReasons` and reason-specific next actions such as `inspect_missing_patch_evidence` and `repair_probe_registry`, instead of mapping every incomplete review scope to branch-evidence restoration (PR #464).
+
+### Fixed
+
+- Successful verified `create_pr` mutations now reconcile the created pull-request number into persistent workflow-controller state, so resumptions no longer retain `pr: null` after publication (PR #462).
+- Local-workflow bootstrap now rejects abbreviated or otherwise non-canonical base SHA identities immediately with `workflow_bootstrap_base_invalid`, preventing caller input mistakes from surfacing later as misleading checkpoint base mismatches (PR #465).
+- Bumped the package version from `1.6.0` to `1.7.0`.
+
 ## [1.6.0] - 2026-09-20
 
 ### Added
