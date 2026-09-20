@@ -50,6 +50,27 @@ test("installer parses self-update from the running installed bundle root", () =
   assert.equal(options.sourceExplicit, false);
 });
 
+test("self-update local replacement requires explicit apply", () => {
+  const context = { installedRoot: resolve("/virtual/installed/github-delivery") };
+  const options = parseInstallArgs([
+    "--update",
+    "--apply",
+    "--replace-local-modifications",
+  ], context);
+  assert.equal(options.update, true);
+  assert.equal(options.apply, true);
+  assert.equal(options.replaceLocalModifications, true);
+
+  assert.throws(
+    () => parseInstallArgs(["--update", "--replace-local-modifications"], context),
+    /update_replace_local_modifications_requires_apply/,
+  );
+  assert.throws(
+    () => parseInstallArgs(["--replace-local-modifications"], context),
+    /replace_local_modifications_update_only/,
+  );
+});
+
 test("self-update keeps an explicit target override", () => {
   const installedRoot = resolve("/virtual/installed/github-delivery");
   const target = resolve("/virtual/custom/github-delivery");
