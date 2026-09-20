@@ -52,6 +52,21 @@ test("parses the public npx command surface and rejects unsafe v1 options", () =
     target: null,
     help: false,
   });
+  assert.deepEqual(parseBootstrapArgs(["update", "--apply", "--replace-local-modifications"]), {
+    command: "update",
+    apply: true,
+    target: null,
+    help: false,
+    replaceLocalModifications: true,
+  });
+  assert.throws(
+    () => parseBootstrapArgs(["update", "--replace-local-modifications"]),
+    /bootstrap_replace_local_modifications_requires_apply/,
+  );
+  assert.throws(
+    () => parseBootstrapArgs(["install", "--replace-local-modifications"]),
+    /bootstrap_replace_local_modifications_update_only/,
+  );
   assert.deepEqual(parseBootstrapArgs(["doctor"]), {
     command: "doctor",
     apply: false,
