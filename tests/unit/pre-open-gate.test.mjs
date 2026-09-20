@@ -177,7 +177,7 @@ test("pre-open gate: evidence covering every required lens/surface clears blocke
 test("pre-open gate: reviewed large diff can reach ready after complete enumeration", () => {
   const files = Array.from(
     { length: 100 },
-    (_, index) => file(`src/file-${index}.ts`, "+const value = 1;"),
+    (_, index) => file(`src/mod-${index}.ts`, "+const value = 1;"),
   );
   const plan = planReviewScope({
     repo: "acme/widget",
