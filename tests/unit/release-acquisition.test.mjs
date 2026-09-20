@@ -143,6 +143,7 @@ test("update candidate planning reuses the shared verified acquisition result", 
         planCalls += 1;
         assert.equal(options.target, target);
         assert.deepEqual(options.releases, [value.release]);
+        assert.deepEqual(options.targetManifest, value.manifest);
         return {
           schemaVersion: 1,
           kind: "github-delivery/stable-update-plan",

@@ -53,6 +53,7 @@ export function parseInstallArgs(argv, { installedRoot = resolve(import.meta.dir
     targetExplicit: false,
     allowDowngrade: false,
     force: false,
+    replaceLocalModifications: false,
     restore: null,
     codexHome,
     host: inferHost(codexHome),
@@ -82,13 +83,20 @@ export function parseInstallArgs(argv, { installedRoot = resolve(import.meta.dir
     else if (arg === "--update") options.update = true;
     else if (arg === "--allow-downgrade") options.allowDowngrade = true;
     else if (arg === "--force") options.force = true;
+    else if (arg === "--replace-local-modifications") options.replaceLocalModifications = true;
     else throw new Error(`unknown argument: ${arg}`);
   }
 
+  if (options.replaceLocalModifications && !options.update) {
+    throw new Error("replace_local_modifications_update_only");
+  }
   if (options.update) {
     if (options.sourceExplicit) throw new Error("update_source_conflict");
     if (options.restore) throw new Error("update_restore_conflict");
     if (options.allowDowngrade) throw new Error("update_allow_downgrade_forbidden");
+    if (options.replaceLocalModifications && !options.apply) {
+      throw new Error("update_replace_local_modifications_requires_apply");
+    }
     if (!options.targetExplicit) options.target = installedRoot;
   }
 
@@ -346,7 +354,13 @@ export async function runInstallCommand(options, dependencies = {}) {
     const legacyMigration = candidate.plan.action === "migrate_legacy"
       && candidate.plan.legacyManifestless === true
       && candidate.plan.migrationAllowed === true;
-    if (!legacyMigration && (candidate.plan.action !== "update" || candidate.plan.safeToReplace !== true)) {
+    const localReplacementAuthorized = options.replaceLocalModifications === true
+      && candidate.plan.action === "blocked_local_modifications";
+    if (
+      !legacyMigration
+      && !localReplacementAuthorized
+      && (candidate.plan.action !== "update" || candidate.plan.safeToReplace !== true)
+    ) {
       throw new Error(`stable_release_update_blocked:${candidate.plan.action || "invalid"}`);
     }
 
@@ -363,6 +377,7 @@ export async function runInstallCommand(options, dependencies = {}) {
       apply: true,
       allowDowngrade: false,
       force: false,
+      replaceLocalModifications: false,
       legacyManifestlessMigration: legacyMigration,
     };
     installation = await installWithWindowsLockRecovery({
@@ -436,6 +451,7 @@ export async function runInstallCommand(options, dependencies = {}) {
       release: candidate.release,
       watchdog: installation?.watchdog || null,
       authorityHost,
+      replacedLocalModifications: localReplacementAuthorized,
     };
   } catch (error) {
     if (installation?.backupPath && error && typeof error === "object") {

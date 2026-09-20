@@ -83,6 +83,63 @@ test("stable update never downgrades an installation ahead of the latest release
   assert.equal(plan.safeToReplace, true);
 });
 
+test("newer release may replace local drift that already matches the verified target manifest", () => {
+  const plan = planStableUpdate({
+    releases: [{
+      tag_name: "v0.5.0",
+      draft: false,
+      prerelease: false,
+      assets: requiredAssets("0.5.0"),
+    }],
+    target: "/skill",
+    installedManifest: manifest("0.4.0", [{
+      path: "SKILL.md",
+      mode: "0644",
+      sha256: "b".repeat(64),
+    }]),
+    targetManifest: manifest("0.5.0", [{
+      path: "SKILL.md",
+      mode: "0644",
+      sha256: "c".repeat(64),
+    }]),
+    dependencies: dirtyInstalledDependencies(),
+  });
+
+  assert.equal(plan.action, "update");
+  assert.equal(plan.safeToReplace, true);
+  assert.deepEqual(plan.localModifications, [{ path: "SKILL.md", reason: "changed" }]);
+  assert.deepEqual(plan.blockingLocalModifications, []);
+  assert.deepEqual(plan.targetConvergedLocalModifications, [{ path: "SKILL.md", reason: "changed" }]);
+});
+
+test("newer release still blocks local drift that differs from the verified target manifest", () => {
+  const plan = planStableUpdate({
+    releases: [{
+      tag_name: "v0.5.0",
+      draft: false,
+      prerelease: false,
+      assets: requiredAssets("0.5.0"),
+    }],
+    target: "/skill",
+    installedManifest: manifest("0.4.0", [{
+      path: "SKILL.md",
+      mode: "0644",
+      sha256: "b".repeat(64),
+    }]),
+    targetManifest: manifest("0.5.0", [{
+      path: "SKILL.md",
+      mode: "0644",
+      sha256: "d".repeat(64),
+    }]),
+    dependencies: dirtyInstalledDependencies(),
+  });
+
+  assert.equal(plan.action, "blocked_local_modifications");
+  assert.equal(plan.safeToReplace, false);
+  assert.deepEqual(plan.blockingLocalModifications, [{ path: "SKILL.md", reason: "changed" }]);
+  assert.deepEqual(plan.targetConvergedLocalModifications, []);
+});
+
 test("current and ahead releases remain no-ops when local drift exists", () => {
   for (const [releaseVersion, installedVersion, expectedAction] of [
     ["0.4.0", "0.4.0", "already_current"],

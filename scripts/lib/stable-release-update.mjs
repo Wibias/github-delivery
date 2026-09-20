@@ -180,9 +180,71 @@ export function releaseAssetPlan(release) {
   };
 }
 
-export function planStableUpdate({ releases, target, installedManifest = undefined, dependencies = {} } = {}) {
+function partitionLocalModificationsAgainstTarget({
+  modifications,
+  targetManifest,
+  target,
+  dependencies = {},
+}) {
+  const blocking = [];
+  const converged = [];
+  if (
+    !targetManifest
+    || targetManifest.schemaVersion !== 1
+    || targetManifest.kind !== "github-delivery/distribution-manifest"
+    || !Array.isArray(targetManifest.files)
+  ) {
+    return { blocking: [...modifications], converged };
+  }
+
+  const targetEntries = new Map();
+  for (const entry of targetManifest.files) {
+    const path = validateManifestPath(entry?.path);
+    if (typeof entry?.sha256 !== "string" || !/^[0-9a-f]{64}$/i.test(entry.sha256)) {
+      throw new Error("stable_release_target_manifest_invalid");
+    }
+    targetEntries.set(path, entry);
+  }
+
+  target = resolve(target);
+  const lstat = dependencies.lstat || lstatSync;
+  const readFile = dependencies.readFile || readFileSync;
+  const digest = dependencies.sha256 || sha256;
+
+  for (const modification of modifications) {
+    if (!["changed", "local_file"].includes(modification.reason)) {
+      blocking.push(modification);
+      continue;
+    }
+    const entry = targetEntries.get(modification.path);
+    if (!entry) {
+      blocking.push(modification);
+      continue;
+    }
+    const path = join(target, ...modification.path.split("/"));
+    const stats = lstatOrMissing(lstat, path);
+    if (!isRegularFile(stats) || digest(readFile(path)) !== entry.sha256.toLowerCase()) {
+      blocking.push(modification);
+      continue;
+    }
+    converged.push(modification);
+  }
+
+  return { blocking, converged };
+}
+
+export function planStableUpdate({
+  releases,
+  target,
+  installedManifest = undefined,
+  targetManifest = undefined,
+  dependencies = {},
+} = {}) {
   const release = selectStableRelease(releases);
   const assets = releaseAssetPlan(release);
+  if (targetManifest !== undefined && targetManifest?.version !== assets.version) {
+    throw new Error("stable_release_target_manifest_invalid");
+  }
 
   let current;
   let local = null;
@@ -223,11 +285,20 @@ export function planStableUpdate({ releases, target, installedManifest = undefin
     };
   }
 
+  const targetComparison = partitionLocalModificationsAgainstTarget({
+    modifications: local.modifications,
+    targetManifest,
+    target,
+    dependencies,
+  });
+  const safeToReplace = comparison > 0
+    ? targetComparison.blocking.length === 0
+    : local.clean;
   const action = comparison === 0
     ? "already_current"
     : comparison < 0
       ? "already_ahead"
-      : !local.clean
+      : !safeToReplace
         ? "blocked_local_modifications"
         : "update";
   return {
@@ -238,7 +309,9 @@ export function planStableUpdate({ releases, target, installedManifest = undefin
     currentVersion: current.version || null,
     target: resolve(target),
     localModifications: local.modifications,
-    safeToReplace: local.clean,
+    blockingLocalModifications: targetComparison.blocking,
+    targetConvergedLocalModifications: targetComparison.converged,
+    safeToReplace,
     action,
     assets,
   };

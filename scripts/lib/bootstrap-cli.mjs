@@ -106,6 +106,7 @@ export function parseBootstrapArgs(argv = []) {
   let target = null;
   let help = false;
   let json = false;
+  let replaceLocalModifications = false;
   let autostartMode = null;
   let index = 0;
 
@@ -135,6 +136,9 @@ export function parseBootstrapArgs(argv = []) {
     } else if (arg === "--apply") {
       if (command !== "update") fail("bootstrap_apply_update_only");
       apply = true;
+    } else if (arg === "--replace-local-modifications") {
+      if (command !== "update") fail("bootstrap_replace_local_modifications_update_only");
+      replaceLocalModifications = true;
     } else if (arg === "--json") {
       if (command !== "doctor") fail("bootstrap_json_doctor_only");
       json = true;
@@ -147,8 +151,13 @@ export function parseBootstrapArgs(argv = []) {
     }
   }
 
+  if (replaceLocalModifications && !apply) {
+    fail("bootstrap_replace_local_modifications_requires_apply");
+  }
+
   const result = { command, apply, target, help };
   if (json) result.json = true;
+  if (replaceLocalModifications) result.replaceLocalModifications = true;
   if (autostartMode) result.autostartMode = autostartMode;
   return result;
 }

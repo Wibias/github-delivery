@@ -56,11 +56,11 @@ Transport failures, malformed metadata, redirect-policy violations, size-limit f
    ```
 
 3. Inspect the returned action:
-   - `update`: a strictly newer verified stable release is available and the installed tracked payload is clean.
+   - `update`: a strictly newer verified stable release is available and no blocking local modifications remain; the installed payload may be clean or contain only target-converged regular files that already match the verified target release.
    - `already_current`: the installed version equals the latest stable release. No replacement is needed. Any reported local modifications are diagnostic only because no replacement is attempted.
    - `already_ahead`: the installed version is newer than the latest stable release. Do not downgrade it. Any reported local modifications are diagnostic only because no replacement is attempted.
-   - `blocked_local_modifications`: a newer release exists, but tracked installed files differ from the installed manifest. Do not overwrite them.
-4. If the action is `blocked_local_modifications`, show the affected paths and stop. `--force` does not bypass this self-update protection.
+   - `blocked_local_modifications`: a newer release exists and at least one local modification would be overwritten with different content. Do not overwrite it. Local regular-file drift that already matches the same path and SHA-256 in the verified target release is target-converged and does not block replacement.
+4. If the action is `blocked_local_modifications`, show the affected paths and stop. `--force` does not bypass this self-update protection. Missing files, mode changes, non-regular substitutions, target-absent local files, and content that differs from the verified target remain blocking by default. After reviewing those paths, the user may explicitly choose the verified release over all remaining local modifications with `update --apply --replace-local-modifications`. That opt-in is apply-only, still uses the verified release payload, does not set installer `force`, and backs up the complete previous installation before replacement.
 5. If the dry-run reports `update`, apply the same verified path:
 
    ```text

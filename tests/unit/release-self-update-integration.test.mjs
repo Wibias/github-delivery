@@ -179,6 +179,32 @@ test("local modifications block replacement and force cannot bypass the update p
   assert.equal(readFileSync(join(target, "marker.txt"), "utf8"), "old\n");
 }));
 
+test("explicit local-replacement authorization reaches verified installer without force", async () => withFixture(async ({ root, target }) => {
+  const candidate = verifiedCandidate(root, target);
+  candidate.plan.action = "blocked_local_modifications";
+  candidate.plan.safeToReplace = false;
+  candidate.plan.localModifications = [{ path: "SKILL.md", reason: "changed" }];
+
+  await assert.rejects(
+    runInstallCommand({
+      update: true,
+      apply: true,
+      target,
+      replaceLocalModifications: true,
+    }, {
+      ...workspaceDependencies(root),
+      prepareVerifiedReleaseCandidate: async () => candidate,
+      readUserConfig: () => ({ config: { schemaVersion: 1, authorityMode: "off" } }),
+      installSkill(options) {
+        assert.equal(options.force, false);
+        assert.equal(options.source, candidate.source);
+        throw new Error("replace_local_modifications_reached_installer");
+      },
+    }),
+    /replace_local_modifications_reached_installer/,
+  );
+}));
+
 test("candidate verification failure occurs before any installer mutation", async () => withFixture(async ({ root, target }) => {
   let installCalls = 0;
   await assert.rejects(
