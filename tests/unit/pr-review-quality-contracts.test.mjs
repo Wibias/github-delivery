@@ -106,13 +106,20 @@ test("re-review trace follow-up release is complete in 1.5.3", () => {
 });
 
 test("post-1.5.3 follow-up release is complete in 1.5.4", () => {
-  const pkg = JSON.parse(read("package.json"));
   const changelog = read("CHANGELOG.md");
   const release = changelog.split("## [1.5.4] - 2026-09-20")[1]?.split("## [1.5.3]")[0] ?? "";
 
-  assert.equal(pkg.version, "1.5.4");
   assert.ok(release, "expected a dated 1.5.4 changelog section");
   for (const pr of [452, 453, 454, 455, 456]) {
     assert.match(release, new RegExp(`PR #${pr}\\b`));
   }
+});
+
+test("package version matches the newest dated changelog release", () => {
+  const pkg = JSON.parse(read("package.json"));
+  const changelog = read("CHANGELOG.md");
+  const match = changelog.match(/^## \[(\d+\.\d+\.\d+)\] - \d{4}-\d{2}-\d{2}$/m);
+
+  assert.ok(match, "expected at least one dated changelog release");
+  assert.equal(pkg.version, match[1]);
 });
