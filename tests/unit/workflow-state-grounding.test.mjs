@@ -124,6 +124,23 @@ test("show re-derives controller state instead of trusting raw checkpoint guidan
   }
 });
 
+test("local workflow bootstrap rejects abbreviated base SHA before checkpoint comparison", () => {
+  const stateDir = mkdtempSync(join(tmpdir(), "github-delivery-bootstrap-base-"));
+  try {
+    assert.throws(
+      () => bootstrapLocalPrWorkflow({
+        repo: "acme/widgets",
+        headSha: HEAD,
+        baseSha: "a".repeat(9),
+        stateDir,
+      }),
+      /workflow_bootstrap_base_invalid/,
+    );
+  } finally {
+    rmSync(stateDir, { recursive: true, force: true });
+  }
+});
+
 test("local workflow bootstrap upgrades reused raw checkpoint guidance", () => {
   const stateDir = mkdtempSync(join(tmpdir(), "github-delivery-bootstrap-grounding-"));
   try {
