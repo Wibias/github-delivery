@@ -13,13 +13,13 @@ All notable changes to `github-delivery` are documented here.
 
 ### Changed
 
+- Bumped the package version from `1.6.0` to `1.7.0`.
 - Unknown pre-open decisions now expose machine-readable `incompleteReasons` and reason-specific next actions such as `inspect_missing_patch_evidence` and `repair_probe_registry`, instead of mapping every incomplete review scope to branch-evidence restoration (PR #464).
 
 ### Fixed
 
 - Successful verified `create_pr` mutations now reconcile the created pull-request number into persistent workflow-controller state, so resumptions no longer retain `pr: null` after publication (PR #462).
 - Local-workflow bootstrap now rejects abbreviated or otherwise non-canonical base SHA identities immediately with `workflow_bootstrap_base_invalid`, preventing caller input mistakes from surfacing later as misleading checkpoint base mismatches (PR #465).
-- Bumped the package version from `1.6.0` to `1.7.0`.
 
 ## [1.6.0] - 2026-09-20
 
