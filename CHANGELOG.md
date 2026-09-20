@@ -4,6 +4,21 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-09-20
+
+### Added
+
+- Self-update now supports the explicit `update --apply --replace-local-modifications` path for replacing reviewed local drift with the verified target release while retaining the existing full-installation backup/rollback safety boundary; the option is apply-only, update-only, and does not enable installer `force` (PR #459).
+
+### Changed
+
+- Bumped the package version from `1.5.4` to `1.6.0`.
+- Self-update now automatically treats local regular-file drift as target-converged when the current file already matches the same path and SHA-256 in the verified target manifest, while missing files, mode changes, non-regular substitutions, target-absent files, and differing content remain blocking by default (PR #459).
+
+### Fixed
+
+- npm publication no longer reports a failed release solely because `dist.integrity` is temporarily absent after a successful fresh publish. The publisher distinguishes delayed registry metadata from a visible integrity mismatch, checks exact-version existence before any republish attempt, keeps mismatches fail-closed, and allows only the successful fresh-publish path to finish with deferred registry verification when the bounded readback window expires (PR #458).
+
 ## [1.5.4] - 2026-09-20
 
 ### Changed

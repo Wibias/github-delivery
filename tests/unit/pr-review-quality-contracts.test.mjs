@@ -115,6 +115,17 @@ test("post-1.5.3 follow-up release is complete in 1.5.4", () => {
   }
 });
 
+test("post-1.5.4 follow-up release is complete in 1.6.0", () => {
+  const changelog = read("CHANGELOG.md");
+  const release = changelog.split("## [1.6.0] - 2026-09-20")[1]?.split("## [1.5.4]")[0] ?? "";
+
+  assert.ok(release, "expected a dated 1.6.0 changelog section");
+  for (const pr of [458, 459]) {
+    assert.match(release, new RegExp(`PR #${pr}\\b`));
+  }
+  assert.match(release, /replace-local-modifications/);
+});
+
 test("package version matches the newest dated changelog release", () => {
   const pkg = JSON.parse(read("package.json"));
   const changelog = read("CHANGELOG.md");
