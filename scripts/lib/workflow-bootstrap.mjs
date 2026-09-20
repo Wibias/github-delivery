@@ -26,6 +26,13 @@ function normalizeHead(headSha) {
   return value;
 }
 
+function normalizeBase(baseSha) {
+  if (baseSha === null || baseSha === undefined || baseSha === "") return null;
+  const value = String(baseSha).trim().toLowerCase();
+  if (!HEAD_RE.test(value)) throw new Error("workflow_bootstrap_base_invalid");
+  return value;
+}
+
 function stateRoot(override) {
   return resolve(
     override || process.env.GITHUB_DELIVERY_STATE_DIR || join(homedir(), ".github-delivery"),
@@ -67,6 +74,7 @@ function assertCheckpointIdentity(snapshot, { repo, headSha }) {
 export function bootstrapLocalPrWorkflow({ repo, headSha, baseSha = null, stateDir } = {}) {
   const normalizedRepo = normalizeRepo(repo);
   const normalizedHead = normalizeHead(headSha);
+  const normalizedBase = normalizeBase(baseSha);
   const checkpointPath = localPrWorkflowCheckpointPath({
     repo: normalizedRepo,
     headSha: normalizedHead,
@@ -76,7 +84,7 @@ export function bootstrapLocalPrWorkflow({ repo, headSha, baseSha = null, stateD
   const initialSnapshot = createDeliveryWorkflowController({
     workflow: profile.workflow,
     repo: normalizedRepo,
-    baseSha: baseSha ? String(baseSha) : null,
+    baseSha: normalizedBase,
     headSha: normalizedHead,
     graph: profile.graph,
     startPhase: profile.startPhase,
@@ -101,9 +109,9 @@ export function bootstrapLocalPrWorkflow({ repo, headSha, baseSha = null, stateD
     headSha: normalizedHead,
   });
   if (
-    baseSha &&
+    normalizedBase &&
     storedSnapshot.baseSha &&
-    String(storedSnapshot.baseSha).toLowerCase() !== String(baseSha).toLowerCase()
+    String(storedSnapshot.baseSha).toLowerCase() !== normalizedBase
   ) {
     throw new Error("workflow_bootstrap_checkpoint_base_mismatch");
   }

@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { isDirectInvocation } from "./lib/direct-invocation.mjs";
@@ -25,6 +27,26 @@ import { validateProbeEvidence } from "./lib/probe-evidence.mjs";
 
 function usageError() {
   throw new Error("Usage: node scripts/pre-open-gate.mjs OWNER/REPO BASE_REF HEAD_REF [--compact] [--output FILE] [--evidence-file FILE] [--hygiene-file FILE] [--checkpoint FILE] [--remote REMOTE] | --self-test");
+}
+
+function sha256File(url) {
+  return `sha256:${createHash("sha256").update(readFileSync(url)).digest("hex")}`;
+}
+
+export function preOpenGeneratorIdentity() {
+  let githubDeliveryVersion = null;
+  try {
+    githubDeliveryVersion = String(
+      JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"))?.version || "",
+    ).trim() || null;
+  } catch {
+    githubDeliveryVersion = null;
+  }
+  return {
+    githubDeliveryVersion,
+    preOpenGateDigest: sha256File(new URL(import.meta.url)),
+    reviewScopeDigest: sha256File(new URL("./lib/review-scope.mjs", import.meta.url)),
+  };
 }
 
 function probeCoverage(plan, evidence) {
@@ -112,6 +134,7 @@ function report({ repo, baseRef, headRef, baseRefOid, headRefOid, diffIdentity, 
   return {
     schemaVersion: 1,
     kind: "github-delivery/pre-open-gate",
+    generator: preOpenGeneratorIdentity(),
     repo,
     baseRef,
     headRef,
@@ -222,6 +245,7 @@ export function compactPreOpenGateReport(result) {
   return {
     schemaVersion: 1,
     kind: "github-delivery/pre-open-gate-summary",
+    generator: result?.generator || preOpenGeneratorIdentity(),
     repo: result?.repo,
     baseRef: result?.baseRef,
     headRef: result?.headRef,

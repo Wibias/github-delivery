@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { compactPreOpenGateReport } from "../../scripts/pre-open-gate.mjs";
+import {
+  compactPreOpenGateReport,
+  preOpenGeneratorIdentity,
+} from "../../scripts/pre-open-gate.mjs";
 
 const HEAD = "b".repeat(40);
 
@@ -79,6 +82,17 @@ test("compact pre-open report exposes only authoritative remaining obligations",
   assert.deepEqual(compact.evidenceRequirements.surfaces.authn.reviewedFiles, ["src/a.ts"]);
   assert.deepEqual(compact.evidenceRequirements.probes["test-honesty"].files, ["src/b.ts"]);
   assert.equal(Object.hasOwn(compact.evidenceRequirements.lenses.silent_failures, "status"), false);
+});
+
+test("pre-open output carries generator version and implementation digests", () => {
+  const generator = preOpenGeneratorIdentity();
+  assert.match(generator.githubDeliveryVersion, /^\d+\.\d+\.\d+$/);
+  assert.match(generator.preOpenGateDigest, /^sha256:[a-f0-9]{64}$/);
+  assert.match(generator.reviewScopeDigest, /^sha256:[a-f0-9]{64}$/);
+
+  const report = blockedReport();
+  report.generator = generator;
+  assert.deepEqual(compactPreOpenGateReport(report).generator, generator);
 });
 
 test("unknown compact report names the incomplete review-scope cause", () => {
