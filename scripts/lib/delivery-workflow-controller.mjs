@@ -510,26 +510,55 @@ export function createDeliveryWorkflowController(options = {}) {
 
   function reconcileMutationResult(result = {}) {
     const results = Array.isArray(result?.results) ? result.results : [result];
+    const completed = new Set(["succeeded", "already_applied", "reconciled_after_error"]);
+    const nextRefs = {};
+
     const pushes = results.filter((entry) =>
       entry?.action === "push_code" &&
-      ["succeeded", "already_applied", "reconciled_after_error"].includes(entry?.status) &&
+      completed.has(entry?.status) &&
       entry?.request?.newTip,
     );
-    if (pushes.length === 0) {
-      return { changed: false, stateGeneration, headSha };
+    if (pushes.length > 0) {
+      const applicable = pushes.filter(
+        (entry) => String(entry.request?.repo || "").toLowerCase() === repo.toLowerCase(),
+      );
+      if (applicable.length !== pushes.length) {
+        throw new Error("mutation_result_repo_mismatch");
+      }
+      const tips = [...new Set(applicable.map((entry) => String(entry.request.newTip)))];
+      if (tips.length !== 1) {
+        throw new Error("mutation_result_head_ambiguous");
+      }
+      nextRefs.headSha = tips[0];
     }
-    const applicable = pushes.filter(
-      (entry) => String(entry.request?.repo || "").toLowerCase() === repo.toLowerCase(),
+
+    const creates = results.filter((entry) =>
+      entry?.action === "create_pr" &&
+      completed.has(entry?.status),
     );
-    if (applicable.length !== pushes.length) {
-      throw new Error("mutation_result_repo_mismatch");
+    if (creates.length > 0) {
+      const applicable = creates.filter(
+        (entry) => String(entry.request?.repo || "").toLowerCase() === repo.toLowerCase(),
+      );
+      if (applicable.length !== creates.length) {
+        throw new Error("mutation_result_repo_mismatch");
+      }
+      const numbers = [...new Set(
+        applicable
+          .map((entry) => Number(entry?.verification?.number ?? entry?.existingMutation?.number))
+          .filter((value) => Number.isInteger(value) && value > 0),
+      )];
+      if (numbers.length > 1) {
+        throw new Error("mutation_result_pr_ambiguous");
+      }
+      if (numbers.length === 1) nextRefs.pr = numbers[0];
     }
-    const tips = [...new Set(applicable.map((entry) => String(entry.request.newTip)))];
-    if (tips.length !== 1) {
-      throw new Error("mutation_result_head_ambiguous");
+
+    if (Object.keys(nextRefs).length === 0) {
+      return { changed: false, stateGeneration, headSha, pr };
     }
-    const updated = updateRefs({ headSha: tips[0] });
-    return { ...updated, headSha };
+    const updated = updateRefs(nextRefs);
+    return { ...updated, headSha, pr };
   }
 
   function recordPreOpenGate(result = {}) {
