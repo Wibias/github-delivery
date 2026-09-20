@@ -72,6 +72,43 @@ test("update always delegates through the installed target explicitly", async ()
   assert.equal(result.updated, true);
 });
 
+test("update forwards explicit local-replacement authorization", async () => {
+  const seen = [];
+  await runBootstrapUpdate({
+    target: TARGET,
+    apply: true,
+    replaceLocalModifications: true,
+    dependencies: {
+      parseInstallArgs(argv) {
+        seen.push(argv);
+        return {
+          update: true,
+          target: TARGET,
+          targetExplicit: true,
+          apply: true,
+          sourceExplicit: false,
+          allowDowngrade: false,
+          force: false,
+          replaceLocalModifications: true,
+        };
+      },
+      async runInstallCommand(options) {
+        seen.push(options);
+        return { action: "update", apply: true, updated: true, target: TARGET };
+      },
+    },
+  });
+
+  assert.deepEqual(seen[0], [
+    "--update",
+    "--target",
+    TARGET,
+    "--apply",
+    "--replace-local-modifications",
+  ]);
+  assert.equal(seen[1].replaceLocalModifications, true);
+});
+
 test("setup fails clearly when no valid installed skill exists", async () => {
   await assert.rejects(
     runBootstrapSetup({
