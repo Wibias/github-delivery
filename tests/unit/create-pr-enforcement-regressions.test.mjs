@@ -169,10 +169,12 @@ test("only exact locked requests can complete local PR publication", () => {
         request: create,
         status: "succeeded",
         operationKey: mutationOperationKey(create),
+        verification: { number: 391, url: "https://github.com/acme/widgets/pull/391" },
       },
     });
     snapshot = readDeliveryWorkflowCheckpoint(checkpoint);
     assert.equal(snapshot.publicationReceipts.create_pr.status, "succeeded");
+    assert.equal(snapshot.pr, 391);
     resumed = createDeliveryWorkflowController({ snapshot, graph: snapshot.graph });
     assert.equal(resumed.transition("REVIEW_FEEDBACK").phase, "REVIEW_FEEDBACK");
   } finally {
