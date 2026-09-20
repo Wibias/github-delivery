@@ -63,3 +63,35 @@ test("default propagation retry budget is bounded to one minute", () => {
     60_000,
   );
 });
+
+
+test("fresh publish verification may defer missing registry metadata after the bounded window", () => {
+  const sleeps = [];
+  const result = verifyPublishedPackageIntegrity({
+    npmCli: "npm-cli.js",
+    spec: SPEC,
+    expectedIntegrity: INTEGRITY,
+    delaysMs: [10, 20],
+    sleep: (milliseconds) => sleeps.push(milliseconds),
+    lookup: () => null,
+    allowMissingAfterRetries: true,
+  });
+
+  assert.equal(result, null);
+  assert.deepEqual(sleeps, [10, 20]);
+});
+
+test("deferred fresh-publish verification still fails on a visible integrity mismatch", () => {
+  assert.throws(
+    () => verifyPublishedPackageIntegrity({
+      npmCli: "npm-cli.js",
+      spec: SPEC,
+      expectedIntegrity: INTEGRITY,
+      delaysMs: [10, 20],
+      sleep: () => {},
+      lookup: () => "sha512-different",
+      allowMissingAfterRetries: true,
+    }),
+    /npm_publish_verification_failed:github-delivery@0\.8\.0: expected sha512-expected, observed sha512-different/,
+  );
+});
