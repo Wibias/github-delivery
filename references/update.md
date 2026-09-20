@@ -56,7 +56,7 @@ Transport failures, malformed metadata, redirect-policy violations, size-limit f
    ```
 
 3. Inspect the returned action:
-   - `update`: a strictly newer verified stable release is available and the installed tracked payload is clean.
+   - `update`: a strictly newer verified stable release is available and no blocking local modifications remain; the installed payload may be clean or contain only target-converged regular files that already match the verified target release.
    - `already_current`: the installed version equals the latest stable release. No replacement is needed. Any reported local modifications are diagnostic only because no replacement is attempted.
    - `already_ahead`: the installed version is newer than the latest stable release. Do not downgrade it. Any reported local modifications are diagnostic only because no replacement is attempted.
    - `blocked_local_modifications`: a newer release exists and at least one local modification would be overwritten with different content. Do not overwrite it. Local regular-file drift that already matches the same path and SHA-256 in the verified target release is target-converged and does not block replacement.
