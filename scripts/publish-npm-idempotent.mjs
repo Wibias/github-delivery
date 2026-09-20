@@ -50,6 +50,17 @@ function publishVerificationError(spec, expectedIntegrity, observedIntegrity) {
   );
 }
 
+function parseVersion(output, code) {
+  if (!output) return null;
+  try {
+    const value = JSON.parse(output);
+    if (typeof value === "string" && value) return value;
+  } catch {
+    if (/^\d+\.\d+\.\d+$/.test(output)) return output;
+  }
+  throw new Error(code);
+}
+
 export function localPackageIntegrity(npmCli) {
   const directory = mkdtempSync(join(tmpdir(), "github-delivery-npm-pack-"));
   try {
@@ -75,6 +86,15 @@ export function publishedPackageIntegrity(npmCli, spec) {
   return parseIntegrity(output, "npm_published_integrity_invalid");
 }
 
+export function publishedPackageVersion(npmCli, spec) {
+  const output = run(
+    npmCli,
+    ["view", spec, "version", "--json"],
+    { allowNotFound: true },
+  );
+  return parseVersion(output, "npm_published_version_invalid");
+}
+
 export function verifyPublishedPackageIntegrity({
   npmCli,
   spec,
@@ -82,6 +102,7 @@ export function verifyPublishedPackageIntegrity({
   delaysMs = DEFAULT_PUBLISH_VERIFY_DELAYS_MS,
   sleep = sleepSync,
   lookup = publishedPackageIntegrity,
+  allowMissingAfterRetries = false,
 }) {
   let observedIntegrity = lookup(npmCli, spec);
   if (observedIntegrity === expectedIntegrity) return observedIntegrity;
@@ -98,6 +119,7 @@ export function verifyPublishedPackageIntegrity({
     }
   }
 
+  if (allowMissingAfterRetries) return null;
   throw publishVerificationError(spec, expectedIntegrity, null);
 }
 
@@ -120,13 +142,33 @@ export function publishNpmIdempotent({ npmCli, packageJsonPath = "package.json" 
     return { spec, status: "already_published", integrity: localIntegrity };
   }
 
+  const existingVersion = publishedPackageVersion(npmCli, spec);
+  if (existingVersion) {
+    const verifiedIntegrity = verifyPublishedPackageIntegrity({
+      npmCli,
+      spec,
+      expectedIntegrity: localIntegrity,
+      allowMissingAfterRetries: true,
+    });
+    if (!verifiedIntegrity) {
+      throw new Error(`npm_existing_version_integrity_missing:${spec}`);
+    }
+    return { spec, status: "already_published", integrity: localIntegrity };
+  }
+
   run(npmCli, ["publish", "--access", "public", "--ignore-scripts"]);
-  verifyPublishedPackageIntegrity({
+  const publishedIntegrity = verifyPublishedPackageIntegrity({
     npmCli,
     spec,
     expectedIntegrity: localIntegrity,
+    allowMissingAfterRetries: true,
   });
-  return { spec, status: "published", integrity: localIntegrity };
+  return {
+    spec,
+    status: "published",
+    integrity: localIntegrity,
+    registryVerification: publishedIntegrity ? "verified" : "deferred",
+  };
 }
 
 const invokedPath = process.argv[1] ? resolve(process.argv[1]) : null;
