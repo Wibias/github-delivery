@@ -195,12 +195,13 @@ function isRequestedPreparation(text) {
 }
 
 function isMergeDiscussion(text) {
+  const candidate = stripAttributedUntrustedText(text);
   return (
-    PR_REFERENCE.test(text) &&
-    MERGE_INTENT.test(text.replace(MERGE_READY_PHRASE, "")) &&
-    !hasExplicitMergeIntent(text) &&
-    !CONFLICT_REQUEST.test(text) &&
-    !(isRequestedPreparation(text) && NEGATED_MERGE_INTENT.test(mergeText(text)))
+    PR_REFERENCE.test(candidate) &&
+    MERGE_INTENT.test(candidate.replace(MERGE_READY_PHRASE, "")) &&
+    !hasExplicitMergeIntent(candidate) &&
+    !CONFLICT_REQUEST.test(candidate) &&
+    !(isRequestedPreparation(candidate) && NEGATED_MERGE_INTENT.test(mergeText(candidate)))
   );
 }
 

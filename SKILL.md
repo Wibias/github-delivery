@@ -20,6 +20,13 @@ modules declared at the top of that workflow. Do **not** load
 `references/shared-rules.md` as mandatory context; it is now a compatibility
 index.
 
+**Competing-skill classification:** when another installed skill plausibly
+overlaps the request, open both `SKILL.md` files before choosing. Record
+`reuse`, `extend`, `merge`, or `create` with cited paths. Compatibility
+redirect aliases such as `babysit` or `babysit-pr` classify as `reuse` of
+`github-delivery`; then route by the requested lifecycle intent. Do not load
+unrelated sibling skills when there is no plausible ownership competition.
+
 **Full-review routing:** full review routes to `references/full-review-pr.md`;
 bot-fix, CodeRabbit, Codex, security, or simplify clauses do not steal it. If
 the same request explicitly asks to merge, use `references/prepare-and-merge-pr.md`,
