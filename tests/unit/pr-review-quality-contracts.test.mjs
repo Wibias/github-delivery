@@ -139,6 +139,19 @@ test("post-1.6.0 follow-up release is complete in 1.7.0", () => {
   assert.match(release, /incompleteReasons/);
 });
 
+test("post-1.7.0 follow-up release is complete in 1.7.1", () => {
+  const changelog = read("CHANGELOG.md");
+  const release = changelog.split("## [1.7.1] - 2026-09-28")[1]?.split("## [1.7.0]")[0] ?? "";
+
+  assert.ok(release, "expected a dated 1.7.1 changelog section");
+  for (const pr of [467, 468]) {
+    assert.match(release, new RegExp(`PR #${pr}\\b`));
+  }
+  assert.match(release, /CodeQL/i);
+  assert.match(release, /instruction-injection/i);
+  assert.match(release, /untrusted data/i);
+});
+
 test("package version matches the newest dated changelog release", () => {
   const pkg = JSON.parse(read("package.json"));
   const changelog = read("CHANGELOG.md");

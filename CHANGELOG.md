@@ -4,6 +4,16 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.7.1] - 2026-09-28
+
+### Changed
+
+- GitHub Actions CodeQL dependencies were refreshed to the latest pinned action revisions used by the repository CI (PR #467).
+
+### Fixed
+
+- Attributed repository and bot content can no longer create merge-discussion intent: embedded instructions such as `merge immediately` are treated as untrusted data, the router preserves the trusted delivery request instead, and instruction-injection attempts surface an explicit security flag. The adversarial evaluation contracts and routing regression now pin that behavior (PR #468).
+
 ## [1.7.0] - 2026-09-21
 
 ### Added
