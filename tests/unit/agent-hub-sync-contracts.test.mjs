@@ -47,6 +47,15 @@ test("default Codex evidence budget allows 50 distinct evidence reads", () => {
   assert.ok(warnings.length >= 1, "expected a soft-limit warning before the hard limit");
 });
 
+test("larger default evidence budget still blocks a duplicate read", () => {
+  const first = evaluateCodexHook(preSearch(1), {});
+  assert.notEqual(first.output?.decision, "block");
+
+  const duplicate = evaluateCodexHook(preSearch(1), first.state);
+  assert.equal(duplicate.output?.decision, "block");
+  assert.match(duplicate.output?.reason || "", /Duplicate read blocked/i);
+});
+
 test("agent-hub follow-up guidance is present", () => {
   assert.match(read("references/change-execution.md"), /Remove shared state before serializing it/);
   assert.match(read("references/regression-first.md"), /forced miss/i);
