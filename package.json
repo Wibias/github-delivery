@@ -34,6 +34,7 @@
     "scripts/lib/bootstrap-maintenance.mjs",
     "scripts/lib/codex-app-server-watchdog-proxy.mjs",
     "scripts/lib/codex-debug-trace.mjs",
+    "scripts/lib/codex-native-memory-drift.mjs",
     "scripts/lib/codex-progress-watchdog.mjs",
     "scripts/lib/codex-watchdog-remote-bridge.mjs",
     "scripts/lib/cursor-debug-trace.mjs",

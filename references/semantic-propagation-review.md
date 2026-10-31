@@ -165,6 +165,12 @@ verify both:
 Use exact equality when order is part of the public contract. Use exact set
 equality when order is not part of the contract.
 
+### Generated or mechanically expanded outputs
+
+When a PR contains generated or machine-written output whose raw line diff is too noisy to review directly, review the semantic source or other authoritative source first, then inspect the generated artifact intentionally with a decoder, structured comparison, focused path, or domain-specific tool.
+
+Do not equate hidden, collapsed, `-diff`, or `linguist-generated` files with unreviewed files. Those mechanisms may reduce diff noise, but the review must still regenerate the candidate output when a generator exists and prove source-to-generated parity or explain why regeneration is not the contract. Check that regeneration is deterministic and that no unexpected generated paths changed. If a generated format stores one logical value in a huge encoded line, compare the decoded logical values rather than scrolling the raw line diff.
+
 ## Step 7: Audit test representativeness
 
 For every changed family-wide helper or shared transformation, answer:

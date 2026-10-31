@@ -55,11 +55,12 @@ Use when converting a plan, PRD, spec, or issue into implementation tickets.
 5. When one broad internal migration cannot be expressed as independently green vertical slices, apply the expand-contract branch in `references/change-execution.md`: expand the new form beside the old, migrate real blast-radius partitions, then contract only after every migration batch and residual check is complete.
 6. Present the breakdown for approval before publishing unless the user already requested direct issue creation.
 7. Publish direct requested issues with `create_issue`. Use `create_follow_up_issue` only for an explicitly identified follow-up issue from the governing workflow.
-8. Publish with this shape:
+8. Publish each implementation issue with this shape:
    - Parent
    - What to build
    - Acceptance criteria
    - Blocked by
+9. When a parent issue owns several implementation issues, keep the relationship visible in ordinary Markdown: add a task list such as `- [ ] #123` / `- [ ] owner/repo#123` (or stable issue URLs where cross-repository syntax is needed) to the parent body after the child issue numbers exist. Keep dependency edges explicit in each affected issue's `Blocked by` section. Native sub-issue/dependency metadata may supplement this, but do not make an opaque API relationship the only durable representation of the plan.
 
 Prefer many thin slices over a few broad issues, except when a real wide-refactor dependency requires the bounded expand-contract sequence above.
 
@@ -151,4 +152,4 @@ Use when the user wants a refactor request, refactoring RFC, or tiny-commit plan
    - Out of Scope
    - Further Notes
 
-The triage-inbox shape is adapted from Matt Pocock's MIT-licensed `triage` skill. GitHub Delivery keeps it read-only until the user selects work and retains its own issue-state, evidence, mutation-authority, and publication rules.
+The triage-inbox shape and the Markdown-visible parent/child task-list convention are adapted from Matt Pocock's MIT-licensed issue-planning skills. GitHub Delivery keeps issue discovery read-only until the user selects work and retains its own issue-state, evidence, mutation-authority, dependency, and publication rules.

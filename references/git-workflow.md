@@ -57,9 +57,11 @@ When a workflow requires a content-preserving history rewrite, preserve the cano
 
 ## 4. Commit messages
 
-Use the repository's existing commit-message convention first. When no project convention exists, prefer a concise imperative description of the logical effect, optionally with a familiar type such as `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, or `chore:`.
+Use the repository's existing commit-message convention first. Derive the message from the staged diff, or the current diff when staging is not yet final, plus the relevant repository context and logical unit being committed. Establish the facts and meaning before prose cleanup: identify the logical effect, the reason for it, and any reviewer-relevant constraint or consequence.
 
-A useful message answers what outcome the commit establishes. Add a body when the reason, compatibility tradeoff, security boundary, migration constraint, or non-obvious decision would otherwise be lost. Do not invent issue IDs, changelog claims, or breaking-change markers that are not supported by the change.
+When no project convention exists, prefer a concise imperative description of the logical effect, optionally with a familiar type such as `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, or `chore:`. A useful subject passes the completion test: `If applied, this commit will <subject>`. Add a body when the rationale, compatibility tradeoff, security boundary, migration constraint, or non-obvious decision would otherwise be lost.
+
+After the substance is established, apply `references/prose-quality.md` as a final readability pass. Preserve repository terminology, exact evidence, and uncertainty; do not invent issue IDs, changelog claims, motivation, or breaking-change markers that are not supported by the change.
 
 ## 5. Pre-commit hygiene
 
