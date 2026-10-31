@@ -227,8 +227,8 @@ export function evaluateCodexHook(input, state = {}, options = {}) {
     now: options.now ?? Date.now(),
     volatileReadIntervalMs: options.volatileReadIntervalMs ?? 30_000,
     maxSubagentInputChars: options.maxSubagentInputChars ?? 6_000,
-    evidenceSoftLimit: options.evidenceSoftLimit ?? 8,
-    evidenceHardLimit: options.evidenceHardLimit ?? 12,
+    evidenceSoftLimit: options.evidenceSoftLimit ?? 32,
+    evidenceHardLimit: options.evidenceHardLimit ?? 64,
     investigationCreditLimit: options.investigationCreditLimit,
     maxNarrationRecoveryAttempts:
       options.maxNarrationRecoveryAttempts ?? DEFAULT_MAX_NARRATION_RECOVERY_ATTEMPTS,
