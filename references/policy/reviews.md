@@ -32,9 +32,9 @@ When the PR is not ours under `GD-GIT-004`, do not base-sync, push, or simplify 
 
 ### GD-REVIEW-008 — Proactive contract verification is necessary
 
-For merge-ready review paths, **find bugs before bots**: passing bots/checks are necessary, not sufficient. Perform proactive contract verification appropriate to the diff: Wiring audit, Operator smoke, Test honesty, Docs vs non-goals, Input shape and evidence semantics, Hot-path scale and determinism, Malformed-input robustness, Serialization and trace budgets, termination for Recursive/re-entrant lookups, and CLI/API payload completeness. Unknown is not false; Unknown must not outrank measured. Check One decision, one clock; Filter before LIMIT; Aggregate semantics match the doc; Byte budgets measure bytes; No unbounded memory; Absent vs malformed; absence of a positive flag is not proof of absence; Aggregate all contributing source records; and No self-recursion on a resolved target. Proactive contract verification incomplete blocks a positive final verdict.
+For merge-ready review, **find bugs before bots** and verify the diff's contracts: wiring, operator smoke, test honesty, docs/non-goals, input/evidence semantics, hot-path scale, malformed inputs, serialization/trace budgets, recursion termination, and payload completeness. Where applicable enforce one decision/clock, filter before LIMIT, aggregate semantics matching docs, byte-true budgets, bounded memory, absent-vs-malformed distinctions, complete source aggregation, and no self-recursion. Unknown must not outrank measured; incomplete verification blocks a positive verdict.
 
-For an always-on hot path, cost is part of the contract: compare target baseline and candidate with the same method and representative inputs, prefer a useful latency distribution, include cold start when relevant, and treat unavailable measurement as unproven rather than free.
+For any always-on hot path, cost is contract evidence. Compare baseline and candidate with the same method and representative inputs; prefer a latency distribution, include cold start when relevant, and mark unavailable measurement unproven.
 
 ### GD-REVIEW-009 — Public security output is redacted
 
