@@ -17,6 +17,8 @@ Prefer the **narrowest stable boundary that directly demonstrates the defect**, 
 
 If a focused test is cheap, natural, and observes the real protected contract, write it first and run it before the production change. It must fail for the bug being fixed, not because the test is malformed or the harness is broken.
 
+For browser interaction, responsive-layout, or rendering defects, source/DOM inspection alone is not enough when browser automation is available. Reproduce the actual interaction at the relevant viewport, inspect the rendered result, and capture a screenshot or equivalent visual state when appearance is part of the symptom. Record the route, viewport, interaction sequence, and deciding rendered evidence so a DOM tree that looks plausible cannot hide a broken screen.
+
 Do not build a broad harness, add brittle mocks, churn unrelated fixtures, or create a slow end-to-end environment only to claim TDD compliance. A bad regression test is worse than an honest executable check. Likewise, do not prefer a trivial helper-level test merely because it is cheap when it could stay green while the real use case remains broken.
 
 ## Required flow
@@ -40,6 +42,13 @@ Valid reasons can include:
 - the bug depends on production-only or external state that cannot be reproduced locally;
 - existing tests would need brittle timing or heavy mock behavior to express the failure;
 - the smallest useful evidence is a real CLI, service, browser, or integration probe.
+
+When the real reproduction fixture is expensive but a stable seam can still expose the defect, a temporary seam check is allowed as diagnostic evidence. Make it prove two things before the production fix:
+
+1. the real broken case is red at the strongest available boundary; and
+2. the seam check also fails under a controlled forced miss or mutation at that seam.
+
+The second check proves the seam can detect the class of failure instead of merely being correlated with it. Keep the assertion strong and specific. Remove a throwaway seam check after the fix unless it protects a useful durable contract; durable regression coverage should live at the highest stable boundary that can express the behavior without brittle setup.
 
 "No time" and "the fix looks obvious" are not evidence.
 
@@ -72,4 +81,4 @@ For each fixed bug, record:
 
 ## Provenance
 
-This reference adapts the practical test-selection ideas from Cursor's `pstack` `tdd` skill. `pstack` is MIT licensed, copyright 2026 Lauren Tan. Stable-boundary selection is specified separately in `references/verification-boundaries.md`, which also adapts relevant use-case testing ideas from Hona's publicly shared engineering-design gist. The workflow here is rewritten to fit `github-delivery`'s root-cause, evidence, and publication contracts.
+This reference adapts practical test-selection ideas from Cursor's `pstack` `tdd` skill and Matt Pocock's MIT-licensed TDD and debugging guidance. `pstack` is MIT licensed, copyright 2026 Lauren Tan. Matt's 2026-10-10 updates add two refinements used here: browser/rendering bugs should be inspected through the rendered interaction at relevant viewports, and when the full fixture is expensive a temporary seam check must prove both that the real case is red and that a controlled miss at the seam is caught before applying the fix. Stable-boundary selection is specified separately in `references/verification-boundaries.md`, which also adapts relevant use-case testing ideas from Hona's publicly shared engineering-design gist. The workflow here is rewritten to fit `github-delivery`'s root-cause, evidence, and publication contracts.
