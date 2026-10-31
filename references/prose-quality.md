@@ -1,9 +1,10 @@
-# Prose quality for durable GitHub text
+# Prose quality for durable Git and GitHub text
 
-Use this companion when `github-delivery` authors durable prose: PR descriptions,
-issue bodies, PRDs, review/status comments, merge-ready summaries, and other
-GitHub text that is not required to remain exact user-authored wording.
+Use this companion when `github-delivery` authors durable prose: commit messages,
+PR descriptions, issue bodies, PRDs, review/status comments, merge-ready summaries,
+and other Git or GitHub text that is not required to remain exact user-authored wording.
 
+Establish the facts, required content, and intended meaning before applying this layer.
 This layer improves readability only. Evidence, policy, template shape, security
 redaction, exact GitHub syntax, and exact user-confirmed text always win over
 style cleanup.
@@ -78,6 +79,13 @@ Do not turn an uncertain result into a confident sentence while editing prose.
 keep their exact meaning.
 
 ## Artifact-specific guidance
+
+### Commit messages
+
+Keep the repository's established convention. Preserve the logical effect and any
+reviewer-relevant rationale established by `references/git-workflow.md`; this pass
+may simplify wording, but it must not turn the subject into a generic summary,
+add unsupported motivation, or optimize for whether the text appears human-written.
 
 ### PR descriptions and review comments
 
