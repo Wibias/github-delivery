@@ -108,6 +108,18 @@ jobs:
           $PublishDir = Join-Path $env:RUNNER_TEMP 'github-delivery-authority-publish'
           dotnet restore $Project --locked-mode
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          $AssetsPath = Join-Path (Split-Path $Project) 'obj\project.assets.json'
+          $Assets = Get-Content $AssetsPath -Raw | ConvertFrom-Json
+          $RestoredDesktopRuntimePackages = $Assets.libraries.PSObject.Properties.Name |
+            Where-Object { $_ -like '*Microsoft.WindowsDesktop.App.Runtime.win-x64/*' }
+          foreach ($Package in @($RestoredDesktopRuntimePackages)) {
+            $PackageVersion = ($Package -split '/', 2)[1]
+            if ([version]$PackageVersion -lt [version]'8.0.32') {
+              throw "Restored vulnerable Windows Desktop runtime: $Package"
+            }
+          }
+
           dotnet publish $Project --configuration Release --runtime win-x64 --self-contained true --no-restore --output $PublishDir
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $DepsPath = Join-Path $PublishDir 'GitHubDeliveryAuthority.deps.json'
@@ -117,10 +129,13 @@ jobs:
           if ($CoreRuntimePackage -ne 'runtimepack.Microsoft.NETCore.App.Runtime.win-x64/8.0.33') {
             throw "Published authority host bundled unexpected .NET Core runtime: $CoreRuntimePackage"
           }
-          $DesktopRuntimePackage = $Deps.libraries.PSObject.Properties.Name |
-            Where-Object { $_ -like 'runtimepack.Microsoft.WindowsDesktop.App.Runtime.win-x64/*' }
-          if ($DesktopRuntimePackage -ne 'runtimepack.Microsoft.WindowsDesktop.App.Runtime.win-x64/8.0.33') {
-            throw "Published authority host bundled unexpected Windows Desktop runtime: $DesktopRuntimePackage"
+          $PublishedDesktopRuntimePackages = $Deps.libraries.PSObject.Properties.Name |
+            Where-Object { $_ -like '*Microsoft.WindowsDesktop.App.Runtime.win-x64/*' }
+          foreach ($Package in @($PublishedDesktopRuntimePackages)) {
+            $PackageVersion = ($Package -split '/', 2)[1]
+            if ([version]$PackageVersion -lt [version]'8.0.32') {
+              throw "Published vulnerable Windows Desktop runtime: $Package"
+            }
           }
           node scripts/build-authority-host-release.mjs --publish-dir "$PublishDir" --out-dir "dist/authority-host" --version "${{ steps.release_version.outputs.version }}" --source-commit "${{ github.sha }}"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
