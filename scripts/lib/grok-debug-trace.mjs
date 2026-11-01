@@ -47,6 +47,15 @@ function terminalDiagnostics(event, status) {
   };
 }
 
+function payloadDiagnostics(diagnostics, method, value) {
+  if (!diagnostics || typeof diagnostics[method] !== "function") return {};
+  try {
+    return diagnostics[method](value) || {};
+  } catch {
+    return {};
+  }
+}
+
 function hasOwnedOutputFormat(args) {
   return args.some((arg) => arg === "--output-format" || String(arg).startsWith("--output-format="));
 }
@@ -73,7 +82,7 @@ function messageIdentity(event) {
   };
 }
 
-function normalizeAssistantMessage(event) {
+function normalizeAssistantMessage(event, diagnostics) {
   const ids = messageIdentity(event);
   const events = [];
   for (const block of Array.isArray(event.message?.content) ? event.message.content : []) {
@@ -88,12 +97,18 @@ function normalizeAssistantMessage(event) {
       ...ids,
       ...(text(block.id) ? { itemId: block.id } : {}),
       ...(text(block.name) ? { itemType: block.name } : {}),
+      ...payloadDiagnostics(diagnostics, "toolInput", {
+        itemType: text(block.name),
+        input: block.input,
+        turnId: ids.turnId,
+        itemId: text(block.id),
+      }),
     });
   }
   return events;
 }
 
-function normalizeUserMessage(event) {
+function normalizeUserMessage(event, diagnostics) {
   const ids = messageIdentity(event);
   const events = [];
   for (const block of Array.isArray(event.message?.content) ? event.message.content : []) {
@@ -108,6 +123,10 @@ function normalizeUserMessage(event) {
         : {}),
       outcome: failed ? "failed" : "succeeded",
       ...(failed ? { errorKind: "tool_failed" } : {}),
+      ...payloadDiagnostics(diagnostics, "toolResult", {
+        result: block.content,
+        itemId: text(block.tool_use_id) || text(block.toolUseId),
+      }),
     });
   }
   return events;
@@ -127,12 +146,12 @@ export function buildGrokDebugTraceArgs(args = []) {
   return [...input, "--output-format", "streaming-messages-json"];
 }
 
-export function normalizeGrokDebugTraceEvent(event) {
+export function normalizeGrokDebugTraceEvent(event, diagnostics = null) {
   if (!event || typeof event !== "object") return [];
   const type = text(event.type);
 
-  if (type === "assistant") return normalizeAssistantMessage(event);
-  if (type === "user") return normalizeUserMessage(event);
+  if (type === "assistant") return normalizeAssistantMessage(event, diagnostics);
+  if (type === "user") return normalizeUserMessage(event, diagnostics);
 
   if (type === "result") {
     const usage = normalizedUsage(event);
@@ -149,13 +168,20 @@ export function normalizeGrokDebugTraceEvent(event) {
   if (type === "thought") return [];
 
   if (type === "tool_call") {
+    const itemType = text(event.toolName);
     return [{
       provider: "grok",
       type: "item_started",
       ...(text(event.sessionId) ? { threadId: event.sessionId } : {}),
       ...(text(event.toolCallId) ? { itemId: event.toolCallId } : {}),
-      ...(text(event.toolName) ? { itemType: event.toolName } : {}),
+      ...(itemType ? { itemType } : {}),
       ...(text(event.parentToolUseId) ? { parentItemId: event.parentToolUseId } : {}),
+      ...payloadDiagnostics(diagnostics, "toolInput", {
+        itemType,
+        input: event.rawInput ?? event.input ?? event.arguments,
+        turnId: text(event.turnId),
+        itemId: text(event.toolCallId),
+      }),
     }];
   }
 
@@ -170,6 +196,10 @@ export function normalizeGrokDebugTraceEvent(event) {
       ...(text(event.toolName) ? { itemType: event.toolName } : {}),
       ...(text(event.parentToolUseId) ? { parentItemId: event.parentToolUseId } : {}),
       ...terminalDiagnostics(event, status),
+      ...payloadDiagnostics(diagnostics, "toolResult", {
+        result: event.rawOutput ?? event.output ?? event.result,
+        itemId: text(event.toolCallId),
+      }),
     }];
   }
 

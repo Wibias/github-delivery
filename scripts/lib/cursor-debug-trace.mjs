@@ -17,6 +17,15 @@ function terminalDiagnostics(event, status) {
   };
 }
 
+function payloadDiagnostics(diagnostics, method, value) {
+  if (!diagnostics || typeof diagnostics[method] !== "function") return {};
+  try {
+    return diagnostics[method](value) || {};
+  } catch {
+    return {};
+  }
+}
+
 function commonCursorIds(event) {
   const threadId = text(event?.conversation_id) || text(event?.session_id);
   const turnId = text(event?.generation_id);
@@ -57,7 +66,7 @@ export function buildCursorDebugTraceArgs(args = []) {
   return ["--print", "--output-format", "stream-json", "--stream-partial-output", ...input];
 }
 
-export function normalizeCursorCliDebugTraceEvent(event) {
+export function normalizeCursorCliDebugTraceEvent(event, diagnostics = null) {
   if (!event || typeof event !== "object") return null;
   const type = text(event.type);
   const subtype = text(event.subtype);
@@ -79,21 +88,33 @@ export function normalizeCursorCliDebugTraceEvent(event) {
   }
 
   if (type === "tool_call" && ["started", "start", "in_progress"].includes(subtype || "")) {
+    const identity = toolIdentity(event);
     return {
       provider: "cursor",
       type: "item_started",
       ...ids,
-      ...toolIdentity(event),
+      ...identity,
+      ...payloadDiagnostics(diagnostics, "toolInput", {
+        itemType: identity.itemType,
+        input: event.args ?? event.tool_input ?? event.input,
+        turnId: ids.turnId,
+        itemId: identity.itemId,
+      }),
     };
   }
 
   if (type === "tool_call" && ["completed", "complete", "failed", "cancelled"].includes(subtype || "")) {
+    const identity = toolIdentity(event);
     return {
       provider: "cursor",
       type: "item_completed",
       ...ids,
-      ...toolIdentity(event),
+      ...identity,
       ...terminalDiagnostics(event, subtype),
+      ...payloadDiagnostics(diagnostics, "toolResult", {
+        result: event.result ?? event.output ?? event.tool_output,
+        itemId: identity.itemId,
+      }),
     };
   }
 
@@ -108,7 +129,7 @@ export function normalizeCursorCliDebugTraceEvent(event) {
   return null;
 }
 
-export function normalizeCursorHookDebugTraceEvent(event) {
+export function normalizeCursorHookDebugTraceEvent(event, diagnostics = null) {
   if (!event || typeof event !== "object") return null;
   const hook = text(event.hook_event_name);
   const ids = commonCursorIds(event);
@@ -123,22 +144,34 @@ export function normalizeCursorHookDebugTraceEvent(event) {
   }
 
   if (hook === "preToolUse") {
+    const identity = toolIdentity(event);
     return {
       provider: "cursor",
       type: "item_started",
       ...ids,
-      ...toolIdentity(event),
+      ...identity,
+      ...payloadDiagnostics(diagnostics, "toolInput", {
+        itemType: identity.itemType,
+        input: event.tool_input,
+        turnId: ids.turnId,
+        itemId: identity.itemId,
+      }),
     };
   }
 
   if (hook === "postToolUse" || hook === "postToolUseFailure") {
     const status = hook === "postToolUseFailure" ? "failed" : "completed";
+    const identity = toolIdentity(event);
     return {
       provider: "cursor",
       type: "item_completed",
       ...ids,
-      ...toolIdentity(event),
+      ...identity,
       ...terminalDiagnostics(event, status),
+      ...payloadDiagnostics(diagnostics, "toolResult", {
+        result: event.tool_output ?? event.result,
+        itemId: identity.itemId,
+      }),
     };
   }
 
