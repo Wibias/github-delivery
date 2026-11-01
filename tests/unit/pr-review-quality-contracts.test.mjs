@@ -152,6 +152,20 @@ test("post-1.7.0 follow-up release is complete in 1.7.1", () => {
   assert.match(release, /untrusted data/i);
 });
 
+test("post-1.7.1 follow-up release is complete in 1.8.0", () => {
+  const changelog = read("CHANGELOG.md");
+  const release = changelog.split("## [1.8.0] - 2026-11-01")[1]?.split("## [1.7.1]")[0] ?? "";
+
+  assert.ok(release, "expected a dated 1.8.0 changelog section");
+  for (const pr of [470, 471, 472, 473, 475, 476, 477, 479, 480]) {
+    assert.match(release, new RegExp(`#${pr}\\b`));
+  }
+  assert.match(release, /native.*memory.*drift/i);
+  assert.match(release, /11\.21\.1/);
+  assert.match(release, /undici[\s\S]*6\.29\.0/i);
+  assert.match(release, /8\.0\.32/);
+});
+
 test("package version matches the newest dated changelog release", () => {
   const pkg = JSON.parse(read("package.json"));
   const changelog = read("CHANGELOG.md");
