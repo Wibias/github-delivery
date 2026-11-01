@@ -79,7 +79,7 @@ test("newer verified release treats BOM/CRLF-only drift as target-converged", ()
   assert.deepEqual(plan.blockingLocalModifications, []);
   assert.deepEqual(
     plan.formatOnlyTargetConvergedLocalModifications.map((entry) => entry.path),
-    fixtures.map(([path]) => path),
+    fixtures.map(([path]) => path).sort((a, b) => a.localeCompare(b)),
   );
 }));
 
