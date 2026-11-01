@@ -48,6 +48,7 @@ const RUNTIME_FILES = [
   "scripts/lib/release-zip.mjs",
   "scripts/lib/stable-release-update.mjs",
   "scripts/lib/structured-debug-cli.mjs",
+  "scripts/lib/trace-analyze.mjs",
   "scripts/lib/update-user-experience.mjs",
   "scripts/lib/user-config.mjs",
   "scripts/lib/watchdog-activation.mjs",
