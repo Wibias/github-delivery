@@ -1,0 +1,57 @@
+name: Refresh npm publish lockfile
+
+on:
+  push:
+    branches:
+      - chore/npm-publish-11.21.1
+    paths:
+      - .github/npm-publish/package.json
+      - .github/workflows/refresh-npm-publish-lock.yml
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Regenerate isolated npm publish lockfile
+        working-directory: .github/npm-publish
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Verify requested npm and bundled undici versions
+        shell: bash
+        run: |
+          node <<'NODE'
+          const lock = require('./.github/npm-publish/package-lock.json');
+          const npmVersion = lock.packages?.['node_modules/npm']?.version;
+          const undiciVersion = lock.packages?.['node_modules/npm/node_modules/undici']?.version;
+          if (lock.packages?.['']?.devDependencies?.npm !== '11.21.1') {
+            throw new Error(`unexpected root npm pin: ${lock.packages?.['']?.devDependencies?.npm}`);
+          }
+          if (npmVersion !== '11.21.1') throw new Error(`unexpected npm version: ${npmVersion}`);
+          if (undiciVersion !== '6.29.0') throw new Error(`unexpected bundled undici version: ${undiciVersion}`);
+          console.log(`npm=${npmVersion} bundled-undici=${undiciVersion}`);
+          NODE
+
+      - name: Commit regenerated lockfile
+        shell: bash
+        run: |
+          if git diff --quiet -- .github/npm-publish/package-lock.json; then
+            echo 'Lockfile already current.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .github/npm-publish/package-lock.json
+          git commit -m 'chore: refresh npm publish lockfile'
+          git push
