@@ -222,6 +222,19 @@ jobs:
           if (-not (Test-Path $AuthorityIcon -PathType Leaf)) {
             throw 'Published authority host is missing Assets\DeliveryAuthority.ico'
           }
+
+          $AssetsPath = Join-Path (Split-Path $Project) 'obj\project.assets.json'
+          $Assets = Get-Content $AssetsPath -Raw | ConvertFrom-Json
+          $RestoredDesktopRuntimePackages = $Assets.libraries.PSObject.Properties.Name |
+            Where-Object { $_ -like '*Microsoft.WindowsDesktop.App.Runtime.win-x64/*' }
+          Write-Host "Restored Windows Desktop runtime packages: $($RestoredDesktopRuntimePackages -join ', ')"
+          foreach ($Package in @($RestoredDesktopRuntimePackages)) {
+            $PackageVersion = ($Package -split '/', 2)[1]
+            if ([version]$PackageVersion -lt [version]'8.0.32') {
+              throw "Restored vulnerable Windows Desktop runtime: $Package"
+            }
+          }
+
           $DepsPath = Join-Path $PublishDir 'GitHubDeliveryAuthority.deps.json'
           $Deps = Get-Content $DepsPath -Raw | ConvertFrom-Json
           $CoreRuntimePackage = $Deps.libraries.PSObject.Properties.Name |
@@ -229,10 +242,14 @@ jobs:
           if ($CoreRuntimePackage -ne 'runtimepack.Microsoft.NETCore.App.Runtime.win-x64/8.0.33') {
             throw "Published authority host bundled unexpected .NET Core runtime: $CoreRuntimePackage"
           }
-          $DesktopRuntimePackage = $Deps.libraries.PSObject.Properties.Name |
-            Where-Object { $_ -like 'runtimepack.Microsoft.WindowsDesktop.App.Runtime.win-x64/*' }
-          if ($DesktopRuntimePackage -ne 'runtimepack.Microsoft.WindowsDesktop.App.Runtime.win-x64/8.0.33') {
-            throw "Published authority host bundled unexpected Windows Desktop runtime: $DesktopRuntimePackage"
+          $PublishedDesktopRuntimePackages = $Deps.libraries.PSObject.Properties.Name |
+            Where-Object { $_ -like '*Microsoft.WindowsDesktop.App.Runtime.win-x64/*' }
+          Write-Host "Published Windows Desktop runtime packages: $($PublishedDesktopRuntimePackages -join ', ')"
+          foreach ($Package in @($PublishedDesktopRuntimePackages)) {
+            $PackageVersion = ($Package -split '/', 2)[1]
+            if ([version]$PackageVersion -lt [version]'8.0.32') {
+              throw "Published vulnerable Windows Desktop runtime: $Package"
+            }
           }
           $Executable = Join-Path $PublishDir 'GitHubDeliveryAuthority.exe'
           if (-not (Test-Path $Executable -PathType Leaf)) {
