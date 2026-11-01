@@ -4,9 +4,26 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-11-01
+
+### Added
+
+- Native Codex durable-memory drift detection is now packaged and surfaced through doctor/setup reporting so local memory-rule drift can be detected read-only before it silently changes delivery behavior (PR #479).
+
 ### Changed
 
-- Commit-message guidance now derives the logical effect and non-obvious rationale from the staged/current diff before applying the existing prose-quality layer, and the canonical eval set measures reviewer utility rather than human-likeness.
+- Bumped the package version from `1.7.1` to `1.8.0`.
+- Codex evidence-exploration defaults increase from 8/12 to 32/64 while duplicate-read protection remains intact; review guidance adds PStack-derived idempotency/shared-state migration checks, stronger regression and rendered-browser evidence, review-cost/generated-output guidance, compact structural PR views, and evidence-first commit-message evaluation (PR #479).
+- GitHub Actions dependencies were refreshed across CodeQL, artifact upload/download, OSSF Scorecard, and GitHub App token workflows (PRs #470, #471, #472, #473, #475, #476, #477).
+- The isolated release-publishing npm toolchain now pins `npm 11.21.1` instead of `11.19.0`, moving its bundled `undici` from `6.27.0` to `6.29.0`; this remains below the advisory's patched `6.29.1` floor and is not claimed as a full remediation.
+
+### Fixed
+
+- The synchronized standalone package now includes the native-memory drift helper in the npm package allowlist and accepts hyphenated `full-review` routing while preserving the standalone source/distribution boundaries (PR #479).
+
+### Security
+
+- Windows Authority release and CI now use the serviced .NET SDK `10.0.403`, verify the self-contained Core runtime at `8.0.33`, and reject any restored or published `Microsoft.WindowsDesktop.App.Runtime.win-x64` older than the patched `8.0.32` floor, hardening CVE-2026-70035 handling without a broad `RuntimeFrameworkVersion` override (PR #480).
 
 ## [1.7.1] - 2026-09-28
 
