@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { prepareVerifiedReleaseCandidate } from "../../scripts/lib/release-self-update.mjs";
 import { planStableUpdate, sha256 } from "../../scripts/lib/stable-release-update.mjs";
 
 function requiredAssets(version) {
@@ -38,17 +37,15 @@ function file(path, content) {
 function withFixture(callback) {
   const root = mkdtempSync(join(tmpdir(), "gd-format-drift-"));
   const installed = join(root, "installed");
-  const release = join(root, "release");
   mkdirSync(installed, { recursive: true });
-  mkdirSync(release, { recursive: true });
   try {
-    return callback({ root, installed, release });
+    return callback({ installed });
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 }
 
-test("newer verified release treats BOM/CRLF-only drift as target-converged", () => withFixture(({ installed, release }) => {
+test("newer verified release treats BOM/CRLF-only drift as target-converged", () => withFixture(({ installed }) => {
   const fixtures = [
     ["README.md", "# GitHub Delivery\n\nStable text.\n"],
     ["authority-host/windows/install.ps1", "Write-Host 'stable'\n"],
@@ -56,8 +53,6 @@ test("newer verified release treats BOM/CRLF-only drift as target-converged", ()
 
   for (const [path, content] of fixtures) {
     mkdirSync(join(installed, ...path.split("/").slice(0, -1)), { recursive: true });
-    mkdirSync(join(release, ...path.split("/").slice(0, -1)), { recursive: true });
-    writeFileSync(join(release, ...path.split("/")), content);
     writeFileSync(
       join(installed, ...path.split("/")),
       `\uFEFF${content.replace(/\n/g, "\r\n")}`,
@@ -76,7 +71,6 @@ test("newer verified release treats BOM/CRLF-only drift as target-converged", ()
     target: installed,
     installedManifest,
     targetManifest,
-    targetSource: release,
     dependencies: { enforcePosixMode: false },
   });
 
@@ -89,12 +83,11 @@ test("newer verified release treats BOM/CRLF-only drift as target-converged", ()
   );
 }));
 
-test("format-drift recovery does not forgive semantic content changes", () => withFixture(({ installed, release }) => {
+test("format-drift recovery does not forgive semantic content changes", () => withFixture(({ installed }) => {
   const path = "README.md";
   const installedReleaseContent = "release 1.7.1\n";
   const targetContent = "release 1.8.0\n";
   writeFileSync(join(installed, path), "local edit\r\n");
-  writeFileSync(join(release, path), targetContent);
 
   const plan = planStableUpdate({
     releases: [{
@@ -106,7 +99,6 @@ test("format-drift recovery does not forgive semantic content changes", () => wi
     target: installed,
     installedManifest: manifest("1.7.1", [file(path, installedReleaseContent)]),
     targetManifest: manifest("1.8.0", [file(path, targetContent)]),
-    targetSource: release,
     dependencies: { enforcePosixMode: false },
   });
 
@@ -115,39 +107,3 @@ test("format-drift recovery does not forgive semantic content changes", () => wi
   assert.deepEqual(plan.blockingLocalModifications, [{ path, reason: "changed" }]);
   assert.deepEqual(plan.formatOnlyTargetConvergedLocalModifications, []);
 }));
-
-test("verified release candidate passes the extracted release tree into update planning", async () => {
-  let planningInput = null;
-  const source = "/verified/release/github-delivery";
-  const payloadManifest = manifest("1.8.0", []);
-  const releaseMetadata = {
-    tag_name: "v1.8.0",
-    draft: false,
-    prerelease: false,
-    assets: requiredAssets("1.8.0"),
-  };
-
-  await prepareVerifiedReleaseCandidate({
-    target: "/installed/github-delivery",
-    workspace: "/workspace",
-    dependencies: {
-      acquireVerifiedReleasePayload: async () => ({
-        schemaVersion: 1,
-        kind: "github-delivery/verified-release-payload",
-        verified: true,
-        source,
-        archivePath: "/workspace/release.zip",
-        manifest: payloadManifest,
-        release: { tag: "v1.8.0", version: "1.8.0", sourceCommit: "a".repeat(40) },
-        releaseMetadata,
-      }),
-      planStableUpdate(input) {
-        planningInput = input;
-        return { action: "update", safeToReplace: true };
-      },
-    },
-  });
-
-  assert.equal(planningInput.targetSource, source);
-  assert.equal(planningInput.targetManifest, payloadManifest);
-});
