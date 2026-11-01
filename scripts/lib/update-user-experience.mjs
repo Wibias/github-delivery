@@ -61,7 +61,7 @@ function blockerSummary(blockers) {
 
 async function defaultConfirmClose({ blockers, input, output }) {
   output?.write?.(`\nGitHub Delivery cannot update because these processes are using the installed skill:\n${blockerSummary(blockers)}\n`);
-  return askYesNo("Close the listed application(s) gracefully and continue the update? [y/N] ", { input, output });
+  return askYesNo("Request a graceful close for the listed application(s) and continue if their handles clear? [y/N] ", { input, output });
 }
 
 async function defaultConfirmBackupCleanup({ oldBackups, keepBackup, input, output }) {
@@ -142,6 +142,10 @@ export async function installWithWindowsLockRecovery({
         detail: String(error?.message || error),
       });
     }
+  }
+
+  if (closeResults.length > 0 && closeResults.every((result) => result?.requested !== true)) {
+    throw targetLocked(lastError, blockers, { closeResults });
   }
 
   let remaining = blockers;
