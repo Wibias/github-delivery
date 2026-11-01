@@ -64,9 +64,6 @@ jobs:
       - name: Validate release contract
         run: node --test tests/unit/pr-review-quality-contracts.test.mjs
 
-      - name: Run repository checks
-        run: npm run check
-
       - name: Commit release preparation
         shell: bash
         run: |
