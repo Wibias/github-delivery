@@ -1,0 +1,81 @@
+name: Prepare github-delivery 1.8.0
+
+on:
+  push:
+    branches:
+      - chore/npm-publish-11.21.1
+    paths:
+      - .github/workflows/prepare-github-delivery-1.8.0.yml
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Prepare version, changelog, and release contract
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from "node:fs";
+
+          const packagePath = "package.json";
+          const pkg = JSON.parse(readFileSync(packagePath, "utf8"));
+          if (pkg.version !== "1.7.1" && pkg.version !== "1.8.0") {
+            throw new Error(`unexpected package version: ${pkg.version}`);
+          }
+          pkg.version = "1.8.0";
+          writeFileSync(packagePath, `${JSON.stringify(pkg, null, 2)}\n`);
+
+          const changelogPath = "CHANGELOG.md";
+          let changelog = readFileSync(changelogPath, "utf8");
+          const oldTop = `## [Unreleased]\n\n### Changed\n\n- Commit-message guidance now derives the logical effect and non-obvious rationale from the staged/current diff before applying the existing prose-quality layer, and the canonical eval set measures reviewer utility rather than human-likeness.\n\n## [1.7.1] - 2026-09-28`;
+          const newTop = `## [Unreleased]\n\n## [1.8.0] - 2026-11-01\n\n### Added\n\n- Native Codex durable-memory drift detection is now packaged and surfaced through doctor/setup reporting so local memory-rule drift can be detected read-only before it silently changes delivery behavior (PR #479).\n\n### Changed\n\n- Bumped the package version from \`1.7.1\` to \`1.8.0\`.\n- Codex evidence-exploration defaults increase from 8/12 to 32/64 while duplicate-read protection remains intact; review guidance adds PStack-derived idempotency/shared-state migration checks, stronger regression and rendered-browser evidence, review-cost/generated-output guidance, compact structural PR views, and evidence-first commit-message evaluation (PR #479).\n- GitHub Actions dependencies were refreshed across CodeQL, artifact upload/download, OSSF Scorecard, and GitHub App token workflows (PRs #470, #471, #472, #473, #475, #476, #477).\n- The isolated release-publishing npm toolchain now pins \`npm 11.21.1\` instead of \`11.19.0\`, moving its bundled \`undici\` from \`6.27.0\` to \`6.29.0\`; this remains below the advisory's patched \`6.29.1\` floor and is not claimed as a full remediation.\n\n### Fixed\n\n- The synchronized standalone package now includes the native-memory drift helper in the npm package allowlist and accepts hyphenated \`full-review\` routing while preserving the standalone source/distribution boundaries (PR #479).\n\n### Security\n\n- Windows Authority release and CI now use the serviced .NET SDK \`10.0.403\`, verify the self-contained Core runtime at \`8.0.33\`, and reject any restored or published \`Microsoft.WindowsDesktop.App.Runtime.win-x64\` older than the patched \`8.0.32\` floor, hardening CVE-2026-70035 handling without a broad \`RuntimeFrameworkVersion\` override (PR #480).\n\n## [1.7.1] - 2026-09-28`;
+
+          if (!changelog.includes("## [1.8.0] - 2026-11-01")) {
+            if (!changelog.includes(oldTop)) {
+              throw new Error("expected Unreleased changelog block not found");
+            }
+            changelog = changelog.replace(oldTop, newTop);
+            writeFileSync(changelogPath, changelog);
+          }
+
+          const testPath = "tests/unit/pr-review-quality-contracts.test.mjs";
+          let tests = readFileSync(testPath, "utf8");
+          const marker = `test("package version matches the newest dated changelog release", () => {`;
+          const releaseTest = `test("post-1.7.1 follow-up release is complete in 1.8.0", () => {\n  const changelog = read("CHANGELOG.md");\n  const release = changelog.split("## [1.8.0] - 2026-11-01")[1]?.split("## [1.7.1]")[0] ?? "";\n\n  assert.ok(release, "expected a dated 1.8.0 changelog section");\n  for (const pr of [470, 471, 472, 473, 475, 476, 477, 479, 480]) {\n    assert.match(release, new RegExp(\`#\${pr}\\\\b\`));\n  }\n  assert.match(release, /native.*memory.*drift/i);\n  assert.match(release, /11\\.21\\.1/);\n  assert.match(release, /undici[\\s\\S]*6\\.29\\.0/i);\n  assert.match(release, /8\\.0\\.32/);\n});\n\n`;
+          if (!tests.includes('test("post-1.7.1 follow-up release is complete in 1.8.0"')) {
+            if (!tests.includes(marker)) throw new Error("release-contract insertion marker not found");
+            tests = tests.replace(marker, `${releaseTest}${marker}`);
+            writeFileSync(testPath, tests);
+          }
+          NODE
+
+      - name: Validate release contract
+        run: node --test tests/unit/pr-review-quality-contracts.test.mjs
+
+      - name: Run repository checks
+        run: npm run check
+
+      - name: Commit release preparation
+        shell: bash
+        run: |
+          if git diff --quiet -- package.json CHANGELOG.md tests/unit/pr-review-quality-contracts.test.mjs; then
+            echo 'Release preparation already current.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package.json CHANGELOG.md tests/unit/pr-review-quality-contracts.test.mjs
+          git commit -m 'release: prepare github-delivery 1.8.0'
+          git push
