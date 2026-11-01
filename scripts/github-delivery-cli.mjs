@@ -173,12 +173,31 @@ function renderUpdateResult(result, stdout) {
     if (authority?.targetVersion) {
       stdout.write(`  Authority    ${value(authority.currentVersion, "not installed")} -> ${authority.targetVersion}\n`);
     }
+    const formatOnly = Array.isArray(result?.formatOnlyTargetConvergedLocalModifications)
+      ? result.formatOnlyTargetConvergedLocalModifications.length
+      : 0;
+    if (formatOnly > 0) {
+      stdout.write(`  Formatting   ${formatOnly} file(s) differ only by BOM/line endings and already match target content\n`);
+    }
     if (result?.action === "already_current" && authority?.required !== true) {
       stdout.write("No update is required.\n");
     } else if (result?.action === "already_ahead") {
       stdout.write("The installed skill is newer than the latest stable release; no update will be applied.\n");
     } else if (result?.action === "blocked_local_modifications") {
+      const blocking = Array.isArray(result?.blockingLocalModifications)
+        ? result.blockingLocalModifications
+        : [];
       stdout.write("Update is blocked because the managed installation has local modifications.\n");
+      if (blocking.length > 0) {
+        stdout.write(`  Blocking     ${blocking.length} file(s)\n`);
+        for (const entry of blocking.slice(0, 20)) {
+          stdout.write(`    - ${entry.path} (${entry.reason})\n`);
+        }
+        if (blocking.length > 20) stdout.write(`    ... and ${blocking.length - 20} more\n`);
+      }
+      stdout.write("If you reviewed these differences and intend to replace them with the verified release:\n");
+      stdout.write("  npx github-delivery update --apply --replace-local-modifications\n");
+      stdout.write("A rollback backup of the existing installation is created before replacement.\n");
     } else {
       stdout.write("Run: npx github-delivery update --apply\n");
     }
@@ -261,13 +280,17 @@ function renderBootstrapResult(result, stdout) {
   stdout.write(`${JSON.stringify(result, null, 2)}\n`);
 }
 
+function stableUpdatePlan(result) {
+  return result?.kind === "github-delivery/stable-update-plan";
+}
+
 function printResult(result, { stdout = process.stdout, options = {} } = {}) {
   if (!result || result.action === "help") return;
   if (result.action === "doctor" && options.json !== true) {
     renderDoctor(result, stdout);
     return;
   }
-  if (options.command === "update") {
+  if (options.command === "update" || stableUpdatePlan(result)) {
     renderUpdateResult(result, stdout);
     return;
   }
@@ -276,6 +299,44 @@ function printResult(result, { stdout = process.stdout, options = {} } = {}) {
     return;
   }
   stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+}
+
+function closeFailureLabel(reason) {
+  if (reason === "no_main_window") return "no main window is available for a graceful close";
+  if (reason === "current_process") return "the blocker is the current GitHub Delivery process";
+  if (reason === "process_not_found") return "the process was not found when the close was requested";
+  if (reason === "close_request_failed") return "the graceful close request failed";
+  return value(reason, "graceful close was not requested");
+}
+
+export function renderCommandError(error, stderr = process.stderr, argv = process.argv.slice(2)) {
+  const message = String(error?.message || error);
+  if (message !== "install_target_locked") {
+    stderr.write(`${message}\n`);
+    return;
+  }
+
+  const blockers = Array.isArray(error?.blockers) ? error.blockers : [];
+  const closeResults = Array.isArray(error?.closeResults) ? error.closeResults : [];
+  const resultByPid = new Map(closeResults.map((result) => [Number(result?.pid), result]));
+  stderr.write("GitHub Delivery update is still blocked by process handles in the installed skill.\n");
+  for (const blocker of blockers) {
+    const pid = Number(blocker?.pid);
+    stderr.write(`  - ${value(blocker?.name, "process")} (PID ${value(blocker?.pid)})\n`);
+    const closeResult = resultByPid.get(pid);
+    if (closeResult?.requested === false) {
+      stderr.write(`    Graceful close unavailable: ${closeFailureLabel(closeResult.reason)}.\n`);
+    }
+    if (Number.isSafeInteger(pid) && pid > 0) {
+      stderr.write("    Inspect before stopping it:\n");
+      stderr.write(`      Get-CimInstance Win32_Process -Filter \"ProcessId = ${pid}\" | Select-Object ProcessId,ParentProcessId,ExecutablePath,CommandLine\n`);
+    }
+  }
+  if (error?.probeError) stderr.write(`  Lock probe: ${error.probeError}\n`);
+  stderr.write("Close or stop the owning application/process yourself, then rerun the update.\n");
+  const replace = argv.includes("--replace-local-modifications") ? " --replace-local-modifications" : "";
+  stderr.write(`  npx github-delivery update --apply${replace}\n`);
+  stderr.write("GitHub Delivery does not force-kill blocking processes automatically.\n");
 }
 
 function isDirectExecution(entry = process.argv[1]) {
@@ -310,7 +371,7 @@ export async function main(argv = process.argv.slice(2), dependencies = {}) {
 
 if (isDirectExecution()) {
   main().catch((error) => {
-    process.stderr.write(`${String(error?.message || error)}\n`);
+    renderCommandError(error, process.stderr, process.argv.slice(2));
     process.exitCode = 1;
   });
 }
