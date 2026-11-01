@@ -80,10 +80,19 @@ export function createGitHubClient({ token, fetchImpl = fetch, apiRoot = API_ROO
   return { request, exists, paginate };
 }
 
-async function readBranchGeneration({ client, owner, repo, branch }) {
-  const payload = await client.request(
-    `/repos/${owner}/${repo}/git/ref/heads/${encodePath(branch)}`,
-  );
+async function readBranchGeneration({ client, owner, repo, branch, allowMissing = false }) {
+  let payload;
+  try {
+    payload = await client.request(
+      `/repos/${owner}/${repo}/git/ref/heads/${encodePath(branch)}`,
+    );
+  } catch (error) {
+    if (allowMissing && error instanceof GitHubHttpError && error.status === 404) {
+      return null;
+    }
+    throw error;
+  }
+
   const sha = String(payload?.object?.sha || "").toLowerCase();
   if (!COMMIT_SHA_RE.test(sha)) {
     throw new Error(`default_branch_generation_invalid:${branch}`);
@@ -110,6 +119,7 @@ async function captureRunHeadRefs({ client, runs }) {
       owner: headOwner,
       repo: headRepo,
       branch,
+      allowMissing: true,
     });
     heads.set(key, { fullName, branch, owner: headOwner, repo: headRepo, sha });
   }
@@ -118,6 +128,7 @@ async function captureRunHeadRefs({ client, runs }) {
 
 async function workflowStillExistsOnCapturedHeads({ client, workflow, heads, log }) {
   for (const head of heads) {
+    if (head.sha === null) continue;
     const exists = await client.exists(
       `/repos/${encodeURIComponent(head.owner)}/${encodeURIComponent(head.repo)}`
       + `/contents/${encodePath(workflow.path)}?ref=${encodeURIComponent(head.sha)}`,
@@ -158,10 +169,19 @@ async function assertCleanupRefsUnchanged({
       owner: head.owner,
       repo: head.repo,
       branch: head.branch,
+      allowMissing: true,
     });
+    if (head.sha === null) {
+      if (current !== null) {
+        throw new Error(
+          `run_head_recreated_during_cleanup:${head.fullName}:${head.branch}:${current}`,
+        );
+      }
+      continue;
+    }
     if (current !== head.sha) {
       throw new Error(
-        `run_head_moved_during_cleanup:${head.fullName}:${head.branch}:${head.sha}:${current}`,
+        `run_head_moved_during_cleanup:${head.fullName}:${head.branch}:${head.sha}:${current ?? "absent"}`,
       );
     }
   }
