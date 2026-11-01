@@ -124,6 +124,18 @@ test("setup leaves a healthy activation untouched after authority reconciliation
   let mutations = 0;
   let authorityCalls = 0;
   const authorityHost = { action: "already_current", changed: false, installed: { supported: true, installed: true, version: "0.5.1" } };
+  const nativeCodexMemory = {
+    applicable: false,
+    ok: true,
+    status: "not_applicable",
+    agentHubHookConfigured: false,
+    settings: {
+      featureEnabled: null,
+      useMemories: null,
+      generateMemories: null,
+    },
+    reasons: [],
+  };
   const result = await runBootstrapSetup({
     target: TARGET,
     codexHome: CODEX_HOME,
@@ -141,6 +153,9 @@ test("setup leaves a healthy activation untouched after authority reconciliation
         hooksConfigured: true,
         hookTrustVerified: true,
       }),
+      async readCodexNativeMemoryDrift() {
+        return nativeCodexMemory;
+      },
       inspectHooks() {
         mutations += 1;
         throw new Error("healthy setup must not rewrite hooks");
@@ -161,6 +176,8 @@ test("setup leaves a healthy activation untouched after authority reconciliation
     watchdog: "hooks",
     changed: false,
     authorityHost,
+    nativeCodexMemory,
+    guidance: null,
   });
 });
 
