@@ -4,6 +4,10 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- Commit-message guidance now derives the logical effect and non-obvious rationale from the staged/current diff before applying the existing prose-quality layer, and the canonical eval set measures reviewer utility rather than human-likeness.
+
 ## [1.7.1] - 2026-09-28
 
 ### Changed

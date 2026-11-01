@@ -8,11 +8,11 @@ Prioritize OWNER/MEMBER/COLLABORATOR/CODEOWNER/user feedback, then other humans,
 
 ### GD-REVIEW-002 — No false deferral for in-diff bot threads
 
-Bot threads on paths in the current PR diff must be fixed in this PR or explicitly declined with verified rationale. Do not use “inherited / copied / fabric file — fix in another PR”, “rebase / stack / downstream branch will pick it up”, “consumer lives elsewhere”, or “non-blocking” as a defer-and-resolve shortcut when the finding is valid and in scope.
+In-diff bot findings must be fixed here or explicitly declined with verified rationale. Do not defer valid in-scope findings as inherited/copied/fabric, downstream/stacked, external-consumer, or non-blocking work.
 
 ### GD-REVIEW-003 — Fix-or-decline before resolution
 
-Fix-or-decline sequence: verify the finding, implement and verify the fix or record a durable evidence-backed decline, reply in the correct thread, then resolve only when permitted. `review` may reply to bot threads and **may resolve bot-authored threads** through the broker/`--resolve-bot`; it must **not** resolve human threads merely by elevating itself. Never resolve a bot thread with only a defer/skip reply.
+Verify the finding, fix it or record a durable evidence-backed decline, reply in-thread, then resolve only when permitted. `review` may resolve bot-authored threads through the broker/`--resolve-bot`, never human threads or bot threads with only defer/skip rationale.
 
 ### GD-REVIEW-004 — Merge-ready review is multidimensional
 
@@ -32,7 +32,9 @@ When the PR is not ours under `GD-GIT-004`, do not base-sync, push, or simplify 
 
 ### GD-REVIEW-008 — Proactive contract verification is necessary
 
-For merge-ready review paths, **find bugs before bots**: passing bots/checks are necessary, not sufficient. Perform proactive contract verification appropriate to the diff: Wiring audit, Operator smoke, Test honesty, Docs vs non-goals, Input shape and evidence semantics, Hot-path scale and determinism, Malformed-input robustness, Serialization and trace budgets, termination for Recursive/re-entrant lookups, and CLI/API payload completeness. Unknown is not false; Unknown must not outrank measured. Check One decision, one clock; Filter before LIMIT; Aggregate semantics match the doc; Byte budgets measure bytes; No unbounded memory; Absent vs malformed; absence of a positive flag is not proof of absence; Aggregate all contributing source records; and No self-recursion on a resolved target. Proactive contract verification incomplete blocks a positive final verdict.
+For merge-ready review, **find bugs before bots** and verify the diff's contracts: wiring, operator smoke, test honesty, docs/non-goals, input/evidence semantics, hot-path scale, malformed inputs, serialization/trace budgets, recursion termination, and payload completeness. Where applicable enforce one decision/clock, filter before LIMIT, aggregate semantics matching docs, byte-true budgets, bounded memory, absent-vs-malformed distinctions, complete source aggregation, and no self-recursion. Unknown must not outrank measured; incomplete verification blocks a positive verdict.
+
+For any always-on hot path, cost is contract evidence. Compare baseline and candidate with the same method and representative inputs; prefer a latency distribution, include cold start when relevant, and mark unavailable measurement unproven.
 
 ### GD-REVIEW-009 — Public security output is redacted
 

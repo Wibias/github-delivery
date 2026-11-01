@@ -4,6 +4,7 @@ import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { installCodexWatchdogHooks } from "../install-codex-watchdog-hooks.mjs";
+import { readCodexNativeMemoryDrift } from "./codex-native-memory-drift.mjs";
 import { parseInstallArgs, runInstallCommand } from "../install-skill.mjs";
 import {
   configureAuthorityHostStartup,
@@ -70,6 +71,32 @@ function authorityProviderGuidance() {
   return "The selected authority protection mode requires a trusted authority provider, but the bundled Windows authority host is unavailable on this platform. Read-only/local workflows remain usable. Protected GitHub writes stay blocked until a compatible authority provider is configured or you explicitly choose authorityMode=off.";
 }
 
+
+function nativeMemoryDriftGuidance() {
+  return "Native Codex memory is not fully isolated while Agent Hub recall is active. From the Agent Hub checkout run: node .\\scripts\\isolate-native-codex-memory.mjs, review the dry-run, then apply with --apply and restart Codex.";
+}
+
+async function safeReadNativeMemoryDrift({ codexHome, dependencies }) {
+  const readDrift = dependencies.readCodexNativeMemoryDrift || readCodexNativeMemoryDrift;
+  try {
+    return await readDrift({ codexHome });
+  } catch (error) {
+    return {
+      applicable: null,
+      ok: false,
+      status: "check_failed",
+      agentHubHookConfigured: null,
+      settings: null,
+      reasons: [],
+      error: String(error?.message || error),
+    };
+  }
+}
+
+function nativeMemoryBlocksReady(result) {
+  return result?.ok === false && result?.applicable !== false;
+}
+
 export async function runBootstrapUpdate({
   target,
   apply = false,
@@ -129,15 +156,29 @@ export async function runBootstrapSetup({
 
   const readReceipt = dependencies.readActivationReceipt || readActivationReceipt;
   const receipt = readReceipt({ codexHome });
+  const nativeCodexMemory = await safeReadNativeMemoryDrift({
+    codexHome,
+    dependencies,
+  });
   if (readyReceipt(receipt)) {
+    const memoryDrift = nativeMemoryBlocksReady(nativeCodexMemory);
     return {
       action: "setup",
-      status: authorityUnavailable ? "authority_provider_required" : "ready",
+      status: memoryDrift
+        ? "native_memory_drift"
+        : authorityUnavailable
+          ? "authority_provider_required"
+          : "ready",
       target,
       watchdog: receipt.mode,
       changed: authorityHost?.changed === true,
       authorityHost,
-      ...(authorityUnavailable ? { guidance: authorityProviderGuidance() } : {}),
+      nativeCodexMemory,
+      guidance: memoryDrift
+        ? nativeMemoryDriftGuidance()
+        : authorityUnavailable
+          ? authorityProviderGuidance()
+          : null,
     };
   }
 
@@ -202,23 +243,33 @@ export async function runBootstrapSetup({
   const result = await installed.runInstallCommand(options);
   const watchdog = result?.watchdog?.mode || "none";
   const watchdogReady = watchdog === "hooks" || watchdog === "stream";
+  const finalNativeCodexMemory = await safeReadNativeMemoryDrift({
+    codexHome,
+    dependencies,
+  });
+  const memoryDrift = nativeMemoryBlocksReady(finalNativeCodexMemory);
   return {
     action: "setup",
     status: !watchdogReady
       ? "hook_trust_required"
-      : authorityUnavailable
-        ? "authority_provider_required"
-        : "ready",
+      : memoryDrift
+        ? "native_memory_drift"
+        : authorityUnavailable
+          ? "authority_provider_required"
+          : "ready",
     target,
     watchdog,
     changed: result?.watchdog?.receiptChanged === true || authorityHost?.changed === true,
     authorityHost,
     authorityProviderRequired: authorityUnavailable,
+    nativeCodexMemory: finalNativeCodexMemory,
     guidance: !watchdogReady
       ? trustGuidance(false)
-      : authorityUnavailable
-        ? authorityProviderGuidance()
-        : null,
+      : memoryDrift
+        ? nativeMemoryDriftGuidance()
+        : authorityUnavailable
+          ? authorityProviderGuidance()
+          : null,
     result,
   };
 }
@@ -309,8 +360,14 @@ export async function runBootstrapDoctor({
       error: null,
     },
     activation: readReceipt({ codexHome: resolve(codexHome) }),
+    nativeCodexMemory: null,
     latest: { version: null, relation: null, error: null },
   };
+
+  report.nativeCodexMemory = await safeReadNativeMemoryDrift({
+    codexHome: resolve(codexHome),
+    dependencies,
+  });
 
   if (selected && !legacyManifestless) {
     try {

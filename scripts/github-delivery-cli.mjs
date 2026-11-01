@@ -86,6 +86,25 @@ function renderDoctor(result, stdout) {
     }
   }
 
+  const nativeMemory = result?.nativeCodexMemory;
+  if (nativeMemory && nativeMemory.status !== "not_applicable") {
+    stdout.write("\nNative Codex memory\n");
+    if (nativeMemory.status === "isolated" && nativeMemory.ok === true) {
+      stdout.write("  Status       isolated\n");
+    } else if (nativeMemory.status === "drift_detected") {
+      stdout.write("  Status       DRIFT DETECTED\n");
+      if (Array.isArray(nativeMemory.reasons) && nativeMemory.reasons.length > 0) {
+        stdout.write(`  Reasons      ${nativeMemory.reasons.join(", ")}\n`);
+      }
+      stdout.write("  Action       run: node .\\scripts\\isolate-native-codex-memory.mjs\n");
+      stdout.write("               review the dry-run, then rerun with --apply and restart Codex\n");
+    } else {
+      stdout.write(`  Status       ${String(nativeMemory.status || "check_failed")}\n`);
+      if (nativeMemory.error) stdout.write(`  Error        ${nativeMemory.error}\n`);
+      stdout.write("  Action       verify native Codex memory isolation before relying on Agent Hub as the sole durable memory\n");
+    }
+  }
+
   if (authority && Object.keys(authority).length > 0) {
     stdout.write("\nDelivery Authority\n");
     if (authority.supported === false) {

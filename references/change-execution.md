@@ -75,7 +75,19 @@ A useful lever should:
 
 Do not require automation when a small manual edit is clearer, safer, and easier to verify.
 
-## 4. Sequence verifiable units
+## 4. Remove shared state before serializing it
+
+When a change wave exposes concurrent mutation or retry hazards, do not jump straight to a lock.
+
+1. First ask whether the state can stop being shared: partition by owner/key, make one phase produce immutable output for the next, or give one component sole write ownership.
+2. If a real cross-worker invariant still requires shared state, encode serialization structurally with a single writer, bounded lock/lease, compare-and-swap/version check, transactional boundary, queue, or explicitly sequential phase. "These callers normally do not overlap" is not concurrency control.
+3. Make externally repeatable operations converge. Setup, migration, retry, and resume paths should tolerate an already-applied step or a crash after partial progress without duplicating effects or corrupting state.
+4. When idempotency needs a key or durable marker, derive it from stable operation intent and store enough state to distinguish completed, retryable, and stale/incomplete work. Never delete or steal a lock/marker solely because it is old without proving ownership/lease semantics make that safe.
+5. Verify the invariant with a rerunnable check that exercises repetition or contention. A successful single run is not proof that retries or concurrent writers are safe.
+
+Prefer fewer shared mutable states over more elaborate synchronization. Serialization is the fallback for an invariant that truly must be shared, not the default architecture.
+
+## 5. Sequence verifiable units
 
 Break the change into the smallest meaningful units that end in a state you can check. A unit can be a planning step, edit batch, migration phase, or commit; it does not have to map one-to-one to Git commits.
 
@@ -97,7 +109,7 @@ Examples of useful unit checks:
 
 Do not manufacture dozens of tiny commits solely to appear disciplined. The requirement is independently checkable progress, not commit-count aesthetics.
 
-## 5. Keep intermediate states honest
+## 6. Keep intermediate states honest
 
 Prefer units that keep the working tree/build/test surface valid. When a migration genuinely requires a temporary intermediate state that is not independently shippable:
 
@@ -109,13 +121,14 @@ Prefer units that keep the working tree/build/test surface valid. When a migrati
 
 Required publication, CI, security, and ship gates still apply to the final candidate head. This companion never authorizes knowingly broken remote states when the governing workflow forbids them.
 
-## 6. Verification for a completed change wave
+## 7. Verification for a completed change wave
 
 Before claiming the migration/sweep complete, verify:
 
 - every inventoried caller/representation is migrated or has a documented compatibility reason;
 - residual searches for old names/shapes produce only intentional survivors;
 - any automation produced the expected target count/result and did not silently skip unexpected input;
+- repeatable operations remain convergent after retry/resume and shared-state invariants survive the intended contention model;
 - focused checks passed for the meaningful partitions;
 - repository-required tests/build/lint/security/CI gates pass on the final head;
 - removed legacy paths are not still referenced by tests, fixtures, docs, generated artifacts, or supported downstream contracts.
@@ -129,10 +142,12 @@ When this companion is used in a refactor plan, record:
 - **Migration surface:** old/new contract and caller/consumer inventory.
 - **Compatibility decision:** delete old path, or keep it with concrete reason/removal condition.
 - **Migration strategy:** direct | expand-contract | bounded non-shippable phase, with why.
+- **Shared-state decision:** eliminate/partition | serialize, with the invariant and mechanism when serialization remains.
+- **Idempotency decision:** how retries/resume converge for externally repeatable mutation.
 - **Lever decision:** manual | script/codemod/generator, with why.
 - **Verifiable units:** ordered effects and checks.
-- **Completion proof:** residual search, focused checks, and final gates.
+- **Completion proof:** residual search, repetition/contention checks when applicable, focused checks, and final gates.
 
 ## Provenance
 
-This reference adapts practical ideas from Cursor's MIT-licensed `pstack` principles for migrating callers before deleting legacy APIs, building a lever for non-trivial mechanical work, and sequencing work into verifiable units. The explicit expand-contract branch and blocker-shaped migration batches additionally adapt the wide-refactor strategy from Matt Pocock's MIT-licensed `to-tickets` skill. The rules are rewritten to fit `github-delivery`'s existing scope, evidence, compatibility, and publication contracts rather than copied as standalone skills.
+This reference adapts practical ideas from Cursor's MIT-licensed `pstack` principles for migrating callers before deleting legacy APIs, building a lever for non-trivial mechanical work, sequencing work into verifiable units, making repeated operations idempotent, and removing shared mutable state before structurally serializing what truly must remain shared. The explicit expand-contract branch and blocker-shaped migration batches additionally adapt the wide-refactor strategy from Matt Pocock's MIT-licensed `to-tickets` skill. The rules are rewritten to fit `github-delivery`'s existing scope, evidence, compatibility, and publication contracts rather than copied as standalone skills.
