@@ -8,11 +8,11 @@ Prioritize OWNER/MEMBER/COLLABORATOR/CODEOWNER/user feedback, then other humans,
 
 ### GD-REVIEW-002 — No false deferral for in-diff bot threads
 
-Bot threads on paths in the current PR diff must be fixed in this PR or explicitly declined with verified rationale. Do not use “inherited / copied / fabric file — fix in another PR”, “rebase / stack / downstream branch will pick it up”, “consumer lives elsewhere”, or “non-blocking” as a defer-and-resolve shortcut when the finding is valid and in scope.
+In-diff bot findings must be fixed here or explicitly declined with verified rationale. Do not defer valid in-scope findings as inherited/copied/fabric, downstream/stacked, external-consumer, or non-blocking work.
 
 ### GD-REVIEW-003 — Fix-or-decline before resolution
 
-Fix-or-decline sequence: verify the finding, implement and verify the fix or record a durable evidence-backed decline, reply in the correct thread, then resolve only when permitted. `review` may reply to bot threads and **may resolve bot-authored threads** through the broker/`--resolve-bot`; it must **not** resolve human threads merely by elevating itself. Never resolve a bot thread with only a defer/skip reply.
+Verify the finding, fix it or record a durable evidence-backed decline, reply in-thread, then resolve only when permitted. `review` may resolve bot-authored threads through the broker/`--resolve-bot`, never human threads or bot threads with only defer/skip rationale.
 
 ### GD-REVIEW-004 — Merge-ready review is multidimensional
 
