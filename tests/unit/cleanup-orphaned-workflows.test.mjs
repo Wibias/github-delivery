@@ -69,7 +69,7 @@ test("cleanup workflow is default-branch-only, least-privilege, bounded, and pin
   assert.match(source, /permissions:\s*\n\s*actions: write\s*\n\s*contents: read/);
   assert.match(source, /timeout-minutes: 10/);
   assert.match(source, /actions\/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1/);
-  assert.match(source, /actions\/setup-node@820762786026740c76f36085b0efc47a31fe5020/);
+  assert.match(source, /actions\/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1/);
   assert.match(source, /persist-credentials: false/);
   assert.match(source, /run: node scripts\/cleanup-orphaned-workflows\.mjs/);
   assert.deepEqual(validateWorkflowFile(".github/workflows/cleanup-orphaned-workflows.yml", source), []);
