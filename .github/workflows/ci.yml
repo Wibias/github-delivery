@@ -224,10 +224,15 @@ jobs:
           }
           $DepsPath = Join-Path $PublishDir 'GitHubDeliveryAuthority.deps.json'
           $Deps = Get-Content $DepsPath -Raw | ConvertFrom-Json
-          $RuntimePackage = $Deps.libraries.PSObject.Properties.Name |
+          $CoreRuntimePackage = $Deps.libraries.PSObject.Properties.Name |
             Where-Object { $_ -like 'runtimepack.Microsoft.NETCore.App.Runtime.win-x64/*' }
-          if ($RuntimePackage -ne 'runtimepack.Microsoft.NETCore.App.Runtime.win-x64/8.0.30') {
-            throw "Published authority host bundled unexpected runtime: $RuntimePackage"
+          if ($CoreRuntimePackage -ne 'runtimepack.Microsoft.NETCore.App.Runtime.win-x64/8.0.33') {
+            throw "Published authority host bundled unexpected .NET Core runtime: $CoreRuntimePackage"
+          }
+          $DesktopRuntimePackage = $Deps.libraries.PSObject.Properties.Name |
+            Where-Object { $_ -like 'runtimepack.Microsoft.WindowsDesktop.App.Runtime.win-x64/*' }
+          if ($DesktopRuntimePackage -ne 'runtimepack.Microsoft.WindowsDesktop.App.Runtime.win-x64/8.0.33') {
+            throw "Published authority host bundled unexpected Windows Desktop runtime: $DesktopRuntimePackage"
           }
           $Executable = Join-Path $PublishDir 'GitHubDeliveryAuthority.exe'
           if (-not (Test-Path $Executable -PathType Leaf)) {
