@@ -22,7 +22,7 @@ test("release workflow builds, attests, and publishes the Windows authority host
   );
 });
 
-test("authority host builds pin the exact verified SDK and patched self-contained runtimes", () => {
+test("authority host builds pin the serviced SDK and reject vulnerable Windows Desktop runtimes", () => {
   assert.equal(existsSync(globalJsonUrl), true, "global.json must pin the repository SDK");
   const globalJson = JSON.parse(readFileSync(globalJsonUrl, "utf8"));
   assert.deepEqual(globalJson, {
@@ -35,10 +35,11 @@ test("authority host builds pin the exact verified SDK and patched self-containe
   assert.doesNotMatch(workflow, /dotnet-version:\s*8\.0\.x/);
   assert.doesNotMatch(ciWorkflow, /dotnet-version:\s*8\.0\.x/);
 
-  for (const runtime of ["Microsoft.NETCore.App", "Microsoft.WindowsDesktop.App"]) {
-    const runtimePattern = new RegExp(`runtimepack\\.${runtime.replaceAll(".", "\\.")}\\.Runtime\\.win-x64\\/8\\.0\\.33`);
-    assert.match(workflow, runtimePattern);
-    assert.match(ciWorkflow, runtimePattern);
+  for (const buildWorkflow of [workflow, ciWorkflow]) {
+    assert.match(buildWorkflow, /runtimepack\.Microsoft\.NETCore\.App\.Runtime\.win-x64\/8\.0\.33/);
+    assert.match(buildWorkflow, /Microsoft\.WindowsDesktop\.App\.Runtime\.win-x64/);
+    assert.match(buildWorkflow, /8\.0\.32/);
+    assert.match(buildWorkflow, /-lt \[version\]'8\.0\.32'/);
   }
 });
 
