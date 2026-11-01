@@ -5,9 +5,31 @@ import {
   readFileSync,
   readdirSync,
 } from "node:fs";
-import { join, relative, resolve, sep } from "node:path";
+import { extname, join, relative, resolve, sep } from "node:path";
+import { TextDecoder } from "node:util";
 
 import { inspectLegacyManifestlessInstallation } from "./bootstrap-cli.mjs";
+
+const COMPARABLE_TEXT_EXTENSIONS = new Set([
+  ".md",
+  ".mjs",
+  ".js",
+  ".json",
+  ".jsonl",
+  ".yml",
+  ".yaml",
+  ".txt",
+  ".cs",
+  ".xaml",
+  ".csproj",
+  ".props",
+  ".targets",
+  ".xml",
+  ".ps1",
+  ".psm1",
+  ".psd1",
+]);
+const UTF8_DECODER = new TextDecoder("utf-8", { fatal: true });
 
 export function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
@@ -95,6 +117,16 @@ function lstatOrMissing(lstat, path) {
 function isRegularFile(stats) {
   return Boolean(stats) && typeof stats.isFile === "function" && stats.isFile() === true
     && (typeof stats.isSymbolicLink !== "function" || stats.isSymbolicLink() !== true);
+}
+
+function comparableText(path, content) {
+  if (path !== "LICENSE" && !COMPARABLE_TEXT_EXTENSIONS.has(extname(path).toLowerCase())) return null;
+  try {
+    const decoded = UTF8_DECODER.decode(Buffer.isBuffer(content) ? content : Buffer.from(content));
+    return Buffer.from(decoded.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n"), "utf8");
+  } catch {
+    return null;
+  }
 }
 
 export function compareInstalledManifest({ manifest, target, dependencies = {} } = {}) {
@@ -188,13 +220,14 @@ function partitionLocalModificationsAgainstTarget({
 }) {
   const blocking = [];
   const converged = [];
+  const formatOnly = [];
   if (
     !targetManifest
     || targetManifest.schemaVersion !== 1
     || targetManifest.kind !== "github-delivery/distribution-manifest"
     || !Array.isArray(targetManifest.files)
   ) {
-    return { blocking: [...modifications], converged };
+    return { blocking: [...modifications], converged, formatOnly };
   }
 
   const targetEntries = new Map();
@@ -223,14 +256,25 @@ function partitionLocalModificationsAgainstTarget({
     }
     const path = join(target, ...modification.path.split("/"));
     const stats = lstatOrMissing(lstat, path);
-    if (!isRegularFile(stats) || digest(readFile(path)) !== entry.sha256.toLowerCase()) {
+    if (!isRegularFile(stats)) {
       blocking.push(modification);
       continue;
     }
-    converged.push(modification);
+    const localContent = readFile(path);
+    if (digest(localContent) === entry.sha256.toLowerCase()) {
+      converged.push(modification);
+      continue;
+    }
+    const normalized = comparableText(modification.path, localContent);
+    if (normalized && digest(normalized) === entry.sha256.toLowerCase()) {
+      converged.push(modification);
+      formatOnly.push(modification);
+      continue;
+    }
+    blocking.push(modification);
   }
 
-  return { blocking, converged };
+  return { blocking, converged, formatOnly };
 }
 
 export function planStableUpdate({
@@ -311,6 +355,7 @@ export function planStableUpdate({
     localModifications: local.modifications,
     blockingLocalModifications: targetComparison.blocking,
     targetConvergedLocalModifications: targetComparison.converged,
+    formatOnlyTargetConvergedLocalModifications: targetComparison.formatOnly,
     safeToReplace,
     action,
     assets,
