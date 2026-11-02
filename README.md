@@ -393,6 +393,19 @@ Runtime capability reporting distinguishes:
 - `Partial (HOOKS)` — supported lifecycle/tool-boundary protection;
 - `Off (NONE)` — no verified interception boundary.
 
+### Trace efficiency diagnostics
+
+Opt-in agent traces can be inspected locally for tool-use efficiency without persisting raw tool arguments or results. When provider data is available, trace events may carry per-trace salted fingerprints plus bounded result-size and token-estimate metadata.
+
+```bash
+github-delivery trace-analyze ~/.github-delivery/debug-traces/grok-....jsonl
+github-delivery trace-analyze ~/.github-delivery/debug-traces/grok-....jsonl --json
+```
+
+The analyzer surfaces repeated arguments, targets, and results; serial discovery; polling; context churn; normalized token usage; and work after the final detected mutation. Its flags are heuristics, not correctness verdicts. Fingerprints are intentionally unstable across traces, and neither the source payload nor the per-trace salt is persisted.
+
+See [`references/agent-debug-trace.md`](references/agent-debug-trace.md) for tracing setup, privacy details, provider limitations, and interpretation guidance.
+
 For the complete budgets, trust model, incident replays, false-positive controls, and host integration, see [`references/agent-progress-watchdog.md`](references/agent-progress-watchdog.md).
 
 ---
