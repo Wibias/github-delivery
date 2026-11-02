@@ -156,7 +156,7 @@ All notable changes to `github-delivery` are documented here.
 ### Added
 
 - Added first-class `grok-trace`, `cursor-trace`, and `codex-trace` npm launchers for explicit per-invocation agent tracing. Grok keeps its headless `streaming-json` path with quoted-prompt shorthand, Cursor keeps its `stream-json` print path, and Codex keeps the protected App Server/watchdog path (PR #431).
-- Added optional `labels: string[]` support to `create_issue`, including validation, deterministic `gh issue create --label` emission, Node/Windows authority binding, and idempotency matching while preserving the first requested spelling for the actual GitHub CLI arguments (PR #431).
+- Added optional `labels: string[]` support to `create_issue`, including validation, deterministic `gh issue create --label` emission, Node/Windows authority binding, and idempotent receipt verification (PR #431).
 
 ### Changed
 
@@ -693,7 +693,7 @@ All notable changes to `github-delivery` are documented here.
 
 ### Fixed
 
-- Repeated grid or malformed tool-protocol placeholder output now hard-stops immediately on the first stall instead of being retried, and the offending model is quarantined across turns and `SessionEnd` so a resume with the same model is blocked before inference until the model changes or a new task begins. Subagent protocol stalls no longer quarantine the parent task.
+- Repeated grid or malformed tool-protocol placeholder output now hard-stops immediately on the first stall instead of being retried, and the offending model is quarantined across turns and `SessionEnd` so a resume with the same model is blocked before inference until the model is changed. Subagent protocol stalls no longer quarantine the parent task.
 - Windows login auto-start is now opt-in (previously enabled by default); users explicitly consent via guided install or `npx github-delivery autostart`.
 
 ## [0.6.0] - 2026-08-14
