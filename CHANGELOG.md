@@ -4,6 +4,10 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Added privacy-preserving trace efficiency diagnostics and `github-delivery trace-analyze <trace.jsonl>` for detecting repeated tool arguments, targets, and results; serial discovery; polling; context churn; and post-final-edit verification tails while persisting only per-trace salted fingerprints and bounded size/token metadata (PR #484).
+
 ## [1.8.0] - 2026-11-01
 
 ### Added

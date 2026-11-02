@@ -7,6 +7,7 @@ function disabledRecorder() {
   return {
     enabled: false,
     path: null,
+    diagnostics: null,
     record() {},
     close() {},
   };
@@ -64,7 +65,7 @@ export function runStructuredDebugCli({
     } catch {
       return;
     }
-    const normalized = normalize(message);
+    const normalized = normalize(message, recorder.diagnostics);
     if (!normalized) return;
     const events = Array.isArray(normalized) ? normalized : [normalized];
     for (const event of events) {

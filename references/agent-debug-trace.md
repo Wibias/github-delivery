@@ -19,6 +19,59 @@ The trace format is JSON Lines. Every normalized event includes an ISO 8601 time
 
 Provider-internal chain-of-thought is not a supported trace payload. Adapters that receive a distinct internal-thinking surface must discard it before recording. Some other provider surfaces expose user-enabled reasoning summaries rather than raw chain-of-thought; those remain private diagnostic material and can still mention sensitive data. Treat debug traces as private and delete them when they are no longer needed.
 
+## Efficiency metadata
+
+When a provider stream exposes a tool input or result before sanitization, GitHub Delivery can derive non-payload diagnostics and then discard the raw value. Current command-stream integrations use these fields where the provider supplies the required data:
+
+- `argumentFingerprint`: salted fingerprint of the complete tool arguments
+- `targetFingerprint`: salted fingerprint of target-like argument fields such as file/path or directory
+- `resultFingerprint`: salted fingerprint of the tool result
+- `resultBytes`: byte size of the JSON-encoded result
+- `resultTokenEstimate`: rough `ceil(resultBytes / 4)` estimate, not provider billing data
+- `turnSequence`: trace-local ordinal assigned to observed turn identities
+
+Fingerprints use a random salt local to one trace. They are useful for detecting repetition inside that trace, but they are intentionally not stable across traces and cannot be used to recover the original path, arguments, or result. The trace stores the fingerprint only, not the salt or source payload.
+
+These fields are opportunistic. A provider or hook that does not expose the raw input/result at the normalization boundary simply omits them. Missing metadata is not evidence that the call was unique.
+
+Token usage is also provider-dependent. `turn_completed` events may contain normalized usage fields when the provider reports them. The analyzer never treats missing provider usage as zero-cost proof.
+
+## Analyze a trace
+
+Use the local analyzer on a JSONL trace:
+
+```bash
+github-delivery trace-analyze ~/.github-delivery/debug-traces/grok-....jsonl
+```
+
+For machine-readable output:
+
+```bash
+github-delivery trace-analyze ~/.github-delivery/debug-traces/grok-....jsonl --json
+```
+
+The analyzer reports duration, tool-call counts, failed calls, repeated argument/target/result fingerprints, serial discovery chains, polling calls, normalized token usage, and work after the final detected mutation. It can emit heuristic flags for:
+
+- context churn
+- serial discovery
+- subagent/command polling
+- a long verification tail after the final edit
+
+These are diagnostic heuristics, not correctness verdicts. For example, two identical reads can be intentional, and a long verification tail can be appropriate for a release-critical change. Use the report to locate candidates for inspection rather than treating every flag as waste.
+
+## Efficiency guidance
+
+Prefer batching independent discovery work when the provider/runtime permits it. If several unrelated greps or reads are already known, issue them together and evaluate the combined evidence instead of forcing a model round-trip between each search.
+
+After the final mutation, use a finite verification plan. A normal stop condition is:
+
+1. run the targeted regression tests for the changed behavior;
+2. run the repository's canonical/full required check;
+3. inspect the final diff and required acceptance criteria;
+4. stop when those checks pass and no new failure or unmet criterion appeared.
+
+A new failure, changed diff, or unmet criterion resets the relevant part of that verification plan. Additional repeated greps/reads/checks without new evidence should not continue merely to increase confidence.
+
 ## Codex
 
 After installing the `github-delivery` npm package, start protected Codex with tracing through the first-class launcher:

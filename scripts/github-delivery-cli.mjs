@@ -1,11 +1,16 @@
 #!/usr/bin/env node
-import { realpathSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import { parseBootstrapArgs } from "./lib/bootstrap-cli.mjs";
 import { runBootstrap } from "./lib/bootstrap-command.mjs";
+import {
+  analyzeTraceEvents,
+  parseTraceJsonl,
+  renderTraceAnalysis,
+} from "./lib/trace-analyze.mjs";
 
-export const HELP_TEXT = `GitHub Delivery\n\nUsage:\n  github-delivery\n  github-delivery install [--target PATH]\n  github-delivery setup [--target PATH]\n  github-delivery start\n  github-delivery autostart [on|off|status]\n  github-delivery doctor [--target PATH] [--json]\n  github-delivery update [--target PATH] [--apply [--replace-local-modifications]]\n\nBare invocation launches guided setup.\nDoctor is human-readable by default; add --json for the raw machine report.\nUpdate is dry-run by default; add --apply only after reviewing the plan. If reviewed local changes intentionally need to be replaced by the verified release, add --replace-local-modifications together with --apply; the old installation is backed up first.\n`;
+export const HELP_TEXT = `GitHub Delivery\n\nUsage:\n  github-delivery\n  github-delivery install [--target PATH]\n  github-delivery setup [--target PATH]\n  github-delivery start\n  github-delivery autostart [on|off|status]\n  github-delivery doctor [--target PATH] [--json]\n  github-delivery update [--target PATH] [--apply [--replace-local-modifications]]\n  github-delivery trace-analyze <trace.jsonl> [--json]\n\nBare invocation launches guided setup.\nDoctor is human-readable by default; add --json for the raw machine report.\nUpdate is dry-run by default; add --apply only after reviewing the plan. If reviewed local changes intentionally need to be replaced by the verified release, add --replace-local-modifications together with --apply; the old installation is backed up first.\nTrace analysis is local and human-readable by default; add --json for machine-readable efficiency metrics.\n`;
 
 function value(value, fallback = "unknown") {
   if (value === null || value === undefined || value === "") return fallback;
@@ -339,6 +344,21 @@ export function renderCommandError(error, stderr = process.stderr, argv = proces
   stderr.write("GitHub Delivery does not force-kill blocking processes automatically.\n");
 }
 
+function runTraceAnalyze(argv, stdout) {
+  const json = argv.includes("--json");
+  const positional = argv.slice(1).filter((arg) => arg !== "--json");
+  if (positional.length !== 1 || positional[0].startsWith("--")) {
+    throw new Error("trace-analyze requires exactly one JSONL trace path");
+  }
+  const path = positional[0];
+  const events = parseTraceJsonl(readFileSync(path, "utf8"));
+  const analysis = analyzeTraceEvents(events);
+  stdout.write(json
+    ? `${JSON.stringify(analysis, null, 2)}\n`
+    : renderTraceAnalysis(analysis));
+  return { action: "trace-analyze", path, analysis };
+}
+
 function isDirectExecution(entry = process.argv[1]) {
   if (!entry) return false;
   try {
@@ -349,13 +369,15 @@ function isDirectExecution(entry = process.argv[1]) {
 }
 
 export async function main(argv = process.argv.slice(2), dependencies = {}) {
+  const stdout = dependencies.stdout || process.stdout;
+  if (argv[0] === "trace-analyze") return runTraceAnalyze(argv, stdout);
+
   const parse = dependencies.parseBootstrapArgs || parseBootstrapArgs;
   const options = parse(argv);
   if (options.help) {
-    (dependencies.stdout || process.stdout).write(HELP_TEXT);
+    stdout.write(HELP_TEXT);
     return { action: "help" };
   }
-  const stdout = dependencies.stdout || process.stdout;
   const runtimeDependencies = { ...dependencies };
   if (options.command === "update" && options.apply) {
     const upstreamProgress = dependencies.onProgress;
