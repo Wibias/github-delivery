@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { EventEmitter } from "node:events";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import test from "node:test";
@@ -174,4 +175,36 @@ test("grok-trace pull-request contract verifies that the current HEAD is publish
     ),
     /pull_request_head_not_current/,
   );
+});
+
+test("grok-trace turns a successful Grok exit into failure when the requested PR cannot be verified", async () => {
+  const { runGrokTrace } = await import("../../scripts/grok-trace.mjs");
+  const child = new EventEmitter();
+  let stderr = "";
+  let verificationCalls = 0;
+  const previousExitCode = process.exitCode;
+  process.exitCode = undefined;
+
+  try {
+    const result = runGrokTrace({
+      args: ["Implement the fix and open a PR with the changes."],
+      env: {},
+      stderr: { write(chunk) { stderr += String(chunk); } },
+      runImpl() { return { child, recorder: null }; },
+      verifyDeliveryContract() {
+        verificationCalls += 1;
+        throw new Error("grok_trace_delivery_contract_unmet:pull_request_not_verified");
+      },
+    });
+
+    assert.equal(result.deliveryContract.requirePullRequest, true);
+    child.emit("exit", 0, null);
+
+    assert.equal(verificationCalls, 1);
+    assert.equal(process.exitCode, 1);
+    assert.match(stderr, /delivery contract failed/i);
+    assert.match(stderr, /pull_request_not_verified/);
+  } finally {
+    process.exitCode = previousExitCode;
+  }
 });
