@@ -90,7 +90,15 @@ test("grok-trace recognizes explicit pull-request delivery requests without trea
     { requirePullRequest: true },
   );
   assert.deepEqual(
+    buildGrokTraceDeliveryContract(["-p", "Do not merge; open a PR with the changes."]),
+    { requirePullRequest: true },
+  );
+  assert.deepEqual(
     buildGrokTraceDeliveryContract(["-p", "Inspect this only. Do not open a PR."]),
+    { requirePullRequest: false },
+  );
+  assert.deepEqual(
+    buildGrokTraceDeliveryContract(["-p", "Inspect this only. Do not ever open a PR."]),
     { requirePullRequest: false },
   );
 });
