@@ -29,12 +29,48 @@ function fail(code, detail = "") {
   throw new Error(detail ? `${code}: ${detail}` : code);
 }
 
-function githubHeaders() {
+function githubApiToken(env) {
+  const token = env?.GH_TOKEN || env?.GITHUB_TOKEN;
+  if (token === undefined || token === null || token === "") return null;
+  // Only bounded, printable ASCII may enter an Authorization header.
+  // Invalid credentials are never included in errors.
+  if (typeof token !== "string" || !/^[!-~]{1,2048}$/.test(token)) {
+    fail("stable_release_token_invalid");
+  }
+  return token;
+}
+
+function githubHeaders(token) {
   return {
     Accept: "application/vnd.github+json",
     "X-GitHub-Api-Version": API_VERSION,
     "User-Agent": "github-delivery-release-self-update",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
+}
+
+function rateLimitDetail(response, token) {
+  if (response?.status !== 403 && response?.status !== 429) return null;
+  const remaining = response.headers?.get?.("x-ratelimit-remaining");
+  const retryAfter = response.headers?.get?.("retry-after");
+  // HTTP 403 alone does not establish rate limiting.
+  if (response.status === 403 && remaining !== "0" && retryAfter == null) return null;
+
+  const parts = [`HTTP ${response.status}`];
+  if (remaining === "0") {
+    const raw = response.headers?.get?.("x-ratelimit-reset");
+    if (typeof raw === "string" && /^[0-9]{1,12}$/.test(raw)) {
+      const milliseconds = Number(raw) * 1000;
+      if (Number.isSafeInteger(milliseconds) && milliseconds <= 8_640_000_000_000_000) {
+        parts.push(`reset_at_utc=${new Date(milliseconds).toISOString()}`);
+      }
+    }
+  }
+  if (typeof retryAfter === "string" && /^[0-9]{1,5}$/.test(retryAfter)) {
+    parts.push(`retry_after_seconds=${Number(retryAfter)}`);
+  }
+  if (!token) parts.push("set GH_TOKEN or GITHUB_TOKEN for a higher API rate limit");
+  return parts.join("; ");
 }
 
 function isSemverTag(value) {
@@ -138,18 +174,21 @@ function validateManifestPath(value) {
   return value;
 }
 
-async function fetchJson(fetchImpl, url, errorCode) {
+async function fetchJson(fetchImpl, url, errorCode, token = null) {
   let response;
   try {
     response = await fetchImpl(url, {
       method: "GET",
       redirect: "manual",
-      headers: githubHeaders(),
+      headers: githubHeaders(token),
     });
-  } catch (error) {
-    fail(errorCode, error?.message || "request failed");
+  } catch {
+    // Network exceptions may include request headers or credentials.
+    fail(errorCode, "network request failed");
   }
   if (!response || response.status < 200 || response.status >= 300) {
+    const rateLimit = rateLimitDetail(response, token);
+    if (rateLimit) fail("stable_release_rate_limited", rateLimit);
     fail(errorCode, `HTTP ${response?.status ?? "unknown"}`);
   }
   try {
@@ -180,6 +219,7 @@ export function createGitHubReleaseClient({
   fetchImpl = globalThis.fetch,
   repository = DEFAULT_REPOSITORY,
   sleepImpl = defaultSleep,
+  env = process.env,
 } = {}) {
   if (typeof fetchImpl !== "function") fail("stable_release_network_client_unavailable");
   if (repository !== DEFAULT_REPOSITORY) fail("stable_release_repository_invalid");
@@ -190,6 +230,7 @@ export function createGitHubReleaseClient({
       fetchImpl,
       `${API_ROOT}/repos/${repository}/releases/latest`,
       "stable_release_metadata_invalid",
+      githubApiToken(env),
     );
     if (
       !release
@@ -264,6 +305,7 @@ export function createGitHubReleaseClient({
         fetchImpl,
         `${API_ROOT}/repos/${repository}/git/ref/tags/${encodeURIComponent(tag)}`,
         "stable_release_tag_resolution_invalid",
+        githubApiToken(env),
       );
       object = ref?.object;
     } catch (error) {
@@ -286,6 +328,7 @@ export function createGitHubReleaseClient({
         fetchImpl,
         `${API_ROOT}/repos/${repository}/git/tags/${sha}`,
         "stable_release_tag_resolution_invalid",
+        githubApiToken(env),
       );
       object = tagObject?.object;
     }
