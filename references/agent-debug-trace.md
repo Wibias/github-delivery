@@ -24,13 +24,17 @@ Provider-internal chain-of-thought is not a supported trace payload. Adapters th
 When a provider stream exposes a tool input or result before sanitization, GitHub Delivery can derive non-payload diagnostics and then discard the raw value. Current command-stream integrations use these fields where the provider supplies the required data:
 
 - `argumentFingerprint`: salted fingerprint of the complete tool arguments
-- `targetFingerprint`: salted fingerprint of target-like argument fields such as file/path or directory
+- `targetFingerprint`: salted fingerprint of target-like argument fields such as file/path or directory, including Grok's `target_file` and `target_directory` fields
 - `resultFingerprint`: salted fingerprint of the tool result
 - `resultBytes`: byte size of the JSON-encoded result
 - `resultTokenEstimate`: rough `ceil(resultBytes / 4)` estimate, not provider billing data
 - `turnSequence`: trace-local ordinal assigned to observed turn identities
+- `toolEffect`: bounded action classification such as `state-change` when a terminal command is recognized as mutating state
+- `publicationAction`: bounded publication classification such as `pr_create` when a terminal command is recognized as a PR-creation attempt
 
 Fingerprints use a random salt local to one trace. They are useful for detecting repetition inside that trace, but they are intentionally not stable across traces and cannot be used to recover the original path, arguments, or result. The trace stores the fingerprint only, not the salt or source payload.
+
+Terminal action classifications are intentionally narrow metadata. The raw command, branch name, PR title/body, paths, and other command arguments are not copied into the normalized trace by this classification step.
 
 These fields are opportunistic. A provider or hook that does not expose the raw input/result at the normalization boundary simply omits them. Missing metadata is not evidence that the call was unique.
 
@@ -50,7 +54,7 @@ For machine-readable output:
 github-delivery trace-analyze ~/.github-delivery/debug-traces/grok-....jsonl --json
 ```
 
-The analyzer reports duration, tool-call counts, failed calls, repeated argument/target/result fingerprints, serial discovery chains, polling calls, normalized token usage, and work after the final detected mutation. It can emit heuristic flags for:
+The analyzer reports duration, tool-call counts, failed calls, repeated argument/target/result fingerprints, target-fingerprint coverage, PR-publication attempts, serial discovery chains, polling calls, normalized token usage, and work after the final detected mutation. If a trace contains no target fingerprints, repeated-target evidence is reported as unavailable rather than as zero repeats. Recognized terminal state changes also participate in final-mutation analysis. The analyzer can emit heuristic flags for:
 
 - context churn
 - serial discovery
@@ -107,6 +111,10 @@ grok-trace --prompt-file task.txt
 ```
 
 When additional Grok options are needed, use an explicit `-p`, `--prompt`, or `--prompt-file` form so the launcher does not guess which option value is the prompt.
+
+When the prompt explicitly asks Grok to open, create, raise, or submit a PR, `grok-trace` treats that requested outcome as a delivery contract. After Grok exits successfully, the launcher verifies that the current branch has an open PR and that the PR's `headRefOid` exactly matches the local `HEAD`. A missing PR, a stale PR head, detached/missing branch identity, or an unverifiable Git/GitHub CLI result makes the launcher exit nonzero with an explicit delivery-contract blocker. Explicit negations such as `do not open a PR` do not create this contract.
+
+The delivery contract verifies the requested publication outcome; it does not silently create or push a PR as a fallback after Grok exits. This keeps repository mutation owned by the requested agent workflow while preventing a successful launcher exit from hiding an unmet PR-delivery request.
 
 The launcher delegates to the Grok debug wrapper, which owns `--output-format streaming-messages-json`. That transport exposes `session_id` and `parent_tool_use_id` on assistant/user messages so nested tool activity can be attributed to the spawning tool. Grok `thinking` blocks are discarded before normalization. Sanitized `tool_use` / `tool_result` lifecycle events retain identifiers and outcomes but never tool input/result payloads.
 
