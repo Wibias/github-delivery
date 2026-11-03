@@ -4,6 +4,17 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.8.2] - 2026-11-03
+
+### Changed
+
+- Bumped the package version from `1.8.1` to `1.8.2`.
+
+### Fixed
+
+- Hardened Grok trace diagnostics to fingerprint `target_file` and `target_directory`, persist only bounded terminal state/publication metadata instead of raw commands, report unavailable target-fingerprint evidence explicitly, and include recognized terminal state changes in final-mutation analysis (PR #487).
+- `grok-trace` now treats explicit PR-publication requests as a delivery contract: after a successful Grok exit it verifies an open PR for the current branch whose `headRefOid` matches local `HEAD`, while direct negations such as `do not open a PR` remain opt-outs and unrelated instructions such as `do not merge; open a PR` still require PR delivery (PR #487).
+
 ## [1.8.1] - 2026-11-02
 
 ### Added
