@@ -43,10 +43,17 @@ function promptText(args, { readFileSyncImpl = readFileSync, cwd = process.cwd()
 function explicitlyRequestsPullRequest(prompt) {
   const text = String(prompt || "");
   if (!text) return false;
-  if (/\b(?:do\s+not|don['’]?t|dont|without)\b[^.!?\n]{0,80}\b(?:open|create|raise|submit)\b[^.!?\n]{0,40}\b(?:pr|pull\s+request)\b/i.test(text)) {
-    return false;
-  }
-  return /\b(?:open|create|raise|submit)\s+(?:(?:a|an)\s+)?(?:draft\s+)?(?:pr|pull\s+request)\b/i.test(text);
+  const action = "(?:open(?:ing)?|creat(?:e|ing)|rais(?:e|ing)|submit(?:ting)?)";
+  const pullRequest = "(?:pr|pull\\s+request)";
+  const negated = new RegExp(
+    `\\b(?:do\\s+not|don['’]?t|dont|without)\\b[^.!?\\n]{0,80}\\b${action}\\b[^.!?\\n]{0,40}\\b${pullRequest}\\b`,
+    "i",
+  );
+  if (negated.test(text)) return false;
+  return new RegExp(
+    `\\b${action}\\s+(?:(?:a|an|the)\\s+)?(?:draft\\s+)?${pullRequest}\\b`,
+    "i",
+  ).test(text);
 }
 
 function runVerificationCommand(spawnSyncImpl, bin, args, { cwd, env, stage }) {
