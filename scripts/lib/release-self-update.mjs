@@ -49,12 +49,21 @@ function githubHeaders(token) {
   };
 }
 
-function rateLimitDetail(response, token) {
+async function rateLimitDetail(response, token) {
   if (response?.status !== 403 && response?.status !== 429) return null;
   const remaining = response.headers?.get?.("x-ratelimit-remaining");
   const retryAfter = response.headers?.get?.("retry-after");
-  // HTTP 403 alone does not establish rate limiting.
-  if (response.status === 403 && remaining !== "0" && retryAfter == null) return null;
+  if (response.status === 403 && remaining !== "0" && retryAfter == null) {
+    // Secondary limits can use only a 403 JSON message without retry headers.
+    // Inspect a bounded body, but never echo it or treat every 403 as throttling.
+    let message = null;
+    try {
+      const bytes = await readLimitedBody(response, 4096);
+      const body = JSON.parse(bytes.toString("utf8"));
+      message = typeof body?.message === "string" ? body.message : null;
+    } catch {}
+    if (!message || !/(?:rate limit|too many requests)/i.test(message)) return null;
+  }
 
   const parts = [`HTTP ${response.status}`];
   if (remaining === "0") {
@@ -68,6 +77,8 @@ function rateLimitDetail(response, token) {
   }
   if (typeof retryAfter === "string" && /^[0-9]{1,5}$/.test(retryAfter)) {
     parts.push(`retry_after_seconds=${Number(retryAfter)}`);
+  } else if (remaining !== "0") {
+    parts.push("wait_at_least_seconds=60");
   }
   if (!token) parts.push("set GH_TOKEN or GITHUB_TOKEN for a higher API rate limit");
   return parts.join("; ");
@@ -187,7 +198,7 @@ async function fetchJson(fetchImpl, url, errorCode, token = null) {
     fail(errorCode, "network request failed");
   }
   if (!response || response.status < 200 || response.status >= 300) {
-    const rateLimit = rateLimitDetail(response, token);
+    const rateLimit = await rateLimitDetail(response, token);
     if (rateLimit) fail("stable_release_rate_limited", rateLimit);
     fail(errorCode, `HTTP ${response?.status ?? "unknown"}`);
   }
@@ -309,7 +320,12 @@ export function createGitHubReleaseClient({
       );
       object = ref?.object;
     } catch (error) {
-      if (String(error?.message || "").includes("stable_release_tag_resolution_invalid")) throw error;
+      const message = String(error?.message || "");
+      if (
+        message.startsWith("stable_release_tag_resolution_invalid")
+        || message.startsWith("stable_release_rate_limited")
+        || message.startsWith("stable_release_token_invalid")
+      ) throw error;
       fail("stable_release_tag_resolution_invalid");
     }
 
