@@ -46,7 +46,7 @@ function explicitlyRequestsPullRequest(prompt) {
   const action = "(?:open(?:ing)?|creat(?:e|ing)|rais(?:e|ing)|submit(?:ting)?)";
   const pullRequest = "(?:pr|pull\\s+request)";
   const negated = new RegExp(
-    `\\b(?:do\\s+not|don['’]?t|dont|without)\\b[^.!?\\n]{0,80}\\b${action}\\b[^.!?\\n]{0,40}\\b${pullRequest}\\b`,
+    `\\b(?:do\\s+not|don['’]?t|dont|without)\\s+(?:ever\\s+)?${action}\\b[^.!?\\n]{0,40}\\b${pullRequest}\\b`,
     "i",
   );
   if (negated.test(text)) return false;
