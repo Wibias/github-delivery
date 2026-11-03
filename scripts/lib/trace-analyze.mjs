@@ -6,6 +6,7 @@ const DISCOVERY_TYPES = new Set([
   "find",
   "find_in_files",
   "glob",
+  "list_dir",
   "list_files",
   "code_search",
   "webSearch",
@@ -112,6 +113,10 @@ function serialDiscoveryChains(starts) {
   return chains;
 }
 
+function isMutation(event) {
+  return MUTATION_TYPES.has(event?.itemType) || event?.toolEffect === "state-change";
+}
+
 function flag(code, level, label, detail = null) {
   return { code, level, label, ...(detail ? { detail } : {}) };
 }
@@ -125,9 +130,17 @@ export function analyzeTraceEvents(events = []) {
   const toolCalls = starts.length;
   const failedToolCalls = completed.filter((event) => event.outcome === "failed").length;
   const duplicateArgumentCalls = duplicateCount(starts, "argumentFingerprint");
-  const repeatedTargetCalls = duplicateCount(starts, "targetFingerprint");
+  const targetFingerprintCalls = starts.filter(
+    (event) => typeof event.targetFingerprint === "string" && event.targetFingerprint.length > 0,
+  ).length;
+  const repeatedTargetCalls = targetFingerprintCalls > 0
+    ? duplicateCount(starts, "targetFingerprint")
+    : null;
   const duplicateResultCalls = duplicateCount(completed, "resultFingerprint");
   const pollingCalls = starts.filter((event) => POLLING_TYPES.has(event.itemType)).length;
+  const publicationAttempts = starts.filter(
+    (event) => event.publicationAction === "pr_create",
+  ).length;
   const serialChains = serialDiscoveryChains(starts);
   const usage = traceUsage(input);
 
@@ -140,7 +153,7 @@ export function analyzeTraceEvents(events = []) {
 
   let finalMutation = null;
   for (const event of starts) {
-    if (MUTATION_TYPES.has(event.itemType)) finalMutation = event;
+    if (isMutation(event)) finalMutation = event;
   }
   const finalMutationTime = finalMutation ? timeMs(finalMutation) : null;
   const afterFinalMutation = finalMutationTime === null
@@ -154,7 +167,7 @@ export function analyzeTraceEvents(events = []) {
       ? Math.max(0, lastTime - finalMutationTime)
       : 0,
     toolCalls: afterFinalMutation.length,
-    mutations: afterFinalMutation.filter((event) => MUTATION_TYPES.has(event.itemType)).length,
+    mutations: afterFinalMutation.filter((event) => isMutation(event)).length,
   };
 
   const flags = [];
@@ -202,8 +215,10 @@ export function analyzeTraceEvents(events = []) {
     failedToolCalls,
     duplicateArgumentCalls,
     duplicateResultCalls,
+    targetFingerprintCalls,
     repeatedTargetCalls,
     pollingCalls,
+    publicationAttempts,
     serialDiscoveryChains: serialChains,
     postFinalMutation,
     usage,
@@ -229,8 +244,18 @@ export function renderTraceAnalysis(analysis) {
   output += row("Tool calls", analysis.toolCalls);
   output += row("Failed tool calls", analysis.failedToolCalls);
   output += row("Potential duplicate calls", analysis.duplicateArgumentCalls);
-  output += row("Repeated targets", analysis.repeatedTargetCalls);
+  output += row(
+    "Target fingerprint coverage",
+    `${analysis.targetFingerprintCalls || 0}/${analysis.toolCalls || 0} (${analysis.toolCalls > 0 ? (((analysis.targetFingerprintCalls || 0) / analysis.toolCalls) * 100).toFixed(1) : "0.0"}%)`,
+  );
+  output += row(
+    "Repeated targets",
+    analysis.repeatedTargetCalls === null
+      ? "n/a (no target fingerprints)"
+      : analysis.repeatedTargetCalls,
+  );
   output += row("Duplicate results", analysis.duplicateResultCalls);
+  output += row("PR publication attempts", analysis.publicationAttempts || 0);
   output += row("Serial discovery chains", analysis.serialDiscoveryChains);
   output += row("Polling calls", analysis.pollingCalls);
   output += "\nToken usage\n";

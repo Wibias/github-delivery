@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { EventEmitter } from "node:events";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import test from "node:test";
@@ -69,4 +70,153 @@ test("grok-trace invocation is an explicit trace opt-in", async () => {
     buildGrokTraceEnv({ GITHUB_DELIVERY_DEBUG_TRACE: "0" }).GITHUB_DELIVERY_DEBUG_TRACE,
     "1",
   );
+});
+
+test("grok-trace recognizes explicit pull-request delivery requests without treating negation as a contract", async () => {
+  const { buildGrokTraceDeliveryContract } = await import(
+    "../../scripts/lib/grok-trace-launcher.mjs"
+  );
+
+  assert.deepEqual(
+    buildGrokTraceDeliveryContract(["Implement the fix and open a PR with the changes."]),
+    { requirePullRequest: true },
+  );
+  assert.deepEqual(
+    buildGrokTraceDeliveryContract(["-p", "Please create a pull request when finished."]),
+    { requirePullRequest: true },
+  );
+  assert.deepEqual(
+    buildGrokTraceDeliveryContract(["-p", "Finish by opening a PR with the changes in that branch."]),
+    { requirePullRequest: true },
+  );
+  assert.deepEqual(
+    buildGrokTraceDeliveryContract(["-p", "Do not merge; open a PR with the changes."]),
+    { requirePullRequest: true },
+  );
+  assert.deepEqual(
+    buildGrokTraceDeliveryContract(["-p", "Inspect this only. Do not open a PR."]),
+    { requirePullRequest: false },
+  );
+  assert.deepEqual(
+    buildGrokTraceDeliveryContract(["-p", "Inspect this only. Do not ever open a PR."]),
+    { requirePullRequest: false },
+  );
+});
+
+test("grok-trace pull-request contract verifies that the current HEAD is published in an open PR", async () => {
+  const { verifyGrokTraceDeliveryContract } = await import(
+    "../../scripts/lib/grok-trace-launcher.mjs"
+  );
+
+  function successfulSpawn(bin, args) {
+    const command = `${bin} ${args.join(" ")}`;
+    if (command === "git rev-parse --abbrev-ref HEAD") {
+      return { status: 0, stdout: "fix/example\n", stderr: "" };
+    }
+    if (command === "git rev-parse HEAD") {
+      return { status: 0, stdout: "abc123\n", stderr: "" };
+    }
+    if (bin === "gh") {
+      return {
+        status: 0,
+        stdout: JSON.stringify([{
+          number: 42,
+          url: "https://github.com/Wibias/github-delivery/pull/42",
+          headRefName: "fix/example",
+          headRefOid: "abc123",
+        }]),
+        stderr: "",
+      };
+    }
+    throw new Error(`unexpected command: ${command}`);
+  }
+
+  assert.deepEqual(
+    verifyGrokTraceDeliveryContract(
+      { requirePullRequest: true },
+      { spawnSyncImpl: successfulSpawn, cwd: "/repo", env: {} },
+    ),
+    {
+      pullRequestVerified: true,
+      number: 42,
+      url: "https://github.com/Wibias/github-delivery/pull/42",
+    },
+  );
+
+  assert.throws(
+    () => verifyGrokTraceDeliveryContract(
+      { requirePullRequest: true },
+      {
+        spawnSyncImpl(bin, args) {
+          if (bin === "git" && args.at(-1) === "HEAD" && args.includes("--abbrev-ref")) {
+            return { status: 0, stdout: "fix/example\n", stderr: "" };
+          }
+          if (bin === "git") return { status: 0, stdout: "abc123\n", stderr: "" };
+          return { status: 0, stdout: "[]", stderr: "" };
+        },
+        cwd: "/repo",
+        env: {},
+      },
+    ),
+    /pull_request_not_verified/,
+  );
+
+  assert.throws(
+    () => verifyGrokTraceDeliveryContract(
+      { requirePullRequest: true },
+      {
+        spawnSyncImpl(bin, args) {
+          if (bin === "git" && args.includes("--abbrev-ref")) {
+            return { status: 0, stdout: "fix/example\n", stderr: "" };
+          }
+          if (bin === "git") return { status: 0, stdout: "abc123\n", stderr: "" };
+          return {
+            status: 0,
+            stdout: JSON.stringify([{
+              number: 42,
+              url: "https://github.com/Wibias/github-delivery/pull/42",
+              headRefName: "fix/example",
+              headRefOid: "stale456",
+            }]),
+            stderr: "",
+          };
+        },
+        cwd: "/repo",
+        env: {},
+      },
+    ),
+    /pull_request_head_not_current/,
+  );
+});
+
+test("grok-trace turns a successful Grok exit into failure when the requested PR cannot be verified", async () => {
+  const { runGrokTrace } = await import("../../scripts/grok-trace.mjs");
+  const child = new EventEmitter();
+  let stderr = "";
+  let verificationCalls = 0;
+  const previousExitCode = process.exitCode;
+  process.exitCode = undefined;
+
+  try {
+    const result = runGrokTrace({
+      args: ["Implement the fix and open a PR with the changes."],
+      env: {},
+      stderr: { write(chunk) { stderr += String(chunk); } },
+      runImpl() { return { child, recorder: null }; },
+      verifyDeliveryContract() {
+        verificationCalls += 1;
+        throw new Error("grok_trace_delivery_contract_unmet:pull_request_not_verified");
+      },
+    });
+
+    assert.equal(result.deliveryContract.requirePullRequest, true);
+    child.emit("exit", 0, null);
+
+    assert.equal(verificationCalls, 1);
+    assert.equal(process.exitCode, 1);
+    assert.match(stderr, /delivery contract failed/i);
+    assert.match(stderr, /pull_request_not_verified/);
+  } finally {
+    process.exitCode = previousExitCode;
+  }
 });
