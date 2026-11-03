@@ -59,6 +59,8 @@ node scripts/install-skill.mjs --update --apply
 
 The first command is a dry-run. It discovers and fully verifies the latest published stable `Wibias/github-delivery` GitHub Release, compares it with the installed copy, and prints the update plan without replacing the installed skill. On supported Windows systems it also reports the separately installed Authority-host component plan. Add `--apply` only after inspecting that plan.
 
+Release metadata and tag lookups use `GH_TOKEN` (preferred) or `GITHUB_TOKEN` from the environment when available; otherwise they use GitHub's anonymous API limit. An authenticated `gh` CLI does not automatically provide a token to Node's API requests. To reuse your existing GitHub CLI login for the current shell, run `$env:GH_TOKEN = gh auth token` in PowerShell, or `export GH_TOKEN="$(gh auth token)"` in a POSIX shell. Do not print or commit the token. API credentials are never attached to release asset downloads or redirect destinations. When GitHub reports an exhausted API limit, the updater shows the provided UTC reset time or retry delay rather than treating it as malformed release metadata.
+
 Unless `--target` is explicitly provided, release self-update targets the root of the installed bundle that is executing `install-skill.mjs`. The compatibility command below reaches the same implementation and security boundary:
 
 ```bash
