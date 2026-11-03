@@ -92,6 +92,23 @@ test("primary rate-limit 403 includes a safe UTC reset time and actionable token
   });
 });
 
+test("tag lookup preserves actionable rate-limit and invalid-token errors", async () => {
+  const rateLimited = createGitHubReleaseClient({
+    env: {},
+    fetchImpl: async () => jsonResponse({ message: "API rate limit exceeded" }, {
+      status: 403,
+      headers: { "x-ratelimit-remaining": "0", "x-ratelimit-reset": "1793750161" },
+    }),
+  });
+  await assert.rejects(() => rateLimited.resolveTagCommit("v1.8.2"), /stable_release_rate_limited: HTTP 403/);
+
+  const badToken = createGitHubReleaseClient({
+    env: { GH_TOKEN: "bad\r\nAuthorization: fake" },
+    fetchImpl: async () => { throw new Error("fetch must not be called"); },
+  });
+  await assert.rejects(() => badToken.resolveTagCommit("v1.8.2"), /stable_release_token_invalid/);
+});
+
 test("secondary rate-limit 403 and 429 expose bounded Retry-After guidance", async () => {
   for (const status of [403, 429]) {
     const client = createGitHubReleaseClient({
