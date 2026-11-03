@@ -70,3 +70,108 @@ test("grok-trace invocation is an explicit trace opt-in", async () => {
     "1",
   );
 });
+
+test("grok-trace recognizes explicit pull-request delivery requests without treating negation as a contract", async () => {
+  const { buildGrokTraceDeliveryContract } = await import(
+    "../../scripts/lib/grok-trace-launcher.mjs"
+  );
+
+  assert.deepEqual(
+    buildGrokTraceDeliveryContract(["Implement the fix and open a PR with the changes."]),
+    { requirePullRequest: true },
+  );
+  assert.deepEqual(
+    buildGrokTraceDeliveryContract(["-p", "Please create a pull request when finished."]),
+    { requirePullRequest: true },
+  );
+  assert.deepEqual(
+    buildGrokTraceDeliveryContract(["-p", "Inspect this only. Do not open a PR."]),
+    { requirePullRequest: false },
+  );
+});
+
+test("grok-trace pull-request contract verifies that the current HEAD is published in an open PR", async () => {
+  const { verifyGrokTraceDeliveryContract } = await import(
+    "../../scripts/lib/grok-trace-launcher.mjs"
+  );
+
+  function successfulSpawn(bin, args) {
+    const command = `${bin} ${args.join(" ")}`;
+    if (command === "git rev-parse --abbrev-ref HEAD") {
+      return { status: 0, stdout: "fix/example\n", stderr: "" };
+    }
+    if (command === "git rev-parse HEAD") {
+      return { status: 0, stdout: "abc123\n", stderr: "" };
+    }
+    if (bin === "gh") {
+      return {
+        status: 0,
+        stdout: JSON.stringify([{
+          number: 42,
+          url: "https://github.com/Wibias/github-delivery/pull/42",
+          headRefName: "fix/example",
+          headRefOid: "abc123",
+        }]),
+        stderr: "",
+      };
+    }
+    throw new Error(`unexpected command: ${command}`);
+  }
+
+  assert.deepEqual(
+    verifyGrokTraceDeliveryContract(
+      { requirePullRequest: true },
+      { spawnSyncImpl: successfulSpawn, cwd: "/repo", env: {} },
+    ),
+    {
+      pullRequestVerified: true,
+      number: 42,
+      url: "https://github.com/Wibias/github-delivery/pull/42",
+    },
+  );
+
+  assert.throws(
+    () => verifyGrokTraceDeliveryContract(
+      { requirePullRequest: true },
+      {
+        spawnSyncImpl(bin, args) {
+          if (bin === "git" && args.at(-1) === "HEAD" && args.includes("--abbrev-ref")) {
+            return { status: 0, stdout: "fix/example\n", stderr: "" };
+          }
+          if (bin === "git") return { status: 0, stdout: "abc123\n", stderr: "" };
+          return { status: 0, stdout: "[]", stderr: "" };
+        },
+        cwd: "/repo",
+        env: {},
+      },
+    ),
+    /pull_request_not_verified/,
+  );
+
+  assert.throws(
+    () => verifyGrokTraceDeliveryContract(
+      { requirePullRequest: true },
+      {
+        spawnSyncImpl(bin, args) {
+          if (bin === "git" && args.includes("--abbrev-ref")) {
+            return { status: 0, stdout: "fix/example\n", stderr: "" };
+          }
+          if (bin === "git") return { status: 0, stdout: "abc123\n", stderr: "" };
+          return {
+            status: 0,
+            stdout: JSON.stringify([{
+              number: 42,
+              url: "https://github.com/Wibias/github-delivery/pull/42",
+              headRefName: "fix/example",
+              headRefOid: "stale456",
+            }]),
+            stderr: "",
+          };
+        },
+        cwd: "/repo",
+        env: {},
+      },
+    ),
+    /pull_request_head_not_current/,
+  );
+});
