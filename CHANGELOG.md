@@ -4,6 +4,10 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- Stable-release metadata and tag requests can use `GH_TOKEN` or `GITHUB_TOKEN` for authenticated GitHub API limits; exhausted primary/secondary limits now return actionable, bounded reset/retry guidance without exposing credentials or weakening asset verification (PR #489).
+
 ## [1.8.2] - 2026-11-03
 
 ### Changed

@@ -29,12 +29,59 @@ function fail(code, detail = "") {
   throw new Error(detail ? `${code}: ${detail}` : code);
 }
 
-function githubHeaders() {
+function githubApiToken(env) {
+  const token = env?.GH_TOKEN || env?.GITHUB_TOKEN;
+  if (token === undefined || token === null || token === "") return null;
+  // Only bounded, printable ASCII may enter an Authorization header.
+  // Invalid credentials are never included in errors.
+  if (typeof token !== "string" || !/^[!-~]{1,2048}$/.test(token)) {
+    fail("stable_release_token_invalid");
+  }
+  return token;
+}
+
+function githubHeaders(token) {
   return {
     Accept: "application/vnd.github+json",
     "X-GitHub-Api-Version": API_VERSION,
     "User-Agent": "github-delivery-release-self-update",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
+}
+
+async function rateLimitDetail(response, token) {
+  if (response?.status !== 403 && response?.status !== 429) return null;
+  const remaining = response.headers?.get?.("x-ratelimit-remaining");
+  const retryAfter = response.headers?.get?.("retry-after");
+  if (response.status === 403 && remaining !== "0" && retryAfter == null) {
+    // Secondary limits can use only a 403 JSON message without retry headers.
+    // Inspect a bounded body, but never echo it or treat every 403 as throttling.
+    let message = null;
+    try {
+      const bytes = await readLimitedBody(response, 4096);
+      const body = JSON.parse(bytes.toString("utf8"));
+      message = typeof body?.message === "string" ? body.message : null;
+    } catch {}
+    if (!message || !/(?:rate limit|too many requests)/i.test(message)) return null;
+  }
+
+  const parts = [`HTTP ${response.status}`];
+  if (remaining === "0") {
+    const raw = response.headers?.get?.("x-ratelimit-reset");
+    if (typeof raw === "string" && /^[0-9]{1,12}$/.test(raw)) {
+      const milliseconds = Number(raw) * 1000;
+      if (Number.isSafeInteger(milliseconds) && milliseconds <= 8_640_000_000_000_000) {
+        parts.push(`reset_at_utc=${new Date(milliseconds).toISOString()}`);
+      }
+    }
+  }
+  if (typeof retryAfter === "string" && /^[0-9]{1,5}$/.test(retryAfter)) {
+    parts.push(`retry_after_seconds=${Number(retryAfter)}`);
+  } else if (remaining !== "0") {
+    parts.push("wait_at_least_seconds=60");
+  }
+  if (!token) parts.push("set GH_TOKEN or GITHUB_TOKEN for a higher API rate limit");
+  return parts.join("; ");
 }
 
 function isSemverTag(value) {
@@ -138,18 +185,21 @@ function validateManifestPath(value) {
   return value;
 }
 
-async function fetchJson(fetchImpl, url, errorCode) {
+async function fetchJson(fetchImpl, url, errorCode, token = null) {
   let response;
   try {
     response = await fetchImpl(url, {
       method: "GET",
       redirect: "manual",
-      headers: githubHeaders(),
+      headers: githubHeaders(token),
     });
-  } catch (error) {
-    fail(errorCode, error?.message || "request failed");
+  } catch {
+    // Network exceptions may include request headers or credentials.
+    fail(errorCode, "network request failed");
   }
   if (!response || response.status < 200 || response.status >= 300) {
+    const rateLimit = await rateLimitDetail(response, token);
+    if (rateLimit) fail("stable_release_rate_limited", rateLimit);
     fail(errorCode, `HTTP ${response?.status ?? "unknown"}`);
   }
   try {
@@ -180,6 +230,7 @@ export function createGitHubReleaseClient({
   fetchImpl = globalThis.fetch,
   repository = DEFAULT_REPOSITORY,
   sleepImpl = defaultSleep,
+  env = process.env,
 } = {}) {
   if (typeof fetchImpl !== "function") fail("stable_release_network_client_unavailable");
   if (repository !== DEFAULT_REPOSITORY) fail("stable_release_repository_invalid");
@@ -190,6 +241,7 @@ export function createGitHubReleaseClient({
       fetchImpl,
       `${API_ROOT}/repos/${repository}/releases/latest`,
       "stable_release_metadata_invalid",
+      githubApiToken(env),
     );
     if (
       !release
@@ -264,10 +316,16 @@ export function createGitHubReleaseClient({
         fetchImpl,
         `${API_ROOT}/repos/${repository}/git/ref/tags/${encodeURIComponent(tag)}`,
         "stable_release_tag_resolution_invalid",
+        githubApiToken(env),
       );
       object = ref?.object;
     } catch (error) {
-      if (String(error?.message || "").includes("stable_release_tag_resolution_invalid")) throw error;
+      const message = String(error?.message || "");
+      if (
+        message.startsWith("stable_release_tag_resolution_invalid")
+        || message.startsWith("stable_release_rate_limited")
+        || message.startsWith("stable_release_token_invalid")
+      ) throw error;
       fail("stable_release_tag_resolution_invalid");
     }
 
@@ -286,6 +344,7 @@ export function createGitHubReleaseClient({
         fetchImpl,
         `${API_ROOT}/repos/${repository}/git/tags/${sha}`,
         "stable_release_tag_resolution_invalid",
+        githubApiToken(env),
       );
       object = tagObject?.object;
     }
