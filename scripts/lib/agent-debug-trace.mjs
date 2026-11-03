@@ -26,6 +26,8 @@ const ALLOWED_EVENT_TYPES = new Set([
   "turn_completed",
 ]);
 const ALLOWED_OUTCOMES = new Set(["succeeded", "failed", "cancelled"]);
+const TOOL_EFFECTS = new Set(["state-change"]);
+const PUBLICATION_ACTIONS = new Set(["pr_create"]);
 const ERROR_KIND_RE = /^[a-z0-9][a-z0-9_.-]{0,63}$/i;
 const FINGERPRINT_RE = /^fp:[a-f0-9]{32}$/;
 const ATTRIBUTION_KEYS = ["threadId", "turnId", "itemId", "parentItemId"];
@@ -48,6 +50,8 @@ const TARGET_KEYS = [
   "filePath",
   "filepath",
   "target",
+  "target_file",
+  "target_directory",
   "cwd",
   "root",
   "directory",
@@ -123,6 +127,11 @@ function safeErrorKind(value) {
   return ERROR_KIND_RE.test(kind) ? kind : null;
 }
 
+function safeBoundedEnum(value, allowed) {
+  const normalized = String(value || "").trim();
+  return allowed.has(normalized) ? normalized : null;
+}
+
 function createIdPseudonymizer(salt) {
   const key = Buffer.isBuffer(salt) ? salt : Buffer.from(String(salt || ""), "utf8");
   return (value) => {
@@ -187,6 +196,24 @@ function diagnosticTarget(input) {
   return Object.keys(target).length > 0 ? target : null;
 }
 
+function terminalActionDiagnostics(itemType, input) {
+  if (itemType !== "run_terminal_command") return {};
+  if (!input || typeof input !== "object" || Array.isArray(input)) return {};
+  const command = cleanString(input.command);
+  if (!command) return {};
+
+  if (/\bgh\s+pr\s+create(?:\s|$)/i.test(command)) {
+    return { toolEffect: "state-change", publicationAction: "pr_create" };
+  }
+  if (/\bgit\s+(?:add|commit|push|merge|rebase|reset|checkout|switch|branch|tag|rm|mv|cherry-pick|revert)\b/i.test(command)) {
+    return { toolEffect: "state-change" };
+  }
+  if (/\bgh\s+(?:pr\s+(?:merge|close|reopen|edit|ready)|issue\s+(?:create|close|reopen|edit))\b/i.test(command)) {
+    return { toolEffect: "state-change" };
+  }
+  return {};
+}
+
 function createTraceDiagnostics(salt) {
   const fingerprint = createDiagnosticFingerprinter(salt);
   const turnSequences = new Map();
@@ -200,15 +227,17 @@ function createTraceDiagnostics(salt) {
   }
 
   return {
-    toolInput({ input, turnId } = {}) {
+    toolInput({ itemType, input, turnId } = {}) {
       const argumentFingerprint = fingerprint(input);
       const target = diagnosticTarget(input);
       const targetFingerprint = target ? fingerprint(target) : null;
       const turnSequence = sequenceFor(turnId);
+      const action = terminalActionDiagnostics(itemType, input);
       return {
         ...(argumentFingerprint ? { argumentFingerprint } : {}),
         ...(targetFingerprint ? { targetFingerprint } : {}),
         ...(turnSequence !== null ? { turnSequence } : {}),
+        ...action,
       };
     },
     toolResult({ result } = {}) {
@@ -301,6 +330,10 @@ function sanitizeEvent(
   if (resultTokenEstimate !== null) sanitized.resultTokenEstimate = resultTokenEstimate;
   const turnSequence = safePositiveInteger(event.turnSequence);
   if (turnSequence !== null) sanitized.turnSequence = turnSequence;
+  const toolEffect = safeBoundedEnum(event.toolEffect, TOOL_EFFECTS);
+  if (toolEffect) sanitized.toolEffect = toolEffect;
+  const publicationAction = safeBoundedEnum(event.publicationAction, PUBLICATION_ACTIONS);
+  if (publicationAction) sanitized.publicationAction = publicationAction;
 
   if (type === "reasoning_summary_delta") {
     sanitized.text = typeof event.text === "string" ? event.text : "";
@@ -518,6 +551,7 @@ export function appendAgentDebugTraceEvent({
   traceKind = TRACE_KIND,
 } = {}) {
   if (!debugTraceEnabled(env)) return { recorded: false, path: null };
+
   const normalizedProvider = checkedProvider(provider);
   const scope = cleanString(scopeId);
   if (!scope) return { recorded: false, path: null };
