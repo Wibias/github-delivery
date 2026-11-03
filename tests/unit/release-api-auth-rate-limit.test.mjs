@@ -110,6 +110,21 @@ test("secondary rate-limit 403 and 429 expose bounded Retry-After guidance", asy
   }
 });
 
+test("secondary 403 without retry headers is recognized from a bounded GitHub message", async () => {
+  const client = createGitHubReleaseClient({
+    env: {},
+    fetchImpl: async () => jsonResponse({
+      message: "You have exceeded a secondary rate limit.",
+    }, { status: 403 }),
+  });
+  await assert.rejects(() => client.latestRelease(), (error) => {
+    assert.match(error.message, /stable_release_rate_limited:/);
+    assert.match(error.message, /wait_at_least_seconds=60/);
+    assert.doesNotMatch(error.message, /You have exceeded/);
+    return true;
+  });
+});
+
 test("unrelated 403 remains a metadata failure; raw response bodies cannot leak tokens", async () => {
   const client = createGitHubReleaseClient({
     env: { GH_TOKEN: "secret_test_token" },
