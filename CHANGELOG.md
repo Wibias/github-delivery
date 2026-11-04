@@ -4,9 +4,16 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.8.3] - 2026-11-04
+
+### Changed
+
+- Bumped the package version from `1.8.2` to `1.8.3`.
+
 ### Fixed
 
 - Stable-release metadata and tag requests can use `GH_TOKEN` or `GITHUB_TOKEN` for authenticated GitHub API limits; exhausted primary/secondary limits now return actionable, bounded reset/retry guidance without exposing credentials or weakening asset verification (PR #489).
+- PR-head verification now uses a private, platform-native temporary worktree by default instead of a fixed operator drive, keeps explicit `--worktree-root` overrides, and supports `--clone-root` when invoked outside a Git checkout. Review documentation no longer embeds a maintainer-specific path, and the formerly missing worktree portability governance test is shipped and run in the canonical test suite (PR #490).
 
 ## [1.8.2] - 2026-11-03
 
