@@ -4,6 +4,16 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.8.4] - 2026-11-04
+
+### Changed
+
+- Bumped the package version from `1.8.3` to `1.8.4`.
+
+### Fixed
+
+- Restored explicit baseline-versus-candidate performance review guidance using the same measurement method, representative inputs, and p50/p95 latency distribution evidence when meaningful; cold-start and unproven-measurement rules remain in place. Added a regression test for the downstream Agent Hub review-policy contract (PR #491).
+
 ## [1.8.3] - 2026-11-04
 
 ### Changed
