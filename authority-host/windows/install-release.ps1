@@ -76,6 +76,7 @@ if (-not $previousExe) {
 }
 
 $stoppedBroker = $false
+$installCommitted = $false
 try {
     New-Item -ItemType Directory -Force -Path $stagingDir | Out-Null
     Copy-Item (Join-Path $SourceDir '*') $stagingDir -Recurse -Force
@@ -122,24 +123,42 @@ try {
     $recordJson = ($installRecord | ConvertTo-Json) + [Environment]::NewLine
     [IO.File]::WriteAllText($recordTemp, $recordJson, $utf8NoBom)
     Move-Item -Force $recordTemp $recordPath
+    $installCommitted = $true
 
-    # Version directories are release-owned and self-contained. Once the new
-    # version is active, remove obsolete release versions so updates do not
-    # accumulate full runtimes. Root state and unknown app content are preserved.
+    # After activation, removal of obsolete runtimes is best-effort. A locked
+    # old DLL or launcher must not roll back a successfully committed version.
+    # Unremoved versions are retried on the next installation.
     $targetName = 'v' + $ExpectedVersion
-    $obsoleteVersionDirs = @(
-        Get-ChildItem -LiteralPath $appRoot -Directory -Force | Where-Object {
-            $_.Name -match '^v\d+\.\d+\.\d+$' -and $_.Name -ne $targetName
+    try {
+        $obsoleteVersionDirs = @(
+            Get-ChildItem -LiteralPath $appRoot -Directory -Force -ErrorAction Stop | Where-Object {
+                $_.Name -match '^v\d+\.\d+\.\d+$' -and $_.Name -ne $targetName
+            }
+        )
+        foreach ($obsoleteVersionDir in $obsoleteVersionDirs) {
+            try {
+                Remove-Item -LiteralPath $obsoleteVersionDir.FullName -Recurse -Force -ErrorAction Stop
+            }
+            catch {
+                Write-Warning "Authority deferred cleanup of obsolete version $($obsoleteVersionDir.Name): $($_.Exception.Message)"
+            }
         }
-    )
-    foreach ($obsoleteVersionDir in $obsoleteVersionDirs) {
-        Remove-Item -LiteralPath $obsoleteVersionDir.FullName -Recurse -Force
+    }
+    catch {
+        Write-Warning "Authority deferred cleanup of obsolete version directories: $($_.Exception.Message)"
     }
 
-    # Remove only the obsolete root-level launcher from the legacy layout. State
-    # (`authority.db`, trust-store.json) and unknown user files are deliberately preserved.
+    # Only the legacy root-level launcher is removed; persistent state
+    # (authority.db, trust-store.json) and unknown user files are preserved.
     $legacyExe = Join-Path $InstallDir 'GitHubDeliveryAuthority.exe'
-    if (Test-Path $legacyExe -PathType Leaf) { Remove-Item $legacyExe -Force }
+    if (Test-Path $legacyExe -PathType Leaf) {
+        try {
+            Remove-Item -LiteralPath $legacyExe -Force -ErrorAction Stop
+        }
+        catch {
+            Write-Warning "Authority deferred cleanup of obsolete legacy launcher: $($_.Exception.Message)"
+        }
+    }
 
     if (-not $SkipStart) {
         Start-Process $installedExe
@@ -147,7 +166,8 @@ try {
     Write-Host "Installed GitHub Delivery Authority $ExpectedVersion to $targetDir"
 }
 catch {
-    if ($stoppedBroker -and -not $SkipStart -and $previousExe -and (Test-Path $previousExe -PathType Leaf)) {
+    # Never restart an obsolete broker after the new install record commits.
+    if (-not $installCommitted -and $stoppedBroker -and -not $SkipStart -and $previousExe -and (Test-Path $previousExe -PathType Leaf)) {
         Start-Process $previousExe
     }
     throw

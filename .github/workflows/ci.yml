@@ -300,3 +300,12 @@ jobs:
             if (Test-Path $Diagnostics -PathType Leaf) { Get-Content $Diagnostics }
             throw "Installed Authority XAML smoke test failed with exit code $LASTEXITCODE."
           }
+
+          # Exercise the real Windows installer with old clrjit.dll and legacy
+          # launcher handles held open. A successful new version must not roll back.
+          & pwsh -NoProfile -File tests/windows/authority-install-obsolete-cleanup.test.ps1 `
+            -SourceDir $Prepared.source `
+            -ExpectedVersion $Version `
+            -ExpectedSourceCommit $env:GITHUB_SHA `
+            -InstallDir (Join-Path $env:RUNNER_TEMP 'github-delivery-authority-obsolete-cleanup-smoke')
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
