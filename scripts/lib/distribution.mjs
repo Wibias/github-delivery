@@ -39,6 +39,7 @@ const RUNTIME_DIRS = [
   "overrides",
   "agents",
   "tests/evals",
+  "tests/worktree-locations.test.mjs",
   "authority-host/windows",
 ];
 const TEXT_EXTENSIONS = new Set([

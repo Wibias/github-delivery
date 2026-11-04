@@ -79,9 +79,14 @@ each gate:
 
 ```bash
 node "<github-delivery>/scripts/verify-pr-head.mjs" OWNER/REPO N \
-  --test-filter "<changed-subsystem>" --worktree-root "D:\codex-worktrees" \
-  --keep-worktree
+  --test-filter "<changed-subsystem>" --keep-worktree
 ```
+
+By default, run from a local Git checkout. The verifier creates a private
+worktree under the operating system's temporary directory and cleans it up
+unless `--keep-worktree` is set. When running outside the intended checkout,
+use `--clone-root PATH`; use `--worktree-root PATH` to override the temporary
+worktree parent explicitly.
 
 It checks out the exact PR head in a temp worktree, runs install/typecheck/
 **GUI typecheck included** (auto-detected from `gui/tsconfig*.json` — the root

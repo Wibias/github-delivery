@@ -27,6 +27,7 @@ function fixtureRoot() {
   writeFileSync(join(root, "scripts", "lib", "helper.mjs"), "export const ok = true;\n");
   writeFileSync(join(root, "overrides", "babysit", "SKILL.md"), "redirect\n");
   writeFileSync(join(root, "tests", "evals", "cases.jsonl"), "{\"id\":\"one\"}\n");
+  writeFileSync(join(root, "tests", "worktree-locations.test.mjs"), "export const portable = true;\n");
   writeFileSync(join(root, "tests", "unit", "ignored.test.mjs"), "throw new Error('exclude');\n");
   writeFileSync(join(root, ".github", "workflows", "ignored.yml"), "name: ignored\n");
   return root;
@@ -51,6 +52,8 @@ test("builds only runtime payload and normalizes text", () => {
   assert.deepEqual(paths, [...paths].sort());
   assert(paths.includes("SKILL.md"));
   assert(paths.includes("tests/evals/cases.jsonl"));
+  assert(paths.includes("tests/worktree-locations.test.mjs"));
+  assert.equal(readFileSync(join(out, "github-delivery", "tests", "worktree-locations.test.mjs"), "utf8"), "export const portable = true;\n");
   assert(!paths.includes("tests/unit/ignored.test.mjs"));
   assert(!paths.includes(".github/workflows/ignored.yml"));
   assert.equal(readFileSync(join(out, "github-delivery", "README.md"), "utf8"), "# github-delivery\n");

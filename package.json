@@ -1,6 +1,6 @@
 {
   "name": "github-delivery",
-  "version": "1.8.2",
+  "version": "1.8.3",
   "description": "Guided installer and safety tooling for GitHub Delivery workflows",
   "type": "module",
   "engines": {
@@ -70,7 +70,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "scripts": {
-    "test": "node --test \"tests/unit/*.test.mjs\"",
+    "test": "node --test \"tests/unit/*.test.mjs\" tests/worktree-locations.test.mjs",
     "reliability:gate": "node --test tests/unit/reliability-regression-gate.test.mjs tests/unit/deepseek-watchdog-incident.test.mjs",
     "evals:offline": "node scripts/validate-evals.mjs",
     "evals:behavioural:compare": "node scripts/compare-behavioural-evals.mjs",
