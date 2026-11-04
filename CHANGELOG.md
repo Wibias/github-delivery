@@ -4,6 +4,17 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+## [1.8.5] - 2026-11-04
+
+### Changed
+
+- Bumped the package version from `1.8.4` to `1.8.5`.
+
+### Fixed
+
+- Windows Approval GUI upgrades now defer cleanup of locked obsolete runtime directories and the legacy root launcher instead of reporting a failed installation after the new GUI install record is committed. Cleanup emits a warning and is retried on the next installation, while new-version installation failures remain fatal. The installer will not restart an obsolete broker after activation, preventing mismatched skill/GUI versions and unnecessary skill rollbacks (PR #492).
+- Added a Windows regression that holds real file handles on an obsolete `clrjit.dll` and launcher during an upgrade, checks persisted state and unknown content, and verifies deferred cleanup completes after handles clear (PR #492).
+
 ## [1.8.4] - 2026-11-04
 
 ### Changed
