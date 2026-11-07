@@ -4,6 +4,10 @@ All notable changes to `github-delivery` are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- `buildCreatePrPublicationPlan` accepts an explicit `pushMode: "fast-forward"` for a true fast-forward on an existing branch. The plan sets `forceWithLease: false`, and `lifecycleCommandFor` emits a plain `git push` without `--force` or `--force-with-lease`. Expected-tip preflight, ancestry proof, checkpoint lock, idempotency, and draft-only creation are unchanged, and the default plan still uses force-with-lease.
+
 ## [1.8.5] - 2026-11-04
 
 ### Changed

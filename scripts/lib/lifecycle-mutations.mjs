@@ -422,12 +422,18 @@ export function lifecycleCommandFor(request = {}) {
       const branch = String(required(request.branch, "branch"));
       const expected = exactSha(request.expectedRemoteTip, "expected_remote_tip", { absent: true });
       const newTip = exactSha(request.newTip, "new_tip");
+      const remote = String(required(request.remote, "remote"));
+      // An explicitly requested ordinary fast-forward needs no force or lease
+      // flag. assertPushTarget already proved the expected tip and ancestry.
+      if (request.forceWithLease === false && expected !== "absent") {
+        return ["git", "push", remote, `${newTip}:refs/heads/${branch}`];
+      }
       const leaseExpectation = expected === "absent" ? "" : expected;
       return [
         "git",
         "push",
         `--force-with-lease=refs/heads/${branch}:${leaseExpectation}`,
-        String(required(request.remote, "remote")),
+        remote,
         `${newTip}:refs/heads/${branch}`,
       ];
     }

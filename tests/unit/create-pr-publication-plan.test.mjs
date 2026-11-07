@@ -75,3 +75,47 @@ test("planner rejects caller attempts to turn initial routed creation non-draft"
     /create_pr_publication_plan_draft_only/,
   );
 });
+
+test("fast-forward push mode opts out of force-with-lease without changing the rest of the plan", () => {
+  const plan = buildCreatePrPublicationPlan(input({ pushMode: "fast-forward" }));
+  assert.deepEqual(plan.requests[0], {
+    schemaVersion: 1,
+    action: "push_code",
+    mutationMode: "maintainer",
+    repo: "acme/widgets",
+    remote: "origin",
+    branch: "feature/widgets",
+    expectedRemoteTip: OLD,
+    originalLocalTip: OLD,
+    newTip: HEAD,
+    forceWithLease: false,
+  });
+  assert.equal(plan.requests[1].draft, true);
+  assert.equal(plan.requests[1].idempotencyKey, "create-pr-feature-widgets");
+  assert.deepEqual(plan.execute, {
+    entrypoint: "scripts/github-mutate.mjs",
+    checkpoint: ".github-delivery/workflow.json",
+  });
+});
+
+test("explicit force-with-lease push mode keeps the default lease flag", () => {
+  const plan = buildCreatePrPublicationPlan(input({ pushMode: "force-with-lease" }));
+  assert.equal(plan.requests[0].forceWithLease, true);
+});
+
+test("planner rejects an unknown push mode instead of guessing", () => {
+  assert.throws(
+    () => buildCreatePrPublicationPlan(input({ pushMode: "force" })),
+    /create_pr_publication_plan_push_mode_invalid/,
+  );
+});
+
+test("fast-forward push mode refuses a new remote branch", () => {
+  assert.throws(
+    () =>
+      buildCreatePrPublicationPlan(
+        input({ pushMode: "fast-forward", expectedRemoteTip: "absent" }),
+      ),
+    /create_pr_publication_plan_fast_forward_requires_remote_tip/,
+  );
+});
