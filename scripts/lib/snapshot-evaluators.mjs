@@ -1,4 +1,5 @@
 import { ownersForPath, parseCodeowners } from "./codeowners.mjs";
+import { resolveLocalCiEvidenceForSnapshot } from "./local-ci-evidence.mjs";
 import { protectionRefName } from "./native-stack-policy.mjs";
 import { validateRulesBoundaryEvidence } from "./rules-boundary.mjs";
 import {
@@ -229,7 +230,10 @@ function decisionFrom(blockers, unknowns) {
   return "ready";
 }
 
-export function evaluateRequiredChecksSnapshot(snapshot) {
+export function evaluateRequiredChecksSnapshot(
+  snapshot,
+  { localEvidence = undefined } = {},
+) {
   const pr = pullRequest(snapshot);
   const base = pr.baseRefName;
   const branchRules = policyEvidence(snapshot).branchProtectionRules || {};
@@ -264,7 +268,16 @@ export function evaluateRequiredChecksSnapshot(snapshot) {
     mergeStateStatus: pr.mergeStateStatus,
   });
 
-  return {
+  const local =
+    localEvidence === undefined
+      ? resolveLocalCiEvidenceForSnapshot(snapshot)
+      : localEvidence;
+  const remoteObserved = {
+    decision: evaluation.decision,
+    blockers: evaluation.blockers,
+    unknowns: evaluation.unknowns,
+  };
+  const output = {
     schemaVersion: 1,
     snapshotId: snapshot.snapshotId,
     repo: snapshot.repo,
@@ -286,7 +299,28 @@ export function evaluateRequiredChecksSnapshot(snapshot) {
     requiredStatus: evaluation.requiredStatus,
     observedStatus: evaluation.observedStatus,
     allLive: evaluation.allLive,
+    remoteObserved,
   };
+  if (local?.active === true && local.mode === "local") {
+    output.mode = "local_evidence";
+    output.evidenceMode = "local";
+    output.localEvidence = {
+      valid: local.valid === true,
+      reasons: local.reasons || [],
+      path: local.path || null,
+      receipt: local.receipt || null,
+    };
+    output.decision = local.valid === true ? "ready" : "blocked";
+    output.ready = local.valid === true;
+    output.blocked = local.valid !== true;
+    output.unknown = false;
+    output.complete = true;
+    output.blockers = local.valid === true ? [] : [...(local.reasons || [])];
+    output.unknowns = [];
+  } else {
+    output.evidenceMode = "remote";
+  }
+  return output;
 }
 
 export function evaluateReviewPolicySnapshot(snapshot) {

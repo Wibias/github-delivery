@@ -30,6 +30,29 @@ On Windows, the same stored preference is available in **Control Center > Settin
 
 The config is global for the user's github-delivery installation and lives outside the installed skill directory.
 
+## Local CI evidence mode (explicit opt-in, per repository)
+
+The default required-check source is remote GitHub check evidence. If a repository cannot produce usable remote check runs (for example, an exhausted Actions quota), the user may explicitly select local evidence for that repository only:
+
+```bash
+node scripts/github-delivery-config.mjs --ci-evidence-mode local --repository OWNER/REPO --waiver "user authorization reference"
+node scripts/github-delivery-config.mjs --ci-evidence-mode remote --repository OWNER/REPO
+node scripts/github-delivery-config.mjs --show --repository OWNER/REPO
+```
+
+The local mode is stored in user configuration schema 2 and never read from repository files. It records the repository identity, the waiver reference, and the time of the change. Without an entry for the repository, remote checks remain authoritative.
+
+A merge with local mode active requires a matching receipt:
+
+```bash
+node scripts/local-ci-receipt.mjs OWNER/REPO PR --log PATH\to\run.log \
+  --command "npm run ci:local -- --full" --scope "full local CI"
+```
+
+The receipt binds the repository, pull request, exact head SHA, base SHA, command and suite scope, exit codes, timestamps, runner host, Node/npm/git versions, and the SHA-256 of the complete log. Receipts live under the user's github-delivery data directory, not in the repository. The merge gate stays blocked when the receipt is missing, belongs to another repository or PR, targets another head, records a non-zero exit, has a tampered log hash, was recorded before the head commit, is older than seven days, or its base is no longer part of the current base history. Remote check results remain visible as observations and advisories; they are not presented as green.
+
+Reviews, authority grants, draft handling, branch protection, conversation resolution, and every other gate keep working unchanged. The mode only substitutes the required-check evidence source for the named repository.
+
 ## Windows Authority host
 
 For normal stable installations, use the managed lifecycle:

@@ -8,6 +8,7 @@ import test from "node:test";
 
 import { buildCreatePrPublicationPlan } from "../../scripts/lib/create-pr-publication-plan.mjs";
 import {
+  assertPreOpenPublicationEvidence,
   createDeliveryWorkflowController,
   readDeliveryWorkflowCheckpoint,
   writeDeliveryWorkflowCheckpoint,
@@ -124,6 +125,90 @@ test("blocked and mismatched pre-open evidence remain publication blockers", () 
 
   current.recordPreOpenGate(readyGate());
   assert.equal(current.transition("OPEN_PR").phase, "OPEN_PR");
+});
+
+test("local-work create_pr binds the exact gate head when headRef is a SHA", () => {
+  const snapshot = {
+    schemaVersion: 1,
+    kind: "github-delivery/workflow-controller",
+    workflow: "create-pr-from-local-work",
+    repo: "acme/widgets",
+    baseSha: BASE,
+    headSha: HEAD,
+    preOpenGate: {
+      decision: "ready",
+      repo: "acme/widgets",
+      baseRef: "dev",
+      headRef: HEAD,
+      baseSha: BASE,
+      headSha: HEAD,
+      diffIdentity: `sha256:${"d".repeat(64)}`,
+      fileCount: 6,
+      recordedAt: 1,
+    },
+  };
+  const plan = publicationPlan("checkpoint.json");
+  assert.doesNotThrow(() => assertPreOpenPublicationEvidence(snapshot, plan.requests[1]));
+
+  const wrongBranchGate = {
+    ...snapshot,
+    preOpenGate: { ...snapshot.preOpenGate, headRef: "other-branch" },
+  };
+  assert.throws(
+    () => assertPreOpenPublicationEvidence(wrongBranchGate, plan.requests[1]),
+    /pre_open_evidence_scope_mismatch/,
+  );
+});
+
+test("local-work post-publication phases authorize only the draft-state change", () => {
+  const directory = mkdtempSync(join(tmpdir(), "github-delivery-draft-intent-"));
+  const checkpoint = join(directory, "controller.json");
+  try {
+    for (const phase of ["REVIEW_FEEDBACK", "CI", "FINAL_GATE"]) {
+      const initial = createDeliveryWorkflowController({
+        workflow: "create-pr-from-local-work",
+        repo: "acme/widgets",
+        baseSha: BASE,
+        headSha: HEAD,
+        graph: {
+          REVIEW_FEEDBACK: ["CI", "FINAL_GATE"],
+          CI: ["FINAL_GATE"],
+          FINAL_GATE: ["DONE"],
+          DONE: [],
+        },
+        startPhase: phase,
+      });
+      writeDeliveryWorkflowCheckpoint(checkpoint, initial.snapshot());
+      const draft = {
+        schemaVersion: 1,
+        action: "change_draft_state",
+        mutationMode: "maintainer",
+        repo: "acme/widgets",
+        pr: 42,
+        expectedHead: HEAD,
+        ready: true,
+      };
+      assert.deepEqual(
+        mutationExecutionContextFromCheckpoint({ path: checkpoint, request: draft }),
+        {
+          trustedWorkflowIntent: true,
+          trustedExactTextConfirmation: false,
+        },
+      );
+      assert.deepEqual(
+        mutationExecutionContextFromCheckpoint({
+          path: checkpoint,
+          request: { ...draft, action: "close_pr" },
+        }),
+        {
+          trustedWorkflowIntent: false,
+          trustedExactTextConfirmation: false,
+        },
+      );
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("mutation boundary independently rejects missing, changed, or stale pre-open scope", () => {

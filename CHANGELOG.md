@@ -2,6 +2,16 @@
 
 All notable changes to `github-delivery` are documented here.
 
+## [1.10.0] - 2026-11-08
+
+### Added
+
+- An explicit, per-repository local CI evidence mode. User configuration schema 2 can select `ciEvidenceMode: local` for one repository with a recorded user waiver, while the default stays remote. The merge gate then requires a user-scoped local receipt bound to the repository, PR, exact head and base SHA, command/suite scope, exit codes, timestamps, runner host, tool versions, and the complete log hash. Missing, foreign, red, stale, pre-head, tampered, or non-ancestor receipts stay blocked; failed remote checks stay visible as observations and never become green. Reviews, authority, draft handling, branch protection, and all other gates are unchanged. New commands: `github-delivery-config --ci-evidence-mode` and `local-ci-receipt`.
+
+### Changed
+
+- Bumped the package version from `1.9.1` to `1.10.0`.
+
 ## [1.9.1] - 2026-11-08
 
 ### Fixed

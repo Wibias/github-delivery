@@ -85,8 +85,9 @@ function mergeSnapshot(feedback = {}) {
 
 test("secure authority is the default when the user has not opted out", () => {
   assert.deepEqual(DEFAULT_USER_CONFIG, {
-    schemaVersion: 1,
+    schemaVersion: 2,
     authorityMode: "high-assurance",
+    ciEvidence: { defaultMode: "remote", repositories: {} },
   });
 });
 

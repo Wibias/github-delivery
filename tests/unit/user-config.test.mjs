@@ -6,29 +6,90 @@ import {
   DEFAULT_USER_CONFIG,
   normalizeUserConfig,
   readUserConfig,
+  resolveCiEvidenceMode,
   resolveAuthorityMode,
   userConfigPath,
+  withCiEvidenceRepository,
   writeUserConfig,
 } from "../../scripts/lib/user-config.mjs";
 
 test("authority mode schema is exact and defaults to high assurance", () => {
   assert.deepEqual(AUTHORITY_MODES, ["off", "high-assurance", "all"]);
   assert.deepEqual(DEFAULT_USER_CONFIG, {
-    schemaVersion: 1,
+    schemaVersion: 2,
     authorityMode: "high-assurance",
+    ciEvidence: { defaultMode: "remote", repositories: {} },
   });
   assert.deepEqual(normalizeUserConfig({ schemaVersion: 1, authorityMode: "high-assurance" }), {
-    schemaVersion: 1,
+    schemaVersion: 2,
     authorityMode: "high-assurance",
+    ciEvidence: { defaultMode: "remote", repositories: {} },
   });
   assert.throws(
     () => normalizeUserConfig({ schemaVersion: 1, authorityMode: "sometimes" }),
     /github_delivery_config_authority_mode_invalid/,
   );
   assert.throws(
-    () => normalizeUserConfig({ schemaVersion: 2, authorityMode: "off" }),
+    () => normalizeUserConfig({ schemaVersion: 3, authorityMode: "off" }),
     /github_delivery_config_schema_version_unsupported/,
   );
+});
+
+test("local CI evidence is explicit, per repository, and requires a waiver", () => {
+  const configured = normalizeUserConfig({
+    schemaVersion: 2,
+    authorityMode: "high-assurance",
+    ciEvidence: {
+      defaultMode: "remote",
+      repositories: {
+        "Wibias/Streamer-Content": {
+          mode: "local",
+          waiver: "t851s5532",
+          recordedAt: "2026-11-08T09:31:00+01:00",
+        },
+      },
+    },
+  });
+  assert.equal(configured.schemaVersion, 2);
+  assert.deepEqual(configured.ciEvidence.repositories["wibias/streamer-content"], {
+    mode: "local",
+    waiver: "t851s5532",
+    recordedAt: "2026-11-08T08:31:00.000Z",
+  });
+  assert.deepEqual(resolveCiEvidenceMode({ config: configured, repo: "wibias/streamer-content" }), {
+    mode: "local",
+    waiver: "t851s5532",
+    recordedAt: "2026-11-08T08:31:00.000Z",
+  });
+  assert.equal(
+    resolveCiEvidenceMode({ config: configured, repo: "Wibias/github-delivery" }).mode,
+    "remote",
+  );
+
+  assert.throws(
+    () => normalizeUserConfig({
+      schemaVersion: 2,
+      authorityMode: "high-assurance",
+      ciEvidence: {
+        defaultMode: "remote",
+        repositories: { "a/b": { mode: "local", waiver: " " } },
+      },
+    }),
+    /github_delivery_config_ci_evidence_waiver_required/,
+  );
+
+  const added = withCiEvidenceRepository(configured, {
+    repository: "wibias/streamer-content",
+    mode: "remote",
+  });
+  assert.deepEqual(added.ciEvidence.repositories, {});
+
+  const local = withCiEvidenceRepository(added, {
+    repository: "wibias/streamer-content",
+    mode: "local",
+    waiver: "t851s5532",
+  });
+  assert.equal(resolveCiEvidenceMode({ config: local, repo: "wibias/streamer-content" }).mode, "local");
 });
 
 test("config path is outside the skill install and follows each OS convention", () => {

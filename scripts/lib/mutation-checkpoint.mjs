@@ -29,6 +29,9 @@ const ROUTED_WORKFLOW_INTENT = Object.freeze({
   }),
   "create-pr-from-local-work": Object.freeze({
     OPEN_PR: Object.freeze(new Set(["create_pr"])),
+    REVIEW_FEEDBACK: Object.freeze(new Set(["change_draft_state"])),
+    CI: Object.freeze(new Set(["change_draft_state"])),
+    FINAL_GATE: Object.freeze(new Set(["change_draft_state"])),
   }),
 });
 const PRE_OPEN_WORKFLOWS = new Set([
