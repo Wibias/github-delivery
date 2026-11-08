@@ -19,6 +19,7 @@ export function collectPaginated({
         pages: page - 1,
         rows,
         error: response?.error || `${label} request failed`,
+        failure: response || null,
       };
     }
 

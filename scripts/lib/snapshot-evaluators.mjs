@@ -1,5 +1,6 @@
 import { ownersForPath, parseCodeowners } from "./codeowners.mjs";
 import { protectionRefName } from "./native-stack-policy.mjs";
+import { validateRulesBoundaryEvidence } from "./rules-boundary.mjs";
 import {
   evaluateRequiredCheckCompleteness,
   evaluateRequiredChecks,
@@ -29,6 +30,27 @@ function sourceComplete(snapshot, name) {
 
 function sourceReadable(snapshot, name) {
   return source(snapshot, name).readable === true;
+}
+
+function rulesBoundaryEvidenceConsistent(snapshot) {
+  const active = source(snapshot, "activeRules");
+  const classic = source(snapshot, "branchProtection");
+  if (
+    active?.featureUnavailable !== true &&
+    classic?.featureUnavailable !== true
+  ) {
+    return true;
+  }
+  const boundary = snapshot?.evidence?.rulesBoundary;
+  return (
+    boundary?.mode === "plan_feature_unavailable" &&
+    validateRulesBoundaryEvidence(boundary?.evidence).valid
+  );
+}
+
+function activeRulesEvidenceComplete(snapshot) {
+  return sourceComplete(snapshot, "activeRules") &&
+    rulesBoundaryEvidenceConsistent(snapshot);
 }
 
 function escapeRegexCharacter(value) {
@@ -161,6 +183,7 @@ function matchingClassicRules(snapshot) {
 
 function classicProtectionReadable(snapshot, matchingRules) {
   if (!sourceReadable(snapshot, "branchProtection")) return false;
+  if (!rulesBoundaryEvidenceConsistent(snapshot)) return false;
   if (unsupportedClassicPatterns(snapshot).length > 0) return false;
   if (!matchingRules.length) return true;
   return snapshot?.evidence?.branchProtection !== null &&
@@ -227,7 +250,7 @@ export function evaluateRequiredChecksSnapshot(snapshot) {
       branchRules.pageInfo?.hasNextPage !== true,
     matchingClassicRuleCount: matchingRules.length,
     classicProtectionReadable: classicProtectionReadable(snapshot, matchingRules),
-    activeRulesComplete: sourceComplete(snapshot, "activeRules"),
+    activeRulesComplete: activeRulesEvidenceComplete(snapshot),
     checkRunsComplete: sourceComplete(snapshot, "checkRuns"),
     statusesComplete: sourceComplete(snapshot, "statuses"),
   });
@@ -323,7 +346,7 @@ export function evaluateReviewPolicySnapshot(snapshot) {
       branchRules.pageInfo?.hasNextPage !== true,
     matchingClassicRuleCount: matchingRules.length,
     classicProtectionReadable: classicProtectionReadable(snapshot, matchingRules),
-    activeRulesComplete: sourceComplete(snapshot, "activeRules"),
+    activeRulesComplete: activeRulesEvidenceComplete(snapshot),
   });
 
   const blockers = [...evaluation.blockers];

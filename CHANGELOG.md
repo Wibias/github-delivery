@@ -2,6 +2,12 @@
 
 All notable changes to `github-delivery` are documented here.
 
+## [1.9.1] - 2026-11-08
+
+### Fixed
+
+- `ship-gate-snapshot` now accepts the documented GitHub plan/feature-unavailable 403 for private repositories without protected branches or rulesets only when the exact message, per-endpoint documentation URLs, private repository metadata, unprotected branch metadata, and empty classic rules all agree. Permission-denied, ambiguous, server, malformed, spoofed, and drifted evidence stays fail-closed, existing rules and required checks keep being enforced, and the snapshot remains complete and boundary-checked. This unblocks the merge gate for Wibias/streamer-content without changing repository plan, visibility, permissions, protection, or thresholds.
+
 ## [1.9.0] - 2026-11-08
 
 ### Added
