@@ -67,7 +67,9 @@ export function stampReviewVerdictRequest(request = {}) {
     throw new Error("review_authority_mode_invalid");
   }
   const key = encodeKey(request.idempotencyKey);
-  const visible = stripReviewAuthorityMarker(request.body).trimEnd();
+  // Keep the approved body byte-for-byte. The grant scope hashes this text, so
+  // trimming here would make the published comment unverifiable.
+  const visible = stripReviewAuthorityMarker(request.body);
   return {
     ...structuredClone(request),
     body: `${visible}\n\n<!-- github-delivery:review-authority mode:${mode} key:${key} grant:${authorityGrant} -->`,

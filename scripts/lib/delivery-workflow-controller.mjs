@@ -228,6 +228,18 @@ export function assertPreOpenPublicationEvidence(snapshot, request = null) {
   ) {
     throw new Error("pre_open_evidence_scope_mismatch");
   }
+  if (request?.action === "create_pr") {
+    const requestHead = String(request?.head || "");
+    const separator = requestHead.indexOf(":");
+    const requestBranch = separator < 0 ? requestHead : requestHead.slice(separator + 1);
+    if (
+      (request?.base && gate.baseRef && String(request.base) !== String(gate.baseRef)) ||
+      (requestBranch && gate.headRef && requestBranch !== String(gate.headRef)) ||
+      (request?.publishedHead && !sameIdentity(request.publishedHead.sha, gate.headSha))
+    ) {
+      throw new Error("pre_open_evidence_scope_mismatch");
+    }
+  }
   return structuredClone(gate);
 }
 

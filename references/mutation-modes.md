@@ -104,6 +104,8 @@ A bare full review is read-only and therefore does not enter the GitHub publicat
 3. publish the authorized request with the hidden `github-delivery:review-authority` marker that binds the exact scope without changing the human-visible body hash;
 4. run `scripts/verify-verdict-published.mjs`, which re-verifies the signed grant at the GitHub comment creation time and requires Windows Hello approval, `scopeSha256`, and the one-time redemption claim.
 
+A PR-scoped grant binds the live head branch in its signed resource and in `scopeSha256`. The verifier authenticates that signed resource and reconstructs the same canonical scope; a grant that binds a branch in `scopeSha256` but omits it from the signed resource, or vice versa, fails closed. Grants issued before branch binding have no resource branch and remain verifiable only against their branch-less legacy scope. The hidden authority marker is appended without altering the approved body, so the published visible text stays byte-identical to the text bound by `scopeSha256`.
+
 When `authorityMode` is explicitly `off` and publication is already authorized by the routed user request, the full-review workflow may publish its verdict under the ordinary mutation policy without obtaining a Windows Hello grant. The absence of trusted authority must remain explicit; a verifier inspecting an existing comment must never manufacture signed provenance that was not used.
 
 Offline security fixtures that explicitly provide `--authority-public-key-file` remain strict regardless of local user config so verifier regression tests cannot be weakened by a developer machine setting.

@@ -5,12 +5,13 @@ import {
   sign,
 } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 
 import { authorityScopeSha256 } from "../../scripts/lib/authority-scope.mjs";
+import { mergeReviewEvidenceForSnapshot } from "../../scripts/lib/merge-review-evidence.mjs";
 import { stampReviewVerdictRequest } from "../../scripts/lib/review-verdict-marker.mjs";
 
 const ROOT = resolve(import.meta.dirname, "../..");
@@ -60,7 +61,16 @@ function signGrant(privateKey, payload) {
   return `${signed}.${signature}`;
 }
 
-function trustedVerdictFixture({ login = "Wibias", body = verdictBody(), tamper = null } = {}) {
+function trustedVerdictFixture({
+  login = "Wibias",
+  body = verdictBody(),
+  tamper = null,
+  authorityBranch = null,
+  resourceBranch = authorityBranch,
+  scopeBranch = authorityBranch,
+  scopePr = 42,
+  grantHead = HEAD,
+} = {}) {
   const directory = mkdtempSync(join(tmpdir(), "github-delivery-verdict-provenance-"));
   const commentsPath = join(directory, "comments.json");
   const publicKeyPath = join(directory, "authority.pem");
@@ -73,17 +83,25 @@ function trustedVerdictFixture({ login = "Wibias", body = verdictBody(), tamper 
     mutationMode: "review",
     repo: "acme/widget",
     pr: 42,
-    expectedHead: HEAD,
+    expectedHead: grantHead,
     idempotencyKey: "full-review-42-provenance",
     body,
+    ...(authorityBranch ? { authorityBranch } : {}),
   };
+  const scopeRequest = { ...request, pr: scopePr };
+  if (scopeBranch) scopeRequest.authorityBranch = scopeBranch;
+  else delete scopeRequest.authorityBranch;
   const payload = {
     version: 1,
     aud: "github-delivery",
     repo: request.repo,
     action: request.action,
-    resource: { pr: request.pr, expectedHead: request.expectedHead },
-    scopeSha256: authorityScopeSha256(request),
+    resource: {
+      pr: request.pr,
+      expectedHead: grantHead,
+      ...(resourceBranch ? { authorityBranch: resourceBranch } : {}),
+    },
+    scopeSha256: authorityScopeSha256(scopeRequest),
     maxMutationMode: "review",
     explicitInstruction: false,
     issuedAt: NOW - 10,
@@ -132,7 +150,7 @@ function unsignedFixture(login = "Wibias") {
   return { commentsPath, publicKeyPath };
 }
 
-function run({ commentsPath, publicKeyPath }, publisher = "Wibias") {
+function run({ commentsPath, publicKeyPath }, publisher = "Wibias", head = HEAD) {
   return spawnSync(
     process.execPath,
     [
@@ -142,7 +160,7 @@ function run({ commentsPath, publicKeyPath }, publisher = "Wibias") {
       "--run-id",
       RUN_ID,
       "--head",
-      HEAD,
+      head,
       "--comments-file",
       commentsPath,
       "--publisher-login",
@@ -174,6 +192,144 @@ test("accepts a same-head verdict only when trusted authority approved the exact
   assert.equal(output.expectedPublisher, "Wibias");
   assert.equal(output.provenance.authority.claims.approvalMethod, "windows_hello");
   assert.equal(output.provenance.authority.claims.redemption, "required");
+  assert.equal(output.provenance.authority.claims.resource.authorityBranch, undefined);
+  assert.equal(
+    output.provenance.authority.claims.scopeSha256,
+    authorityScopeSha256({
+      schemaVersion: 1,
+      action: "post_comment",
+      mutationMode: "review",
+      repo: "acme/widget",
+      pr: 42,
+      expectedHead: HEAD,
+      idempotencyKey: "full-review-42-provenance",
+      body: verdictBody(),
+    }),
+  );
+});
+
+test("accepts a branch-bound grant and reconstructs its signed scope", () => {
+  const result = run(trustedVerdictFixture({ authorityBranch: "feature/audit" }));
+  assert.equal(result.status, 0, result.stderr + result.stdout);
+  const output = JSON.parse(result.stdout);
+  assert.equal(output.trusted, true);
+  assert.equal(output.provenance.authority.claims.resource.authorityBranch, "feature/audit");
+  assert.equal(
+    output.provenance.authority.claims.scopeSha256,
+    authorityScopeSha256({
+      schemaVersion: 1,
+      action: "post_comment",
+      mutationMode: "review",
+      repo: "acme/widget",
+      pr: 42,
+      expectedHead: HEAD,
+      idempotencyKey: "full-review-42-provenance",
+      body: verdictBody(),
+      authorityBranch: "feature/audit",
+    }),
+  );
+});
+
+test("merge review evidence accepts a branch-bound trusted verdict", () => {
+  const fixture = trustedVerdictFixture({
+    authorityBranch: "feature/audit",
+    body: `${verdictBody()}\n`,
+  });
+  const comments = JSON.parse(readFileSync(fixture.commentsPath, "utf8"));
+  const evidence = mergeReviewEvidenceForSnapshot(
+    {
+      repo: "acme/widget",
+      pr: 42,
+      headOid: HEAD,
+      evidence: {
+        viewer: { login: "Wibias" },
+        feedback: { issueComments: comments },
+        pullRequest: { headRefName: "feature/audit" },
+      },
+    },
+    { authorityVerifier: readFileSync(fixture.publicKeyPath, "utf8") },
+  );
+  assert.equal(evidence.label, "approve-comment");
+  assert.match(evidence.authorityScopeSha256, /^[0-9a-f]{64}$/);
+});
+
+test("preserves the approved body exactly through review-authority stamping", () => {
+  const result = run(
+    trustedVerdictFixture({
+      authorityBranch: "feature/audit",
+      body: `${verdictBody()}\n`,
+    }),
+  );
+  assert.equal(result.status, 0, result.stderr + result.stdout);
+  const output = JSON.parse(result.stdout);
+  assert.equal(output.trusted, true);
+});
+
+test("rejects a branch-bound scope when the signed resource omits the branch", () => {
+  const result = run(
+    trustedVerdictFixture({
+      authorityBranch: null,
+      resourceBranch: null,
+      scopeBranch: "feature/audit",
+    }),
+  );
+  assert.equal(result.status, 1, result.stderr + result.stdout);
+  const output = JSON.parse(result.stdout);
+  assert.equal(output.trusted, false);
+  assert.match(output.reason, /review_authority_invalid:scope_mismatch/);
+});
+
+test("rejects a signed resource branch that differs from the signed scope", () => {
+  const result = run(
+    trustedVerdictFixture({
+      authorityBranch: "feature/other",
+      resourceBranch: "feature/other",
+      scopeBranch: "feature/audit",
+    }),
+  );
+  assert.equal(result.status, 1, result.stderr + result.stdout);
+  const output = JSON.parse(result.stdout);
+  assert.equal(output.trusted, false);
+  assert.match(output.reason, /review_authority_invalid:scope_mismatch/);
+});
+
+test("rejects a branch-bound verdict whose grant binds a different head", () => {
+  const result = run(
+    trustedVerdictFixture({ authorityBranch: "feature/audit", grantHead: "f".repeat(40) }),
+  );
+  assert.equal(result.status, 1, result.stderr + result.stdout);
+  const output = JSON.parse(result.stdout);
+  assert.equal(output.published, true);
+  assert.equal(output.trusted, false);
+  assert.match(output.reason, /review_authority_invalid:resource_mismatch/);
+});
+
+test("rejects a grant scoped to another pull request", () => {
+  const result = run(
+    trustedVerdictFixture({ authorityBranch: "feature/audit", scopePr: 99 }),
+  );
+  assert.equal(result.status, 1, result.stderr + result.stdout);
+  const output = JSON.parse(result.stdout);
+  assert.equal(output.trusted, false);
+  assert.match(output.reason, /review_authority_invalid:scope_mismatch/);
+});
+
+test("rejects a verdict whose signed grant signature was tampered", () => {
+  const result = run(
+    trustedVerdictFixture({
+      authorityBranch: "feature/audit",
+      tamper(body) {
+        return body.replace(
+          /(gd1\.[A-Za-z0-9_-]+\.)([A-Za-z0-9_-])/,
+          (match, prefix, first) => `${prefix}${first === "A" ? "B" : "A"}`,
+        );
+      },
+    }),
+  );
+  assert.equal(result.status, 1, result.stderr + result.stdout);
+  const output = JSON.parse(result.stdout);
+  assert.equal(output.trusted, false);
+  assert.match(output.reason, /review_authority_invalid:bad_signature/);
 });
 
 test("rejects a same-actor format-valid verdict without authority provenance", () => {

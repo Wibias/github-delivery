@@ -4,6 +4,7 @@ import {
   assertCreatePrPublicationRequest,
   createPrPublicationPlanLock,
   normalizeCreatePrPublicationPlanLock,
+  normalizeCreatePrPublicationReceipts,
   reconcileCreatePrPublicationReceipts,
 } from "./create-pr-publication-state.mjs";
 import { resolveDeliveryWorkflowProfile } from "./delivery-workflow-profiles.mjs";
@@ -74,6 +75,10 @@ function routedWorkflowIntentMarkerKey(slot) {
   return `payload:${digest}`;
 }
 
+function sameIdentity(left, right) {
+  return String(left || "").toLowerCase() === String(right || "").toLowerCase();
+}
+
 function mutationAuthorization(snapshot, operationKey) {
   return Array.isArray(snapshot?.mutationAuthorizations)
     ? snapshot.mutationAuthorizations.find(
@@ -129,13 +134,21 @@ function assertPublicationCheckpoint(snapshot, request) {
 function samePublicationLock(left, right) {
   const current = normalizeCreatePrPublicationPlanLock(left);
   const next = normalizeCreatePrPublicationPlanLock(right);
-  return Boolean(
-    current &&
-    next &&
-    String(current.headSha || "").toLowerCase() === String(next.headSha || "").toLowerCase() &&
-    current.operationKeys.push_code === next.operationKeys.push_code &&
-    current.operationKeys.create_pr === next.operationKeys.create_pr
-  );
+  if (!current || !next || current.mode !== next.mode) return false;
+  if (!sameIdentity(current.headSha, next.headSha)) return false;
+  if (current.operationKeys.create_pr !== next.operationKeys.create_pr) return false;
+  if (current.mode === "already-published") {
+    return Boolean(
+      current.publishedHead &&
+      next.publishedHead &&
+      sameIdentity(current.publishedHead.repo, next.publishedHead.repo) &&
+      current.publishedHead.remote === next.publishedHead.remote &&
+      current.publishedHead.branch === next.publishedHead.branch &&
+      current.publishedHead.base === next.publishedHead.base &&
+      sameIdentity(current.publishedHead.sha, next.publishedHead.sha)
+    );
+  }
+  return current.operationKeys.push_code === next.operationKeys.push_code;
 }
 
 export function lockCreatePrPublicationPlanCheckpoint({ path, plan } = {}) {
@@ -158,6 +171,90 @@ export function lockCreatePrPublicationPlanCheckpoint({ path, plan } = {}) {
   snapshot.publicationReceipts = {};
   writeDeliveryWorkflowCheckpoint(path, snapshot);
   return structuredClone(lock);
+}
+
+export function replanCreatePrPublicationPlanCheckpoint({
+  path,
+  plan,
+  reason,
+  now = Date.now,
+} = {}) {
+  if (!path) throw new Error("checkpoint path is required");
+  const snapshot = readDeliveryWorkflowCheckpoint(path);
+  if (!CREATE_PR_PUBLICATION_PLAN_WORKFLOWS.has(String(snapshot.workflow || ""))) {
+    throw new Error("create_pr_publication_plan_not_required");
+  }
+  if (!["PREOPEN_GATE", "OPEN_PR"].includes(String(snapshot.phase || ""))) {
+    throw new Error("create_pr_publication_plan_phase_invalid");
+  }
+  const existing = normalizeCreatePrPublicationPlanLock(snapshot.publicationPlan);
+  if (!existing) throw new Error("create_pr_publication_plan_missing");
+  const next = createPrPublicationPlanLock(plan, { headSha: snapshot.headSha, now });
+  if (existing.mode === "already-published") {
+    if (!samePublicationLock(existing, next)) {
+      throw new Error("create_pr_publication_plan_already_locked");
+    }
+    return structuredClone(existing);
+  }
+  if (next.mode !== "already-published") {
+    throw new Error("create_pr_publication_replan_mode_invalid");
+  }
+  const text = String(reason || "").trim();
+  if (!text || text.length > 240) {
+    throw new Error("create_pr_publication_replan_reason_required");
+  }
+  const gate = snapshot.preOpenGate;
+  if (!gate || gate.decision !== "ready") {
+    throw new Error("create_pr_publication_replan_evidence_missing");
+  }
+  if (
+    !snapshot.repo ||
+    !snapshot.baseSha ||
+    !snapshot.headSha ||
+    !sameIdentity(gate.repo, snapshot.repo) ||
+    !sameIdentity(gate.baseSha, snapshot.baseSha) ||
+    !sameIdentity(gate.headSha, snapshot.headSha)
+  ) {
+    throw new Error("create_pr_publication_replan_evidence_mismatch");
+  }
+  if (!sameIdentity(existing.headSha, snapshot.headSha)) {
+    throw new Error("create_pr_publication_plan_stale");
+  }
+  if (!sameIdentity(next.publishedHead.repo, snapshot.repo)) {
+    throw new Error("create_pr_publication_replan_repo_mismatch");
+  }
+  if (!sameIdentity(next.publishedHead.sha, snapshot.headSha)) {
+    throw new Error("create_pr_publication_replan_head_mismatch");
+  }
+  const createRequest = Array.isArray(plan?.requests) ? plan.requests[0] : null;
+  if (
+    !createRequest ||
+    !sameIdentity(createRequest.repo, snapshot.repo) ||
+    String(createRequest.base || "") !== String(gate.baseRef || "") ||
+    next.publishedHead.branch !== String(gate.headRef || "")
+  ) {
+    throw new Error("create_pr_publication_replan_scope_mismatch");
+  }
+  const receipts = normalizeCreatePrPublicationReceipts(snapshot.publicationReceipts);
+  if (Object.keys(receipts).length > 0) {
+    throw new Error("create_pr_publication_replan_receipts_present");
+  }
+  const replanned = normalizeCreatePrPublicationPlanLock({
+    ...next,
+    replannedFrom: {
+      mode: existing.mode,
+      headSha: existing.headSha,
+      pushOperationKey: existing.operationKeys.push_code,
+      createPrOperationKey: existing.operationKeys.create_pr,
+      reason: text,
+      replannedAt: now(),
+    },
+  });
+  if (!replanned) throw new Error("create_pr_publication_plan_invalid");
+  snapshot.publicationPlan = replanned;
+  snapshot.publicationReceipts = {};
+  writeDeliveryWorkflowCheckpoint(path, snapshot);
+  return structuredClone(replanned);
 }
 
 export function mutationExecutionContextFromCheckpoint({ path, request } = {}) {

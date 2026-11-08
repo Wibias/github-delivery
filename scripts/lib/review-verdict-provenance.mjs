@@ -9,6 +9,29 @@ import {
 const IDEMPOTENCY_MARKER_RE =
   /\n\n<!-- github-delivery:idempotency [0-9a-f]{64} -->\s*$/i;
 
+/**
+ * The authority host signs the live PR head branch into the grant resource and
+ * into scopeSha256 for PR-scoped operations. The branch is not an effect of a
+ * comment, so it is not independently observable here; read it from the signed
+ * payload and let verifyAuthorityGrant authenticate it. Grants issued before
+ * branch binding have no resource branch and reconstruct the branch-less
+ * legacy scope.
+ */
+function signedResource(token) {
+  const parts = String(token || "").split(".");
+  if (parts.length !== 3 || parts[0] !== "gd1") return null;
+  try {
+    const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
+    const resource = payload.resource;
+    return resource && typeof resource === "object" && !Array.isArray(resource)
+      ? resource
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 function commentCreatedAt(comment = {}) {
   const value = comment.created_at ?? comment.createdAt ?? null;
   const timestamp = value ? Date.parse(value) : NaN;
@@ -65,6 +88,10 @@ export function verifyReviewVerdictProvenance({
     idempotencyKey: authorityMarker.idempotencyKey,
     body: visibleBody(body),
   };
+  const resource = signedResource(authorityMarker.authorityGrant);
+  const authorityBranch =
+    typeof resource?.authorityBranch === "string" ? resource.authorityBranch.trim() : "";
+  if (authorityBranch) request.authorityBranch = authorityBranch;
   let verifier;
   try {
     verifier = verifierOptions(authorityVerifier, publicKey, trustStore);

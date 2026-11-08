@@ -2,7 +2,20 @@
 
 All notable changes to `github-delivery` are documented here.
 
-## [Unreleased]
+## [1.9.0] - 2026-11-08
+
+### Added
+
+- `buildCreatePrPublicationPlan` accepts an explicit `pushMode: "fast-forward"` for a true fast-forward on an existing branch. The plan sets `forceWithLease: false`, and `lifecycleCommandFor` emits a plain `git push` without `--force` or `--force-with-lease`. Expected-tip preflight, ancestry proof, checkpoint lock, idempotency, and draft-only creation are unchanged, and the default plan still uses force-with-lease.
+- An explicit `already-published` publication mode creates the draft PR for an exact candidate that is already on the remote branch without a push operation. Execution re-reads the remote branch and base, requires the exact candidate SHA and base ancestry, and records a plan-bound `published_head` receipt alongside `create_pr`; `create-pr-publication-plan.mjs --replan --reason TEXT` is the supported transition from an existing push-mode lock.
+
+### Changed
+
+- Bumped the package version from `1.8.5` to `1.9.0`.
+
+### Fixed
+
+- Full-review verdict verification now reconstructs the canonical authority scope with the head branch that the authority host signed into the grant resource. Branch-bound grants issued through the documented authorize path verify again, including as merge review evidence; grants that disagree about whether a branch is bound still fail closed, and legacy branch-less grants keep verifying against their old scope. Review-authority stamping also preserves the approved body exactly, so trailing whitespace can no longer make a newly published verdict unverifiable.
 
 ## [1.8.5] - 2026-11-04
 

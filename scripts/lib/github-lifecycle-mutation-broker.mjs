@@ -13,6 +13,7 @@ import {
   preflightLifecycleMutation,
   validateLifecycleMutation,
   verifyLifecycleMutation,
+  verifyPublishedHead,
 } from "./lifecycle-mutations.mjs";
 import { boundedSpawnSync } from "./subprocess-policy.mjs";
 
@@ -329,27 +330,49 @@ export function executeLifecycleMutationRequest({
   const store = baselineStore || createFileRewriteBaselineStore();
 
   const observedHead = verifyHead({ request: plan.request, runner });
+  // Exact-head publication has no push write to prove. Read the remote at the
+  // execution boundary and fail closed before any PR write if it moved.
+  const publishedHeadVerification =
+    plan.request.action === "create_pr" && plan.request.publishedHead
+      ? verifyPublishedHead({ request: plan.request, runner })
+      : null;
 
   // Recover an exact same-actor/idempotency create before broader publication
   // preflights. Otherwise an already-created PR would be rejected as a generic
   // exact-head duplicate before its durable receipt can converge the retry.
   const existingMutation = findExistingCreate({ request: plan.request, runner });
   if (existingMutation) {
+    const existingVerification = plan.request.publishedHead
+      ? {
+          ...existingMutation,
+          ...verifyLifecycleMutation({
+            request: plan.request,
+            runner,
+            baselineStore: store,
+          }),
+        }
+      : existingMutation;
     return {
       ...plan,
       executed: false,
       status: "already_applied",
       observedHead,
+      publishedHeadVerification,
       preflight: null,
       existingMutation,
       stdout: "",
-      verification: existingMutation,
+      verification: existingVerification,
     };
   }
 
   let preflight;
   try {
-    preflight = preflightLifecycleMutation({ request: plan.request, runner, baselineStore: store });
+    preflight = preflightLifecycleMutation({
+      request: plan.request,
+      runner,
+      baselineStore: store,
+      publishedHeadVerification,
+    });
   } catch (error) {
     const recovered =
       plan.action === "push_code"
@@ -366,6 +389,7 @@ export function executeLifecycleMutationRequest({
       executed: false,
       status: "already_applied",
       observedHead,
+      publishedHeadVerification,
       preflight: recovered.preflight,
       existingMutation: null,
       stdout: "",
@@ -412,6 +436,7 @@ export function executeLifecycleMutationRequest({
     executed: true,
     status,
     observedHead,
+    publishedHeadVerification,
     preflight,
     existingMutation: null,
     stdout,
