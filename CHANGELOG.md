@@ -13,6 +13,10 @@ All notable changes to `github-delivery` are documented here.
 
 - Bumped the package version from `1.8.5` to `1.9.0`.
 
+### Fixed
+
+- Full-review verdict verification now reconstructs the canonical authority scope with the head branch that the authority host signed into the grant resource. Branch-bound grants issued through the documented authorize path verify again, including as merge review evidence; grants that disagree about whether a branch is bound still fail closed, and legacy branch-less grants keep verifying against their old scope. Review-authority stamping also preserves the approved body exactly, so trailing whitespace can no longer make a newly published verdict unverifiable.
+
 ## [1.8.5] - 2026-11-04
 
 ### Changed

@@ -17,6 +17,7 @@ const RESOURCE_FIELDS = [
   "commentId",
   "threadId",
   "expectedHead",
+  "authorityBranch",
   "headRefName",
   "targetRepo",
   "supersedingPr",
