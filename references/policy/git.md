@@ -34,6 +34,6 @@ Do not automatically delete a merged PR head branch. GitHub's ref-delete API has
 
 Non-fast-forward force-with-lease `push_code` fails closed unless the new tip tree matches a broker `record_rewrite_baseline` (`originalLocalTip`) and branch reflog generation, or `rewriteExemption` is restack, conflicts, or simplify-pr. Different-tree reflog SHAs must be baseline ancestors. `expectedRemoteTip` is the lease.
 
-### GD-GIT-009 — Ordinary fast-forward publication stays force-free
+### GD-GIT-009 — Plain fast-forward only
 
-A genuine fast-forward on an existing branch may use the planner's explicit `pushMode: "fast-forward"` option. That option keeps the expected-tip preflight, ancestry proof, checkpoint lock, idempotency, and draft-only create unchanged, and emits a plain `git push` with no `--force`, `--force-with-lease`, or `+refspec`. The default plan stays `force-with-lease`; do not use fast-forward mode for a new remote branch or a non-fast-forward rewrite.
+`pushMode: "fast-forward"` may push an existing branch only with proven ancestry: plain `git push`, no force or lease flags, same expected-tip, checkpoint, and draft gates. Never new branches or rewrites.
