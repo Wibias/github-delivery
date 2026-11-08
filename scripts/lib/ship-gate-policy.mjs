@@ -12,12 +12,14 @@ const UNDERSTOOD_ACTIVE_RULE_TYPES = new Set([
 const MERGE_STATES_READY = new Set(["CLEAN", "UNSTABLE", "HAS_HOOKS"]);
 const MERGE_STATES_WAKE = new Set(["DIRTY", "BEHIND", "CONFLICTING"]);
 
-function applyMergeStateUnknowns(snapshot, unknowns) {
+function applyMergeStateUnknowns(snapshot, unknowns, { localEvidenceActive = false } = {}) {
   const mergeStateStatus = String(
     snapshot?.evidence?.pullRequest?.mergeStateStatus || "",
   ).toUpperCase();
   if (mergeStateStatus === "BLOCKED") {
-    unknowns.push("policy:github_merge_state_blocked");
+    // With valid local evidence the remote check conclusion is intentionally
+    // waived, so GitHub's derived BLOCKED state is not independent evidence.
+    if (!localEvidenceActive) unknowns.push("policy:github_merge_state_blocked");
     return;
   }
   if (
@@ -86,8 +88,12 @@ export function combineShipGateResults({
   };
   const blockers = [];
   const unknowns = [];
+  const localEvidenceActive =
+    requiredChecks?.evidenceMode === "local" &&
+    requiredChecks?.localEvidence?.valid === true;
 
   for (const [name, component] of Object.entries(authoritative)) {
+    if (localEvidenceActive && name === "baseHealth") continue;
     for (const blocker of component?.blockers || []) {
       blockers.push(blockerValue(name, blocker));
     }
@@ -113,7 +119,7 @@ export function combineShipGateResults({
     unknowns.push(unknown);
   }
 
-  applyMergeStateUnknowns(snapshot, unknowns);
+  applyMergeStateUnknowns(snapshot, unknowns, { localEvidenceActive });
   unknowns.push(...nativeStackShipGateUnknowns(snapshot));
 
   const mergeQueueEnabled = reviewPolicy?.mergeQueue?.enabled === true;
@@ -172,6 +178,15 @@ export function combineShipGateResults({
         "The same failures are present on the base tip. They may block merging, but they do not automatically belong in this PR's implementation scope.",
     });
   }
+  if (localEvidenceActive) {
+    advisories.push({
+      code: "remote_checks_waived_by_local_evidence",
+      message:
+        "Remote required checks were waived by an explicit per-repository local evidence mode; the bound local receipt is the authoritative check evidence.",
+      remoteDecision: requiredChecks?.remoteObserved?.decision || "unknown",
+      remoteBlockerCount: (requiredChecks?.remoteObserved?.blockers || []).length,
+    });
+  }
 
   const uniqueBlockers = [...new Set(blockers)];
   const uniqueUnknowns = [...new Set(unknowns)];
@@ -201,12 +216,16 @@ export function combineShipGateResults({
     complete: uniqueUnknowns.length === 0,
     blockers: uniqueBlockers,
     unknowns: uniqueUnknowns,
+    evidenceMode: requiredChecks?.evidenceMode || "remote",
+    remoteChecksWaived: localEvidenceActive,
+    localEvidence: requiredChecks?.localEvidence || null,
     advisories,
     components: {
       requiredChecks: {
         ...componentSummary(requiredChecks),
         sha: requiredChecks?.authoritativeCheckSha || requiredChecks?.sha || null,
         reason: requiredChecks?.authoritativeCheckReason || null,
+        evidenceMode: requiredChecks?.evidenceMode || "remote",
       },
       baseHealth: {
         ...componentSummary(baseHealth),
