@@ -2,11 +2,16 @@
 
 All notable changes to `github-delivery` are documented here.
 
-## [Unreleased]
+## [1.9.0] - 2026-11-08
 
 ### Added
 
 - `buildCreatePrPublicationPlan` accepts an explicit `pushMode: "fast-forward"` for a true fast-forward on an existing branch. The plan sets `forceWithLease: false`, and `lifecycleCommandFor` emits a plain `git push` without `--force` or `--force-with-lease`. Expected-tip preflight, ancestry proof, checkpoint lock, idempotency, and draft-only creation are unchanged, and the default plan still uses force-with-lease.
+- An explicit `already-published` publication mode creates the draft PR for an exact candidate that is already on the remote branch without a push operation. Execution re-reads the remote branch and base, requires the exact candidate SHA and base ancestry, and records a plan-bound `published_head` receipt alongside `create_pr`; `create-pr-publication-plan.mjs --replan --reason TEXT` is the supported transition from an existing push-mode lock.
+
+### Changed
+
+- Bumped the package version from `1.8.5` to `1.9.0`.
 
 ## [1.8.5] - 2026-11-04
 
