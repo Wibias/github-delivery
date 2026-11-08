@@ -635,13 +635,35 @@ export function verifyLifecycleMutation({ request, runner, baselineStore }) {
     return observed;
   }
   if (request.action === "create_pr") {
+    const repo = String(required(request.repo, "repo"));
+    const head = String(required(request.head, "head"));
+    if (request.publishedHead) {
+      const scope = assertPublishedHeadScope(request);
+      const raw = run(runner, [
+        "gh",
+        "pr",
+        "view",
+        head,
+        "--repo",
+        repo,
+        "--json",
+        "body,headRefOid",
+      ]);
+      const payload = parseJson(raw, "create_pr_verification_invalid_json");
+      const observedHead = exactSha(payload?.headRefOid, "create_pr_observed_head");
+      if (observedHead !== scope.sha) {
+        throw new Error(`create_pr_head_mismatch: expected ${scope.sha}, observed ${observedHead}`);
+      }
+      assertPublishedMarkdown(String(payload?.body || ""));
+      return { body: String(payload?.body || ""), headRefOid: observedHead };
+    }
     const observed = run(runner, [
       "gh",
       "pr",
       "view",
-      String(required(request.head, "head")),
+      head,
       "--repo",
-      String(required(request.repo, "repo")),
+      repo,
       "--json",
       "body",
       "--jq",

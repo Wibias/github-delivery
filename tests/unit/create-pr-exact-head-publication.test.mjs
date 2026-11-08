@@ -28,6 +28,7 @@ import {
   preflightLifecycleMutation,
   validateLifecycleMutation,
   verifyPublishedHead,
+  verifyLifecycleMutation,
 } from "../../scripts/lib/lifecycle-mutations.mjs";
 import { planLifecycleMutationRequest } from "../../scripts/lib/github-lifecycle-mutation-broker.mjs";
 import { mutationOperationKey } from "../../scripts/lib/mutation-document-execution.mjs";
@@ -135,6 +136,8 @@ function runner({
   repoView = { url: "https://github.com/acme/widgets", sshUrl: "git@github.com:acme/widgets.git" },
   pulls = [],
   failRead = null,
+  prHeadSha = HEAD,
+  prBody = "Body",
 } = {}) {
   return (command, args) => {
     const ok = (stdout) => ({ status: 0, stdout, stderr: "" });
@@ -161,6 +164,12 @@ function runner({
     if (command === "gh" && args[0] === "api") {
       if (String(args[1]).includes("/pulls?")) return ok(JSON.stringify([pulls]));
       if (String(args[1]).includes("/compare/")) return ok(`${ancestry}\n`);
+    }
+    if (command === "gh" && args[0] === "pr" && args[1] === "view") {
+      if (String(args[6]).includes("headRefOid")) {
+        return ok(JSON.stringify({ body: prBody, headRefOid: prHeadSha }));
+      }
+      return ok(prBody);
     }
     throw new Error(`unexpected command: ${command} ${args.join(" ")}`);
   };
@@ -302,6 +311,20 @@ test("missing hygiene, pre-open evidence, or authority blocks exact-head publica
     );
     assert.doesNotThrow(
       () => planLifecycleMutationRequest({ ...create, mutationMode: "maintainer", explicitInstruction: true }),
+    );
+  });
+});
+
+test("post-create verification binds the PR head to the candidate SHA", () => {
+  withTemp((directory) => {
+    const path = writeCheckpoint(directory, checkpointSnapshot());
+    const create = exactPlan(path).requests[0];
+    const verification = verifyLifecycleMutation({ request: create, runner: runner() });
+    assert.equal(verification.headRefOid, HEAD);
+    assert.equal(verification.body, "Body");
+    assert.throws(
+      () => verifyLifecycleMutation({ request: create, runner: runner({ prHeadSha: MOVED }) }),
+      /create_pr_head_mismatch/,
     );
   });
 });

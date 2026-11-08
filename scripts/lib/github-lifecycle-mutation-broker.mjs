@@ -342,6 +342,16 @@ export function executeLifecycleMutationRequest({
   // exact-head duplicate before its durable receipt can converge the retry.
   const existingMutation = findExistingCreate({ request: plan.request, runner });
   if (existingMutation) {
+    const existingVerification = plan.request.publishedHead
+      ? {
+          ...existingMutation,
+          ...verifyLifecycleMutation({
+            request: plan.request,
+            runner,
+            baselineStore: store,
+          }),
+        }
+      : existingMutation;
     return {
       ...plan,
       executed: false,
@@ -351,7 +361,7 @@ export function executeLifecycleMutationRequest({
       preflight: null,
       existingMutation,
       stdout: "",
-      verification: existingMutation,
+      verification: existingVerification,
     };
   }
 
