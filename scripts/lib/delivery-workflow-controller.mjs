@@ -232,9 +232,14 @@ export function assertPreOpenPublicationEvidence(snapshot, request = null) {
     const requestHead = String(request?.head || "");
     const separator = requestHead.indexOf(":");
     const requestBranch = separator < 0 ? requestHead : requestHead.slice(separator + 1);
+    const gateHeadRef = String(gate.headRef || "");
+    // Local-work gates bind headRef to the exact commit SHA; issue-work gates
+    // bind it to the head branch. Only compare branch names when that is what
+    // the gate recorded; the SHA identity is already checked above.
+    const gateHeadRefIsSha = /^[0-9a-f]{40,64}$/i.test(gateHeadRef);
     if (
       (request?.base && gate.baseRef && String(request.base) !== String(gate.baseRef)) ||
-      (requestBranch && gate.headRef && requestBranch !== String(gate.headRef)) ||
+      (requestBranch && gateHeadRef && !gateHeadRefIsSha && requestBranch !== gateHeadRef) ||
       (request?.publishedHead && !sameIdentity(request.publishedHead.sha, gate.headSha))
     ) {
       throw new Error("pre_open_evidence_scope_mismatch");
