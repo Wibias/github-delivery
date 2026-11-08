@@ -160,6 +160,57 @@ test("local-work create_pr binds the exact gate head when headRef is a SHA", () 
   );
 });
 
+test("local-work post-publication phases authorize only the draft-state change", () => {
+  const directory = mkdtempSync(join(tmpdir(), "github-delivery-draft-intent-"));
+  const checkpoint = join(directory, "controller.json");
+  try {
+    for (const phase of ["REVIEW_FEEDBACK", "CI", "FINAL_GATE"]) {
+      const initial = createDeliveryWorkflowController({
+        workflow: "create-pr-from-local-work",
+        repo: "acme/widgets",
+        baseSha: BASE,
+        headSha: HEAD,
+        graph: {
+          REVIEW_FEEDBACK: ["CI", "FINAL_GATE"],
+          CI: ["FINAL_GATE"],
+          FINAL_GATE: ["DONE"],
+          DONE: [],
+        },
+        startPhase: phase,
+      });
+      writeDeliveryWorkflowCheckpoint(checkpoint, initial.snapshot());
+      const draft = {
+        schemaVersion: 1,
+        action: "change_draft_state",
+        mutationMode: "maintainer",
+        repo: "acme/widgets",
+        pr: 42,
+        expectedHead: HEAD,
+        ready: true,
+      };
+      assert.deepEqual(
+        mutationExecutionContextFromCheckpoint({ path: checkpoint, request: draft }),
+        {
+          trustedWorkflowIntent: true,
+          trustedExactTextConfirmation: false,
+        },
+      );
+      assert.deepEqual(
+        mutationExecutionContextFromCheckpoint({
+          path: checkpoint,
+          request: { ...draft, action: "close_pr" },
+        }),
+        {
+          trustedWorkflowIntent: false,
+          trustedExactTextConfirmation: false,
+        },
+      );
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("mutation boundary independently rejects missing, changed, or stale pre-open scope", () => {
   const directory = mkdtempSync(join(tmpdir(), "github-delivery-preopen-boundary-"));
   const checkpoint = join(directory, "controller.json");
