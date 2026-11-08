@@ -144,6 +144,10 @@ PR creation is identity-based, not title-similarity-based. Before creating a PR,
 
 For PR-body rewrites, existing protected screenshots, videos, uploads, and other media are preserved by default. Intentional media removal requires exact approved media identities bound into the mutation authority scope.
 
+When the exact candidate is already on the remote branch, use the explicit `already-published` publication mode. The plan contains a single draft `create_pr` request bound to the repository, remote, branch, base, and candidate SHA; there is no push operation. At the execution boundary the broker re-reads the remote branch and base, requires the branch to still equal the candidate SHA, and requires the candidate to descend from the current base. A plan-bound `published_head` receipt is recorded alongside the `create_pr` receipt, and publication stays incomplete if either receipt is missing or does not match the lock.
+
+`node scripts/create-pr-publication-plan.mjs --input FILE --replan --reason TEXT` is the supported transition from an existing push-mode lock to an already-published plan. It refuses to replace a lock when the pre-open scope changed or any publication receipt already exists.
+
 ---
 
 ## Safety model

@@ -342,6 +342,75 @@ function createPrCommand(request, repo) {
   return command;
 }
 
+function publishedHeadScope(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const repo = String(value.repo || "").trim();
+  const remote = String(value.remote || "").trim();
+  const branch = String(value.branch || "").trim();
+  const base = String(value.base || "").trim();
+  const sha = String(value.sha || "").trim().toLowerCase();
+  if (!/^[^/\s]+\/[^/\s]+$/.test(repo) || !remote || !branch || !base) return null;
+  if (!/^[0-9a-f]{40,64}$/.test(sha)) return null;
+  return { repo, remote, branch, base, sha };
+}
+
+function assertPublishedHeadScope(request) {
+  const scope = publishedHeadScope(request.publishedHead);
+  if (!scope) throw new Error("published_head_invalid");
+  if (!sameRepo(scope.repo, request.repo)) throw new Error("published_head_repo_mismatch");
+  if (scope.base !== String(request.base || "")) throw new Error("published_head_base_mismatch");
+  const identity = createPrHeadIdentity(request);
+  if (scope.branch !== identity.branch) throw new Error("published_head_branch_mismatch");
+  return scope;
+}
+
+function readRemoteHead(runner, remote, branch) {
+  const row = run(runner, ["git", "ls-remote", "--heads", remote, `refs/heads/${branch}`]);
+  return row ? String(row.split(/\s+/)[0] || "").toLowerCase() : "absent";
+}
+
+export function verifyPublishedHead({ request, runner } = {}) {
+  const scope = assertPublishedHeadScope(request);
+  const repo = String(required(request.repo, "repo"));
+  const remote = String(required(scope.remote, "published_head_remote"));
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(remote)) throw new Error("published_head_remote_invalid");
+  const branch = String(required(scope.branch, "published_head_branch"));
+  const base = String(required(scope.base, "published_head_base"));
+  run(runner, ["git", "check-ref-format", `refs/heads/${branch}`]);
+  run(runner, ["git", "check-ref-format", `refs/heads/${base}`]);
+  assertRemoteRepoIdentity({ repo, remote }, runner);
+  const observed = readRemoteHead(runner, remote, branch);
+  if (observed === "absent") throw new Error("published_head_branch_absent");
+  if (observed !== scope.sha) {
+    throw new Error(`published_head_mismatch: expected ${scope.sha}, observed ${observed}`);
+  }
+  const baseSha = readRemoteHead(runner, remote, base);
+  if (baseSha === "absent") throw new Error("published_head_base_absent");
+  const ancestry = String(
+    run(runner, [
+      "gh",
+      "api",
+      `repos/${repo}/compare/${baseSha}...${scope.sha}`,
+      "--jq",
+      ".status",
+    ]) || "",
+  ).trim().toLowerCase();
+  if (ancestry !== "ahead" && ancestry !== "identical") {
+    throw new Error(`published_head_not_descendant: ${ancestry || "unknown"}`);
+  }
+  return {
+    kind: "github-delivery/published-head-verification",
+    repo,
+    remote,
+    branch,
+    base,
+    sha: scope.sha,
+    observedSha: observed,
+    baseSha,
+    ancestry,
+  };
+}
+
 function assertCreatePrNotDuplicate(request, runner) {
   const repo = String(required(request.repo, "repo"));
   const base = String(required(request.base, "base"));
@@ -391,6 +460,7 @@ export function validateLifecycleMutation(request = {}) {
       required(request.body, "body");
       assertPublishedMarkdown(request.body);
       required(request.idempotencyKey, "idempotency_key");
+      if (request.publishedHead !== undefined) assertPublishedHeadScope(request);
       break;
     case "update_pr_body":
       positiveInteger(request.pr, "pr");
@@ -488,13 +558,19 @@ export function lifecycleCommandFor(request = {}) {
   }
 }
 
-export function preflightLifecycleMutation({ request, runner, baselineStore }) {
+export function preflightLifecycleMutation({ request, runner, baselineStore, publishedHeadVerification = null }) {
   if (request.action === "push_code") return assertPushTarget(request, runner, baselineStore);
   if (request.action === "record_rewrite_baseline") {
     return assertRewriteBaselineCapture(request, runner, baselineStore);
   }
   if (request.action === "update_pr_body") return assertUpdatePrBodySafe(request, runner);
-  if (request.action === "create_pr") return assertCreatePrNotDuplicate(request, runner);
+  if (request.action === "create_pr") {
+    const published = request.publishedHead
+      ? (publishedHeadVerification || verifyPublishedHead({ request, runner }))
+      : null;
+    const duplicate = assertCreatePrNotDuplicate(request, runner);
+    return published ? { ...duplicate, publishedHead: published } : duplicate;
+  }
   return null;
 }
 
