@@ -29,6 +29,7 @@ import { runGitHubCommandWithRetry } from "./lib/github-retry.mjs";
 import { boundedSpawnSync } from "./lib/subprocess-policy.mjs";
 import { graphqlCliField } from "./lib/graphql-cli-fields.mjs";
 import { normalizeNativeStack } from "./lib/native-stack-policy.mjs";
+import { classifyRulesPlanFeatureUnavailable } from "./lib/rules-boundary.mjs";
 
 function parseArgs(argv) {
   const positionals = [];
@@ -505,12 +506,68 @@ function fetchPolicy(owner, name, pr) {
 }
 
 function fetchBranchProtection(owner, name, base) {
-  return classifyBranchProtectionResponse(
+  const response = ghOk([
+    "api",
+    `repos/${owner}/${name}/branches/${encodeURIComponent(base)}/protection`,
+  ]);
+  return { ...classifyBranchProtectionResponse(response), response };
+}
+
+function parseJsonResponse(response, label) {
+  if (!response?.ok) {
+    return {
+      readable: false,
+      complete: false,
+      payload: null,
+      error: response?.error || `${label} request failed`,
+    };
+  }
+  let payload;
+  try {
+    payload = JSON.parse(response.body || "null");
+  } catch {
+    return {
+      readable: false,
+      complete: false,
+      payload: null,
+      error: `${label} returned invalid JSON`,
+    };
+  }
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return {
+      readable: false,
+      complete: false,
+      payload: null,
+      error: `${label} returned an unexpected payload`,
+    };
+  }
+  return { readable: true, complete: true, payload, error: null };
+}
+
+function fetchRepoMetadata(owner, name) {
+  return parseJsonResponse(
+    ghOk(["api", `repos/${owner}/${name}`]),
+    "repository metadata",
+  );
+}
+
+function fetchBranchMetadata(owner, name, base) {
+  return parseJsonResponse(
     ghOk([
       "api",
-      `repos/${owner}/${name}/branches/${encodeURIComponent(base)}/protection`,
+      `repos/${owner}/${name}/branches/${encodeURIComponent(base)}`,
     ]),
+    "branch metadata",
   );
+}
+
+function unprovenRulesCollection(collection, rulesBoundary) {
+  if (!collection || collection.complete === true) return collection;
+  const reason = `rules_plan_feature_unavailable_unproven:${rulesBoundary?.reason || "unknown"}`;
+  return {
+    ...collection,
+    error: collection.error ? `${collection.error}; ${reason}` : reason,
+  };
 }
 
 function fetchBranchOid(owner, name, base) {
@@ -886,11 +943,48 @@ try {
   );
   const threads = reviewThreads(owner, name, pr);
   const branchProtection = fetchBranchProtection(owner, name, protectionBase);
+  let activeRulesEvidence = activeRules;
+  let branchProtectionEvidence = branchProtection;
+  let rulesBoundary = null;
+  if (activeRules.complete !== true) {
+    const repoMetadata = fetchRepoMetadata(owner, name);
+    const branchMetadata = fetchBranchMetadata(owner, name, protectionBase);
+    rulesBoundary = classifyRulesPlanFeatureUnavailable({
+      repo: repoMetadata.payload,
+      branch: branchMetadata.payload,
+      policy,
+      probes: {
+        rulesets: ghOk(["api", `repos/${owner}/${name}/rulesets`]),
+        branchRules: activeRules.failure || null,
+        classicProtection: branchProtection.response || null,
+      },
+    });
+    if (rulesBoundary.unavailable === true) {
+      activeRulesEvidence = {
+        readable: true,
+        complete: true,
+        pages: 0,
+        rows: [],
+        error: null,
+        featureUnavailable: true,
+      };
+      branchProtectionEvidence = {
+        required: false,
+        readable: true,
+        complete: true,
+        payload: null,
+        error: null,
+        featureUnavailable: true,
+      };
+    } else {
+      activeRulesEvidence = unprovenRulesCollection(activeRules, rulesBoundary);
+    }
+  }
   const codeowners = fetchCodeowners(owner, name, protectionBase);
   const requiredChecks = normalizeRequiredChecks({
     classicRequiredStatusChecks:
-      branchProtection?.payload?.required_status_checks || null,
-    activeRules: activeRules.rows || [],
+      branchProtectionEvidence?.payload?.required_status_checks || null,
+    activeRules: activeRulesEvidence.rows || [],
   }).descriptors;
   const workflowCoverage = scanTargetWorkflows(
     owner,
@@ -904,10 +998,43 @@ try {
   );
   const viewer = fetchViewer();
 
-  const finalActiveRules = restCollection(
+  const finalActiveRulesRaw = restCollection(
     `repos/${owner}/${name}/rules/branches/${encodeURIComponent(protectionBase)}`,
     "final active rules",
   );
+  let finalActiveRules = finalActiveRulesRaw;
+  let finalRulesBoundary = null;
+  if (rulesBoundary?.unavailable === true) {
+    const finalRepoMetadata = fetchRepoMetadata(owner, name);
+    const finalBranchMetadata = fetchBranchMetadata(
+      owner,
+      name,
+      protectionBase,
+    );
+    finalRulesBoundary = classifyRulesPlanFeatureUnavailable({
+      repo: finalRepoMetadata.payload,
+      branch: finalBranchMetadata.payload,
+      policy,
+      probes: {
+        rulesets: ghOk(["api", `repos/${owner}/${name}/rulesets`]),
+        branchRules: finalActiveRulesRaw.failure || null,
+        classicProtection: ghOk([
+          "api",
+          `repos/${owner}/${name}/branches/${encodeURIComponent(protectionBase)}/protection`,
+        ]),
+      },
+    });
+    if (finalRulesBoundary.unavailable === true) {
+      finalActiveRules = {
+        readable: true,
+        complete: true,
+        pages: 0,
+        rows: [],
+        error: null,
+        featureUnavailable: true,
+      };
+    }
+  }
   const finalBaseOid = fetchBranchOid(owner, name, base);
   const finalTestMergeOid = fetchTestMergeOid(owner, name, pr);
   const finalPrEvidence = ghJson([
@@ -922,8 +1049,12 @@ try {
   const boundary = verifySnapshotBoundary(prEvidence, finalPrEvidence, {
     initialBaseOid: baseOid,
     finalBaseOid,
-    initialRules: activeRules,
+    initialRules: activeRulesEvidence,
     finalRules: finalActiveRules,
+    initialRulesBoundary:
+      rulesBoundary?.unavailable === true ? rulesBoundary : null,
+    finalRulesBoundary:
+      rulesBoundary?.unavailable === true ? finalRulesBoundary : null,
     initialTestMergeOid: testMergeOid,
     finalTestMergeOid,
   });
@@ -931,19 +1062,30 @@ try {
   const capture = assembleSnapshotCapture({
     prEvidence,
     changedFiles,
-    activeRules,
+    activeRules: activeRulesEvidence,
     checkRuns,
     statuses,
     issueComments,
     reviewComments,
     reviews,
     threads,
-    branchProtection,
+    branchProtection: branchProtectionEvidence,
     codeowners,
     policy,
     workflowCoverage,
     viewer,
     boundary,
+    rulesBoundary: rulesBoundary
+      ? {
+          mode:
+            rulesBoundary.unavailable === true
+              ? "plan_feature_unavailable"
+              : "unproven",
+          reason:
+            rulesBoundary.unavailable === true ? null : rulesBoundary.reason,
+          evidence: rulesBoundary.evidence,
+        }
+      : { mode: "rules_api_available", reason: null, evidence: null },
     checkEvidence: {
       authoritative: {
         sha: selectedChecks.sha,

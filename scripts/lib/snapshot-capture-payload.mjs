@@ -1,5 +1,10 @@
 import { createHash } from "node:crypto";
 
+import {
+  rulesBoundaryFingerprint,
+  validateRulesBoundaryEvidence,
+} from "./rules-boundary.mjs";
+
 const MAX_BOUNDARY_FAILURE_CHARS = 2_000;
 
 function collectionSource(collection, required = true) {
@@ -9,6 +14,9 @@ function collectionSource(collection, required = true) {
     complete: collection?.complete === true,
     pages: collection?.pages ?? null,
     error: collection?.error || null,
+    ...(collection?.featureUnavailable === true
+      ? { featureUnavailable: true }
+      : {}),
   };
 }
 
@@ -103,6 +111,8 @@ export function verifySnapshotBoundary(
     finalBaseOid = null,
     initialRules = null,
     finalRules = null,
+    initialRulesBoundary = null,
+    finalRulesBoundary = null,
     initialTestMergeOid = undefined,
     finalTestMergeOid = undefined,
   } = {},
@@ -154,6 +164,7 @@ export function verifySnapshotBoundary(
   }
 
   let rulesFingerprint = null;
+  let rulesBoundaryFingerprintValue = null;
   if (initialRules !== null || finalRules !== null) {
     if (initialRules?.complete !== true || finalRules?.complete !== true) {
       const causeMessage = collectionFailureMessage(initialRules, finalRules);
@@ -174,12 +185,43 @@ export function verifySnapshotBoundary(
     rulesFingerprint = before;
   }
 
+  if (initialRulesBoundary !== null) {
+    const initialEvidence = initialRulesBoundary?.evidence || null;
+    const finalEvidence = finalRulesBoundary?.evidence || null;
+    const initialValid =
+      initialRulesBoundary?.unavailable === true &&
+      validateRulesBoundaryEvidence(initialEvidence).valid;
+    const finalValid =
+      finalRulesBoundary?.unavailable === true &&
+      validateRulesBoundaryEvidence(finalEvidence).valid;
+    if (!initialValid || !finalValid) {
+      const causeMessage = "rules_plan_feature_state_unproven";
+      const error = new Error(
+        `snapshot_rules_boundary_incomplete: ${causeMessage}`,
+      );
+      error.code = "snapshot_rules_boundary_incomplete";
+      error.causeMessage = causeMessage;
+      throw error;
+    }
+    const before = rulesBoundaryFingerprint(initialEvidence);
+    const after = rulesBoundaryFingerprint(finalEvidence);
+    if (before !== after) {
+      throw new Error(
+        `snapshot_rules_moved:rules_boundary_evidence: expected ${before}, observed ${after}`,
+      );
+    }
+    rulesBoundaryFingerprintValue = before;
+  }
+
   return {
     headOid: initialHead,
     baseRefName: initialBase,
     ...(baseOid ? { baseOid } : {}),
     ...(testMergeOid ? { testMergeOid } : {}),
     ...(rulesFingerprint ? { rulesFingerprint } : {}),
+    ...(rulesBoundaryFingerprintValue
+      ? { rulesBoundaryFingerprint: rulesBoundaryFingerprintValue }
+      : {}),
   };
 }
 
@@ -200,6 +242,7 @@ export function assembleSnapshotCapture({
   viewer,
   boundary = null,
   checkEvidence = null,
+  rulesBoundary = null,
 } = {}) {
   const sources = {
     pr: { required: true, readable: true, complete: true, error: null },
@@ -216,6 +259,9 @@ export function assembleSnapshotCapture({
       readable: branchProtection?.readable === true,
       complete: branchProtection?.complete === true,
       error: branchProtection?.error || null,
+      ...(branchProtection?.featureUnavailable === true
+        ? { featureUnavailable: true }
+        : {}),
     },
     codeowners: {
       required: false,
@@ -254,6 +300,7 @@ export function assembleSnapshotCapture({
     evidence: {
       pullRequest: prEvidence,
       captureBoundary: boundary,
+      rulesBoundary: rulesBoundary || null,
       changedFiles: changedFiles?.rows || [],
       branchProtection: branchProtection?.payload ?? null,
       activeRules: activeRules?.rows || [],
