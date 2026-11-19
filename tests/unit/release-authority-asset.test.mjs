@@ -27,7 +27,7 @@ test("authority host builds pin the serviced SDK and reject vulnerable Windows D
   const globalJson = JSON.parse(readFileSync(globalJsonUrl, "utf8"));
   assert.deepEqual(globalJson, {
     sdk: {
-      version: "10.0.403",
+      version: "10.0.404",
       rollForward: "disable",
     },
   });
@@ -36,10 +36,10 @@ test("authority host builds pin the serviced SDK and reject vulnerable Windows D
   assert.doesNotMatch(ciWorkflow, /dotnet-version:\s*8\.0\.x/);
 
   for (const buildWorkflow of [workflow, ciWorkflow]) {
-    assert.match(buildWorkflow, /runtimepack\.Microsoft\.NETCore\.App\.Runtime\.win-x64\/8\.0\.33/);
+    assert.match(buildWorkflow, /runtimepack\.Microsoft\.NETCore\.App\.Runtime\.win-x64\/8\.0\.34/);
     assert.match(buildWorkflow, /Microsoft\.WindowsDesktop\.App\.Runtime\.win-x64/);
-    assert.match(buildWorkflow, /8\.0\.32/);
-    assert.match(buildWorkflow, /-lt \[version\]'8\.0\.32'/);
+    assert.match(buildWorkflow, /8\.0\.34/);
+    assert.match(buildWorkflow, /-lt \[version\]'8\.0\.34'/);
   }
 });
 
