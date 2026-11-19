@@ -230,7 +230,7 @@ jobs:
           Write-Host "Restored Windows Desktop runtime packages: $($RestoredDesktopRuntimePackages -join ', ')"
           foreach ($Package in @($RestoredDesktopRuntimePackages)) {
             $PackageVersion = ($Package -split '/', 2)[1]
-            if ([version]$PackageVersion -lt [version]'8.0.32') {
+            if ([version]$PackageVersion -lt [version]'8.0.34') {
               throw "Restored vulnerable Windows Desktop runtime: $Package"
             }
           }
@@ -239,7 +239,7 @@ jobs:
           $Deps = Get-Content $DepsPath -Raw | ConvertFrom-Json
           $CoreRuntimePackage = $Deps.libraries.PSObject.Properties.Name |
             Where-Object { $_ -like 'runtimepack.Microsoft.NETCore.App.Runtime.win-x64/*' }
-          if ($CoreRuntimePackage -ne 'runtimepack.Microsoft.NETCore.App.Runtime.win-x64/8.0.33') {
+          if ($CoreRuntimePackage -ne 'runtimepack.Microsoft.NETCore.App.Runtime.win-x64/8.0.34') {
             throw "Published authority host bundled unexpected .NET Core runtime: $CoreRuntimePackage"
           }
           $PublishedDesktopRuntimePackages = $Deps.libraries.PSObject.Properties.Name |
@@ -247,7 +247,7 @@ jobs:
           Write-Host "Published Windows Desktop runtime packages: $($PublishedDesktopRuntimePackages -join ', ')"
           foreach ($Package in @($PublishedDesktopRuntimePackages)) {
             $PackageVersion = ($Package -split '/', 2)[1]
-            if ([version]$PackageVersion -lt [version]'8.0.32') {
+            if ([version]$PackageVersion -lt [version]'8.0.34') {
               throw "Published vulnerable Windows Desktop runtime: $Package"
             }
           }

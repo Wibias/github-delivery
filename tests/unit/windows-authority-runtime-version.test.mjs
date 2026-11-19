@@ -11,7 +11,7 @@ const globalJson = JSON.parse(
 );
 
 test("self-contained Windows authority host uses the serviced SDK without a global runtime override", () => {
-  assert.equal(globalJson.sdk.version, "10.0.403");
+  assert.equal(globalJson.sdk.version, "10.0.404");
   assert.equal(globalJson.sdk.rollForward, "disable");
   assert.doesNotMatch(project, /<RuntimeFrameworkVersion>/);
 });
