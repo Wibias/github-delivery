@@ -86,6 +86,14 @@ Use one `close_pr` request bound to the obsolete PR's current head:
 }
 ```
 
+Start the supersede controller with the exact obsolete PR and its full head
+SHA. After preflight and preparation, transition to `PUBLISH_CHANGE` and
+pass that checkpoint to `github-mutate.mjs --checkpoint FILE` for both plan
+and execution. Use the same request for retries. The controller binds the
+close intent to the repository, obsolete PR, full head SHA, phase, and
+operation key. Do not manufacture authorization with caller flags; the
+configured trusted-authority requirement still applies.
+
 Plan it first, then execute it through the broker and keep the receipt.
 Immediately re-read PR #12. The required postcondition is `state=CLOSED` and
 `merged=false`.

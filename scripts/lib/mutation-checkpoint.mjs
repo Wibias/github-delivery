@@ -23,6 +23,9 @@ const EMPTY_EXECUTION_CONTEXT = Object.freeze({
 });
 
 const ROUTED_WORKFLOW_INTENT = Object.freeze({
+  "supersede-pr": Object.freeze({
+    PUBLISH_CHANGE: Object.freeze(new Set(["close_pr"])),
+  }),
   "create-pr-for-issue": Object.freeze({
     OPEN_PR: Object.freeze(new Set(["create_pr"])),
     FINAL_GATE: Object.freeze(new Set(["update_pr_body"])),
@@ -56,7 +59,11 @@ function routedWorkflowIntentSlot(snapshot, request) {
 
 function assertRoutedWorkflowIntentBinding(snapshot, request) {
   const slot = routedWorkflowIntentSlot(snapshot, request);
-  if (slot !== "create-pr-for-issue:FINAL_GATE:update_pr_body") return;
+  const supersedeClose = slot === "supersede-pr:PUBLISH_CHANGE:close_pr";
+  if (!supersedeClose && slot !== "create-pr-for-issue:FINAL_GATE:update_pr_body") return;
+  if (supersedeClose && request?.mutationMode !== "maintainer") {
+    throw new Error("mutation_workflow_intent_mode_mismatch");
+  }
 
   const checkpointPr = Number(snapshot?.pr);
   const requestPr = Number(request?.pr);
@@ -66,7 +73,8 @@ function assertRoutedWorkflowIntentBinding(snapshot, request) {
 
   const checkpointHead = String(snapshot?.headSha || "").trim().toLowerCase();
   const requestHead = String(request?.expectedHead || "").trim().toLowerCase();
-  if (!checkpointHead || requestHead !== checkpointHead) {
+  if (!checkpointHead || requestHead !== checkpointHead
+    || (supersedeClose && !/^[0-9a-f]{40}$/.test(checkpointHead))) {
     throw new Error("mutation_workflow_intent_head_mismatch");
   }
 }
@@ -269,6 +277,10 @@ export function mutationExecutionContextFromCheckpoint({ path, request } = {}) {
     String(snapshot.repo || "").toLowerCase() !== requestRepo.toLowerCase()
   ) {
     throw new Error("mutation_checkpoint_repo_mismatch");
+  }
+  if (snapshot.workflow === "supersede-pr" && request?.action === "close_pr"
+    && snapshot.phase !== "PUBLISH_CHANGE") {
+    return { ...EMPTY_EXECUTION_CONTEXT };
   }
   assertPublicationCheckpoint(snapshot, request);
   assertRoutedWorkflowIntentBinding(snapshot, request);
